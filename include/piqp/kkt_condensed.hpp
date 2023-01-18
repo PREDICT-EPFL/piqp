@@ -92,7 +92,7 @@ struct KKTCondensed
             }
         }
 
-        // add GT * (W + delta) * G
+        // add GT * (W + delta)^{-1} * G
         for (isize k = 0; k < data.GT.outerSize(); k++)
         {
             for (typename SparseMat<T, I>::InnerIterator GT_j_it(data.GT, k); GT_j_it; ++GT_j_it)
