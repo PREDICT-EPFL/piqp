@@ -18,18 +18,15 @@ namespace piqp
 template<typename T, typename I>
 struct LDLt
 {
-    Vec<I> etree;    // elimination tree
+    Vec<I> etree;  // elimination tree
     // L in CSC
-    Vec<I> L_cols;   // column starts [n+1]
-    Vec<I> L_nnz;    // number of non-zeros per column [n]
-    Vec<I> L_ind;    // row indices
-    Vec<T> L_vals;   // values
+    Vec<I> L_cols; // column starts[n+1]
+    Vec<I> L_nnz;  // number of non-zeros per column[n]
+    Vec<I> L_ind;  // row indices
+    Vec<T> L_vals; // values
 
-    Vec<T> D;        // diagonal matrix D
-    Vec<T> D_inv;    // inverse of D
-
-    Vec<I> perm;     // permutation matrix
-    Vec<I> perm_inv; // inverse permutation matrix
+    Vec<T> D;      // diagonal matrix D
+    Vec<T> D_inv;  // inverse of D
 
     // working variables used in numerical factorization
     struct {
@@ -37,6 +34,161 @@ struct LDLt
         Vec<I> pattern;
         Vec<T> y;
     } work;
+
+    void factorize_symbolic_upper_triangular(const SparseMat<T, I>& A)
+    {
+        // reimplementation of LDL_symbolic in
+        // https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/stable/LDL/Source/ldl.c
+        // see LDL_License.txt for license
+        // we assume A has only the upper triangular part stored which simplifies the code from the original
+
+        static_assert(!SparseMat<T, I>::IsRowMajor, "A has to be column major!");
+        eigen_assert(A.rows() == A.cols() && "A has to be quadratic!");
+
+        const isize n = A.rows();
+        const Eigen::Map<const Vec<I>> Ap(A.outerIndexPtr(), A.outerSize() + 1);
+        const Eigen::Map<const Vec<I>> Ai(A.innerIndexPtr(), A.nonZeros());
+
+        etree.resize(n);
+        L_cols.resize(n + 1);
+        L_nnz.resize(n);
+
+        D.resize(n);
+        D_inv.resize(n);
+
+        work.flag.resize(n);
+        work.pattern.resize(n);
+        work.y.resize(n);
+
+        for (isize k = 0; k < n; k++)
+        {
+            /* L(k,:) pattern: all nodes reachable in etree from nz in A(0:k-1,k) */
+            etree[k] = -1;                   /* parent of k is not yet known */
+            work.flag[k] = k;                 /* mark node k as visited */
+            L_nnz[k] = 0;                    /* count of nonzeros in column k of L */
+            isize p2 = Ap[k + 1];
+            for (isize p = Ap[k]; p < p2; p++)
+            {
+                /* A (i,k) is nonzero (original or permuted A) */
+                isize i = Ai[p];
+                /* follow path from i to root of etree, stop at flagged node */
+                for (; work.flag[i] != k; i = etree[i])
+                {
+                    /* find parent of i if not yet determined */
+                    if (etree[i] == -1) etree[i] = k;
+                    L_nnz[i]++;      /* L (k,i) is nonzero */
+                    work.flag[i] = k; /* mark i as visited */
+                }
+            }
+        }
+        /* construct Lp index array from Lnz column counts */
+        L_cols[0] = 0;
+        for (isize k = 0; k < n; k++)
+        {
+            L_cols[k + 1] = L_cols[k] + L_nnz[k];
+        }
+
+        L_ind.resize(L_cols[n]);
+        L_vals.resize(L_cols[n]);
+    }
+
+    isize factorize_numeric_upper_triangular(const SparseMat<T, I>& A)
+    {
+        // reimplementation of LDL_numeric in
+        // https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/stable/LDL/Source/ldl.c
+        // see LDL_License.txt for license
+        // we assume A has only the upper triangular part stored which simplifies the code from the original
+
+        const isize n = A.rows();
+        const Eigen::Map<const Vec<I>> Ap(A.outerIndexPtr(), A.outerSize() + 1);
+        const Eigen::Map<const Vec<I>> Ai(A.innerIndexPtr(), A.nonZeros());
+        const Eigen::Map<const Vec<T>> Ax(A.valuePtr(), A.nonZeros());
+
+        static_assert(!SparseMat<T, I>::IsRowMajor, "A has to be column major!");
+        eigen_assert(n == L_cols.rows() - 1 && "symbolic factorization does not match!");
+
+        for (isize k = 0 ; k < n; k++)
+        {
+            /* compute nonzero Pattern of kth row of L, in topological order */
+            work.y[k] = 0.0;                   /* Y(0:k) is now all zero */
+            isize top = n;                     /* stack for pattern is empty */
+            work.flag[k] = k;                   /* mark node k as visited */
+            L_nnz[k] = 0;                      /* count of nonzeros in column k of L */
+            isize p2 = Ap[k + 1];
+            for (isize p = Ap[k]; p < p2; p++)
+            {
+                isize i = Ai[p]; /* get A(i,k) */
+                work.y[i] += Ax[p];  /* scatter A(i,k) into Y (sum duplicates) */
+                isize len;
+                for (len = 0; work.flag[i] != k; i = etree[i])
+                {
+                    work.pattern[len++] = i; /* L(k,i) is nonzero */
+                    work.flag[i] = k ;        /* mark i as visited */
+                }
+                while (len > 0) work.pattern[--top] = work.pattern[--len];
+            }
+            /* compute numerical values kth row of L (a sparse triangular solve) */
+            D[k] = work.y[k]; /* get D(k,k) and clear Y(k) */
+            work.y[k] = 0.0;
+            for (; top < n ; top++)
+            {
+                isize i = work.pattern[top]; /* Pattern[top:n-1] is pattern of L(k,:) */
+                T yi = work.y[i];            /* get and clear Y(i) */
+                work.y[i] = 0.0;
+                p2 = L_cols[i] + L_nnz[i];
+                isize p;
+                for (p = L_cols[i]; p < p2; p++)
+                {
+                    work.y[L_ind[p]] -= L_vals[p] * yi;
+                }
+                T l_ki = yi / D[i]; /* the nonzero entry L(k,i) */
+                D[k] -= l_ki * yi;
+                L_ind[p] = k;       /* store L(k,i) in column form of L */
+                L_vals[p] = l_ki;
+                L_nnz[i]++;         /* increment count of nonzeros in col i */
+            }
+            if (D[k] == 0.0) return k;     /* failure, D(k,k) is zero */
+        }
+
+        D_inv.array() = D.array().inverse();
+
+        return n; /* success, diagonal of D is all nonzero */
+    }
+
+    void lsolve(VecRef<T> x)
+    {
+        isize n = x.rows();
+        eigen_assert(n == L_cols.rows() - 1 && "vector dimension missmatch!");
+        for (isize j = 0; j < n; j++)
+        {
+            isize p2 = L_cols[j + 1];
+            for (isize p = L_cols[j]; p < p2; p++)
+            {
+                x[L_ind[p]] -= L_vals[p] * x[j];
+            }
+        }
+    }
+
+    void dsolve(VecRef<T> x)
+    {
+        isize n = x.rows();
+        eigen_assert(n == D_inv.rows() && "vector dimension missmatch!");
+        x.array() *= D_inv.array();
+    }
+
+    void ltsolve(VecRef<T> x)
+    {
+        isize n = x.rows();
+        eigen_assert(n == L_cols.rows() - 1 && "vector dimension missmatch!");
+        for (isize j = n - 1; j >= 0; j--)
+        {
+            isize p2 = L_cols[j + 1];
+            for (isize p = L_cols[j]; p < p2; p++)
+            {
+                x[j] -= L_vals[p] * x[L_ind[p]];
+            }
+        }
+    }
 };
 
 } // namespace piqp

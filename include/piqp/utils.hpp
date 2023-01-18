@@ -56,7 +56,7 @@ SparseMat<T, I> sparse_matrix_rand(isize n, isize m, T p)
 }
 
 template<typename T, typename I>
-SparseMat<T, I> sparse_positive_definite_rand(isize n, T rho, T p)
+SparseMat<T, I> sparse_positive_definite_upper_triangular_rand(isize n, T p, T rho = T(1e-2))
 {
     SparseMat<T, I> P(n, n);
     P.setZero();
@@ -85,7 +85,7 @@ template<typename T, typename I>
 Model<T, I> sparse_strongly_convex_qp(isize dim, isize n_eq, isize n_ineq,
                                       T sparsity_factor, T strong_convexity_factor = T(1e-2))
 {
-    SparseMat<T, I> P = sparse_positive_definite_rand<T, I>(dim, strong_convexity_factor, sparsity_factor);
+    SparseMat<T, I> P = sparse_positive_definite_upper_triangular_rand<T, I>(dim, sparsity_factor, strong_convexity_factor);
     SparseMat<T, I> A = sparse_matrix_rand<T, I>(n_eq, dim, sparsity_factor);
     SparseMat<T, I> G = sparse_matrix_rand<T, I>(n_ineq, dim, sparsity_factor);
 
