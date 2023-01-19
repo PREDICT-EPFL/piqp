@@ -98,6 +98,7 @@ struct LDLt
         // https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/stable/LDL/Source/ldl.c
         // see LDL_License.txt for license
         // we assume A has only the upper triangular part stored which simplifies the code from the original
+        // additionally we assume that there are no duplicate entries present
 
         const isize n = A.rows();
         const Eigen::Map<const Vec<I>> Ap(A.outerIndexPtr(), A.outerSize() + 1);
@@ -118,7 +119,7 @@ struct LDLt
             for (isize p = Ap[k]; p < p2; p++)
             {
                 isize i = Ai[p]; /* get A(i,k) */
-                work.y[i] += Ax[p];  /* scatter A(i,k) into Y (sum duplicates) */
+                work.y[i] = Ax[p];  /* scatter A(i,k) into Y */
                 isize len;
                 for (len = 0; work.flag[i] != k; i = etree[i])
                 {
