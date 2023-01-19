@@ -22,6 +22,12 @@ struct KKTCondensed
 {
     Data<T, I>& data;
 
+    T m_rho;
+    T m_delta;
+
+    Vec<T> m_s;
+    Vec<T> m_z_inv;
+
     Vec<I> P_utri_to_Ki; // mapping from P_utri row indices to KKT matrix
     Vec<I> AT_A_to_Ki;   // mapping from AT_A row indices to KKT matrix
     Vec<I> GT_G_to_Ki;   // mapping from GT_G row indices to KKT matrix
@@ -35,23 +41,36 @@ struct KKTCondensed
 
     LDLt<T, I> ldlt;
 
-    Vec<T> rhs;
+    Vec<T> rhs_z_bar; // temporary variable needed for back solve
+    Vec<T> rhs_perm;  // permuted rhs for back solve
+    Vec<T> rhs;       // stores the rhs and the solution for back solve
 
-    explicit KKTCondensed(Data<T, I>& data) : data(data), rhs(data.P_utri.cols()) {}
+    explicit KKTCondensed(Data<T, I>& data) :
+        data(data),
+        m_s(data.GT.cols()),
+        m_z_inv(data.GT.cols()),
+        rhs_z_bar(data.GT.cols()),
+        rhs_perm(data.P_utri.cols()),
+        rhs(data.P_utri.cols()) {}
 
     void init_kkt(const T& rho, const T& delta)
     {
+        m_rho = rho;
+        m_delta = delta;
+        m_s.setConstant(1);
+        m_z_inv.setConstant(1);
+
         SparseMat<T, I> eye_rho(data.P_utri.cols(), data.P_utri.cols());
         eye_rho.setIdentity();
         // set diagonal to rho
-        Eigen::Map<Vec<T>>(eye_rho.valuePtr(), eye_rho.nonZeros()).setConstant(rho);
+        Eigen::Map<Vec<T>>(eye_rho.valuePtr(), eye_rho.nonZeros()).setConstant(m_rho);
 
         AT_A = (data.AT * data.AT.transpose()).template triangularView<Eigen::Upper>();
         GT_G = (data.GT * data.GT.transpose()).template triangularView<Eigen::Upper>();
 
-        T delta_inv = T(1) / delta;
+        T delta_inv = T(1) / m_delta;
         Eigen::Map<Vec<T>>(AT_A.valuePtr(), AT_A.nonZeros()).array() *= delta_inv;
-        T W_delta_inv = T(1) / (1 + delta);
+        T W_delta_inv = T(1) / (1 + m_delta);
         Eigen::Map<Vec<T>>(GT_G.valuePtr(), GT_G.nonZeros()).array() *= W_delta_inv;
 
         SparseMat<T, I> KKT = data.P_utri + eye_rho + AT_A + GT_G;
@@ -101,6 +120,11 @@ struct KKTCondensed
 
     void update_kkt(const T& rho, const T& delta, const CVecRef<T>& s, const CVecRef<T>& z)
     {
+        m_rho = rho;
+        m_delta = delta;
+        m_s = s;
+        m_z_inv.array() = T(1) / z.array();
+
         // set PKPt to zero keeping pattern
         Eigen::Map<Vec<T>>(PKPt.valuePtr(), PKPt.nonZeros()).setZero();
 
@@ -117,7 +141,7 @@ struct KKTCondensed
         // hence we can directly address the diagonal from the outer index pointer
         for (isize col = 0; col < PKPt.outerSize(); col++)
         {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering[col] + 1] - 1] += rho;
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering[col] + 1] - 1] += m_rho;
         }
 
         static_assert(!decltype(PKPt)::IsRowMajor, "KKT has to be column major!");
@@ -126,7 +150,7 @@ struct KKTCondensed
 
         // update delta_inv * AT * A
         Eigen::Map<Vec<T>>(AT_A.valuePtr(), AT_A.nonZeros()).setZero();
-        T delta_inv = T(1) / delta;
+        T delta_inv = T(1) / m_delta;
         for (isize k = 0; k < data.AT.outerSize(); k++)
         {
             for (typename SparseMat<T, I>::InnerIterator AT_j_it(data.AT, k); AT_j_it; ++AT_j_it)
@@ -176,7 +200,7 @@ struct KKTCondensed
                     {
                         eigen_assert(GT_G_i_it.index() == GT_i_it.index() && "GT_G is missing entry!");
 
-                        T W_delta_inv = T(1) / (s(k) / z(k) + delta);
+                        T W_delta_inv = T(1) / (m_s(k) * m_z_inv(k) + m_delta);
                         GT_G_i_it.valueRef() += W_delta_inv * GT_i_it.value() * GT_j_it.value();
                         ++GT_G_i_it;
                         ++GT_i_it;
@@ -189,6 +213,56 @@ struct KKTCondensed
         {
             PKPt.valuePtr()[PKi(GT_G_to_Ki(k))] += GT_G.valuePtr()[k];
         }
+    }
+
+    void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,
+                  const CVecRef<T>& delta_z, const CVecRef<T>& delta_s,
+                  VecRef<T> rhs_x, VecRef<T> rhs_y, VecRef<T> rhs_z, VecRef<T> rhs_s)
+    {
+        rhs_x.noalias() = data.P_utri.template triangularView<Eigen::StrictlyUpper>() * delta_x;
+        rhs_x.noalias() += data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * delta_x;
+        rhs_x.array() += data.P_utri.diagonal().array() * delta_x.array();
+        rhs_x.noalias() += m_rho * delta_x;
+        rhs_x.noalias() += data.AT * delta_y + data.GT * delta_z;
+
+        rhs_y.noalias() = data.AT.transpose() * delta_x;
+        rhs_y.noalias() -= m_delta * delta_y;
+
+        rhs_z.noalias() = data.GT.transpose() * delta_x;
+        rhs_z.noalias() += delta_s;
+        rhs_z.noalias() -= m_delta * delta_z;
+
+        rhs_s.array() = m_s.array() * delta_z.array() + m_z_inv.array().cwiseInverse() * delta_s.array();
+    }
+
+    bool factorize_kkt()
+    {
+        isize n = ldlt.factorize_numeric_upper_triangular(PKPt);
+        return n == PKPt.rows();
+    }
+
+    void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y, const CVecRef<T>& rhs_z, const CVecRef<T>& rhs_s,
+               VecRef<T> delta_x, VecRef<T> delta_y, VecRef<T> delta_z, VecRef<T> delta_s)
+    {
+        T delta_inv = T(1) / m_delta;
+
+        rhs_z_bar.array() = rhs_z.array() - m_z_inv.array() * rhs_s.array();
+        rhs_z_bar.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
+        rhs.noalias() = rhs_x + data.GT * rhs_z_bar;
+        rhs.noalias() += delta_inv * data.AT * rhs_y;
+
+        ordering.template perm<T>(rhs_perm, rhs);
+        ldlt.lsolve(rhs_perm);
+        ldlt.dsolve(rhs_perm);
+        ldlt.ltsolve(rhs_perm);
+        ordering.template permt<T>(delta_x, rhs_perm);
+
+        delta_y.noalias() = delta_inv * data.AT.transpose() * delta_x;
+        delta_y.noalias() -= delta_inv * rhs_y;
+        delta_z.noalias() = data.GT.transpose() * delta_x;
+        delta_z.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
+        delta_z.noalias() -= rhs_z_bar;
+        delta_s.array() = m_z_inv.array() * (rhs_s.array() - m_s.array() * delta_z.array());
     }
 };
 

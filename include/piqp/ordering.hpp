@@ -90,7 +90,7 @@ public:
     }
 
     template<typename T>
-    void perm(VecRef<T> x, const CVecRef<T> b)
+    void perm(VecRef<T> x, const CVecRef<T>& b)
     {
         isize n = x.rows();
         eigen_assert(n == b.rows() && n == P.rows() && "vector dimension missmatch!");
@@ -101,7 +101,7 @@ public:
     }
 
     template<typename T>
-    void permt(VecRef<T> x, const CVecRef<T> b)
+    void permt(VecRef<T> x, const CVecRef<T>& b)
     {
         isize n = x.rows();
         eigen_assert(n == b.rows() && n == P.rows() && "vector dimension missmatch!");
