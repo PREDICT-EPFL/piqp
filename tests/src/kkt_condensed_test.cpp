@@ -42,9 +42,9 @@ TEST(KKTCondensed, Init)
     KKTCondensed<T, I> kkt(data);
     kkt.init_kkt(rho, delta);
 
-    // assert KKT matrix is upper triangular
-    SparseMat<T, I> KKT_upper = kkt.KKT.triangularView<Eigen::Upper>();
-    assert_sparse_matrices_equal(kkt.KKT, KKT_upper);
+    // assert PKPt matrix is upper triangular
+    SparseMat<T, I> PKPt_upper = kkt.PKPt.triangularView<Eigen::Upper>();
+    assert_sparse_matrices_equal(kkt.PKPt, PKPt_upper);
 }
 
 TEST(KKTCondensed, Update)
@@ -79,13 +79,13 @@ TEST(KKTCondensed, Update)
     kkt.update_kkt(rho, delta, s, z);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    // assert KKT matrix is upper triangular
-    SparseMat<T, I> KKT_upper = kkt.KKT.triangularView<Eigen::Upper>();
-    assert_sparse_matrices_equal(kkt.KKT, KKT_upper);
+    // assert PKPt matrix is upper triangular
+    SparseMat<T, I> PKPt_upper = kkt.PKPt.triangularView<Eigen::Upper>();
+    assert_sparse_matrices_equal(kkt.PKPt, PKPt_upper);
 
     KKTCondensed<T, I> kkt2(data);
     kkt2.init_kkt(rho, delta);
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
-    EXPECT_TRUE(kkt.KKT.isApprox(kkt2.KKT, 1e-8));
+    EXPECT_TRUE(kkt.PKPt.isApprox(kkt2.PKPt, 1e-8));
 }
