@@ -12,6 +12,7 @@
 #include "piqp/utils/random.hpp"
 
 #include "gtest/gtest.h"
+#include "utils.hpp"
 
 using namespace piqp;
 
@@ -42,7 +43,8 @@ TEST(KKTCondensed, Init)
     kkt.init_kkt(rho, delta);
 
     // assert KKT matrix is upper triangular
-    EXPECT_TRUE(kkt.KKT.isApprox(kkt.KKT.triangularView<Eigen::Upper>(), 1e-8));
+    SparseMat<T, I> KKT_upper = kkt.KKT.triangularView<Eigen::Upper>();
+    assert_sparse_matrices_equal(kkt.KKT, KKT_upper);
 }
 
 TEST(KKTCondensed, Update)
@@ -78,7 +80,8 @@ TEST(KKTCondensed, Update)
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert KKT matrix is upper triangular
-    EXPECT_TRUE(kkt.KKT.isApprox(kkt.KKT.triangularView<Eigen::Upper>(), 1e-8));
+    SparseMat<T, I> KKT_upper = kkt.KKT.triangularView<Eigen::Upper>();
+    assert_sparse_matrices_equal(kkt.KKT, KKT_upper);
 
     KKTCondensed<T, I> kkt2(data);
     kkt2.init_kkt(rho, delta);

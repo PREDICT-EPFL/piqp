@@ -20,6 +20,8 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
+include_directories(include)
+
 add_executable(kkt_condensed_test src/kkt_condensed_test.cpp)
 target_link_libraries(kkt_condensed_test PRIVATE Eigen3.3 gtest_main gtest)
 
