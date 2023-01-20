@@ -9,7 +9,7 @@
 #define PIQP_EIGEN_CHECK_MALLOC
 
 #include "piqp/piqp.hpp"
-#include "piqp/utils/random.hpp"
+#include "piqp/utils/random_utils.hpp"
 
 #include "gtest/gtest.h"
 

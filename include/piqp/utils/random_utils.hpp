@@ -6,8 +6,8 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_UTILS_RANDOM_HPP
-#define PIQP_UTILS_RANDOM_HPP
+#ifndef PIQP_UTILS_RANDOM_UTILS_HPP
+#define PIQP_UTILS_RANDOM_UTILS_HPP
 
 #include <random>
 
@@ -111,4 +111,4 @@ Model<T, I> sparse_strongly_convex_qp(isize dim, isize n_eq, isize n_ineq,
 
 } // namespace piqp
 
-#endif //PIQP_UTILS_RANDOM_HPP
+#endif //PIQP_UTILS_RANDOM_UTILS_HPP

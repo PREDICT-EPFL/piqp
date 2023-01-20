@@ -6,8 +6,8 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_UTILS_SPARSE_HPP
-#define PIQP_UTILS_SPARSE_HPP
+#ifndef PIQP_UTILS_SPARSE_UTILS_HPP
+#define PIQP_UTILS_SPARSE_UTILS_HPP
 
 namespace piqp
 {
@@ -119,4 +119,4 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
 
 } // namespace piqp
 
-#endif //PIQP_UTILS_SPARSE_HPP
+#endif //PIQP_UTILS_SPARSE_UTILS_HPP
