@@ -20,7 +20,7 @@ using namespace piqp;
 using T = double;
 using I = int;
 
-TEST(Ordering, Natural)
+TEST(SparseUtils, OrderingNatural)
 {
     isize dim = 10;
     T sparsity_factor = 0.5;
@@ -43,7 +43,7 @@ TEST(Ordering, Natural)
     ASSERT_EQ(Ai_to_Ci, Ai_to_Ci_expect);
 }
 
-TEST(Ordering, AMD)
+TEST(SparseUtils, OrderingAMD)
 {
     // 1 0 2 3
     // 0 4 0 5
@@ -71,4 +71,21 @@ TEST(Ordering, AMD)
     Vec<I> Ai_to_Ci_expect(7);
     Ai_to_Ci_expect << 3, 0, 2, 1, 5, 4, 6;
     ASSERT_EQ(Ai_to_Ci, Ai_to_Ci_expect);
+}
+
+TEST(SparseUtils, TransposeNoAlloc)
+{
+    SparseMat<T, I> A = rand::sparse_matrix_rand<T, I>(10, 9, 0.5);
+    SparseMat<T, I> AT = A.transpose();
+
+    SparseMat<T, I> C = AT;
+
+    // set values of C to something random
+    Eigen::Map<Vec<T>>(C.valuePtr(), C.nonZeros()) = rand::vector_rand<T>(C.nonZeros());
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    transpose_no_allocation(A, C);
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    assert_sparse_matrices_equal(C, AT);
 }

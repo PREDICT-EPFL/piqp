@@ -12,7 +12,7 @@
 #include "piqp/data.hpp"
 #include "piqp/ldlt.hpp"
 #include "piqp/ordering.hpp"
-#include "piqp/utils/sparse.hpp"
+#include "piqp/utils/sparse_utils.hpp"
 
 namespace piqp
 {

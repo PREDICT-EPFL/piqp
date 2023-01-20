@@ -117,6 +117,39 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
     return Ai_to_Ci;
 }
 
+/*
+ * Transposes a matrix A to matrix C = A.transpose() without any allocations by fully reusing the memory in C.
+ * Note that C has to already have the same pattern as A.transpose().
+ *
+ * @param A  input matrix
+ * @param C  transpose of matrix A, C has to already be allocated, only values are copied
+ */
+template<typename T, typename I>
+void transpose_no_allocation(const SparseMat<T, I>& A, SparseMat<T, I>& C)
+{
+    eigen_assert(A.outerSize() == C.innerSize() && A.innerSize() == C.outerSize() && "sparsity pattern of C does not match AT!");
+    for (isize j = 0; j < A.outerSize(); ++j)
+    {
+        for (isize k = A.outerIndexPtr()[j]; k < A.outerIndexPtr()[j + 1]; k++)
+        {
+            isize i = A.innerIndexPtr()[k];
+            // we are abusing the outer index pointer as a temporary
+            isize q = C.outerIndexPtr()[i]++;
+            eigen_assert(C.outerIndexPtr()[i] <= C.outerIndexPtr()[i + 1] && "sparsity pattern of C does not match AT!");
+            C.innerIndexPtr()[q] = j;
+            C.valuePtr()[q] = A.valuePtr()[k];
+        }
+    }
+    // revert outer index pointer which has been abused as a temporary
+    isize m = A.innerSize();
+    eigen_assert(C.outerIndexPtr()[m - 1] == C.outerIndexPtr()[m] && "sparsity pattern of C does not match AT!");
+    for (isize j = m - 1; j > 0; j--)
+    {
+        C.outerIndexPtr()[j] = C.outerIndexPtr()[j - 1];
+    }
+    C.outerIndexPtr()[0] = 0;
+}
+
 } // namespace piqp
 
 #endif //PIQP_UTILS_SPARSE_UTILS_HPP
