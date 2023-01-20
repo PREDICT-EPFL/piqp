@@ -190,6 +190,13 @@ struct LDLt
             }
         }
     }
+
+    void solve_inplace(VecRef<T> x)
+    {
+        lsolve(x);
+        dsolve(x);
+        ltsolve(x);
+    }
 };
 
 } // namespace piqp

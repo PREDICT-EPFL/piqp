@@ -66,9 +66,7 @@ TEST(LDLT, Solve)
     Vec<T> x = b;
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    ldlt.lsolve(x);
-    ldlt.dsolve(x);
-    ldlt.ltsolve(x);
+    ldlt.solve_inplace(x);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     SparseMat<T, I> PT = P.transpose();
