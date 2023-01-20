@@ -30,10 +30,10 @@ struct Model
     Vec<T> h;
 
     Model(const SparseMat<T, I>& P,
-          const CVecRef<T>& c,
           const SparseMat<T, I>& A,
-          const CVecRef<T>& b,
           const SparseMat<T, I>& G,
+          const CVecRef<T>& c,
+          const CVecRef<T>& b,
           const CVecRef<T>& h) noexcept
       : P(P), A(A), G(G), c(c), b(b), h(h) {}
 };

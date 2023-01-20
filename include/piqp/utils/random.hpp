@@ -104,7 +104,7 @@ Model<T, I> sparse_strongly_convex_qp(isize dim, isize n_eq, isize n_ineq,
     Vec<T> b = A * x_sol;
     Vec<T> h = G * x_sol + delta;
 
-    return Model<T, I>(P, c, A, b, G, h);
+    return Model<T, I>(P, A, G, c, b, h);
 }
 
 } // namespace rand
