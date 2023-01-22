@@ -67,7 +67,8 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
     for (isize j = 0; j < n; j++)
     {
         isize j2 = ordering.inv(j);
-        for (isize k = A.outerIndexPtr()[j]; k < A.outerIndexPtr()[j + 1]; k++)
+        isize kk = A.outerIndexPtr()[j + 1];
+        for (isize k = A.outerIndexPtr()[j]; k < kk; k++)
         {
             isize i = A.innerIndexPtr()[k];
             if (i > j) continue; // we only consider upper triangular part
@@ -81,7 +82,8 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
 
     // 2nd pass: by transposing we get the upper triangular part and sort all row indices automatically
     C.resize(n, n);
-    for (isize j = 0; j < CT.outerSize(); j++)
+    isize jj = CT.outerSize();
+    for (isize j = 0; j < jj; j++)
     {
         for (typename SparseMat<T, I>::InnerIterator it(CT, j); it; ++it)
         {
@@ -90,7 +92,8 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
     }
 
     sum = 0;
-    for (isize j = 0; j < C.outerSize(); j++)
+    jj = C.outerSize();
+    for (isize j = 0; j < jj; j++)
     {
         isize tmp = C.outerIndexPtr()[j];
         C.outerIndexPtr()[j] = sum;
@@ -102,9 +105,11 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
 
     Vec<I> Ai_to_Ci(sum);
 
-    for (isize j = 0; j < CT.outerSize(); ++j)
+    jj = CT.outerSize();
+    for (isize j = 0; j < jj; ++j)
     {
-        for (isize k = CT.outerIndexPtr()[j]; k < CT.outerIndexPtr()[j + 1]; k++)
+        isize kk = CT.outerIndexPtr()[j + 1];
+        for (isize k = CT.outerIndexPtr()[j]; k < kk; k++)
         {
             isize i = CT.innerIndexPtr()[k];
             isize q = w(i)++;
@@ -128,9 +133,11 @@ template<typename T, typename I>
 void transpose_no_allocation(const SparseMat<T, I>& A, SparseMat<T, I>& C)
 {
     eigen_assert(A.outerSize() == C.innerSize() && A.innerSize() == C.outerSize() && "sparsity pattern of C does not match AT!");
-    for (isize j = 0; j < A.outerSize(); ++j)
+    isize jj = A.outerSize();
+    for (isize j = 0; j < jj; ++j)
     {
-        for (isize k = A.outerIndexPtr()[j]; k < A.outerIndexPtr()[j + 1]; k++)
+        isize kk = A.outerIndexPtr()[j + 1];
+        for (isize k = A.outerIndexPtr()[j]; k < kk; k++)
         {
             isize i = A.innerIndexPtr()[k];
             // we are abusing the outer index pointer as a temporary

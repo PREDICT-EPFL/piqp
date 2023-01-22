@@ -18,6 +18,10 @@ namespace piqp
 template<typename T, typename I>
 struct Data
 {
+    isize n; // number of variables
+    isize p; // number of equality constraints
+    isize m; // number of inequality constraints
+
     SparseMat<T, I> P_utri; // upper triangular part of H
     SparseMat<T, I> AT;     // A transpose
     SparseMat<T, I> GT;     // G transpose

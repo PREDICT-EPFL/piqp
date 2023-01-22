@@ -45,22 +45,23 @@ struct KKTCondensed
     Vec<T> rhs_perm;  // permuted rhs for back solve
     Vec<T> rhs;       // stores the rhs and the solution for back solve
 
-    explicit KKTCondensed(Data<T, I>& data) :
-        data(data),
-        m_s(data.GT.cols()),
-        m_z_inv(data.GT.cols()),
-        rhs_z_bar(data.GT.cols()),
-        rhs_perm(data.P_utri.cols()),
-        rhs(data.P_utri.cols()) {}
+    explicit KKTCondensed(Data<T, I>& data) : data(data) {}
 
     void init_kkt(const T& rho, const T& delta)
     {
+        // init workspace
+        m_s.resize(data.m);
+        m_z_inv.resize(data.m);
+        rhs_z_bar.resize(data.m);
+        rhs_perm.resize(data.n);
+        rhs.resize(data.n);
+
         m_rho = rho;
         m_delta = delta;
         m_s.setConstant(1);
         m_z_inv.setConstant(1);
 
-        SparseMat<T, I> eye_rho(data.P_utri.cols(), data.P_utri.cols());
+        SparseMat<T, I> eye_rho(data.n, data.n);
         eye_rho.setIdentity();
         // set diagonal to rho
         Eigen::Map<Vec<T>>(eye_rho.valuePtr(), eye_rho.nonZeros()).setConstant(m_rho);
@@ -139,7 +140,8 @@ struct KKTCondensed
 
         // we assume that PKPt is upper triangular and diagonal is set
         // hence we can directly address the diagonal from the outer index pointer
-        for (isize col = 0; col < PKPt.outerSize(); col++)
+        isize n = PKPt.outerSize();
+        for (isize col = 0; col < n; col++)
         {
             PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering[col] + 1] - 1] += m_rho;
         }
@@ -151,7 +153,8 @@ struct KKTCondensed
         // update delta_inv * AT * A
         Eigen::Map<Vec<T>>(AT_A.valuePtr(), AT_A.nonZeros()).setZero();
         T delta_inv = T(1) / m_delta;
-        for (isize k = 0; k < data.AT.outerSize(); k++)
+        n = data.AT.outerSize();
+        for (isize k = 0; k < n; k++)
         {
             for (typename SparseMat<T, I>::InnerIterator AT_j_it(data.AT, k); AT_j_it; ++AT_j_it)
             {
@@ -176,14 +179,16 @@ struct KKTCondensed
             }
         }
         // copy delta_inv * AT * A to PKPt
-        for (isize k = 0; k < AT_A.nonZeros(); k++)
+        n = AT_A.nonZeros();
+        for (isize k = 0; k < n; k++)
         {
             PKPt.valuePtr()[PKi(AT_A_to_Ki(k))] += AT_A.valuePtr()[k];
         }
 
         // update GT * (W + delta)^{-1} * G
         Eigen::Map<Vec<T>>(GT_G.valuePtr(), GT_G.nonZeros()).setZero();
-        for (isize k = 0; k < data.GT.outerSize(); k++)
+        n = data.GT.outerSize();
+        for (isize k = 0; k < n; k++)
         {
             for (typename SparseMat<T, I>::InnerIterator GT_j_it(data.GT, k); GT_j_it; ++GT_j_it)
             {
@@ -209,7 +214,8 @@ struct KKTCondensed
             }
         }
         // copy GT * (W + delta)^{-1} * G to PKPt
-        for (isize k = 0; k < GT_G.nonZeros(); k++)
+        n = GT_G.nonZeros();
+        for (isize k = 0; k < n; k++)
         {
             PKPt.valuePtr()[PKi(GT_G_to_Ki(k))] += GT_G.valuePtr()[k];
         }
@@ -238,7 +244,7 @@ struct KKTCondensed
     bool factorize_kkt()
     {
         isize n = ldlt.factorize_numeric_upper_triangular(PKPt);
-        return n == PKPt.rows();
+        return n == data.n;
     }
 
     void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y, const CVecRef<T>& rhs_z, const CVecRef<T>& rhs_s,

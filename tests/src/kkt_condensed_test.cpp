@@ -29,6 +29,9 @@ TEST(KKTCondensed, Init)
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
     Data<T, I> data;
+    data.n = dim;
+    data.p = n_eq;
+    data.m = n_ineq;
     data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
     data.AT = qp_model.A.transpose();
     data.GT = qp_model.G.transpose();
@@ -57,6 +60,9 @@ TEST(KKTCondensed, Update)
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
     Data<T, I> data;
+    data.n = dim;
+    data.p = n_eq;
+    data.m = n_ineq;
     data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
     data.AT = qp_model.A.transpose();
     data.GT = qp_model.G.transpose();
@@ -100,6 +106,9 @@ TEST(KKTCondensed, FactorizeSolve)
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
     Data<T, I> data;
+    data.n = dim;
+    data.p = n_eq;
+    data.m = n_ineq;
     data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
     data.AT = qp_model.A.transpose();
     data.GT = qp_model.G.transpose();
