@@ -28,10 +28,14 @@ target_link_libraries(kkt_condensed_test PRIVATE Eigen3.3 gtest_main gtest)
 add_executable(ldlt_test src/ldlt_test.cpp)
 target_link_libraries(ldlt_test PRIVATE Eigen3.3 gtest_main gtest)
 
+add_executable(solver_test src/solver_test.cpp)
+target_link_libraries(solver_test PRIVATE Eigen3.3 gtest_main gtest)
+
 add_executable(sparse_utils_test src/sparse_utils_test.cpp)
 target_link_libraries(sparse_utils_test PRIVATE Eigen3.3 gtest_main gtest)
 
 include(GoogleTest)
 gtest_discover_tests(kkt_condensed_test)
 gtest_discover_tests(ldlt_test)
+gtest_discover_tests(solver_test)
 gtest_discover_tests(sparse_utils_test)

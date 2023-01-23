@@ -10,6 +10,6 @@
 
 #include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
-#include "workspace.hpp"
+#include "piqp/solver.hpp"
 
 #endif //PIQP_PIQP_HPP
