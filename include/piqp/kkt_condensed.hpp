@@ -33,7 +33,7 @@ struct KKTCondensed
     Vec<I> GT_G_to_Ki;   // mapping from GT_G row indices to KKT matrix
 
     SparseMat<T, I> AT_A;
-    SparseMat<T, I> GT_G;
+    SparseMat<T, I> W_delta_inv_GT_G;
 
     Ordering ordering;
     SparseMat<T, I> PKPt; // permuted KKT matrix, upper triangular only
@@ -67,28 +67,27 @@ struct KKTCondensed
         Eigen::Map<Vec<T>>(eye_rho.valuePtr(), eye_rho.nonZeros()).setConstant(m_rho);
 
         AT_A = (data.AT * data.AT.transpose()).template triangularView<Eigen::Upper>();
-        GT_G = (data.GT * data.GT.transpose()).template triangularView<Eigen::Upper>();
+        W_delta_inv_GT_G = (data.GT * data.GT.transpose()).template triangularView<Eigen::Upper>();
+
+        T W_delta_inv = T(1) / (1 + m_delta);
+        Eigen::Map<Vec<T>>(W_delta_inv_GT_G.valuePtr(), W_delta_inv_GT_G.nonZeros()).array() *= W_delta_inv;
 
         T delta_inv = T(1) / m_delta;
-        Eigen::Map<Vec<T>>(AT_A.valuePtr(), AT_A.nonZeros()).array() *= delta_inv;
-        T W_delta_inv = T(1) / (1 + m_delta);
-        Eigen::Map<Vec<T>>(GT_G.valuePtr(), GT_G.nonZeros()).array() *= W_delta_inv;
-
-        SparseMat<T, I> KKT = data.P_utri + eye_rho + AT_A + GT_G;
+        SparseMat<T, I> KKT = data.P_utri + eye_rho + delta_inv * AT_A + W_delta_inv_GT_G;
 
         P_utri_to_Ki.resize(data.P_utri.nonZeros());
         AT_A_to_Ki.resize(AT_A.nonZeros());
-        GT_G_to_Ki.resize(GT_G.nonZeros());
+        GT_G_to_Ki.resize(W_delta_inv_GT_G.nonZeros());
 
         for (isize j = 0; j < KKT.outerSize(); j++)
         {
             isize P_utri_k = data.P_utri.outerIndexPtr()[j];
             isize AT_A_k = AT_A.outerIndexPtr()[j];
-            isize GT_G_k = GT_G.outerIndexPtr()[j];
+            isize GT_G_k = W_delta_inv_GT_G.outerIndexPtr()[j];
 
             isize P_utri_end = data.P_utri.outerIndexPtr()[j + 1];
             isize AT_A_end = AT_A.outerIndexPtr()[j + 1];
-            isize GT_G_end = GT_G.outerIndexPtr()[j + 1];
+            isize GT_G_end = W_delta_inv_GT_G.outerIndexPtr()[j + 1];
 
             for (isize KKT_k = KKT.outerIndexPtr()[j]; KKT_k < KKT.outerIndexPtr()[j + 1]; KKT_k++)
             {
@@ -96,7 +95,7 @@ struct KKTCondensed
 
                 while (data.P_utri.innerIndexPtr()[P_utri_k] < KKT_i && P_utri_k != P_utri_end) P_utri_k++;
                 while (AT_A.innerIndexPtr()[AT_A_k] < KKT_i && AT_A_k != AT_A_end) AT_A_k++;
-                while (GT_G.innerIndexPtr()[GT_G_k] < KKT_i && GT_G_k != GT_G_end) GT_G_k++;
+                while (W_delta_inv_GT_G.innerIndexPtr()[GT_G_k] < KKT_i && GT_G_k != GT_G_end) GT_G_k++;
 
                 if (data.P_utri.innerIndexPtr()[P_utri_k] == KKT_i && P_utri_k != P_utri_end)
                 {
@@ -106,7 +105,7 @@ struct KKTCondensed
                 {
                     AT_A_to_Ki(AT_A_k) = KKT_k;
                 }
-                if (GT_G.innerIndexPtr()[GT_G_k] == KKT_i && GT_G_k != GT_G_end)
+                if (W_delta_inv_GT_G.innerIndexPtr()[GT_G_k] == KKT_i && GT_G_k != GT_G_end)
                 {
                     GT_G_to_Ki(GT_G_k) = KKT_k;
                 }
@@ -146,14 +145,41 @@ struct KKTCondensed
             PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering[col] + 1] - 1] += m_rho;
         }
 
+        add_delta_inv_AT_A_to_PKPt();
+        update_W_delta_inv_GT_G();
+        add_W_delta_inv_GT_G_to_PKPt();
+    }
+
+    void add_delta_inv_AT_A_to_PKPt()
+    {
+        // copy delta_inv * AT * A to PKPt
+        T delta_inv = T(1) / m_delta;
+        isize n = AT_A.nonZeros();
+        for (isize k = 0; k < n; k++)
+        {
+            PKPt.valuePtr()[PKi(AT_A_to_Ki(k))] += delta_inv * AT_A.valuePtr()[k];
+        }
+    }
+
+    void add_W_delta_inv_GT_G_to_PKPt()
+    {
+        // copy GT * (W + delta)^{-1} * G to PKPt
+        isize n = W_delta_inv_GT_G.nonZeros();
+        for (isize k = 0; k < n; k++)
+        {
+            PKPt.valuePtr()[PKi(GT_G_to_Ki(k))] += W_delta_inv_GT_G.valuePtr()[k];
+        }
+    }
+
+    void update_AT_A()
+    {
         static_assert(!decltype(PKPt)::IsRowMajor, "KKT has to be column major!");
         static_assert(!decltype(data.AT)::IsRowMajor, "AT has to be column major!");
-        static_assert(!decltype(data.GT)::IsRowMajor, "GT has to be column major!");
 
         // update delta_inv * AT * A
         Eigen::Map<Vec<T>>(AT_A.valuePtr(), AT_A.nonZeros()).setZero();
         T delta_inv = T(1) / m_delta;
-        n = data.AT.outerSize();
+        isize n = data.AT.outerSize();
         for (isize k = 0; k < n; k++)
         {
             for (typename SparseMat<T, I>::InnerIterator AT_j_it(data.AT, k); AT_j_it; ++AT_j_it)
@@ -171,29 +197,29 @@ struct KKTCondensed
                     {
                         eigen_assert(AT_A_i_it.index() == AT_i_it.index() && "AT_A is missing entry!");
 
-                        AT_A_i_it.valueRef() += delta_inv * AT_i_it.value() * AT_j_it.value();
+                        AT_A_i_it.valueRef() += AT_i_it.value() * AT_j_it.value();
                         ++AT_A_i_it;
                         ++AT_i_it;
                     }
                 }
             }
         }
-        // copy delta_inv * AT * A to PKPt
-        n = AT_A.nonZeros();
-        for (isize k = 0; k < n; k++)
-        {
-            PKPt.valuePtr()[PKi(AT_A_to_Ki(k))] += AT_A.valuePtr()[k];
-        }
+    }
+
+    void update_W_delta_inv_GT_G()
+    {
+        static_assert(!decltype(PKPt)::IsRowMajor, "KKT has to be column major!");
+        static_assert(!decltype(data.GT)::IsRowMajor, "GT has to be column major!");
 
         // update GT * (W + delta)^{-1} * G
-        Eigen::Map<Vec<T>>(GT_G.valuePtr(), GT_G.nonZeros()).setZero();
-        n = data.GT.outerSize();
+        Eigen::Map<Vec<T>>(W_delta_inv_GT_G.valuePtr(), W_delta_inv_GT_G.nonZeros()).setZero();
+        isize n = data.GT.outerSize();
         for (isize k = 0; k < n; k++)
         {
             for (typename SparseMat<T, I>::InnerIterator GT_j_it(data.GT, k); GT_j_it; ++GT_j_it)
             {
                 I j = GT_j_it.index();
-                typename SparseMat<T, I>::InnerIterator GT_G_i_it(GT_G, j);
+                typename SparseMat<T, I>::InnerIterator GT_G_i_it(W_delta_inv_GT_G, j);
                 typename SparseMat<T, I>::InnerIterator GT_i_it(data.GT, k);
                 while (GT_G_i_it && GT_i_it)
                 {
@@ -212,12 +238,6 @@ struct KKTCondensed
                     }
                 }
             }
-        }
-        // copy GT * (W + delta)^{-1} * G to PKPt
-        n = GT_G.nonZeros();
-        for (isize k = 0; k < n; k++)
-        {
-            PKPt.valuePtr()[PKi(GT_G_to_Ki(k))] += GT_G.valuePtr()[k];
         }
     }
 
