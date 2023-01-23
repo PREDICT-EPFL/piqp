@@ -137,6 +137,7 @@ public:
         m_result.info.factor_retires = 0;
         m_result.info.no_primal_update = 0;
         m_result.info.no_dual_update = 0;
+        m_result.info.mu = 0;
         m_result.info.primal_step = 0;
         m_result.info.dual_step = 0;
 
@@ -174,28 +175,31 @@ public:
         rs.setZero();
         m_kkt.solve(rx, m_data.b, m_data.h, rs, m_result.x, m_result.y, m_result.z, m_result.s);
 
-        // not sure if this is necessary
-        if (m_result.s.norm() <= 1e-4)
+        if (m_data.m > 0)
         {
-            // 0.1 is arbitrary
-            m_result.s.setConstant(0.1);
-            m_result.z.setConstant(0.1);
+            // not sure if this is necessary
+            if (m_result.s.norm() <= 1e-4)
+            {
+                // 0.1 is arbitrary
+                m_result.s.setConstant(0.1);
+                m_result.z.setConstant(0.1);
+            }
+
+            T delta_s = std::max(T(-1.5) * m_result.s.minCoeff(), T(0));
+            T delta_z = std::max(T(-1.5) * m_result.z.minCoeff(), T(0));
+            T tmp_prod = (m_result.s.array() + delta_s).matrix().dot((m_result.z.array() + delta_z).matrix());
+            T delta_s_bar = delta_s + (T(0.5) * tmp_prod) / (m_result.z.sum() + m_data.m * delta_z);
+            T delta_z_bar = delta_z + (T(0.5) * tmp_prod) / (m_result.s.sum() + m_data.m * delta_s);
+
+            m_result.s.array() += delta_s_bar;
+            m_result.z.array() += delta_z_bar;
+
+            m_result.info.mu = m_result.s.dot(m_result.z) / m_data.m;
         }
-
-        T delta_s = std::max(T(-1.5) * m_result.s.minCoeff(), T(0));
-        T delta_z = std::max(T(-1.5) * m_result.z.minCoeff(), T(0));
-        T tmp_prod = (m_result.s.array() + delta_s).matrix().dot((m_result.z.array() + delta_z).matrix());
-        T delta_s_bar = delta_s + (T(0.5) * tmp_prod) / (m_result.z.sum() + m_data.m * delta_z);
-        T delta_z_bar = delta_z + (T(0.5) * tmp_prod) / (m_result.s.sum() + m_data.m * delta_s);
-
-        m_result.s.array() += delta_s_bar;
-        m_result.z.array() += delta_z_bar;
 
         m_result.zeta = m_result.x;
         m_result.lambda = m_result.y;
         m_result.nu = m_result.z;
-
-        m_result.info.mu = m_result.s.dot(m_result.z) / m_data.m;
 
         while (m_result.info.iter < m_settings.max_iter)
         {
@@ -288,117 +292,125 @@ public:
             }
             m_result.info.factor_retires = 0;
 
-            // TODO: no predictor corrector if no inequality constraints -> just PMM
-
-            // ------------------ predictor step ------------------
-            rs.array() = -m_result.s.array() * m_result.z.array();
-
-            m_kkt.solve(rx, ry, rz, rs, dx, dy, dz, ds);
-
-            // step in the non-negative orthant
-            T alpha_s = T(1);
-            T alpha_z = T(1);
-            for (isize i = 0; i < m_data.m; i++)
+            if (m_data.m > 0)
             {
-                if (ds(i) < 0)
+                // ------------------ predictor step ------------------
+                rs.array() = -m_result.s.array() * m_result.z.array();
+
+                m_kkt.solve(rx, ry, rz, rs, dx, dy, dz, ds);
+
+                // step in the non-negative orthant
+                T alpha_s = T(1);
+                T alpha_z = T(1);
+                for (isize i = 0; i < m_data.m; i++)
                 {
-                    alpha_s = std::min(alpha_s, -m_result.s(i) / ds(i));
+                    if (ds(i) < 0)
+                    {
+                        alpha_s = std::min(alpha_s, -m_result.s(i) / ds(i));
+                    }
+                    if (dz(i) < 0)
+                    {
+                        alpha_z = std::min(alpha_z, -m_result.z(i) / dz(i));
+                    }
                 }
-                if (dz(i) < 0)
+                // avoid getting to close to the boundary
+                alpha_s *= m_settings.tau;
+                alpha_z *= m_settings.tau;
+
+                m_result.info.sigma = (m_result.s + alpha_s * ds).dot(m_result.z + alpha_z * dz) / (m_result.info.mu * m_data.m);
+                m_result.info.sigma = m_result.info.sigma * m_result.info.sigma * m_result.info.sigma;
+
+                // ------------------ corrector step ------------------
+                rs.array() += -ds.array() * dz.array() + m_result.info.sigma * m_result.info.mu;
+
+                m_kkt.solve(rx, ry, rz, rs, dx, dy, dz, ds);
+
+                // step in the non-negative orthant
+                alpha_s = T(1);
+                alpha_z = T(1);
+                for (isize i = 0; i < m_data.m; i++)
                 {
-                    alpha_z = std::min(alpha_z, -m_result.z(i) / dz(i));
+                    if (ds(i) < 0)
+                    {
+                        alpha_s = std::min(alpha_s, -m_result.s(i) / ds(i));
+                    }
+                    if (dz(i) < 0)
+                    {
+                        alpha_z = std::min(alpha_z, -m_result.z(i) / dz(i));
+                    }
                 }
-            }
-            // avoid getting to close to the boundary
-            alpha_s *= m_settings.tau;
-            alpha_z *= m_settings.tau;
+                // avoid getting to close to the boundary
+                m_result.info.primal_step = alpha_s * m_settings.tau;
+                m_result.info.dual_step = alpha_z * m_settings.tau;
 
-            m_result.info.sigma = (m_result.s + alpha_s * ds).dot(m_result.z + alpha_z * dz) / (m_result.info.mu * m_data.m);
-            m_result.info.sigma = m_result.info.sigma * m_result.info.sigma * m_result.info.sigma;
+                // ------------------ update ------------------
+                m_result.x += m_result.info.primal_step * dx;
+                m_result.y += m_result.info.dual_step * dy;
+                m_result.z += m_result.info.dual_step * dz;
+                m_result.s += m_result.info.primal_step * ds;
 
-            // ------------------ corrector step ------------------
-            rs.array() += -ds.array() * dz.array() + m_result.info.sigma * m_result.info.mu;
+                T mu_prev = m_result.info.mu;
+                m_result.info.mu = m_result.s.dot(m_result.z) / m_data.m;
+                T mu_rate = std::abs(mu_prev - m_result.info.mu) / mu_prev;
 
-            m_kkt.solve(rx, ry, rz, rs, dx, dy, dz, ds);
+                // ------------------ update regularization ------------------
+                update_nr_residuals();
 
-            // step in the non-negative orthant
-            alpha_s = T(1);
-            alpha_z = T(1);
-            for (isize i = 0; i < m_data.m; i++)
-            {
-                if (ds(i) < 0)
+                if (rx_nr.norm() < 0.95 * m_result.info.dual_inf)
                 {
-                    alpha_s = std::min(alpha_s, -m_result.s(i) / ds(i));
-                }
-                if (dz(i) < 0)
-                {
-                    alpha_z = std::min(alpha_z, -m_result.z(i) / dz(i));
-                }
-            }
-            // avoid getting to close to the boundary
-            m_result.info.primal_step = alpha_s * m_settings.tau;
-            m_result.info.dual_step = alpha_z * m_settings.tau;
-
-            // ------------------ update ------------------
-            m_result.x += m_result.info.primal_step * dx;
-            m_result.y += m_result.info.dual_step * dy;
-            m_result.z += m_result.info.dual_step * dz;
-            m_result.s += m_result.info.primal_step * ds;
-            T mu_prev = m_result.info.mu;
-            m_result.info.mu = m_result.s.dot(m_result.z) / m_data.m;
-
-            // ------------------ update regularization ------------------
-            T mu_rate = std::abs(mu_prev - m_result.info.mu) / mu_prev;
-
-            update_nr_residuals();
-
-            if (rx_nr.norm() < 0.95 * m_result.info.dual_inf)
-            {
-                m_result.zeta = m_result.x;
-                if (m_data.m > 0)
-                {
+                    m_result.zeta = m_result.x;
                     rho = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * rho);
                 }
                 else
                 {
-                    rho = std::max(m_result.info.reg_limit, 0.1 * rho);
-                }
-            }
-            else
-            {
-                m_result.info.no_primal_update++;
-                if (m_data.m > 0)
-                {
+                    m_result.info.no_primal_update++;
                     rho = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * rho);
                 }
-                else
-                {
-                    rho = std::max(m_result.info.reg_limit, 0.5 * rho);
-                }
-            }
 
-            if (ry_nr.norm() + rz_nr.norm() < 0.95 * m_result.info.primal_inf)
-            {
-                m_result.lambda = m_result.y;
-                m_result.nu = m_result.z;
-                if (m_data.m > 0)
+                if (ry_nr.norm() + rz_nr.norm() < 0.95 * m_result.info.primal_inf)
                 {
+                    m_result.lambda = m_result.y;
+                    m_result.nu = m_result.z;
                     delta = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * delta);
                 }
                 else
                 {
-                    delta = std::max(m_result.info.reg_limit, 0.1 * delta);
+                    m_result.info.no_dual_update++;
+                    delta = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * delta);
                 }
             }
             else
             {
-                m_result.info.no_dual_update++;
-                if (m_data.m > 0)
+                // since there are no inequalities we can take full steps
+                m_kkt.solve(rx, ry, rz, rs, dx, dy, dz, ds);
+
+                m_result.info.primal_step = T(1);
+                m_result.info.dual_step = T(1);
+                m_result.x += m_result.info.primal_step * dx;
+                m_result.y += m_result.info.dual_step * dy;
+
+                // ------------------ update regularization ------------------
+                update_nr_residuals();
+
+                if (rx_nr.norm() < 0.95 * m_result.info.dual_inf)
                 {
-                    delta = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * delta);
+                    m_result.zeta = m_result.x;
+                    rho = std::max(m_result.info.reg_limit, 0.1 * rho);
                 }
                 else
                 {
+                    m_result.info.no_primal_update++;
+                    rho = std::max(m_result.info.reg_limit, 0.5 * rho);
+                }
+
+                if (ry_nr.norm() + rz_nr.norm() < 0.95 * m_result.info.primal_inf)
+                {
+                    m_result.lambda = m_result.y;
+                    delta = std::max(m_result.info.reg_limit, 0.1 * delta);
+                }
+                else
+                {
+                    m_result.info.no_dual_update++;
                     delta = std::max(m_result.info.reg_limit, 0.5 * delta);
                 }
             }
