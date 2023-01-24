@@ -14,7 +14,7 @@
 namespace piqp
 {
 
-enum struct Status
+enum Status
 {
     PIQP_SOLVED = 1,
     PIQP_MAX_ITER_REACHED = -1,
