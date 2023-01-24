@@ -214,9 +214,8 @@ public:
             if (m_settings.verbose)
             {
                 // use rx as temporary variables
-                rx.noalias() = m_data.P_utri.template triangularView<Eigen::StrictlyUpper>() * m_result.x;
+                rx.noalias() = m_data.P_utri * m_result.x;
                 rx.noalias() += m_data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * m_result.x;
-                rx.array() += m_data.P_utri.diagonal().array() * m_result.x.array();
                 T xPx_half = T(0.5) * m_result.x.dot(rx);
 
                 T primal_cost = xPx_half + m_data.c.dot(m_result.x);
@@ -423,9 +422,8 @@ public:
 private:
     void update_nr_residuals()
     {
-        rx_nr.noalias() = -m_data.P_utri.template triangularView<Eigen::StrictlyUpper>() * m_result.x;
+        rx_nr.noalias() = -m_data.P_utri * m_result.x;
         rx_nr.noalias() -= m_data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * m_result.x;
-        rx_nr.array() -= m_data.P_utri.diagonal().array() * m_result.x.array();
         rx_nr.array() -= m_data.c.array();
         rx_nr.noalias() -= m_data.AT * m_result.y;
         rx_nr.noalias() -= m_data.GT * m_result.z;
