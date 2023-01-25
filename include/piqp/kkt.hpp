@@ -17,7 +17,7 @@
 #include "piqp/kkt_full.hpp"
 #include "piqp/kkt_eq_eliminated.hpp"
 #include "piqp/kkt_ineq_eliminated.hpp"
-#include "piqp/kkt_eq_and_ineq_eliminated.hpp"
+#include "piqp/kkt_all_eliminated.hpp"
 
 namespace piqp
 {

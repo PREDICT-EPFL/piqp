@@ -22,7 +22,7 @@ using I = int;
 using kkt_types = testing::Types<KKT<T, I, KKTMode::FULL>,
                                  KKT<T, I, KKTMode::EQ_ELIMINATED>,
                                  KKT<T, I, KKTMode::INEQ_ELIMINATED>,
-                                 KKT<T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>>;
+                                 KKT<T, I, KKTMode::ALL_ELIMINATED>>;
 template <typename T>
 class KKTTest : public ::testing::Test {};
 TYPED_TEST_SUITE(KKTTest, kkt_types);

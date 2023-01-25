@@ -6,8 +6,8 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_KKT_EQ_AND_INEQ_ELIMINATED_HPP
-#define PIQP_KKT_EQ_AND_INEQ_ELIMINATED_HPP
+#ifndef PIQP_KKT_ALL_ELIMINATED_HPP
+#define PIQP_KKT_ALL_ELIMINATED_HPP
 
 #include "piqp/typedefs.hpp"
 #include "piqp/kkt_fwd.hpp"
@@ -16,7 +16,7 @@ namespace piqp
 {
 
 template<typename Derived, typename T, typename I>
-struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
+struct KKTImpl<Derived, T, I, KKTMode::ALL_ELIMINATED>
 {
     SparseMat<T, I> A;
     SparseMat<T, I> G;
@@ -222,4 +222,4 @@ struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
 
 } // namespace piqp
 
-#endif //PIQP_KKT_EQ_AND_INEQ_ELIMINATED_HPP
+#endif //PIQP_KKT_ALL_ELIMINATED_HPP

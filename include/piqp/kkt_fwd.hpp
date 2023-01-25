@@ -17,6 +17,7 @@ enum KKTMode
     FULL = 0,
     EQ_ELIMINATED = 0x1,
     INEQ_ELIMINATED = 0x2,
+    ALL_ELIMINATED = EQ_ELIMINATED | INEQ_ELIMINATED
 };
 
 template<typename Derived, typename T, typename I, int Mode>
