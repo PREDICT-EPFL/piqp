@@ -17,6 +17,6 @@ git checkout "$EIGEN_VERSION"
 
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j2
 sudo make install

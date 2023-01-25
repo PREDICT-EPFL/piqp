@@ -18,6 +18,9 @@ jobs:
       matrix:
         os: [ ubuntu-20.04, ubuntu-22.04, macos-12 ]
         eigen: [ 3.3.4, 3.3.7, 3.4.0 ]
+        exclude:
+          - os: macos-12
+            eigen: 3.3.4
 
     runs-on: ${{ matrix.os }}
 
