@@ -6,28 +6,18 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_KKT_CONDENSED_HPP
-#define PIQP_KKT_CONDENSED_HPP
+#ifndef PIQP_KKT_EQ_AND_INEQ_ELIMINATED_HPP
+#define PIQP_KKT_EQ_AND_INEQ_ELIMINATED_HPP
 
-#include "piqp/data.hpp"
-#include "piqp/ldlt.hpp"
-#include "piqp/ordering.hpp"
-#include "piqp/utils/sparse_utils.hpp"
+#include "piqp/typedefs.hpp"
+#include "piqp/kkt_fwd.hpp"
 
 namespace piqp
 {
 
-template<typename T, typename I, typename Ordering = AMDOrdering<I>>
-struct KKTCondensed
+template<typename Derived, typename T, typename I>
+struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
 {
-    Data<T, I>& data;
-
-    T m_rho;
-    T m_delta;
-
-    Vec<T> m_s;
-    Vec<T> m_z_inv;
-
     Vec<I> P_utri_to_Ki; // mapping from P_utri row indices to KKT matrix
     Vec<I> AT_A_to_Ki;   // mapping from AT_A row indices to KKT matrix
     Vec<I> GT_G_to_Ki;   // mapping from GT_G row indices to KKT matrix
@@ -35,51 +25,41 @@ struct KKTCondensed
     SparseMat<T, I> AT_A;
     SparseMat<T, I> W_delta_inv_GT_G;
 
-    Ordering ordering;
-    SparseMat<T, I> PKPt; // permuted KKT matrix, upper triangular only
-    Vec<I> PKi; // mapping of row indices of KKT matrix to permuted KKT matrix
-
-    LDLt<T, I> ldlt;
-
-    Vec<T> rhs_z_bar; // temporary variable needed for back solve
-    Vec<T> rhs_perm;  // permuted rhs for back solve
-    Vec<T> rhs;       // stores the rhs and the solution for back solve
-
-    explicit KKTCondensed(Data<T, I>& data) : data(data) {}
-
-    void init_kkt(const T& rho, const T& delta)
+    void init_workspace()
     {
-        // init workspace
-        m_s.resize(data.m);
-        m_z_inv.resize(data.m);
-        rhs_z_bar.resize(data.m);
-        rhs_perm.resize(data.n);
-        rhs.resize(data.n);
-
-        m_rho = rho;
-        m_delta = delta;
-        m_s.setConstant(1);
-        m_z_inv.setConstant(1);
-
-        SparseMat<T, I> eye_rho(data.n, data.n);
-        eye_rho.setIdentity();
-        // set diagonal to rho
-        Eigen::Map<Vec<T>>(eye_rho.valuePtr(), eye_rho.nonZeros()).setConstant(m_rho);
+        auto& data = static_cast<Derived*>(this)->data;
+        auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
         AT_A = (data.AT * data.AT.transpose()).template triangularView<Eigen::Upper>();
-        W_delta_inv_GT_G = (data.GT * data.GT.transpose()).template triangularView<Eigen::Upper>();
 
+        W_delta_inv_GT_G = (data.GT * data.GT.transpose()).template triangularView<Eigen::Upper>();
         T W_delta_inv = T(1) / (1 + m_delta);
         Eigen::Map<Vec<T>>(W_delta_inv_GT_G.valuePtr(), W_delta_inv_GT_G.nonZeros()).array() *= W_delta_inv;
-
-        T delta_inv = T(1) / m_delta;
-        SparseMat<T, I> KKT = data.P_utri + eye_rho + delta_inv * AT_A + W_delta_inv_GT_G;
 
         P_utri_to_Ki.resize(data.P_utri.nonZeros());
         AT_A_to_Ki.resize(AT_A.nonZeros());
         GT_G_to_Ki.resize(W_delta_inv_GT_G.nonZeros());
+    }
 
-        for (isize j = 0; j < KKT.outerSize(); j++)
+    SparseMat<T, I> init_KKT_matrix()
+    {
+        auto& data = static_cast<Derived*>(this)->data;
+        auto& m_rho = static_cast<Derived*>(this)->m_rho;
+        auto& m_delta = static_cast<Derived*>(this)->m_delta;
+
+        T delta_inv = T(1) / m_delta;
+
+        SparseMat<T, I> diagonal_rho;
+        diagonal_rho.resize(data.n, data.n);
+        diagonal_rho.setIdentity();
+        // set diagonal to rho
+        Eigen::Map<Vec<T>>(diagonal_rho.valuePtr(), data.n).setConstant(m_rho);
+
+        SparseMat<T, I> KKT = data.P_utri + diagonal_rho + delta_inv * AT_A + W_delta_inv_GT_G;
+
+        // compute mappings
+        isize jj = KKT.outerSize();
+        for (isize j = 0; j < jj; j++)
         {
             isize P_utri_k = data.P_utri.outerIndexPtr()[j];
             isize AT_A_k = AT_A.outerIndexPtr()[j];
@@ -89,7 +69,8 @@ struct KKTCondensed
             isize AT_A_end = AT_A.outerIndexPtr()[j + 1];
             isize GT_G_end = W_delta_inv_GT_G.outerIndexPtr()[j + 1];
 
-            for (isize KKT_k = KKT.outerIndexPtr()[j]; KKT_k < KKT.outerIndexPtr()[j + 1]; KKT_k++)
+            isize KKT_kk = KKT.outerIndexPtr()[j + 1];
+            for (isize KKT_k = KKT.outerIndexPtr()[j]; KKT_k < KKT_kk; KKT_k++)
             {
                 isize KKT_i = KKT.innerIndexPtr()[KKT_k];
 
@@ -112,18 +93,16 @@ struct KKTCondensed
             }
         }
 
-        ordering.init(KKT);
-        PKi = permute_sparse_symmetric_matrix(KKT, PKPt, ordering);
-
-        ldlt.factorize_symbolic_upper_triangular(PKPt);
+        return KKT;
     }
 
-    void update_kkt(const T& rho, const T& delta, const CVecRef<T>& s, const CVecRef<T>& z)
+    void update_kkt_cost()
     {
-        m_rho = rho;
-        m_delta = delta;
-        m_s = s;
-        m_z_inv.array() = T(1) / z.array();
+        auto& data = static_cast<Derived*>(this)->data;
+        auto& PKPt = static_cast<Derived*>(this)->PKPt;
+        auto& PKi = static_cast<Derived*>(this)->PKi;
+        auto& ordering = static_cast<Derived*>(this)->ordering;
+        auto& m_rho = static_cast<Derived*>(this)->m_rho;
 
         // set PKPt to zero keeping pattern
         Eigen::Map<Vec<T>>(PKPt.valuePtr(), PKPt.nonZeros()).setZero();
@@ -133,25 +112,24 @@ struct KKTCondensed
         {
             for (isize k = data.P_utri.outerIndexPtr()[j]; k < data.P_utri.outerIndexPtr()[j + 1]; k++)
             {
-                PKPt.valuePtr()[PKi(P_utri_to_Ki(k))] = data.P_utri.valuePtr()[k];
+                PKPt.valuePtr()[PKi(this->P_utri_to_Ki(k))] += data.P_utri.valuePtr()[k];
             }
         }
 
         // we assume that PKPt is upper triangular and diagonal is set
         // hence we can directly address the diagonal from the outer index pointer
-        isize n = PKPt.outerSize();
-        for (isize col = 0; col < n; col++)
+        for (isize col = 0; col < data.n; col++)
         {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering[col] + 1] - 1] += m_rho;
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += m_rho;
         }
-
-        add_delta_inv_AT_A_to_PKPt();
-        update_W_delta_inv_GT_G();
-        add_W_delta_inv_GT_G_to_PKPt();
     }
 
-    void add_delta_inv_AT_A_to_PKPt()
+    void update_kkt_equalities()
     {
+        auto& PKPt = static_cast<Derived*>(this)->PKPt;
+        auto& PKi = static_cast<Derived*>(this)->PKi;
+        auto& m_delta = static_cast<Derived*>(this)->m_delta;
+
         // copy delta_inv * AT * A to PKPt
         T delta_inv = T(1) / m_delta;
         isize n = AT_A.nonZeros();
@@ -161,8 +139,13 @@ struct KKTCondensed
         }
     }
 
-    void add_W_delta_inv_GT_G_to_PKPt()
+    void update_kkt_inequalities()
     {
+        auto& PKPt = static_cast<Derived*>(this)->PKPt;
+        auto& PKi = static_cast<Derived*>(this)->PKi;
+
+        update_G();
+
         // copy GT * (W + delta)^{-1} * G to PKPt
         isize n = W_delta_inv_GT_G.nonZeros();
         for (isize k = 0; k < n; k++)
@@ -171,10 +154,10 @@ struct KKTCondensed
         }
     }
 
-    void update_AT_A()
+    void update_A()
     {
-        static_assert(!decltype(PKPt)::IsRowMajor, "KKT has to be column major!");
-        static_assert(!decltype(data.AT)::IsRowMajor, "AT has to be column major!");
+        auto& data = static_cast<Derived*>(this)->data;
+        auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
         // update delta_inv * AT * A
         Eigen::Map<Vec<T>>(AT_A.valuePtr(), AT_A.nonZeros()).setZero();
@@ -206,10 +189,13 @@ struct KKTCondensed
         }
     }
 
-    void update_W_delta_inv_GT_G()
+    void update_G()
     {
-        static_assert(!decltype(PKPt)::IsRowMajor, "KKT has to be column major!");
-        static_assert(!decltype(data.GT)::IsRowMajor, "GT has to be column major!");
+        auto& data = static_cast<Derived*>(this)->data;
+        auto& m_delta = static_cast<Derived*>(this)->m_delta;
+
+        auto& m_s = static_cast<Derived*>(this)->m_s;
+        auto& m_z_inv = static_cast<Derived*>(this)->m_z_inv;
 
         // update GT * (W + delta)^{-1} * G
         Eigen::Map<Vec<T>>(W_delta_inv_GT_G.valuePtr(), W_delta_inv_GT_G.nonZeros()).setZero();
@@ -240,58 +226,8 @@ struct KKTCondensed
             }
         }
     }
-
-    void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,
-                  const CVecRef<T>& delta_z, const CVecRef<T>& delta_s,
-                  VecRef<T> rhs_x, VecRef<T> rhs_y, VecRef<T> rhs_z, VecRef<T> rhs_s)
-    {
-        rhs_x.noalias() = data.P_utri.template triangularView<Eigen::StrictlyUpper>() * delta_x;
-        rhs_x.noalias() += data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * delta_x;
-        rhs_x.array() += data.P_utri.diagonal().array() * delta_x.array();
-        rhs_x.noalias() += m_rho * delta_x;
-        rhs_x.noalias() += data.AT * delta_y + data.GT * delta_z;
-
-        rhs_y.noalias() = data.AT.transpose() * delta_x;
-        rhs_y.noalias() -= m_delta * delta_y;
-
-        rhs_z.noalias() = data.GT.transpose() * delta_x;
-        rhs_z.noalias() += delta_s;
-        rhs_z.noalias() -= m_delta * delta_z;
-
-        rhs_s.array() = m_s.array() * delta_z.array() + m_z_inv.array().cwiseInverse() * delta_s.array();
-    }
-
-    bool factorize_kkt()
-    {
-        isize n = ldlt.factorize_numeric_upper_triangular(PKPt);
-        return n == data.n;
-    }
-
-    void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y, const CVecRef<T>& rhs_z, const CVecRef<T>& rhs_s,
-               VecRef<T> delta_x, VecRef<T> delta_y, VecRef<T> delta_z, VecRef<T> delta_s)
-    {
-        T delta_inv = T(1) / m_delta;
-
-        rhs_z_bar.array() = rhs_z.array() - m_z_inv.array() * rhs_s.array();
-        rhs_z_bar.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
-        rhs.noalias() = rhs_x + data.GT * rhs_z_bar;
-        rhs.noalias() += delta_inv * data.AT * rhs_y;
-
-        ordering.template perm<T>(rhs_perm, rhs);
-        ldlt.lsolve(rhs_perm);
-        ldlt.dsolve(rhs_perm);
-        ldlt.ltsolve(rhs_perm);
-        ordering.template permt<T>(delta_x, rhs_perm);
-
-        delta_y.noalias() = delta_inv * data.AT.transpose() * delta_x;
-        delta_y.noalias() -= delta_inv * rhs_y;
-        delta_z.noalias() = data.GT.transpose() * delta_x;
-        delta_z.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
-        delta_z.noalias() -= rhs_z_bar;
-        delta_s.array() = m_z_inv.array() * (rhs_s.array() - m_s.array() * delta_z.array());
-    }
 };
 
 } // namespace piqp
 
-#endif //PIQP_KKT_CONDENSED_HPP
+#endif //PIQP_KKT_EQ_AND_INEQ_ELIMINATED_HPP

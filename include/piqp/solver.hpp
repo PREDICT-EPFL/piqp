@@ -15,19 +15,19 @@
 #include "piqp/results.hpp"
 #include "piqp/settings.hpp"
 #include "piqp/data.hpp"
-#include "piqp/kkt_condensed.hpp"
+#include "piqp/kkt.hpp"
 
 namespace piqp
 {
 
-template<typename T, typename I>
+template<typename T, typename I, int Mode = KKTMode::FULL>
 class Solver
 {
 private:
     Result<T> m_result;
     Settings<T> m_settings;
     Data<T, I> m_data;
-    KKTCondensed<T, I> m_kkt;
+    KKT<T, I, Mode> m_kkt;
     bool m_kkt_dirty = true;
 
     // regularization parameters
