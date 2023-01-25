@@ -1,0 +1,47 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
+
+env:
+  CMAKE_BUILD_TYPE: Release
+  ENABLE_SANITIZERS: ON
+
+jobs:
+  strategy:
+    matrix:
+      os: [ubuntu-20.04, ubuntu-22.04, macos-12]
+      eigen: [3.3.4, 3.3.7, 3.4.0]
+  tests:
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: Setup working directories
+        run: |
+          mkdir -p build_external
+          mkdir -p build
+
+      - name: Install Eigen
+        working-directory: build_external
+        run: bash  ../ci/shared/install_eigen.sh
+        env:
+          EIGEN_VERSION: ${{ matrix.eigen }}
+
+      - name: Build laopt
+        working-directory: build
+        run: |
+          cmake .. -CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DENABLE_SANITIZERS=$ENABLE_SANITIZERS
+          make -j2
+
+      - name: Test laopt
+        working-directory: build
+        run: ctest --test-dir tests --verbose
