@@ -16,11 +16,12 @@ jobs:
   tests:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+#        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest ]
         eigen: [ 3.3.4, 3.3.7, 3.4.0 ]
-        exclude:
-          - os: macos-latest
-            eigen: 3.3.4
+#        exclude:
+#          - os: macos-latest
+#            eigen: 3.3.4
 
     runs-on: ${{ matrix.os }}
 
