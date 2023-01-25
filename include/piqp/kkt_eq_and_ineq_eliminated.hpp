@@ -18,27 +18,35 @@ namespace piqp
 template<typename Derived, typename T, typename I>
 struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
 {
+    SparseMat<T, I> A;
+    SparseMat<T, I> G;
+    SparseMat<T, I> AT_A;
+    SparseMat<T, I> GT_W_delta_inv_G;
+    Vec<T> tmp_scatter; // temporary storage for scatter operation
+
     Vec<I> P_utri_to_Ki; // mapping from P_utri row indices to KKT matrix
     Vec<I> AT_A_to_Ki;   // mapping from AT_A row indices to KKT matrix
     Vec<I> GT_G_to_Ki;   // mapping from GT_G row indices to KKT matrix
-
-    SparseMat<T, I> AT_A;
-    SparseMat<T, I> W_delta_inv_GT_G;
 
     void init_workspace()
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
-        AT_A = (data.AT * data.AT.transpose()).template triangularView<Eigen::Upper>();
+        A = data.AT.transpose();
+        G = data.GT.transpose();
 
-        W_delta_inv_GT_G = (data.GT * data.GT.transpose()).template triangularView<Eigen::Upper>();
+        AT_A = (data.AT * A).template triangularView<Eigen::Upper>();
+        GT_W_delta_inv_G = (data.GT * G).template triangularView<Eigen::Upper>();
         T W_delta_inv = T(1) / (1 + m_delta);
-        Eigen::Map<Vec<T>>(W_delta_inv_GT_G.valuePtr(), W_delta_inv_GT_G.nonZeros()).array() *= W_delta_inv;
+        Eigen::Map<Vec<T>>(GT_W_delta_inv_G.valuePtr(), GT_W_delta_inv_G.nonZeros()).array() *= W_delta_inv;
+
+        tmp_scatter.resize(std::max(A.cols(), G.cols()));
+        tmp_scatter.setZero();
 
         P_utri_to_Ki.resize(data.P_utri.nonZeros());
         AT_A_to_Ki.resize(AT_A.nonZeros());
-        GT_G_to_Ki.resize(W_delta_inv_GT_G.nonZeros());
+        GT_G_to_Ki.resize(GT_W_delta_inv_G.nonZeros());
     }
 
     SparseMat<T, I> init_KKT_matrix()
@@ -55,7 +63,7 @@ struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
         // set diagonal to rho
         Eigen::Map<Vec<T>>(diagonal_rho.valuePtr(), data.n).setConstant(m_rho);
 
-        SparseMat<T, I> KKT = data.P_utri + diagonal_rho + delta_inv * AT_A + W_delta_inv_GT_G;
+        SparseMat<T, I> KKT = data.P_utri + diagonal_rho + delta_inv * AT_A + GT_W_delta_inv_G;
 
         // compute mappings
         isize jj = KKT.outerSize();
@@ -63,11 +71,11 @@ struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
         {
             isize P_utri_k = data.P_utri.outerIndexPtr()[j];
             isize AT_A_k = AT_A.outerIndexPtr()[j];
-            isize GT_G_k = W_delta_inv_GT_G.outerIndexPtr()[j];
+            isize GT_G_k = GT_W_delta_inv_G.outerIndexPtr()[j];
 
             isize P_utri_end = data.P_utri.outerIndexPtr()[j + 1];
             isize AT_A_end = AT_A.outerIndexPtr()[j + 1];
-            isize GT_G_end = W_delta_inv_GT_G.outerIndexPtr()[j + 1];
+            isize GT_G_end = GT_W_delta_inv_G.outerIndexPtr()[j + 1];
 
             isize KKT_kk = KKT.outerIndexPtr()[j + 1];
             for (isize KKT_k = KKT.outerIndexPtr()[j]; KKT_k < KKT_kk; KKT_k++)
@@ -76,7 +84,7 @@ struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
 
                 while (data.P_utri.innerIndexPtr()[P_utri_k] < KKT_i && P_utri_k != P_utri_end) P_utri_k++;
                 while (AT_A.innerIndexPtr()[AT_A_k] < KKT_i && AT_A_k != AT_A_end) AT_A_k++;
-                while (W_delta_inv_GT_G.innerIndexPtr()[GT_G_k] < KKT_i && GT_G_k != GT_G_end) GT_G_k++;
+                while (GT_W_delta_inv_G.innerIndexPtr()[GT_G_k] < KKT_i && GT_G_k != GT_G_end) GT_G_k++;
 
                 if (data.P_utri.innerIndexPtr()[P_utri_k] == KKT_i && P_utri_k != P_utri_end)
                 {
@@ -86,7 +94,7 @@ struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
                 {
                     AT_A_to_Ki(AT_A_k) = KKT_k;
                 }
-                if (W_delta_inv_GT_G.innerIndexPtr()[GT_G_k] == KKT_i && GT_G_k != GT_G_end)
+                if (GT_W_delta_inv_G.innerIndexPtr()[GT_G_k] == KKT_i && GT_G_k != GT_G_end)
                 {
                     GT_G_to_Ki(GT_G_k) = KKT_k;
                 }
@@ -144,52 +152,43 @@ struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
 
-        update_G();
+        update_GT_W_delta_inv_G();
 
         // copy GT * (W + delta)^{-1} * G to PKPt
-        isize n = W_delta_inv_GT_G.nonZeros();
+        isize n = GT_W_delta_inv_G.nonZeros();
         for (isize k = 0; k < n; k++)
         {
-            PKPt.valuePtr()[PKi(GT_G_to_Ki(k))] += W_delta_inv_GT_G.valuePtr()[k];
+            PKPt.valuePtr()[PKi(GT_G_to_Ki(k))] += GT_W_delta_inv_G.valuePtr()[k];
         }
     }
 
-    void update_A()
+    void update_AT_A()
     {
         auto& data = static_cast<Derived*>(this)->data;
-        auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
-        // update delta_inv * AT * A
-        Eigen::Map<Vec<T>>(AT_A.valuePtr(), AT_A.nonZeros()).setZero();
-        T delta_inv = T(1) / m_delta;
-        isize n = data.AT.outerSize();
-        for (isize k = 0; k < n; k++)
+        // update AT * A
+        isize n = A.outerSize();
+        for (isize j = 0; j < n; j++)
         {
-            for (typename SparseMat<T, I>::InnerIterator AT_j_it(data.AT, k); AT_j_it; ++AT_j_it)
+            for (typename SparseMat<T, I>::InnerIterator Ak_it(A, j); Ak_it; ++Ak_it)
             {
-                I j = AT_j_it.index();
-                typename SparseMat<T, I>::InnerIterator AT_A_i_it(AT_A, j);
-                typename SparseMat<T, I>::InnerIterator AT_i_it(data.AT, k);
-                while (AT_A_i_it && AT_i_it)
+                I k = Ak_it.index();
+                for (typename SparseMat<T, I>::InnerIterator AT_i_it(data.AT, k); AT_i_it; ++AT_i_it)
                 {
-                    if (AT_A_i_it.index() < AT_i_it.index())
-                    {
-                        ++AT_A_i_it;
-                    }
-                    else
-                    {
-                        eigen_assert(AT_A_i_it.index() == AT_i_it.index() && "AT_A is missing entry!");
-
-                        AT_A_i_it.valueRef() += AT_i_it.value() * AT_j_it.value();
-                        ++AT_A_i_it;
-                        ++AT_i_it;
-                    }
+                    if (AT_i_it.index() > j) continue;
+                    tmp_scatter(AT_i_it.index()) += Ak_it.value() * AT_i_it.value();
                 }
+            }
+
+            for (typename SparseMat<T, I>::InnerIterator AT_A_it(AT_A, j); AT_A_it; ++AT_A_it)
+            {
+                AT_A_it.valueRef() = tmp_scatter(AT_A_it.index());
+                tmp_scatter(AT_A_it.index()) = 0;
             }
         }
     }
 
-    void update_G()
+    void update_GT_W_delta_inv_G()
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
@@ -198,31 +197,24 @@ struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED | KKTMode::INEQ_ELIMINATED>
         auto& m_z_inv = static_cast<Derived*>(this)->m_z_inv;
 
         // update GT * (W + delta)^{-1} * G
-        Eigen::Map<Vec<T>>(W_delta_inv_GT_G.valuePtr(), W_delta_inv_GT_G.nonZeros()).setZero();
-        isize n = data.GT.outerSize();
-        for (isize k = 0; k < n; k++)
+        isize n = G.outerSize();
+        for (isize j = 0; j < n; j++)
         {
-            for (typename SparseMat<T, I>::InnerIterator GT_j_it(data.GT, k); GT_j_it; ++GT_j_it)
+            for (typename SparseMat<T, I>::InnerIterator Gk_it(G, j); Gk_it; ++Gk_it)
             {
-                I j = GT_j_it.index();
-                typename SparseMat<T, I>::InnerIterator GT_G_i_it(W_delta_inv_GT_G, j);
-                typename SparseMat<T, I>::InnerIterator GT_i_it(data.GT, k);
-                while (GT_G_i_it && GT_i_it)
+                I k = Gk_it.index();
+                for (typename SparseMat<T, I>::InnerIterator GT_i_it(data.GT, k); GT_i_it; ++GT_i_it)
                 {
-                    if (GT_G_i_it.index() < GT_i_it.index())
-                    {
-                        ++GT_G_i_it;
-                    }
-                    else
-                    {
-                        eigen_assert(GT_G_i_it.index() == GT_i_it.index() && "GT_G is missing entry!");
-
-                        T W_delta_inv = T(1) / (m_s(k) * m_z_inv(k) + m_delta);
-                        GT_G_i_it.valueRef() += W_delta_inv * GT_i_it.value() * GT_j_it.value();
-                        ++GT_G_i_it;
-                        ++GT_i_it;
-                    }
+                    if (GT_i_it.index() > j) continue;
+                    T W_delta_inv = T(1) / (m_s(k) * m_z_inv(k) + m_delta);
+                    tmp_scatter(GT_i_it.index()) += W_delta_inv * Gk_it.value() * GT_i_it.value();
                 }
+            }
+
+            for (typename SparseMat<T, I>::InnerIterator GT_G_it(GT_W_delta_inv_G, j); GT_G_it; ++GT_G_it)
+            {
+                GT_G_it.valueRef() = tmp_scatter(GT_G_it.index());
+                tmp_scatter(GT_G_it.index()) = 0;
             }
         }
     }

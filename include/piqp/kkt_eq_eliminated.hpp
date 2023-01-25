@@ -18,16 +18,23 @@ namespace piqp
 template<typename Derived, typename T, typename I>
 struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED>
 {
+    SparseMat<T, I> A;
+    SparseMat<T, I> AT_A;
+    Vec<T> tmp_scatter; // temporary storage for scatter operation
+
     Vec<I> P_utri_to_Ki; // mapping from P_utri row indices to KKT matrix
     Vec<I> AT_A_to_Ki;   // mapping from AT_A row indices to KKT matrix
     Vec<I> GT_to_Ki;     // mapping from GT row indices to KKT matrix
 
-    SparseMat<T, I> AT_A;
-
     void init_workspace()
     {
         auto& data = static_cast<Derived*>(this)->data;
-        AT_A = (data.AT * data.AT.transpose()).template triangularView<Eigen::Upper>();
+
+        A = data.AT.transpose();
+        AT_A = (data.AT * A).template triangularView<Eigen::Upper>();
+
+        tmp_scatter.resize(A.cols());
+        tmp_scatter.setZero();
 
         P_utri_to_Ki.resize(data.P_utri.nonZeros());
         AT_A_to_Ki.resize(AT_A.nonZeros());
@@ -208,6 +215,32 @@ struct KKTImpl<Derived, T, I, KKTMode::EQ_ELIMINATED>
         {
             PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] = -m_s(k) * m_z_inv(k) - m_delta;
             k++;
+        }
+    }
+
+    void update_AT_A()
+    {
+        auto& data = static_cast<Derived*>(this)->data;
+
+        // update AT * A
+        isize n = A.outerSize();
+        for (isize j = 0; j < n; j++)
+        {
+            for (typename SparseMat<T, I>::InnerIterator Ak_it(A, j); Ak_it; ++Ak_it)
+            {
+                I k = Ak_it.index();
+                for (typename SparseMat<T, I>::InnerIterator AT_i_it(data.AT, k); AT_i_it; ++AT_i_it)
+                {
+                    if (AT_i_it.index() > j) continue;
+                    tmp_scatter(AT_i_it.index()) += Ak_it.value() * AT_i_it.value();
+                }
+            }
+
+            for (typename SparseMat<T, I>::InnerIterator AT_A_it(AT_A, j); AT_A_it; ++AT_A_it)
+            {
+                AT_A_it.valueRef() = tmp_scatter(AT_A_it.index());
+                tmp_scatter(AT_A_it.index()) = 0;
+            }
         }
     }
 };
