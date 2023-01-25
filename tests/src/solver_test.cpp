@@ -18,10 +18,10 @@ using namespace piqp;
 using T = double;
 using I = int;
 
-using solver_types = testing::Types<Solver<T, I, KKTMode::FULL>,
-                                    Solver<T, I, KKTMode::EQ_ELIMINATED>,
-                                    Solver<T, I, KKTMode::INEQ_ELIMINATED>,
-                                    Solver<T, I, KKTMode::ALL_ELIMINATED>>;
+using solver_types = testing::Types<Solver<T, I, KKTMode::KKT_FULL>,
+                                    Solver<T, I, KKTMode::KKT_EQ_ELIMINATED>,
+                                    Solver<T, I, KKTMode::KKT_INEQ_ELIMINATED>,
+                                    Solver<T, I, KKTMode::KKT_ALL_ELIMINATED>>;
 template <typename T>
 class SolverTest : public ::testing::Test {};
 TYPED_TEST_SUITE(SolverTest, solver_types);

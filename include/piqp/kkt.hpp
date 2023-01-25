@@ -22,7 +22,7 @@
 namespace piqp
 {
 
-template<typename T, typename I, int Mode = KKTMode::FULL, typename Ordering = AMDOrdering<I>>
+template<typename T, typename I, int Mode = KKTMode::KKT_FULL, typename Ordering = AMDOrdering<I>>
 struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
 {
     Data<T, I>& data;
@@ -45,18 +45,18 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
 
     explicit KKT(Data<T, I>& data) : data(data) {}
 
-    void init_kkt(const T& rho, const T& delta)
+    void init(const T& rho, const T& delta)
     {
         isize n_kkt;
-        if (Mode == KKTMode::FULL)
+        if (Mode == KKTMode::KKT_FULL)
         {
             n_kkt = data.n + data.p + data.m;
         }
-        else if (Mode == KKTMode::EQ_ELIMINATED)
+        else if (Mode == KKTMode::KKT_EQ_ELIMINATED)
         {
             n_kkt = data.n + data.m;
         }
-        else if (Mode == KKTMode::INEQ_ELIMINATED)
+        else if (Mode == KKTMode::KKT_INEQ_ELIMINATED)
         {
             n_kkt = data.n + data.p;
         }
@@ -78,7 +78,7 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         m_z_inv.setConstant(1);
 
         this->init_workspace();
-        SparseMat<T, I> KKT = this->init_KKT_matrix();
+        SparseMat<T, I> KKT = this->create_kkt_matrix();
 
         ordering.init(KKT);
         PKi = permute_sparse_symmetric_matrix(KKT, PKPt, ordering);
@@ -86,16 +86,16 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         ldlt.factorize_symbolic_upper_triangular(PKPt);
     }
 
-    void update_kkt(const T& rho, const T& delta, const CVecRef<T>& s, const CVecRef<T>& z)
+    void update_scalings(const T& rho, const T& delta, const CVecRef<T>& s, const CVecRef<T>& z)
     {
         m_rho = rho;
         m_delta = delta;
         m_s = s;
         m_z_inv.array() = T(1) / z.array();
 
-        this->update_kkt_cost();
-        this->update_kkt_equalities();
-        this->update_kkt_inequalities();
+        this->update_kkt_cost_scalings();
+        this->update_kkt_equality_scalings();
+        this->update_kkt_inequality_scaling();
     }
 
     void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,
@@ -117,7 +117,7 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         rhs_s.array() = m_s.array() * delta_z.array() + m_z_inv.array().cwiseInverse() * delta_s.array();
     }
 
-    bool factorize_kkt()
+    bool factorize()
     {
         isize n = ldlt.factorize_numeric_upper_triangular(PKPt);
         return n == PKPt.cols();
@@ -131,17 +131,17 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         rhs_z_bar.array() = rhs_z.array() - m_z_inv.array() * rhs_s.array();
 
         rhs.head(data.n).noalias() = rhs_x;
-        if (Mode == KKTMode::FULL)
+        if (Mode == KKTMode::KKT_FULL)
         {
             rhs.segment(data.n, data.p).noalias() = rhs_y;
             rhs.tail(data.m).noalias() = rhs_z_bar;
         }
-        else if (Mode == KKTMode::EQ_ELIMINATED)
+        else if (Mode == KKTMode::KKT_EQ_ELIMINATED)
         {
             rhs.head(data.n).noalias() += delta_inv * data.AT * rhs_y;
             rhs.tail(data.m).noalias() = rhs_z_bar;
         }
-        else if (Mode == KKTMode::INEQ_ELIMINATED)
+        else if (Mode == KKTMode::KKT_INEQ_ELIMINATED)
         {
             rhs_z_bar.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
             rhs.head(data.n).noalias() += data.GT * rhs_z_bar;
@@ -161,18 +161,18 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         ordering.template permt<T>(rhs, rhs_perm);
 
         delta_x.noalias() = rhs.head(data.n);
-        if (Mode == KKTMode::FULL)
+        if (Mode == KKTMode::KKT_FULL)
         {
             delta_y.noalias() = rhs.segment(data.n, data.p);
             delta_z.noalias() = rhs.tail(data.m);
         }
-        else if (Mode == KKTMode::EQ_ELIMINATED)
+        else if (Mode == KKTMode::KKT_EQ_ELIMINATED)
         {
             delta_y.noalias() = delta_inv * data.AT.transpose() * delta_x;
             delta_y.noalias() -= delta_inv * rhs_y;
             delta_z.noalias() = rhs.tail(data.m);
         }
-        else if (Mode == KKTMode::INEQ_ELIMINATED)
+        else if (Mode == KKTMode::KKT_INEQ_ELIMINATED)
         {
             delta_y.noalias() = rhs.tail(data.p);
             delta_z.noalias() = data.GT.transpose() * delta_x;

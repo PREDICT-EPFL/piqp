@@ -16,7 +16,7 @@ namespace piqp
 {
 
 template<typename Derived, typename T, typename I>
-struct KKTImpl<Derived, T, I, KKTMode::FULL>
+struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
 {
     Vec<I> P_utri_to_Ki; // mapping from P_utri row indices to KKT matrix
     Vec<T> P_diagonal;   // diagonal of P
@@ -33,7 +33,7 @@ struct KKTImpl<Derived, T, I, KKTMode::FULL>
         GT_to_Ki.resize(data.GT.nonZeros());
     }
 
-    SparseMat<T, I> init_KKT_matrix()
+    SparseMat<T, I> create_kkt_matrix()
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& m_rho = static_cast<Derived*>(this)->m_rho;
@@ -168,7 +168,7 @@ struct KKTImpl<Derived, T, I, KKTMode::FULL>
         return KKT;
     }
 
-    void update_kkt_cost()
+    void update_kkt_cost_scalings()
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
@@ -183,7 +183,7 @@ struct KKTImpl<Derived, T, I, KKTMode::FULL>
         }
     }
 
-    void update_kkt_equalities()
+    void update_kkt_equality_scalings()
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
@@ -197,7 +197,7 @@ struct KKTImpl<Derived, T, I, KKTMode::FULL>
         }
     }
 
-    void update_kkt_inequalities()
+    void update_kkt_inequality_scaling()
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;

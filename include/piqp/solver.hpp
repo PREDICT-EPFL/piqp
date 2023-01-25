@@ -21,7 +21,7 @@
 namespace piqp
 {
 
-template<typename T, typename I, int Mode = KKTMode::FULL>
+template<typename T, typename I, int Mode = KKTMode::KKT_FULL>
 class Solver
 {
 private:
@@ -112,7 +112,7 @@ public:
         dz.resize(m_data.m);
         ds.resize(m_data.m);
 
-        m_kkt.init_kkt(rho, delta);
+        m_kkt.init(rho, delta);
         m_kkt_dirty = false;
     }
 
@@ -149,10 +149,10 @@ public:
 
             m_result.s.setConstant(1);
             m_result.z.setConstant(1);
-            m_kkt.update_kkt(rho, delta, m_result.s, m_result.z);
+            m_kkt.update_scalings(rho, delta, m_result.s, m_result.z);
         }
 
-        while (!m_kkt.factorize_kkt())
+        while (!m_kkt.factorize())
         {
             if (m_result.info.factor_retires < m_settings.max_factor_retires)
             {
@@ -270,9 +270,9 @@ public:
                 m_result.info.no_dual_update = 0;
             }
 
-            m_kkt.update_kkt(rho, delta, m_result.s, m_result.z);
+            m_kkt.update_scalings(rho, delta, m_result.s, m_result.z);
             m_kkt_dirty = true;
-            bool kkt_success = m_kkt.factorize_kkt();
+            bool kkt_success = m_kkt.factorize();
             if (!kkt_success)
             {
                 if (m_result.info.factor_retires < m_settings.max_factor_retires)
@@ -419,8 +419,6 @@ public:
         m_result.info.status = Status::PIQP_MAX_ITER_REACHED;
         return m_result.info.status;
     }
-
-
 
 private:
     void update_nr_residuals()

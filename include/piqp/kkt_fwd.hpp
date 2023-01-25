@@ -14,10 +14,10 @@ namespace piqp
 
 enum KKTMode
 {
-    FULL = 0,
-    EQ_ELIMINATED = 0x1,
-    INEQ_ELIMINATED = 0x2,
-    ALL_ELIMINATED = EQ_ELIMINATED | INEQ_ELIMINATED
+    KKT_FULL = 0,
+    KKT_EQ_ELIMINATED = 0x1,
+    KKT_INEQ_ELIMINATED = 0x2,
+    KKT_ALL_ELIMINATED = KKT_EQ_ELIMINATED | KKT_INEQ_ELIMINATED
 };
 
 template<typename Derived, typename T, typename I, int Mode>
