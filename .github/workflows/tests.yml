@@ -37,12 +37,12 @@ jobs:
         env:
           EIGEN_VERSION: ${{ matrix.eigen }}
 
-      - name: Build laopt
+      - name: Build piqp
         working-directory: build
         run: |
-          cmake .. -CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DENABLE_SANITIZERS=$ENABLE_SANITIZERS
+          cmake .. -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DENABLE_SANITIZERS=$ENABLE_SANITIZERS
           make -j2
 
-      - name: Test laopt
+      - name: Test piqp
         working-directory: build
         run: ctest --test-dir tests --verbose
