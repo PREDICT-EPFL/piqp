@@ -16,6 +16,7 @@
 #include "piqp/settings.hpp"
 #include "piqp/data.hpp"
 #include "piqp/kkt.hpp"
+#include "piqp/utils/optional.hpp"
 
 namespace piqp
 {
@@ -418,6 +419,8 @@ public:
         m_result.info.status = Status::PIQP_MAX_ITER_REACHED;
         return m_result.info.status;
     }
+
+
 
 private:
     void update_nr_residuals()
