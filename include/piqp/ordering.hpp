@@ -17,7 +17,7 @@ class NaturalOrdering
 {
 public:
     template<typename T>
-    void init(const SparseMat<T, I>& A) {}
+    void init(PIQP_MAYBE_UNUSED const SparseMat<T, I>& A) {}
 
     EIGEN_STRONG_INLINE I operator[](isize idx) const
     {
