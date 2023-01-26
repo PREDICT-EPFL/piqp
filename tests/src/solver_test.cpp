@@ -133,6 +133,28 @@ TYPED_TEST(SolverTest, DualInfeasibleQP)
     ASSERT_EQ(status, Status::PIQP_DUAL_INFEASIBLE);
 }
 
+//TYPED_TEST(SolverTest, NonConvexQP)
+//{
+//    Mat<T> P(2, 2); P << 2, 5, 5, 1;
+//    Vec<T> c(2); c << 3, 4;
+//
+//    SparseMat<T, I> A(0, 2);
+//    Vec<T> b(0);
+//
+//    Mat<T> G(5, 2); G << -1, 0, 0, -1, -1, 3, 2, 5, 3, 4;
+//    Vec<T> h(5); h << 0, 0, -15, 100, 80;
+//
+//    TypeParam solver;
+//    solver.settings().verbose = true;
+//    solver.setup(P.sparseView(), A, G.sparseView(), c, b, h);
+//
+//    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+//    Status status = solver.solve();
+//    PIQP_EIGEN_MALLOC_ALLOWED();
+//
+//    ASSERT_EQ(status, Status::PIQP_NON_CONVEX);
+//}
+
 TYPED_TEST(SolverTest, StronglyConvexWithEqualityAndInequalities)
 {
     isize dim = 20;

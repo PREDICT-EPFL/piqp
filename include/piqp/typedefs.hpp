@@ -57,6 +57,8 @@ using Vec = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 template<typename T>
 using VecRef = Eigen::Ref<Eigen::Matrix<T, Eigen::Dynamic, 1>>;
 template<typename T>
+using Mat = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+template<typename T>
 using MatRef = Eigen::Ref<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>;
 template<typename T>
 using CVecRef = Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>>;
