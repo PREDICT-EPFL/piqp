@@ -133,7 +133,7 @@ public:
             isize n = P_.outerSize();
             for (isize j = 0; j < n; j++)
             {
-                isize P_col_nnz = P_.outerIndexPtr()[j + 1] - P_.outerIndexPtr()[j];
+                PIQP_MAYBE_UNUSED isize P_col_nnz = P_.outerIndexPtr()[j + 1] - P_.outerIndexPtr()[j];
                 isize P_utri_col_nnz = m_data.P_utri.outerIndexPtr()[j + 1] - m_data.P_utri.outerIndexPtr()[j];
                 eigen_assert(P_col_nnz >= P_utri_col_nnz && "P nonzeros missmatch");
                 Eigen::Map<Vec<T>>(m_data.P_utri.valuePtr() + m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P_.valuePtr() + P_.outerIndexPtr()[j], P_utri_col_nnz);

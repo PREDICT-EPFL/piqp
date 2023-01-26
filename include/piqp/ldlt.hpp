@@ -172,7 +172,7 @@ struct LDLt
 
     void dsolve(VecRef<T> x)
     {
-        isize n = x.rows();
+        PIQP_MAYBE_UNUSED isize n = x.rows();
         eigen_assert(n == D_inv.rows() && "vector dimension missmatch!");
         x.array() *= D_inv.array();
     }
