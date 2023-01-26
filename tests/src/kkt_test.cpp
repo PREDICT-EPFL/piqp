@@ -77,6 +77,57 @@ TYPED_TEST(KKTTest, UpdateScalings)
     EXPECT_TRUE(kkt.PKPt.isApprox(kkt2.PKPt, 1e-8));
 }
 
+TYPED_TEST(KKTTest, UpdateData)
+{
+    isize dim = 10;
+    isize n_eq = 8;
+    isize n_ineq = 9;
+    T sparsity_factor = 0.2;
+
+    Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
+
+    Data<T, I> data;
+    data.n = dim;
+    data.p = n_eq;
+    data.m = n_ineq;
+    data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
+    data.AT = qp_model.A.transpose();
+    data.GT = qp_model.G.transpose();
+    data.c = qp_model.c;
+    data.b = qp_model.b;
+    data.h = qp_model.h;
+
+    // make sure P_utri has not complete diagonal filled
+    data.P_utri.coeffRef(1, 1) = 0;
+    data.P_utri.prune(0.0);
+
+    T rho = 0.9;
+    T delta = 1.2;
+
+    TypeParam kkt(data);
+    kkt.init(rho, delta);
+
+    // update data
+    Eigen::Map<Vec<T>>(data.P_utri.valuePtr(), data.P_utri.nonZeros()) = rand::vector_rand<T>(data.P_utri.nonZeros());
+    Eigen::Map<Vec<T>>(data.AT.valuePtr(), data.AT.nonZeros()) = rand::vector_rand<T>(data.AT.nonZeros());
+    Eigen::Map<Vec<T>>(data.GT.valuePtr(), data.GT.nonZeros()) = rand::vector_rand<T>(data.GT.nonZeros());
+    int update_options = KKTUpdateOptions::KKT_UPDATE_P | KKTUpdateOptions::KKT_UPDATE_A | KKTUpdateOptions::KKT_UPDATE_G;
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    kkt.update_data(update_options);
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    // assert PKPt matrix is upper triangular
+    SparseMat<T, I> PKPt_upper = kkt.PKPt.template triangularView<Eigen::Upper>();
+    assert_sparse_matrices_equal(kkt.PKPt, PKPt_upper);
+
+    TypeParam kkt2(data);
+    kkt2.init(rho, delta);
+
+    // assert update was correct, i.e. it's the same as a freshly initialized one
+    EXPECT_TRUE(kkt.PKPt.isApprox(kkt2.PKPt, 1e-8));
+}
+
 TYPED_TEST(KKTTest, FactorizeSolve)
 {
     isize dim = 10;

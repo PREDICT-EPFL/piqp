@@ -27,10 +27,15 @@ class SolverTest : public ::testing::Test {};
 TYPED_TEST_SUITE(SolverTest, solver_types);
 
 /*
+ * first QP:
  * min 3 x1^2 + 2 x2^2 - x1 - 4 x2
  * s.t. -1 <= x <= 1, x1 = 2 x2
+ *
+ * second QP:
+ * min 4 x1^2 + 2 x2^2 - x1 - 4 x2
+ * s.t. -1 <= x <= 2, x1 = 3 x2
 */
-TYPED_TEST(SolverTest, SimpleQP)
+TYPED_TEST(SolverTest, SimpleQPWithUpdate)
 {
     SparseMat<T, I> P(2, 2);
     P.insert(0, 0) = 6;
@@ -61,9 +66,25 @@ TYPED_TEST(SolverTest, SimpleQP)
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     ASSERT_EQ(status, Status::PIQP_SOLVED);
-
     ASSERT_NEAR(solver.result().x(0), 0.4285714, 1e-6);
     ASSERT_NEAR(solver.result().x(1), 0.2142857, 1e-6);
+
+    P.coeffRef(0, 0) = 8;
+    A.coeffRef(0, 1) = -3;
+    h(0) = 2;
+    h(1) = 2;
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    solver.update(P, A, nullopt, c, b, h);
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    status = solver.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    ASSERT_NEAR(solver.result().x(0), 0.2763157, 1e-6);
+    ASSERT_NEAR(solver.result().x(1), 0.0921056, 1e-6);
 }
 
 /*

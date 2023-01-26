@@ -20,6 +20,14 @@ enum KKTMode
     KKT_ALL_ELIMINATED = KKT_EQ_ELIMINATED | KKT_INEQ_ELIMINATED
 };
 
+enum KKTUpdateOptions
+{
+    KKT_UPDATE_NONE = 0,
+    KKT_UPDATE_P = 0x1,
+    KKT_UPDATE_A = 0x2,
+    KKT_UPDATE_G = 0x4
+};
+
 template<typename Derived, typename T, typename I, int Mode>
 struct KKTImpl;
 

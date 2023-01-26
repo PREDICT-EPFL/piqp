@@ -116,6 +116,66 @@ public:
         m_kkt_dirty = false;
     }
 
+    void update(optional<const SparseMat<T, I>&> P,
+                optional<const SparseMat<T, I>&> A,
+                optional<const SparseMat<T, I>&> G,
+                const CVecRef<T>& c,
+                const CVecRef<T>& b,
+                const CVecRef<T>& h)
+    {
+        int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
+
+        if (P.has_value())
+        {
+            const SparseMat<T, I>& P_ = *P;
+
+            eigen_assert(P_.rows() == m_data.n && P_.cols() == m_data.n && "P has wrong dimensions");
+            isize n = P_.outerSize();
+            for (isize j = 0; j < n; j++)
+            {
+                isize P_col_nnz = P_.outerIndexPtr()[j + 1] - P_.outerIndexPtr()[j];
+                isize P_utri_col_nnz = m_data.P_utri.outerIndexPtr()[j + 1] - m_data.P_utri.outerIndexPtr()[j];
+                eigen_assert(P_col_nnz >= P_utri_col_nnz && "P nonzeros missmatch");
+                Eigen::Map<Vec<T>>(m_data.P_utri.valuePtr() + m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P_.valuePtr() + P_.outerIndexPtr()[j], P_utri_col_nnz);
+            }
+
+            update_options |= KKTUpdateOptions::KKT_UPDATE_P;
+        }
+
+        if (A.has_value())
+        {
+            const SparseMat<T, I>& A_ = *A;
+
+            eigen_assert(A_.rows() == m_data.p && A_.cols() == m_data.n && "A has wrong dimensions");
+            eigen_assert(A_.nonZeros() == m_data.AT.nonZeros() && "A nonzeros missmatch");
+            transpose_no_allocation(A_, m_data.AT);
+
+            update_options |= KKTUpdateOptions::KKT_UPDATE_A;
+        }
+
+        if (G.has_value())
+        {
+            const SparseMat<T, I>& G_ = *G;
+
+            eigen_assert(G_.rows() == m_data.m && G_.cols() == m_data.n && "G has wrong dimensions");
+            eigen_assert(G_.nonZeros() == m_data.GT.nonZeros() && "G nonzeros missmatch");
+            transpose_no_allocation(G_, m_data.GT);
+
+            update_options |= KKTUpdateOptions::KKT_UPDATE_G;
+        }
+
+        eigen_assert(c.size() == m_data.n && "c has wrong dimensions");
+        m_data.c = c;
+
+        eigen_assert(b.size() == m_data.p && "b has wrong dimensions");
+        m_data.b = b;
+
+        eigen_assert(h.size() == m_data.m && "h has wrong dimensions");
+        m_data.h = h;
+
+        m_kkt.update_data(update_options);
+    }
+
     Status solve()
     {
         if (m_settings.verbose)

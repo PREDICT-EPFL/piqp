@@ -214,6 +214,49 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
             k++;
         }
     }
+
+    void update_data(int options)
+    {
+        auto& data = static_cast<Derived*>(this)->data;
+        auto& PKPt = static_cast<Derived*>(this)->PKPt;
+        auto& PKi = static_cast<Derived*>(this)->PKi;
+
+        if (options & KKTUpdateOptions::KKT_UPDATE_P)
+        {
+            isize jj = data.P_utri.outerSize();
+            for (isize j = 0; j < jj; j++)
+            {
+                isize kk = data.P_utri.outerIndexPtr()[j + 1];
+                for (isize k = data.P_utri.outerIndexPtr()[j]; k < kk; k++)
+                {
+                    PKPt.valuePtr()[PKi(P_utri_to_Ki(k))] = data.P_utri.valuePtr()[k];
+                    if (j == data.P_utri.innerIndexPtr()[k])
+                    {
+                        P_diagonal[j] = data.P_utri.valuePtr()[k];
+                    }
+                }
+            }
+            update_kkt_cost_scalings();
+        }
+
+        if (options & KKTUpdateOptions::KKT_UPDATE_A)
+        {
+            isize n = data.AT.nonZeros();
+            for (isize k = 0; k < n; k++)
+            {
+                PKPt.valuePtr()[PKi(AT_to_Ki(k))] = data.AT.valuePtr()[k];
+            }
+        }
+
+        if (options & KKTUpdateOptions::KKT_UPDATE_G)
+        {
+            isize n = data.GT.nonZeros();
+            for (isize k = 0; k < n; k++)
+            {
+                PKPt.valuePtr()[PKi(GT_to_Ki(k))] = data.GT.valuePtr()[k];
+            }
+        }
+    }
 };
 
 } // namespace piqp

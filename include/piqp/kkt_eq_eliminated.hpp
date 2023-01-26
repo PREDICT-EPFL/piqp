@@ -218,6 +218,24 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
         }
     }
 
+    void update_data(int options)
+    {
+        auto& data = static_cast<Derived*>(this)->data;
+
+        if (options & KKTUpdateOptions::KKT_UPDATE_A)
+        {
+            transpose_no_allocation(data.AT, A);
+            update_AT_A();
+        }
+
+        if (options != KKTUpdateOptions::KKT_UPDATE_NONE)
+        {
+            update_kkt_cost_scalings();
+            update_kkt_equality_scalings();
+            update_kkt_inequality_scaling();
+        }
+    }
+
     void update_AT_A()
     {
         auto& data = static_cast<Derived*>(this)->data;
