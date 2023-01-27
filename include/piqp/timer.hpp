@@ -9,6 +9,8 @@
 #ifndef PIQP_TIMER_HPP
 #define PIQP_TIMER_HPP
 
+#include <chrono>
+
 namespace piqp
 {
 
