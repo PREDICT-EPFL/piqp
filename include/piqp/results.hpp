@@ -36,6 +36,8 @@ struct Info
     T no_primal_update; // dual infeasibility detection counter
     T no_dual_update;   // primal infeasibility detection counter
 
+    T rho;
+    T delta;
     T mu;
     T sigma;
     T primal_step;

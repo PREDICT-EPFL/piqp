@@ -31,10 +31,6 @@ private:
     KKT<T, I, Mode> m_kkt;
     bool m_kkt_dirty = true;
 
-    // regularization parameters
-    T rho;
-    T delta;
-
     // residuals
     Vec<T> rx;
     Vec<T> ry;
@@ -98,8 +94,8 @@ public:
         m_result.nu.resize(m_data.m);
 
         // init workspace
-        rho = m_settings.rho_init;
-        delta = m_settings.delta_init;
+        m_result.info.rho = m_settings.rho_init;
+        m_result.info.delta = m_settings.delta_init;
 
         rx.resize(m_data.n);
         ry.resize(m_data.p);
@@ -115,7 +111,7 @@ public:
         dz.resize(m_data.m);
         ds.resize(m_data.m);
 
-        m_kkt.init(rho, delta);
+        m_kkt.init(m_result.info.rho, m_result.info.delta);
         m_kkt_dirty = false;
     }
 
@@ -207,20 +203,20 @@ public:
 
         if (m_kkt_dirty)
         {
-            rho = m_settings.rho_init;
-            delta = m_settings.delta_init;
+            m_result.info.rho = m_settings.rho_init;
+            m_result.info.delta = m_settings.delta_init;
 
             m_result.s.setConstant(1);
             m_result.z.setConstant(1);
-            m_kkt.update_scalings(rho, delta, m_result.s, m_result.z);
+            m_kkt.update_scalings(m_result.info.rho, m_result.info.delta, m_result.s, m_result.z);
         }
 
         while (!m_kkt.factorize())
         {
             if (m_result.info.factor_retires < m_settings.max_factor_retires)
             {
-                delta *= 100;
-                rho *= 100;
+                m_result.info.delta *= 100;
+                m_result.info.rho *= 100;
                 m_result.info.factor_retires++;
                 m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.feas_tol_abs);
             }
@@ -292,16 +288,16 @@ public:
                        dual_cost,
                        m_result.info.primal_inf,
                        m_result.info.dual_inf,
-                       rho,
-                       delta,
+                       m_result.info.rho,
+                       m_result.info.delta,
                        m_result.info.mu,
                        m_result.info.primal_step,
                        m_result.info.dual_step);
             }
 
-            rx = rx_nr - rho * (m_result.x - m_result.zeta);
-            ry = ry_nr - delta * (m_result.lambda - m_result.y);
-            rz = rz_nr - delta * (m_result.nu - m_result.z);
+            rx = rx_nr - m_result.info.rho * (m_result.x - m_result.zeta);
+            ry = ry_nr - m_result.info.delta * (m_result.lambda - m_result.y);
+            rz = rz_nr - m_result.info.delta * (m_result.nu - m_result.z);
 
             if (m_result.info.primal_inf < m_settings.feas_tol_abs + m_settings.feas_tol_rel * primal_rel_inf &&
                 m_result.info.dual_inf < m_settings.feas_tol_abs + m_settings.feas_tol_rel * dual_rel_inf &&
@@ -330,23 +326,23 @@ public:
             m_result.info.iter++;
 
             // avoid possibility of converging to a local minimum -> decrease the minimum regularization value
-            if ((m_result.info.no_primal_update > 5 && rho == m_result.info.reg_limit && m_result.info.reg_limit != 5e-13) ||
-                (m_result.info.no_dual_update > 5 && delta == m_result.info.reg_limit && m_result.info.reg_limit != 5e-13))
+            if ((m_result.info.no_primal_update > 5 && m_result.info.rho == m_result.info.reg_limit && m_result.info.reg_limit != 5e-13) ||
+                (m_result.info.no_dual_update > 5 && m_result.info.delta == m_result.info.reg_limit && m_result.info.reg_limit != 5e-13))
             {
                 m_result.info.reg_limit = 5e-13;
                 m_result.info.no_primal_update = 0;
                 m_result.info.no_dual_update = 0;
             }
 
-            m_kkt.update_scalings(rho, delta, m_result.s, m_result.z);
+            m_kkt.update_scalings(m_result.info.rho, m_result.info.delta, m_result.s, m_result.z);
             m_kkt_dirty = true;
             bool kkt_success = m_kkt.factorize();
             if (!kkt_success)
             {
                 if (m_result.info.factor_retires < m_settings.max_factor_retires)
                 {
-                    delta *= 100;
-                    rho *= 100;
+                    m_result.info.delta *= 100;
+                    m_result.info.rho *= 100;
                     m_result.info.iter--;
                     m_result.info.factor_retires++;
                     m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.feas_tol_abs);
@@ -427,24 +423,24 @@ public:
                 if (rx_nr.template lpNorm<Eigen::Infinity>() < 0.95 * m_result.info.dual_inf)
                 {
                     m_result.zeta = m_result.x;
-                    rho = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * rho);
+                    m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.rho);
                 }
                 else
                 {
                     m_result.info.no_primal_update++;
-                    rho = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * rho);
+                    m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * m_result.info.rho);
                 }
 
                 if (std::max(ry_nr.template lpNorm<Eigen::Infinity>(), rz_nr.template lpNorm<Eigen::Infinity>()) < 0.95 * m_result.info.primal_inf)
                 {
                     m_result.lambda = m_result.y;
                     m_result.nu = m_result.z;
-                    delta = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * delta);
+                    m_result.info.delta = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.delta);
                 }
                 else
                 {
                     m_result.info.no_dual_update++;
-                    delta = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * delta);
+                    m_result.info.delta = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * m_result.info.delta);
                 }
             }
             else
@@ -463,23 +459,23 @@ public:
                 if (rx_nr.template lpNorm<Eigen::Infinity>() < 0.95 * m_result.info.dual_inf)
                 {
                     m_result.zeta = m_result.x;
-                    rho = std::max(m_result.info.reg_limit, 0.1 * rho);
+                    m_result.info.rho = std::max(m_result.info.reg_limit, 0.1 * m_result.info.rho);
                 }
                 else
                 {
                     m_result.info.no_primal_update++;
-                    rho = std::max(m_result.info.reg_limit, 0.5 * rho);
+                    m_result.info.rho = std::max(m_result.info.reg_limit, 0.5 * m_result.info.rho);
                 }
 
                 if (std::max(ry_nr.template lpNorm<Eigen::Infinity>(), rz_nr.template lpNorm<Eigen::Infinity>()) < 0.95 * m_result.info.primal_inf)
                 {
                     m_result.lambda = m_result.y;
-                    delta = std::max(m_result.info.reg_limit, 0.1 * delta);
+                    m_result.info.delta = std::max(m_result.info.reg_limit, 0.1 * m_result.info.delta);
                 }
                 else
                 {
                     m_result.info.no_dual_update++;
-                    delta = std::max(m_result.info.reg_limit, 0.5 * delta);
+                    m_result.info.delta = std::max(m_result.info.reg_limit, 0.5 * m_result.info.delta);
                 }
             }
         }
