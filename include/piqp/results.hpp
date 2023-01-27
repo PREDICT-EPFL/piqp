@@ -25,6 +25,21 @@ enum Status
     PIQP_INVALID_SETTINGS = -10
 };
 
+constexpr const char* status_to_string(Status status)
+{
+    switch (status)
+    {
+        case Status::PIQP_SOLVED: return "solved";
+        case Status::PIQP_MAX_ITER_REACHED: return "max iterations reached";
+        case Status::PIQP_PRIMAL_INFEASIBLE: return "primal infeasible";
+        case Status::PIQP_DUAL_INFEASIBLE: return "dual infeasible";
+        case Status::PIQP_NUMERICS: return "numerics issue";
+        case Status::PIQP_UNSOLVED: return "unsolved";
+        case Status::PIQP_INVALID_SETTINGS: return "invalid settings";
+        default: return "unknown";
+    }
+}
+
 template<typename T>
 struct Info
 {
@@ -45,6 +60,11 @@ struct Info
     T reg_limit;
     T no_primal_update; // dual infeasibility detection counter
     T no_dual_update;   // primal infeasibility detection counter
+
+    T setup_time;
+    T update_time;
+    T solve_time;
+    T run_time;
 };
 
 template<typename T>

@@ -12,6 +12,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
+#include "piqp/timer.hpp"
 #include "piqp/results.hpp"
 #include "piqp/settings.hpp"
 #include "piqp/data.hpp"
@@ -25,11 +26,14 @@ template<typename T, typename I, int Mode = KKTMode::KKT_FULL>
 class Solver
 {
 private:
+    Timer<T> m_timer;
     Result<T> m_result;
     Settings<T> m_settings;
     Data<T, I> m_data;
     KKT<T, I, Mode> m_kkt;
+
     bool m_kkt_dirty = true;
+    bool m_setup_done = false;
 
     // residuals
     Vec<T> rx;
@@ -65,6 +69,11 @@ public:
                const CVecRef<T>& b,
                const CVecRef<T>& h)
     {
+        if (m_settings.compute_timings)
+        {
+            m_timer.start();
+        }
+
         m_data.n = P.rows();
         m_data.p = A.rows();
         m_data.m = G.rows();
@@ -96,6 +105,10 @@ public:
         // init workspace
         m_result.info.rho = m_settings.rho_init;
         m_result.info.delta = m_settings.delta_init;
+        m_result.info.setup_time = 0;
+        m_result.info.update_time = 0;
+        m_result.info.solve_time = 0;
+        m_result.info.run_time = 0;
 
         rx.resize(m_data.n);
         ry.resize(m_data.p);
@@ -113,6 +126,14 @@ public:
 
         m_kkt.init(m_result.info.rho, m_result.info.delta);
         m_kkt_dirty = false;
+        m_setup_done = true;
+
+        if (m_settings.compute_timings)
+        {
+            T setup_time = m_timer.stop();
+            m_result.info.setup_time = setup_time;
+            m_result.info.run_time += setup_time;
+        }
     }
 
     void update(optional<const SparseMat<T, I>&> P,
@@ -122,6 +143,17 @@ public:
                 const CVecRef<T>& b,
                 const CVecRef<T>& h)
     {
+        if (!m_setup_done)
+        {
+            eigen_assert(false && "Solver not setup yet");
+            return;
+        }
+
+        if (m_settings.compute_timings)
+        {
+            m_timer.start();
+        }
+
         int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
 
         if (P.has_value())
@@ -173,6 +205,13 @@ public:
         m_data.h = h;
 
         m_kkt.update_data(update_options);
+
+        if (m_settings.compute_timings)
+        {
+            T update_time = m_timer.stop();
+            m_result.info.update_time = update_time;
+            m_result.info.run_time += update_time;
+        }
     }
 
     Status solve()
@@ -187,8 +226,46 @@ public:
             printf("variables n = %ld, nzz(P upper triangular) = %ld\n", m_data.m, m_data.P_utri.nonZeros());
             printf("equality constraints p = %ld, nnz(A) = %ld\n", m_data.p, m_data.AT.nonZeros());
             printf("inequality constraints m = %ld, nnz(G) = %ld\n", m_data.m, m_data.GT.nonZeros());
-            printf("----------------------------------------------------------\n");
+            printf("\n");
             printf("iter  prim_cost      dual_cost      prim_inf      dual_inf      rho         delta       mu          prim_step   dual_step\n");
+        }
+
+        if (m_settings.compute_timings)
+        {
+            m_timer.start();
+        }
+
+        Status status = solve_impl();
+
+        if (m_settings.compute_timings)
+        {
+            T solve_time = m_timer.stop();
+            m_result.info.solve_time = solve_time;
+            m_result.info.run_time += solve_time;
+        }
+
+        printf("\n");
+        printf("status:               %s\n", status_to_string(status));
+        printf("number of iterations: %ld\n", m_result.info.iter);
+        if (m_settings.compute_timings)
+        {
+            printf("total run time:       %.3es\n", m_result.info.run_time);
+            printf("  setup time:         %.3es\n", m_result.info.setup_time);
+            printf("  update time:        %.3es\n", m_result.info.update_time);
+            printf("  solve time:         %.3es\n", m_result.info.solve_time);
+        }
+
+        return status;
+    }
+
+protected:
+    Status solve_impl()
+    {
+        if (!m_setup_done)
+        {
+            eigen_assert(false && "Solver not setup yet");
+            m_result.info.status = Status::PIQP_UNSOLVED;
+            return m_result.info.status;
         }
 
         if (!m_settings.verify_settings())
@@ -490,7 +567,6 @@ public:
         return m_result.info.status;
     }
 
-private:
     void update_nr_residuals()
     {
         rx_nr.noalias() = -m_data.P_utri * m_result.x;

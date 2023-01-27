@@ -29,6 +29,7 @@ struct Settings
     T tau = 0.995;
 
     bool verbose = false;
+    bool compute_timings = false;
 
     bool verify_settings() const noexcept
     {
