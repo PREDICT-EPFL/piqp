@@ -18,7 +18,8 @@ struct Settings
     T rho_init   = 1e-6;
     T delta_init = 1e-4;
 
-    T feas_tol         = 1e-8;
+    T feas_tol_abs     = 1e-8;
+    T feas_tol_rel     = 1e-8;
     T dual_tol         = 1e-8;
     T reg_lower_limit  = 1e-10;
 

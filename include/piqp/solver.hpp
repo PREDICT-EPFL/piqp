@@ -52,6 +52,9 @@ private:
     Vec<T> dz;
     Vec<T> ds;
 
+    T primal_rel_inf;
+    T dual_rel_inf;
+
 public:
     Solver() : m_kkt(m_data) {};
 
@@ -219,7 +222,7 @@ public:
                 delta *= 100;
                 rho *= 100;
                 m_result.info.factor_retires++;
-                m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.feas_tol);
+                m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.feas_tol_abs);
             }
             else
             {
@@ -239,7 +242,7 @@ public:
         if (m_data.m > 0)
         {
             // not sure if this is necessary
-            if (m_result.s.norm() <= 1e-4)
+            if (m_result.s.template lpNorm<Eigen::Infinity>() <= 1e-4)
             {
                 // 0.1 is arbitrary
                 m_result.s.setConstant(0.1);
@@ -269,8 +272,9 @@ public:
                 update_nr_residuals();
             }
 
-            m_result.info.primal_inf = ry_nr.norm() + rz_nr.norm();
-            m_result.info.dual_inf = rx_nr.norm();
+            m_result.info.primal_inf = std::max(ry_nr.template lpNorm<Eigen::Infinity>(),
+                                                rz_nr.template lpNorm<Eigen::Infinity>());
+            m_result.info.dual_inf = rx_nr.template lpNorm<Eigen::Infinity>();
 
             if (m_settings.verbose)
             {
@@ -299,21 +303,25 @@ public:
             ry = ry_nr - delta * (m_result.lambda - m_result.y);
             rz = rz_nr - delta * (m_result.nu - m_result.z);
 
-            if (m_result.info.dual_inf / std::max(T(100), m_data.c.norm()) < m_settings.feas_tol &&
-                m_result.info.primal_inf / std::max(T(100), m_data.b.norm() + m_data.h.norm()) < m_settings.feas_tol &&
+            if (m_result.info.primal_inf < m_settings.feas_tol_abs + m_settings.feas_tol_rel * primal_rel_inf &&
+                m_result.info.dual_inf < m_settings.feas_tol_abs + m_settings.feas_tol_rel * dual_rel_inf &&
                 m_result.info.mu < m_settings.dual_tol)
             {
                 m_result.info.status = Status::PIQP_SOLVED;
                 return m_result.info.status;
             }
 
-            if (m_result.info.no_dual_update > 5 && (m_result.lambda - m_result.y).norm() + (m_result.nu - m_result.z).norm() > 1e10 && ry.norm() + rz.norm() < m_settings.feas_tol)
+            if (m_result.info.no_dual_update > 5 &&
+                std::max((m_result.lambda - m_result.y).template lpNorm<Eigen::Infinity>(), (m_result.nu - m_result.z).template lpNorm<Eigen::Infinity>()) > 1e10 &&
+                std::max(ry.template lpNorm<Eigen::Infinity>(), rz.template lpNorm<Eigen::Infinity>()) < m_settings.feas_tol_abs)
             {
                 m_result.info.status = Status::PIQP_PRIMAL_INFEASIBLE;
                 return m_result.info.status;
             }
 
-            if (m_result.info.no_primal_update > 5 && (m_result.x - m_result.zeta).norm() > 1e10 && rx.norm() < m_settings.feas_tol)
+            if (m_result.info.no_primal_update > 5 &&
+                (m_result.x - m_result.zeta).template lpNorm<Eigen::Infinity>() > 1e10 &&
+                rx.template lpNorm<Eigen::Infinity>() < m_settings.feas_tol_abs)
             {
                 m_result.info.status = Status::PIQP_DUAL_INFEASIBLE;
                 return m_result.info.status;
@@ -341,7 +349,7 @@ public:
                     rho *= 100;
                     m_result.info.iter--;
                     m_result.info.factor_retires++;
-                    m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.feas_tol);
+                    m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.feas_tol_abs);
                     continue;
                 }
                 else
@@ -416,7 +424,7 @@ public:
                 // ------------------ update regularization ------------------
                 update_nr_residuals();
 
-                if (rx_nr.norm() < 0.95 * m_result.info.dual_inf)
+                if (rx_nr.template lpNorm<Eigen::Infinity>() < 0.95 * m_result.info.dual_inf)
                 {
                     m_result.zeta = m_result.x;
                     rho = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * rho);
@@ -427,7 +435,7 @@ public:
                     rho = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * rho);
                 }
 
-                if (ry_nr.norm() + rz_nr.norm() < 0.95 * m_result.info.primal_inf)
+                if (std::max(ry_nr.template lpNorm<Eigen::Infinity>(), rz_nr.template lpNorm<Eigen::Infinity>()) < 0.95 * m_result.info.primal_inf)
                 {
                     m_result.lambda = m_result.y;
                     m_result.nu = m_result.z;
@@ -452,7 +460,7 @@ public:
                 // ------------------ update regularization ------------------
                 update_nr_residuals();
 
-                if (rx_nr.norm() < 0.95 * m_result.info.dual_inf)
+                if (rx_nr.template lpNorm<Eigen::Infinity>() < 0.95 * m_result.info.dual_inf)
                 {
                     m_result.zeta = m_result.x;
                     rho = std::max(m_result.info.reg_limit, 0.1 * rho);
@@ -463,7 +471,7 @@ public:
                     rho = std::max(m_result.info.reg_limit, 0.5 * rho);
                 }
 
-                if (ry_nr.norm() + rz_nr.norm() < 0.95 * m_result.info.primal_inf)
+                if (std::max(ry_nr.template lpNorm<Eigen::Infinity>(), rz_nr.template lpNorm<Eigen::Infinity>()) < 0.95 * m_result.info.primal_inf)
                 {
                     m_result.lambda = m_result.y;
                     delta = std::max(m_result.info.reg_limit, 0.1 * delta);
@@ -485,13 +493,24 @@ private:
     {
         rx_nr.noalias() = -m_data.P_utri * m_result.x;
         rx_nr.noalias() -= m_data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * m_result.x;
-        rx_nr.array() -= m_data.c.array();
-        rx_nr.noalias() -= m_data.AT * m_result.y;
-        rx_nr.noalias() -= m_data.GT * m_result.z;
+        dual_rel_inf = rx_nr.template lpNorm<Eigen::Infinity>();
+        rx_nr.noalias() -= m_data.c;
+        dx.noalias() = m_data.AT * m_result.y; // use dx as a temporary
+        dual_rel_inf = std::max(dual_rel_inf, dx.template lpNorm<Eigen::Infinity>());
+        rx_nr.noalias() -= dx;
+        dx.noalias() = m_data.GT * m_result.z; // use dx as a temporary
+        dual_rel_inf = std::max(dual_rel_inf, dx.template lpNorm<Eigen::Infinity>());
+        rx_nr.noalias() -= dx;
 
-        ry_nr.noalias() = m_data.b - m_data.AT.transpose() * m_result.x;
+        ry_nr.noalias() = -m_data.AT.transpose() * m_result.x;
+        primal_rel_inf = ry_nr.template lpNorm<Eigen::Infinity>();
+        ry_nr.noalias() += m_data.b;
+        primal_rel_inf = std::max(primal_rel_inf, m_data.b.template lpNorm<Eigen::Infinity>());
 
-        rz_nr.noalias() = m_data.h - m_result.s - m_data.GT.transpose() * m_result.x;
+        rz_nr.noalias() = -m_data.GT.transpose() * m_result.x;
+        primal_rel_inf = std::max(primal_rel_inf, rz_nr.template lpNorm<Eigen::Infinity>());
+        rz_nr.noalias() += m_data.h - m_result.s;
+        primal_rel_inf = std::max(primal_rel_inf, m_data.h.template lpNorm<Eigen::Infinity>());
     }
 };
 
