@@ -29,6 +29,19 @@ struct Settings
     T tau = 0.995;
 
     bool verbose = false;
+
+    bool verify_settings() const noexcept
+    {
+        return rho_init > 0 &&
+               delta_init > 0 &&
+               feas_tol_abs > 0 &&
+               feas_tol_rel > 0 &&
+               dual_tol > 0 &&
+               reg_lower_limit > 0 &&
+               max_iter > 0 &&
+               max_factor_retires > 0 &&
+               tau > 0 && tau <= 1;
+    }
 };
 
 } // namespace piqp

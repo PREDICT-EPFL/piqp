@@ -31,11 +31,6 @@ struct Info
     Status status;
 
     isize iter;
-    T factor_retires;
-    T reg_limit;
-    T no_primal_update; // dual infeasibility detection counter
-    T no_dual_update;   // primal infeasibility detection counter
-
     T rho;
     T delta;
     T mu;
@@ -45,6 +40,11 @@ struct Info
 
     T primal_inf;
     T dual_inf;
+
+    T factor_retires;
+    T reg_limit;
+    T no_primal_update; // dual infeasibility detection counter
+    T no_dual_update;   // primal infeasibility detection counter
 };
 
 template<typename T>

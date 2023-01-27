@@ -191,6 +191,12 @@ public:
             printf("iter  prim_cost      dual_cost      prim_inf      dual_inf      rho         delta       mu          prim_step   dual_step\n");
         }
 
+        if (!m_settings.verify_settings())
+        {
+            m_result.info.status = Status::PIQP_INVALID_SETTINGS;
+            return m_result.info.status;
+        }
+
         m_result.info.status = Status::PIQP_UNSOLVED;
         m_result.info.iter = 0;
         m_result.info.reg_limit = m_settings.reg_lower_limit;
