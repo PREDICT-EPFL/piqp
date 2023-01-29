@@ -136,12 +136,12 @@ public:
         }
     }
 
-    void update(optional<const SparseMat<T, I>&> P,
-                optional<const SparseMat<T, I>&> A,
-                optional<const SparseMat<T, I>&> G,
-                const CVecRef<T>& c,
-                const CVecRef<T>& b,
-                const CVecRef<T>& h)
+    void update(const optional<SparseMat<T, I>> P,
+                const optional<SparseMat<T, I>> A,
+                const optional<SparseMat<T, I>> G,
+                const optional<CVecRef<T>> c,
+                const optional<CVecRef<T>> b,
+                const optional<CVecRef<T>> h)
     {
         if (!m_setup_done)
         {
@@ -195,14 +195,23 @@ public:
             update_options |= KKTUpdateOptions::KKT_UPDATE_G;
         }
 
-        eigen_assert(c.size() == m_data.n && "c has wrong dimensions");
-        m_data.c = c;
+        if (c.has_value())
+        {
+            eigen_assert(c->size() == m_data.n && "c has wrong dimensions");
+            m_data.c = *c;
+        }
 
-        eigen_assert(b.size() == m_data.p && "b has wrong dimensions");
-        m_data.b = b;
+        if (b.has_value())
+        {
+            eigen_assert(b->size() == m_data.p && "b has wrong dimensions");
+            m_data.b = *b;
+        }
 
-        eigen_assert(h.size() == m_data.m && "h has wrong dimensions");
-        m_data.h = h;
+        if (h.has_value())
+        {
+            eigen_assert(h->size() == m_data.m && "h has wrong dimensions");
+            m_data.h = *h;
+        }
 
         m_kkt.update_data(update_options);
 
