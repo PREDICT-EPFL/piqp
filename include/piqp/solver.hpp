@@ -253,15 +253,18 @@ public:
             m_result.info.run_time += solve_time;
         }
 
-        printf("\n");
-        printf("status:               %s\n", status_to_string(status));
-        printf("number of iterations: %ld\n", m_result.info.iter);
-        if (m_settings.compute_timings)
+        if (m_settings.verbose)
         {
-            printf("total run time:       %.3es\n", m_result.info.run_time);
-            printf("  setup time:         %.3es\n", m_result.info.setup_time);
-            printf("  update time:        %.3es\n", m_result.info.update_time);
-            printf("  solve time:         %.3es\n", m_result.info.solve_time);
+            printf("\n");
+            printf("status:               %s\n", status_to_string(status));
+            printf("number of iterations: %ld\n", m_result.info.iter);
+            if (m_settings.compute_timings)
+            {
+                printf("total run time:       %.3es\n", m_result.info.run_time);
+                printf("  setup time:         %.3es\n", m_result.info.setup_time);
+                printf("  update time:        %.3es\n", m_result.info.update_time);
+                printf("  solve time:         %.3es\n", m_result.info.solve_time);
+            }
         }
 
         return status;
