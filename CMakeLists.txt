@@ -60,8 +60,57 @@ else ()
     message(STATUS "Using Eigen3 from: ${EIGEN3_INCLUDE_DIRS}")
 endif ()
 
-include_directories(include)
+add_library(piqp INTERFACE)
+target_include_directories(piqp INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(piqp INTERFACE Eigen3.3)
+add_library(piqp::piqp ALIAS piqp)
 
 if (BUILD_TESTS)
     add_subdirectory(tests)
 endif ()
+
+install(
+    DIRECTORY include/
+    DESTINATION include
+)
+
+install(
+    TARGETS piqp
+    EXPORT piqpTargets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
+)
+
+# https://cmake.org/cmake/help/latest/guide/importing-exporting/index.html
+install(
+    EXPORT piqpTargets
+    FILE piqpTargets.cmake
+    DESTINATION lib/cmake/piqp
+)
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/piqpConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake
+    INSTALL_DESTINATION lib/cmake/piqp
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake
+    VERSION ${PROJECT_VERSION} COMPATIBILITY ExactVersion
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake"
+    DESTINATION lib/cmake/piqp
+)
+
+export(EXPORT piqpTargets
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/piqpTargets.cmake
+    NAMESPACE piqp::
+)
