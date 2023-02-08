@@ -12,7 +12,7 @@
 #include "piqp/sparse/data.hpp"
 #include "piqp/sparse/ldlt.hpp"
 #include "piqp/sparse/ordering.hpp"
-#include "utils.hpp"
+#include "piqp/sparse/utils.hpp"
 #include "piqp/sparse/kkt_fwd.hpp"
 #include "piqp/sparse/kkt_full.hpp"
 #include "piqp/sparse/kkt_eq_eliminated.hpp"
