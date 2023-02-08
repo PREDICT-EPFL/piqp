@@ -26,6 +26,9 @@ target_compile_options(pipq-test INTERFACE ${compiler_flags})
 target_link_options(pipq-test INTERFACE ${compiler_flags})
 target_link_libraries(pipq-test INTERFACE piqp gtest_main gtest)
 
+add_executable(dense_ldlt_test src/dense/ldlt_test.cpp)
+target_link_libraries(dense_ldlt_test PRIVATE pipq-test)
+
 add_executable(sparse_kkt_test src/sparse/kkt_test.cpp)
 target_link_libraries(sparse_kkt_test PRIVATE pipq-test)
 
@@ -39,6 +42,7 @@ add_executable(solver_test src/solver_test.cpp)
 target_link_libraries(solver_test PRIVATE pipq-test)
 
 include(GoogleTest)
+gtest_discover_tests(dense_ldlt_test)
 gtest_discover_tests(sparse_kkt_test)
 gtest_discover_tests(sparse_ldlt_test)
 gtest_discover_tests(sparse_utils_test)

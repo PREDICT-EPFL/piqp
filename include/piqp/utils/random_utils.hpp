@@ -58,7 +58,7 @@ SparseMat<T, I> sparse_matrix_rand(isize n, isize m, T p)
 template<typename T>
 Mat<T> dense_positive_definite_upper_triangular_rand(isize n, T rho = T(1e-2))
 {
-    Mat<T> mat(n, n);
+    Mat<T> mat = Mat<T>::Zero(n, n);
     for (isize i = 0; i < n; i++) {
         for (isize j = i + 1; j < n; ++j) {
             T random = T(normal_dist(gen));

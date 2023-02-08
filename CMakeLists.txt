@@ -14,6 +14,7 @@ project(piqp
 
 #### User options ####
 option(BUILD_TESTS "Build tests" ON)
+option(BUILD_BENCHMARKS "Build benchmarks" ON)
 
 #### Developer options ####
 option(ENABLE_SANITIZERS "Build with sanitizers enabled" OFF)
@@ -71,6 +72,10 @@ add_library(piqp::piqp ALIAS piqp)
 if (BUILD_TESTS)
     add_subdirectory(tests)
 endif ()
+
+if (BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()
 
 install(
     DIRECTORY include/
