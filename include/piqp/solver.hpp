@@ -15,6 +15,8 @@
 #include "piqp/timer.hpp"
 #include "piqp/results.hpp"
 #include "piqp/settings.hpp"
+#include "piqp/dense/data.hpp"
+#include "piqp/dense/kkt.hpp"
 #include "piqp/sparse/data.hpp"
 #include "piqp/sparse/kkt.hpp"
 #include "piqp/utils/optional.hpp"
@@ -22,15 +24,24 @@
 namespace piqp
 {
 
-template<typename T, typename I, int Mode = KKTMode::KKT_FULL>
-class Solver
+enum SolverMatrixType
 {
-private:
+    PIQP_DENSE = 0,
+    PIQP_SPARSE = 1
+};
+
+template<typename Derived, typename T, typename I, int MatrixType, int Mode = KKTMode::KKT_FULL>
+class SolverBase
+{
+protected:
+    using DataType = typename std::conditional<MatrixType == PIQP_DENSE, dense::Data<T>, sparse::Data<T, I>>::type;
+    using KKTType = typename std::conditional<MatrixType == PIQP_DENSE, dense::KKT<T>, sparse::KKT<T, I, Mode>>::type;
+
     Timer<T> m_timer;
     Result<T> m_result;
     Settings<T> m_settings;
-    sparse::Data<T, I> m_data;
-    sparse::KKT<T, I, Mode> m_kkt;
+    DataType m_data;
+    KKTType m_kkt;
 
     bool m_kkt_dirty = true;
     bool m_setup_done = false;
@@ -56,172 +67,11 @@ private:
     T dual_rel_inf;
 
 public:
-    Solver() : m_kkt(m_data) {};
+    SolverBase() : m_kkt(m_data) {};
 
     Settings<T>& settings() { return m_settings; }
 
     const Result<T>& result() const { return m_result; }
-
-    void setup(const SparseMat<T, I>& P,
-               const SparseMat<T, I>& A,
-               const SparseMat<T, I>& G,
-               const CVecRef<T>& c,
-               const CVecRef<T>& b,
-               const CVecRef<T>& h)
-    {
-        if (m_settings.compute_timings)
-        {
-            m_timer.start();
-        }
-
-        m_data.n = P.rows();
-        m_data.p = A.rows();
-        m_data.m = G.rows();
-
-        eigen_assert(P.rows() == m_data.n && P.cols() == m_data.n && "P must be square");
-        eigen_assert(A.rows() == m_data.p && A.cols() == m_data.n && "A must have correct dimensions");
-        eigen_assert(G.rows() == m_data.m && G.cols() == m_data.n && "G must have correct dimensions");
-        eigen_assert(c.size() == m_data.n && "c must have correct dimensions");
-        eigen_assert(b.size() == m_data.p && "b must have correct dimensions");
-        eigen_assert(h.size() == m_data.m && "h must have correct dimensions");
-
-        m_data.P_utri = P.template triangularView<Eigen::Upper>();
-        m_data.AT = A.transpose();
-        m_data.GT = G.transpose();
-        m_data.c = c;
-        m_data.b = b;
-        m_data.h = h;
-
-        // init result
-        m_result.x.resize(m_data.n);
-        m_result.y.resize(m_data.p);
-        m_result.z.resize(m_data.m);
-        m_result.s.resize(m_data.m);
-
-        m_result.zeta.resize(m_data.n);
-        m_result.lambda.resize(m_data.p);
-        m_result.nu.resize(m_data.m);
-
-        // init workspace
-        m_result.info.rho = m_settings.rho_init;
-        m_result.info.delta = m_settings.delta_init;
-        m_result.info.setup_time = 0;
-        m_result.info.update_time = 0;
-        m_result.info.solve_time = 0;
-        m_result.info.run_time = 0;
-
-        rx.resize(m_data.n);
-        ry.resize(m_data.p);
-        rz.resize(m_data.m);
-        rs.resize(m_data.m);
-
-        rx_nr.resize(m_data.n);
-        ry_nr.resize(m_data.p);
-        rz_nr.resize(m_data.m);
-
-        dx.resize(m_data.n);
-        dy.resize(m_data.p);
-        dz.resize(m_data.m);
-        ds.resize(m_data.m);
-
-        m_kkt.init(m_result.info.rho, m_result.info.delta);
-        m_kkt_dirty = false;
-        m_setup_done = true;
-
-        if (m_settings.compute_timings)
-        {
-            T setup_time = m_timer.stop();
-            m_result.info.setup_time = setup_time;
-            m_result.info.run_time += setup_time;
-        }
-    }
-
-    void update(const optional<SparseMat<T, I>> P,
-                const optional<SparseMat<T, I>> A,
-                const optional<SparseMat<T, I>> G,
-                const optional<CVecRef<T>> c,
-                const optional<CVecRef<T>> b,
-                const optional<CVecRef<T>> h)
-    {
-        if (!m_setup_done)
-        {
-            eigen_assert(false && "Solver not setup yet");
-            return;
-        }
-
-        if (m_settings.compute_timings)
-        {
-            m_timer.start();
-        }
-
-        int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
-
-        if (P.has_value())
-        {
-            const SparseMat<T, I>& P_ = *P;
-
-            eigen_assert(P_.rows() == m_data.n && P_.cols() == m_data.n && "P has wrong dimensions");
-            isize n = P_.outerSize();
-            for (isize j = 0; j < n; j++)
-            {
-                PIQP_MAYBE_UNUSED isize P_col_nnz = P_.outerIndexPtr()[j + 1] - P_.outerIndexPtr()[j];
-                isize P_utri_col_nnz = m_data.P_utri.outerIndexPtr()[j + 1] - m_data.P_utri.outerIndexPtr()[j];
-                eigen_assert(P_col_nnz >= P_utri_col_nnz && "P nonzeros missmatch");
-                Eigen::Map<Vec<T>>(m_data.P_utri.valuePtr() + m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P_.valuePtr() + P_.outerIndexPtr()[j], P_utri_col_nnz);
-            }
-
-            update_options |= KKTUpdateOptions::KKT_UPDATE_P;
-        }
-
-        if (A.has_value())
-        {
-            const SparseMat<T, I>& A_ = *A;
-
-            eigen_assert(A_.rows() == m_data.p && A_.cols() == m_data.n && "A has wrong dimensions");
-            eigen_assert(A_.nonZeros() == m_data.AT.nonZeros() && "A nonzeros missmatch");
-            sparse::transpose_no_allocation(A_, m_data.AT);
-
-            update_options |= KKTUpdateOptions::KKT_UPDATE_A;
-        }
-
-        if (G.has_value())
-        {
-            const SparseMat<T, I>& G_ = *G;
-
-            eigen_assert(G_.rows() == m_data.m && G_.cols() == m_data.n && "G has wrong dimensions");
-            eigen_assert(G_.nonZeros() == m_data.GT.nonZeros() && "G nonzeros missmatch");
-            sparse::transpose_no_allocation(G_, m_data.GT);
-
-            update_options |= KKTUpdateOptions::KKT_UPDATE_G;
-        }
-
-        if (c.has_value())
-        {
-            eigen_assert(c->size() == m_data.n && "c has wrong dimensions");
-            m_data.c = *c;
-        }
-
-        if (b.has_value())
-        {
-            eigen_assert(b->size() == m_data.p && "b has wrong dimensions");
-            m_data.b = *b;
-        }
-
-        if (h.has_value())
-        {
-            eigen_assert(h->size() == m_data.m && "h has wrong dimensions");
-            m_data.h = *h;
-        }
-
-        m_kkt.update_data(update_options);
-
-        if (m_settings.compute_timings)
-        {
-            T update_time = m_timer.stop();
-            m_result.info.update_time = update_time;
-            m_result.info.run_time += update_time;
-        }
-    }
 
     Status solve()
     {
@@ -232,9 +82,18 @@ public:
             printf("           (c) Roland Schwan, Colin N. Jones              \n");
             printf("   École Polytechnique Fédérale de Lausanne (EPFL) 2023   \n");
             printf("----------------------------------------------------------\n");
-            printf("variables n = %ld, nzz(P upper triangular) = %ld\n", m_data.m, m_data.P_utri.nonZeros());
-            printf("equality constraints p = %ld, nnz(A) = %ld\n", m_data.p, m_data.AT.nonZeros());
-            printf("inequality constraints m = %ld, nnz(G) = %ld\n", m_data.m, m_data.GT.nonZeros());
+            if (MatrixType == PIQP_DENSE)
+            {
+                printf("variables n = %ld\n", m_data.m);
+                printf("equality constraints p = %ld\n", m_data.p);
+                printf("inequality constraints m = %ld\n", m_data.m);
+            }
+            else
+            {
+                printf("variables n = %ld, nzz(P upper triangular) = %ld\n", m_data.m, m_data.non_zeros_P_utri());
+                printf("equality constraints p = %ld, nnz(A) = %ld\n", m_data.p, m_data.non_zeros_A());
+                printf("inequality constraints m = %ld, nnz(G) = %ld\n", m_data.m, m_data.non_zeros_G());
+            }
             printf("\n");
             printf("iter  prim_cost      dual_cost      prim_inf      dual_inf      rho         delta       mu          prim_step   dual_step\n");
         }
@@ -271,6 +130,86 @@ public:
     }
 
 protected:
+    void init_workspace()
+    {
+        // init result
+        m_result.x.resize(m_data.n);
+        m_result.y.resize(m_data.p);
+        m_result.z.resize(m_data.m);
+        m_result.s.resize(m_data.m);
+
+        m_result.zeta.resize(m_data.n);
+        m_result.lambda.resize(m_data.p);
+        m_result.nu.resize(m_data.m);
+
+        // init workspace
+        m_result.info.rho = m_settings.rho_init;
+        m_result.info.delta = m_settings.delta_init;
+        m_result.info.setup_time = 0;
+        m_result.info.update_time = 0;
+        m_result.info.solve_time = 0;
+        m_result.info.run_time = 0;
+
+        rx.resize(m_data.n);
+        ry.resize(m_data.p);
+        rz.resize(m_data.m);
+        rs.resize(m_data.m);
+
+        rx_nr.resize(m_data.n);
+        ry_nr.resize(m_data.p);
+        rz_nr.resize(m_data.m);
+
+        dx.resize(m_data.n);
+        dy.resize(m_data.p);
+        dz.resize(m_data.m);
+        ds.resize(m_data.m);
+
+        m_kkt.init(m_result.info.rho, m_result.info.delta);
+        m_kkt_dirty = false;
+        m_setup_done = true;
+    }
+
+    template<typename MatType>
+    void setup_impl(const MatType& P,
+                    const CVecRef<T>& c,
+                    const MatType& A,
+                    const CVecRef<T>& b,
+                    const MatType& G,
+                    const CVecRef<T>& h)
+    {
+        if (this->m_settings.compute_timings)
+        {
+            this->m_timer.start();
+        }
+
+        this->m_data.n = P.rows();
+        this->m_data.p = A.rows();
+        this->m_data.m = G.rows();
+
+        eigen_assert(P.rows() == this->m_data.n && P.cols() == this->m_data.n && "P must be square");
+        eigen_assert(A.rows() == this->m_data.p && A.cols() == this->m_data.n && "A must have correct dimensions");
+        eigen_assert(G.rows() == this->m_data.m && G.cols() == this->m_data.n && "G must have correct dimensions");
+        eigen_assert(c.size() == this->m_data.n && "c must have correct dimensions");
+        eigen_assert(b.size() == this->m_data.p && "b must have correct dimensions");
+        eigen_assert(h.size() == this->m_data.m && "h must have correct dimensions");
+
+        this->m_data.P_utri = P.template triangularView<Eigen::Upper>();
+        this->m_data.AT = A.transpose();
+        this->m_data.GT = G.transpose();
+        this->m_data.c = c;
+        this->m_data.b = b;
+        this->m_data.h = h;
+
+        this->init_workspace();
+
+        if (this->m_settings.compute_timings)
+        {
+            T setup_time = this->m_timer.stop();
+            this->m_result.info.setup_time = setup_time;
+            this->m_result.info.run_time += setup_time;
+        }
+    }
+
     Status solve_impl()
     {
         if (!m_setup_done)
@@ -601,6 +540,195 @@ protected:
         primal_rel_inf = std::max(primal_rel_inf, rz_nr.template lpNorm<Eigen::Infinity>());
         rz_nr.noalias() += m_data.h - m_result.s;
         primal_rel_inf = std::max(primal_rel_inf, m_data.h.template lpNorm<Eigen::Infinity>());
+    }
+};
+
+template<typename T>
+class DenseSolver : public SolverBase<DenseSolver<T>, T, int, PIQP_DENSE, KKTMode::KKT_FULL>
+{
+public:
+    void setup(const CMatRef<T>& P,
+               const CVecRef<T>& c,
+               const CMatRef<T>& A,
+               const CVecRef<T>& b,
+               const CMatRef<T>& G,
+               const CVecRef<T>& h)
+    {
+        this->setup_impl(P, c, A, b, G, h);
+    }
+
+    void update(const optional<CMatRef<T>> P,
+                const optional<CVecRef<T>> c,
+                const optional<CMatRef<T>> A,
+                const optional<CVecRef<T>> b,
+                const optional<CMatRef<T>> G,
+                const optional<CVecRef<T>> h)
+    {
+        if (!this->m_setup_done)
+        {
+            eigen_assert(false && "Solver not setup yet");
+            return;
+        }
+
+        if (this->m_settings.compute_timings)
+        {
+            this->m_timer.start();
+        }
+
+        int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
+
+        if (P.has_value())
+        {
+            eigen_assert(P->rows() == this->m_data.n && P->cols() == this->m_data.n && "P has wrong dimensions");
+            this->m_data.P_utri = P->template triangularView<Eigen::Upper>();
+
+            update_options |= KKTUpdateOptions::KKT_UPDATE_P;
+        }
+
+        if (A.has_value())
+        {
+            eigen_assert(A->rows() == this->m_data.p && A->cols() == this->m_data.n && "A has wrong dimensions");
+            this->m_data.AT = A->transpose();
+
+            update_options |= KKTUpdateOptions::KKT_UPDATE_A;
+        }
+
+        if (G.has_value())
+        {
+            eigen_assert(G->rows() == this->m_data.m && G->cols() == this->m_data.n && "G has wrong dimensions");
+            this->m_data.GT = G->transpose();
+
+            update_options |= KKTUpdateOptions::KKT_UPDATE_G;
+        }
+
+        if (c.has_value())
+        {
+            eigen_assert(c->size() == this->m_data.n && "c has wrong dimensions");
+            this->m_data.c = *c;
+        }
+
+        if (b.has_value())
+        {
+            eigen_assert(b->size() == this->m_data.p && "b has wrong dimensions");
+            this->m_data.b = *b;
+        }
+
+        if (h.has_value())
+        {
+            eigen_assert(h->size() == this->m_data.m && "h has wrong dimensions");
+            this->m_data.h = *h;
+        }
+
+        this->m_kkt.update_data(update_options);
+
+        if (this->m_settings.compute_timings)
+        {
+            T update_time = this->m_timer.stop();
+            this->m_result.info.update_time = update_time;
+            this->m_result.info.run_time += update_time;
+        }
+    }
+};
+
+template<typename T, typename I, int Mode = KKTMode::KKT_FULL>
+class SparseSolver : public SolverBase<SparseSolver<T, I, Mode>, T, I, PIQP_SPARSE, Mode>
+{
+public:
+    void setup(const SparseMat<T, I>& P,
+               const CVecRef<T>& c,
+               const SparseMat<T, I>& A,
+               const CVecRef<T>& b,
+               const SparseMat<T, I>& G,
+               const CVecRef<T>& h)
+    {
+        this->setup_impl(P, c, A, b, G, h);
+    }
+
+    void update(const optional<SparseMat<T, I>> P,
+                const optional<CVecRef<T>> c,
+                const optional<SparseMat<T, I>> A,
+                const optional<CVecRef<T>> b,
+                const optional<SparseMat<T, I>> G,
+                const optional<CVecRef<T>> h)
+    {
+        if (!this->m_setup_done)
+        {
+            eigen_assert(false && "Solver not setup yet");
+            return;
+        }
+
+        if (this->m_settings.compute_timings)
+        {
+            this->m_timer.start();
+        }
+
+        int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
+
+        if (P.has_value())
+        {
+            const SparseMat<T, I>& P_ = *P;
+
+            eigen_assert(P_.rows() == this->m_data.n && P_.cols() == this->m_data.n && "P has wrong dimensions");
+            isize n = P_.outerSize();
+            for (isize j = 0; j < n; j++)
+            {
+                PIQP_MAYBE_UNUSED isize P_col_nnz = P_.outerIndexPtr()[j + 1] - P_.outerIndexPtr()[j];
+                isize P_utri_col_nnz = this->m_data.P_utri.outerIndexPtr()[j + 1] - this->m_data.P_utri.outerIndexPtr()[j];
+                eigen_assert(P_col_nnz >= P_utri_col_nnz && "P nonzeros missmatch");
+                Eigen::Map<Vec<T>>(this->m_data.P_utri.valuePtr() + this->m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P_.valuePtr() + P_.outerIndexPtr()[j], P_utri_col_nnz);
+            }
+
+            update_options |= KKTUpdateOptions::KKT_UPDATE_P;
+        }
+
+        if (A.has_value())
+        {
+            const SparseMat<T, I>& A_ = *A;
+
+            eigen_assert(A_.rows() == this->m_data.p && A_.cols() == this->m_data.n && "A has wrong dimensions");
+            eigen_assert(A_.nonZeros() == this->m_data.AT.nonZeros() && "A nonzeros missmatch");
+            sparse::transpose_no_allocation(A_, this->m_data.AT);
+
+            update_options |= KKTUpdateOptions::KKT_UPDATE_A;
+        }
+
+        if (G.has_value())
+        {
+            const SparseMat<T, I>& G_ = *G;
+
+            eigen_assert(G_.rows() == this->m_data.m && G_.cols() == this->m_data.n && "G has wrong dimensions");
+            eigen_assert(G_.nonZeros() == this->m_data.GT.nonZeros() && "G nonzeros missmatch");
+            sparse::transpose_no_allocation(G_, this->m_data.GT);
+
+            update_options |= KKTUpdateOptions::KKT_UPDATE_G;
+        }
+
+        if (c.has_value())
+        {
+            eigen_assert(c->size() == this->m_data.n && "c has wrong dimensions");
+            this->m_data.c = *c;
+        }
+
+        if (b.has_value())
+        {
+            eigen_assert(b->size() == this->m_data.p && "b has wrong dimensions");
+            this->m_data.b = *b;
+        }
+
+        if (h.has_value())
+        {
+            eigen_assert(h->size() == this->m_data.m && "h has wrong dimensions");
+            this->m_data.h = *h;
+        }
+
+        this->m_kkt.update_data(update_options);
+
+        if (this->m_settings.compute_timings)
+        {
+            T update_time = this->m_timer.stop();
+            this->m_result.info.update_time = update_time;
+            this->m_result.info.run_time += update_time;
+        }
     }
 };
 

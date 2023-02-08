@@ -32,6 +32,9 @@ target_link_libraries(dense_ldlt_test PRIVATE pipq-test)
 add_executable(dense_kkt_test src/dense/kkt_test.cpp)
 target_link_libraries(dense_kkt_test PRIVATE pipq-test)
 
+add_executable(dense_solver_test src/dense/solver_test.cpp)
+target_link_libraries(dense_solver_test PRIVATE pipq-test)
+
 add_executable(sparse_kkt_test src/sparse/kkt_test.cpp)
 target_link_libraries(sparse_kkt_test PRIVATE pipq-test)
 
@@ -41,13 +44,14 @@ target_link_libraries(sparse_ldlt_test PRIVATE pipq-test)
 add_executable(sparse_utils_test src/sparse/utils_test.cpp)
 target_link_libraries(sparse_utils_test PRIVATE pipq-test)
 
-add_executable(solver_test src/solver_test.cpp)
-target_link_libraries(solver_test PRIVATE pipq-test)
+add_executable(sparse_solver_test src/sparse/solver_test.cpp)
+target_link_libraries(sparse_solver_test PRIVATE pipq-test)
 
 include(GoogleTest)
 gtest_discover_tests(dense_ldlt_test)
 gtest_discover_tests(dense_kkt_test)
+gtest_discover_tests(dense_solver_test)
 gtest_discover_tests(sparse_kkt_test)
 gtest_discover_tests(sparse_ldlt_test)
 gtest_discover_tests(sparse_utils_test)
-gtest_discover_tests(solver_test)
+gtest_discover_tests(sparse_solver_test)

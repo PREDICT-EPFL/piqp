@@ -34,6 +34,10 @@ struct Data
     Vec<T> c;
     Vec<T> b;
     Vec<T> h;
+
+    Eigen::Index non_zeros_P_utri() { return P_utri.rows() * (P_utri.rows() - 1) / 2; }
+    Eigen::Index non_zeros_A() { return AT.rows() * AT.cols(); }
+    Eigen::Index non_zeros_G() { return GT.rows() * GT.cols(); }
 };
 
 } // namespace dense

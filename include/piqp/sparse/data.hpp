@@ -34,6 +34,10 @@ struct Data
     Vec<T> c;
     Vec<T> b;
     Vec<T> h;
+
+    Eigen::Index non_zeros_P_utri() { return P_utri.nonZeros(); }
+    Eigen::Index non_zeros_A() { return AT.nonZeros(); }
+    Eigen::Index non_zeros_G() { return GT.nonZeros(); }
 };
 
 } // namespace sparse
