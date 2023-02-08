@@ -12,6 +12,7 @@
 #include <random>
 
 #include "piqp/typedefs.hpp"
+#include "piqp/dense/model.hpp"
 #include "piqp/sparse/model.hpp"
 
 // adapted from https://github.com/Simple-Robotics/proxsuite/blob/main/include/proxsuite/proxqp/utils/random_qp_problems.hpp
@@ -37,6 +38,18 @@ Vec<T> vector_rand(isize n)
     }
 
     return v;
+}
+
+template<typename T>
+Mat<T> dense_matrix_rand(isize n, isize m)
+{
+    Mat<T> A(n, m);
+    for (isize i = 0; i < n; i++) {
+        for (isize j = 0; j < m; ++j) {
+            A(i, j) = T(normal_dist(gen));
+        }
+    }
+    return A;
 }
 
 template<typename T, typename I>
@@ -99,6 +112,31 @@ SparseMat<T, I> sparse_positive_definite_upper_triangular_rand(isize n, T p, T r
 
     P.makeCompressed();
     return P;
+}
+
+template<typename T>
+dense::Model<T> dense_strongly_convex_qp(isize dim, isize n_eq, isize n_ineq, T strong_convexity_factor = T(1e-2))
+{
+    Mat<T> P = dense_positive_definite_upper_triangular_rand<T>(dim, strong_convexity_factor);
+    Mat<T> A = dense_matrix_rand<T>(n_eq, dim);
+    Mat<T> G = dense_matrix_rand<T>(n_ineq, dim);
+
+    Vec<T> x_sol = vector_rand<T>(dim);
+
+    Vec<T> delta(n_ineq);
+    delta.setZero();
+    for (isize i = 0; i < n_ineq; i++) {
+        // 30% of ineq constraints are active
+        if (uniform_dist(gen) < 0.3) {
+            delta(i) = uniform_dist(gen);
+        }
+    }
+
+    Vec<T> c = vector_rand<T>(dim);
+    Vec<T> b = A * x_sol;
+    Vec<T> h = G * x_sol + delta;
+
+    return dense::Model<T>(P, A, G, c, b, h);
 }
 
 template<typename T, typename I>
