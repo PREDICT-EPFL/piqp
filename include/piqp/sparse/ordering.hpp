@@ -6,10 +6,13 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_ORDERING_HPP
-#define PIQP_ORDERING_HPP
+#ifndef PIQP_SPARSE_ORDERING_HPP
+#define PIQP_SPARSE_ORDERING_HPP
 
 namespace piqp
+{
+
+namespace sparse
 {
 
 template<typename I>
@@ -111,6 +114,8 @@ public:
     }
 };
 
+} // namespace sparse
+
 } // namespace piqp
 
-#endif //PIQP_ORDERING_HPP
+#endif //PIQP_SPARSE_ORDERING_HPP

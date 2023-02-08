@@ -6,20 +6,23 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_KKT_HPP
-#define PIQP_KKT_HPP
+#ifndef PIQP_SPARSE_KKT_HPP
+#define PIQP_SPARSE_KKT_HPP
 
-#include "piqp/data.hpp"
-#include "piqp/ldlt.hpp"
-#include "piqp/ordering.hpp"
-#include "piqp/utils/sparse_utils.hpp"
-#include "piqp/kkt_fwd.hpp"
-#include "piqp/kkt_full.hpp"
-#include "piqp/kkt_eq_eliminated.hpp"
-#include "piqp/kkt_ineq_eliminated.hpp"
-#include "piqp/kkt_all_eliminated.hpp"
+#include "piqp/sparse/data.hpp"
+#include "piqp/sparse/ldlt.hpp"
+#include "piqp/sparse/ordering.hpp"
+#include "utils.hpp"
+#include "piqp/sparse/kkt_fwd.hpp"
+#include "piqp/sparse/kkt_full.hpp"
+#include "piqp/sparse/kkt_eq_eliminated.hpp"
+#include "piqp/sparse/kkt_ineq_eliminated.hpp"
+#include "piqp/sparse/kkt_all_eliminated.hpp"
 
 namespace piqp
+{
+
+namespace sparse
 {
 
 template<typename T, typename I, int Mode = KKTMode::KKT_FULL, typename Ordering = AMDOrdering<I>>
@@ -191,6 +194,8 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
     }
 };
 
+} // namespace sparse
+
 } // namespace piqp
 
-#endif //PIQP_KKT_HPP
+#endif //PIQP_SPARSE_KKT_HPP

@@ -6,13 +6,16 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_KKT_FULL_HPP
-#define PIQP_KKT_FULL_HPP
+#ifndef PIQP_SPARSE_KKT_FULL_HPP
+#define PIQP_SPARSE_KKT_FULL_HPP
 
 #include "piqp/typedefs.hpp"
-#include "piqp/kkt_fwd.hpp"
+#include "piqp/sparse/kkt_fwd.hpp"
 
 namespace piqp
+{
+
+namespace sparse
 {
 
 template<typename Derived, typename T, typename I>
@@ -259,6 +262,8 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
     }
 };
 
+} // namespace sparse
+
 } // namespace piqp
 
-#endif //PIQP_KKT_FULL_HPP
+#endif //PIQP_SPARSE_KKT_FULL_HPP

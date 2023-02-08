@@ -18,10 +18,10 @@ using namespace piqp;
 using T = double;
 using I = int;
 
-using solver_types = testing::Types<Solver<T, I, KKTMode::KKT_FULL>,
-                                    Solver<T, I, KKTMode::KKT_EQ_ELIMINATED>,
-                                    Solver<T, I, KKTMode::KKT_INEQ_ELIMINATED>,
-                                    Solver<T, I, KKTMode::KKT_ALL_ELIMINATED>>;
+using solver_types = testing::Types<Solver<T, I, sparse::KKTMode::KKT_FULL>,
+                                    Solver<T, I, sparse::KKTMode::KKT_EQ_ELIMINATED>,
+                                    Solver<T, I, sparse::KKTMode::KKT_INEQ_ELIMINATED>,
+                                    Solver<T, I, sparse::KKTMode::KKT_ALL_ELIMINATED>>;
 template <typename T>
 class SolverTest : public ::testing::Test {};
 TYPED_TEST_SUITE(SolverTest, solver_types);
@@ -183,7 +183,7 @@ TYPED_TEST(SolverTest, StronglyConvexWithEqualityAndInequalities)
     isize n_ineq = 12;
     T sparsity_factor = 0.2;
 
-    Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
+    sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
     TypeParam solver;
     solver.settings().verbose = true;
@@ -203,7 +203,7 @@ TYPED_TEST(SolverTest, NonStronglyConvexWithEqualityAndInequalities)
     isize n_ineq = 12;
     T sparsity_factor = 0.2;
 
-    Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor, 0.0);
+    sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor, 0.0);
 
     TypeParam solver;
     solver.settings().verbose = true;
@@ -223,7 +223,7 @@ TYPED_TEST(SolverTest, StronglyConvexOnlyEqualities)
     isize n_ineq = 0;
     T sparsity_factor = 0.2;
 
-    Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
+    sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
     TypeParam solver;
     solver.settings().verbose = true;
@@ -243,7 +243,7 @@ TYPED_TEST(SolverTest, StronglyConvexOnlyInequalities)
     isize n_ineq = 12;
     T sparsity_factor = 0.2;
 
-    Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
+    sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
     TypeParam solver;
     solver.settings().verbose = true;
@@ -263,7 +263,7 @@ TYPED_TEST(SolverTest, StronglyConvexNoConstraints)
     isize n_ineq = 0;
     T sparsity_factor = 0.2;
 
-    Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
+    sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
     TypeParam solver;
     solver.settings().verbose = true;

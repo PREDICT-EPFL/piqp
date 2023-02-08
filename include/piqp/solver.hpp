@@ -15,22 +15,22 @@
 #include "piqp/timer.hpp"
 #include "piqp/results.hpp"
 #include "piqp/settings.hpp"
-#include "piqp/data.hpp"
-#include "piqp/kkt.hpp"
+#include "piqp/sparse/data.hpp"
+#include "piqp/sparse/kkt.hpp"
 #include "piqp/utils/optional.hpp"
 
 namespace piqp
 {
 
-template<typename T, typename I, int Mode = KKTMode::KKT_FULL>
+template<typename T, typename I, int Mode = sparse::KKTMode::KKT_FULL>
 class Solver
 {
 private:
     Timer<T> m_timer;
     Result<T> m_result;
     Settings<T> m_settings;
-    Data<T, I> m_data;
-    KKT<T, I, Mode> m_kkt;
+    sparse::Data<T, I> m_data;
+    sparse::KKT<T, I, Mode> m_kkt;
 
     bool m_kkt_dirty = true;
     bool m_setup_done = false;
@@ -154,7 +154,7 @@ public:
             m_timer.start();
         }
 
-        int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
+        int update_options = sparse::KKTUpdateOptions::KKT_UPDATE_NONE;
 
         if (P.has_value())
         {
@@ -170,7 +170,7 @@ public:
                 Eigen::Map<Vec<T>>(m_data.P_utri.valuePtr() + m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P_.valuePtr() + P_.outerIndexPtr()[j], P_utri_col_nnz);
             }
 
-            update_options |= KKTUpdateOptions::KKT_UPDATE_P;
+            update_options |= sparse::KKTUpdateOptions::KKT_UPDATE_P;
         }
 
         if (A.has_value())
@@ -179,9 +179,9 @@ public:
 
             eigen_assert(A_.rows() == m_data.p && A_.cols() == m_data.n && "A has wrong dimensions");
             eigen_assert(A_.nonZeros() == m_data.AT.nonZeros() && "A nonzeros missmatch");
-            transpose_no_allocation(A_, m_data.AT);
+            sparse::transpose_no_allocation(A_, m_data.AT);
 
-            update_options |= KKTUpdateOptions::KKT_UPDATE_A;
+            update_options |= sparse::KKTUpdateOptions::KKT_UPDATE_A;
         }
 
         if (G.has_value())
@@ -190,9 +190,9 @@ public:
 
             eigen_assert(G_.rows() == m_data.m && G_.cols() == m_data.n && "G has wrong dimensions");
             eigen_assert(G_.nonZeros() == m_data.GT.nonZeros() && "G nonzeros missmatch");
-            transpose_no_allocation(G_, m_data.GT);
+            sparse::transpose_no_allocation(G_, m_data.GT);
 
-            update_options |= KKTUpdateOptions::KKT_UPDATE_G;
+            update_options |= sparse::KKTUpdateOptions::KKT_UPDATE_G;
         }
 
         if (c.has_value())

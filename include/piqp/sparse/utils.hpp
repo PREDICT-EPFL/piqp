@@ -6,10 +6,13 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_UTILS_SPARSE_UTILS_HPP
-#define PIQP_UTILS_SPARSE_UTILS_HPP
+#ifndef PIQP_SPARSE_UTILS_HPP
+#define PIQP_SPARSE_UTILS_HPP
 
 namespace piqp
+{
+
+namespace sparse
 {
 
 /*
@@ -157,6 +160,8 @@ void transpose_no_allocation(const SparseMat<T, I>& A, SparseMat<T, I>& C)
     C.outerIndexPtr()[0] = 0;
 }
 
+} // namespace sparse
+
 } // namespace piqp
 
-#endif //PIQP_UTILS_SPARSE_UTILS_HPP
+#endif //PIQP_SPARSE_UTILS_HPP

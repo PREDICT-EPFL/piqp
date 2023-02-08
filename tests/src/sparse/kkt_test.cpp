@@ -15,6 +15,7 @@
 #include "utils.hpp"
 
 using namespace piqp;
+using namespace piqp::sparse;
 
 using T = double;
 using I = int;
@@ -24,10 +25,10 @@ using kkt_types = testing::Types<KKT<T, I, KKTMode::KKT_FULL>,
                                  KKT<T, I, KKTMode::KKT_INEQ_ELIMINATED>,
                                  KKT<T, I, KKTMode::KKT_ALL_ELIMINATED>>;
 template <typename T>
-class KKTTest : public ::testing::Test {};
-TYPED_TEST_SUITE(KKTTest, kkt_types);
+class SparseKKTTest : public ::testing::Test {};
+TYPED_TEST_SUITE(SparseKKTTest, kkt_types);
 
-TYPED_TEST(KKTTest, UpdateScalings)
+TYPED_TEST(SparseKKTTest, UpdateScalings)
 {
     isize dim = 10;
     isize n_eq = 8;
@@ -77,7 +78,7 @@ TYPED_TEST(KKTTest, UpdateScalings)
     EXPECT_TRUE(kkt.PKPt.isApprox(kkt2.PKPt, 1e-8));
 }
 
-TYPED_TEST(KKTTest, UpdateData)
+TYPED_TEST(SparseKKTTest, UpdateData)
 {
     isize dim = 10;
     isize n_eq = 8;
@@ -128,7 +129,7 @@ TYPED_TEST(KKTTest, UpdateData)
     EXPECT_TRUE(kkt.PKPt.isApprox(kkt2.PKPt, 1e-8));
 }
 
-TYPED_TEST(KKTTest, FactorizeSolve)
+TYPED_TEST(SparseKKTTest, FactorizeSolve)
 {
     isize dim = 10;
     isize n_eq = 8;

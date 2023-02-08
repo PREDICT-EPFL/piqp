@@ -12,7 +12,7 @@
 #include <random>
 
 #include "piqp/typedefs.hpp"
-#include "piqp/model.hpp"
+#include "piqp/sparse/model.hpp"
 
 // adapted from https://github.com/Simple-Robotics/proxsuite/blob/main/include/proxsuite/proxqp/utils/random_qp_problems.hpp
 
@@ -55,6 +55,26 @@ SparseMat<T, I> sparse_matrix_rand(isize n, isize m, T p)
     return A;
 }
 
+template<typename T>
+Mat<T> dense_positive_definite_upper_triangular_rand(isize n, T rho = T(1e-2))
+{
+    Mat<T> mat(n, n);
+    for (isize i = 0; i < n; i++) {
+        for (isize j = i + 1; j < n; ++j) {
+            T random = T(normal_dist(gen));
+            mat(i, j) = random;
+        }
+    }
+
+    Vec<T> eig_h = mat.template selfadjointView<Eigen::Upper>().eigenvalues();
+    T min = eig_h.minCoeff();
+    for (isize i = 0; i < n; i++) {
+        mat(i, i) += (rho + abs(min));
+    }
+
+    return mat;
+}
+
 template<typename T, typename I>
 SparseMat<T, I> sparse_positive_definite_upper_triangular_rand(isize n, T p, T rho = T(1e-2))
 {
@@ -82,8 +102,8 @@ SparseMat<T, I> sparse_positive_definite_upper_triangular_rand(isize n, T p, T r
 }
 
 template<typename T, typename I>
-Model<T, I> sparse_strongly_convex_qp(isize dim, isize n_eq, isize n_ineq,
-                                      T sparsity_factor, T strong_convexity_factor = T(1e-2))
+sparse::Model<T, I> sparse_strongly_convex_qp(isize dim, isize n_eq, isize n_ineq,
+                                              T sparsity_factor, T strong_convexity_factor = T(1e-2))
 {
     SparseMat<T, I> P = sparse_positive_definite_upper_triangular_rand<T, I>(dim, sparsity_factor, strong_convexity_factor);
     SparseMat<T, I> A = sparse_matrix_rand<T, I>(n_eq, dim, sparsity_factor);
@@ -104,7 +124,7 @@ Model<T, I> sparse_strongly_convex_qp(isize dim, isize n_eq, isize n_ineq,
     Vec<T> b = A * x_sol;
     Vec<T> h = G * x_sol + delta;
 
-    return Model<T, I>(P, A, G, c, b, h);
+    return sparse::Model<T, I>(P, A, G, c, b, h);
 }
 
 } // namespace rand

@@ -6,13 +6,16 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_LDLT_HPP
-#define PIQP_LDLT_HPP
+#ifndef PIQP_SPARSE_LDLT_HPP
+#define PIQP_SPARSE_LDLT_HPP
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
 namespace piqp
+{
+
+namespace sparse
 {
 
 template<typename T, typename I>
@@ -199,6 +202,8 @@ struct LDLt
     }
 };
 
+} // namespace sparse
+
 } // namespace piqp
 
-#endif //PIQP_LDLT_HPP
+#endif //PIQP_SPARSE_LDLT_HPP

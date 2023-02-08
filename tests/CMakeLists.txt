@@ -26,20 +26,20 @@ target_compile_options(pipq-test INTERFACE ${compiler_flags})
 target_link_options(pipq-test INTERFACE ${compiler_flags})
 target_link_libraries(pipq-test INTERFACE piqp gtest_main gtest)
 
-add_executable(kkt_test src/kkt_test.cpp)
-target_link_libraries(kkt_test PRIVATE pipq-test)
+add_executable(sparse_kkt_test src/sparse/kkt_test.cpp)
+target_link_libraries(sparse_kkt_test PRIVATE pipq-test)
 
-add_executable(ldlt_test src/ldlt_test.cpp)
-target_link_libraries(ldlt_test PRIVATE pipq-test)
+add_executable(sparse_ldlt_test src/sparse/ldlt_test.cpp)
+target_link_libraries(sparse_ldlt_test PRIVATE pipq-test)
+
+add_executable(sparse_utils_test src/sparse/utils_test.cpp)
+target_link_libraries(sparse_utils_test PRIVATE pipq-test)
 
 add_executable(solver_test src/solver_test.cpp)
 target_link_libraries(solver_test PRIVATE pipq-test)
 
-add_executable(sparse_utils_test src/sparse_utils_test.cpp)
-target_link_libraries(sparse_utils_test PRIVATE pipq-test)
-
 include(GoogleTest)
-gtest_discover_tests(kkt_test)
-gtest_discover_tests(ldlt_test)
-gtest_discover_tests(solver_test)
+gtest_discover_tests(sparse_kkt_test)
+gtest_discover_tests(sparse_ldlt_test)
 gtest_discover_tests(sparse_utils_test)
+gtest_discover_tests(solver_test)

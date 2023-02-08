@@ -6,26 +6,27 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_KKT_ALL_ELIMINATED_HPP
-#define PIQP_KKT_ALL_ELIMINATED_HPP
+#ifndef PIQP_SPARSE_KKT_INEQ_ELIMINATED_HPP
+#define PIQP_SPARSE_KKT_INEQ_ELIMINATED_HPP
 
 #include "piqp/typedefs.hpp"
-#include "piqp/kkt_fwd.hpp"
+#include "piqp/sparse/kkt_fwd.hpp"
 
 namespace piqp
 {
 
-template<typename Derived, typename T, typename I>
-struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
+namespace sparse
 {
-    SparseMat<T, I> A;
+
+template<typename Derived, typename T, typename I>
+struct KKTImpl<Derived, T, I, KKTMode::KKT_INEQ_ELIMINATED>
+{
     SparseMat<T, I> G;
-    SparseMat<T, I> AT_A;
     SparseMat<T, I> GT_W_delta_inv_G;
     Vec<T> tmp_scatter; // temporary storage for scatter operation
 
     Vec<I> P_utri_to_Ki; // mapping from P_utri row indices to KKT matrix
-    Vec<I> AT_A_to_Ki;   // mapping from AT_A row indices to KKT matrix
+    Vec<I> AT_to_Ki;     // mapping from AT row indices to KKT matrix
     Vec<I> GT_G_to_Ki;   // mapping from GT_G row indices to KKT matrix
 
     void init_workspace()
@@ -33,19 +34,17 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
         auto& data = static_cast<Derived*>(this)->data;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
-        A = data.AT.transpose();
         G = data.GT.transpose();
 
-        AT_A = (data.AT * A).template triangularView<Eigen::Upper>();
         GT_W_delta_inv_G = (data.GT * G).template triangularView<Eigen::Upper>();
         T W_delta_inv = T(1) / (1 + m_delta);
         Eigen::Map<Vec<T>>(GT_W_delta_inv_G.valuePtr(), GT_W_delta_inv_G.nonZeros()).array() *= W_delta_inv;
 
-        tmp_scatter.resize(std::max(A.cols(), G.cols()));
+        tmp_scatter.resize(G.cols());
         tmp_scatter.setZero();
 
         P_utri_to_Ki.resize(data.P_utri.nonZeros());
-        AT_A_to_Ki.resize(AT_A.nonZeros());
+        AT_to_Ki.resize(data.AT.nonZeros());
         GT_G_to_Ki.resize(GT_W_delta_inv_G.nonZeros());
     }
 
@@ -55,26 +54,81 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
         auto& m_rho = static_cast<Derived*>(this)->m_rho;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
-        T delta_inv = T(1) / m_delta;
-
         SparseMat<T, I> diagonal_rho;
         diagonal_rho.resize(data.n, data.n);
         diagonal_rho.setIdentity();
         // set diagonal to rho
         Eigen::Map<Vec<T>>(diagonal_rho.valuePtr(), data.n).setConstant(m_rho);
 
-        SparseMat<T, I> KKT = data.P_utri + diagonal_rho + delta_inv * AT_A + GT_W_delta_inv_G;
+        SparseMat<T, I> KKT_top_left_block = data.P_utri + diagonal_rho + GT_W_delta_inv_G;
 
-        // compute mappings
-        isize jj = KKT.outerSize();
+        isize n_kkt = data.n + data.p;
+        SparseMat<T, I> KKT(n_kkt, n_kkt);
+
+        // count non-zeros
+        isize non_zeros = 0;
+        isize j_kkt = 0;
+        isize jj = KKT_top_left_block.outerSize();
+        for (isize j = 0; j < jj; j++)
+        {
+            non_zeros += KKT_top_left_block.outerIndexPtr()[j + 1] - KKT_top_left_block.outerIndexPtr()[j];
+            j_kkt++;
+            KKT.outerIndexPtr()[j_kkt] = non_zeros;
+        }
+        jj = data.AT.outerSize();
+        for (isize j = 0; j < jj; j++)
+        {
+            non_zeros += data.AT.outerIndexPtr()[j + 1] - data.AT.outerIndexPtr()[j];
+            non_zeros++; // add one for the diagonal element
+            j_kkt++;
+            KKT.outerIndexPtr()[j_kkt] = non_zeros;
+        }
+        KKT.resizeNonZeros(non_zeros);
+
+        j_kkt = 0;
+        // copy top left block
+        jj = KKT_top_left_block.outerSize();
+        for (isize j = 0; j < jj; j++)
+        {
+            isize k_kkt = KKT.outerIndexPtr()[j_kkt];
+            isize col_nnz = KKT_top_left_block.outerIndexPtr()[j + 1] - KKT_top_left_block.outerIndexPtr()[j];
+            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<Vec<I>>(KKT_top_left_block.innerIndexPtr() + KKT_top_left_block.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<Vec<T>>(KKT_top_left_block.valuePtr() + KKT_top_left_block.outerIndexPtr()[j], col_nnz);
+
+            j_kkt++;
+        }
+        // copy AT and the diagonal
+        jj = data.AT.outerSize();
+        for (isize j = 0; j < jj; j++)
+        {
+            isize k_kkt = KKT.outerIndexPtr()[j_kkt];
+            isize col_nnz = data.AT.outerIndexPtr()[j + 1] - data.AT.outerIndexPtr()[j];
+            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<Vec<I>>(data.AT.innerIndexPtr() + data.AT.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<Vec<T>>(data.AT.valuePtr() + data.AT.outerIndexPtr()[j], col_nnz);
+
+            // diagonal
+            KKT.innerIndexPtr()[k_kkt + col_nnz] = j_kkt;
+            KKT.valuePtr()[k_kkt + col_nnz] = -m_delta;
+
+            isize i = 0;
+            isize kk = data.AT.outerIndexPtr()[j + 1];
+            for (isize k = data.AT.outerIndexPtr()[j]; k < kk; k++)
+            {
+                AT_to_Ki[k] = k_kkt + i;
+                i++;
+            }
+
+            j_kkt++;
+        }
+
+        // compute remaining mappings
+        jj = data.n;
         for (isize j = 0; j < jj; j++)
         {
             isize P_utri_k = data.P_utri.outerIndexPtr()[j];
-            isize AT_A_k = AT_A.outerIndexPtr()[j];
             isize GT_G_k = GT_W_delta_inv_G.outerIndexPtr()[j];
 
             isize P_utri_end = data.P_utri.outerIndexPtr()[j + 1];
-            isize AT_A_end = AT_A.outerIndexPtr()[j + 1];
             isize GT_G_end = GT_W_delta_inv_G.outerIndexPtr()[j + 1];
 
             isize KKT_kk = KKT.outerIndexPtr()[j + 1];
@@ -83,16 +137,11 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
                 isize KKT_i = KKT.innerIndexPtr()[KKT_k];
 
                 while (data.P_utri.innerIndexPtr()[P_utri_k] < KKT_i && P_utri_k != P_utri_end) P_utri_k++;
-                while (AT_A.innerIndexPtr()[AT_A_k] < KKT_i && AT_A_k != AT_A_end) AT_A_k++;
                 while (GT_W_delta_inv_G.innerIndexPtr()[GT_G_k] < KKT_i && GT_G_k != GT_G_end) GT_G_k++;
 
                 if (data.P_utri.innerIndexPtr()[P_utri_k] == KKT_i && P_utri_k != P_utri_end)
                 {
                     P_utri_to_Ki(P_utri_k) = KKT_k;
-                }
-                if (AT_A.innerIndexPtr()[AT_A_k] == KKT_i && AT_A_k != AT_A_end)
-                {
-                    AT_A_to_Ki(AT_A_k) = KKT_k;
                 }
                 if (GT_W_delta_inv_G.innerIndexPtr()[GT_G_k] == KKT_i && GT_G_k != GT_G_end)
                 {
@@ -134,16 +183,24 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
 
     void update_kkt_equality_scalings()
     {
+        auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
+        auto& ordering = static_cast<Derived*>(this)->ordering;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
-        // copy delta_inv * AT * A to PKPt
-        T delta_inv = T(1) / m_delta;
-        isize n = AT_A.nonZeros();
+        // copy AT to PKPt
+        isize n = data.AT.nonZeros();
         for (isize k = 0; k < n; k++)
         {
-            PKPt.valuePtr()[PKi(AT_A_to_Ki(k))] += delta_inv * AT_A.valuePtr()[k];
+            PKPt.valuePtr()[PKi(AT_to_Ki(k))] = data.AT.valuePtr()[k];
+        }
+
+        // diagonal
+        n = data.n + data.p;
+        for (isize col = data.n; col < n; col++)
+        {
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] = -m_delta;
         }
     }
 
@@ -166,12 +223,6 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
     {
         auto& data = static_cast<Derived*>(this)->data;
 
-        if (options & KKTUpdateOptions::KKT_UPDATE_A)
-        {
-            transpose_no_allocation(data.AT, A);
-            update_AT_A();
-        }
-
         if (options & KKTUpdateOptions::KKT_UPDATE_G)
         {
             transpose_no_allocation(data.GT, G);
@@ -182,32 +233,6 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
             update_kkt_cost_scalings();
             update_kkt_equality_scalings();
             update_kkt_inequality_scaling();
-        }
-    }
-
-    void update_AT_A()
-    {
-        auto& data = static_cast<Derived*>(this)->data;
-
-        // update AT * A
-        isize n = A.outerSize();
-        for (isize j = 0; j < n; j++)
-        {
-            for (typename SparseMat<T, I>::InnerIterator Ak_it(A, j); Ak_it; ++Ak_it)
-            {
-                I k = Ak_it.index();
-                for (typename SparseMat<T, I>::InnerIterator AT_i_it(data.AT, k); AT_i_it; ++AT_i_it)
-                {
-                    if (AT_i_it.index() > j) continue;
-                    tmp_scatter(AT_i_it.index()) += Ak_it.value() * AT_i_it.value();
-                }
-            }
-
-            for (typename SparseMat<T, I>::InnerIterator AT_A_it(AT_A, j); AT_A_it; ++AT_A_it)
-            {
-                AT_A_it.valueRef() = tmp_scatter(AT_A_it.index());
-                tmp_scatter(AT_A_it.index()) = 0;
-            }
         }
     }
 
@@ -243,6 +268,8 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
     }
 };
 
+} // namespace sparse
+
 } // namespace piqp
 
-#endif //PIQP_KKT_ALL_ELIMINATED_HPP
+#endif //PIQP_SPARSE_KKT_INEQ_ELIMINATED_HPP

@@ -14,11 +14,12 @@
 #include "gtest/gtest.h"
 
 using namespace piqp;
+using namespace piqp::sparse;
 
 using T = double;
 using I = int;
 
-TEST(LDLT, Symbolic)
+TEST(SparseLDLT, Symbolic)
 {
     isize dim = 10;
     T sparsity_factor = 0.5;
@@ -29,7 +30,7 @@ TEST(LDLT, Symbolic)
     ldlt.factorize_symbolic_upper_triangular(P);
 }
 
-TEST(LDLT, Numeric)
+TEST(SparseLDLT, Numeric)
 {
     isize dim = 10;
     T sparsity_factor = 0.5;
@@ -46,7 +47,7 @@ TEST(LDLT, Numeric)
     EXPECT_EQ(dim, n);
 }
 
-TEST(LDLT, Solve)
+TEST(SparseLDLT, Solve)
 {
     isize dim = 10;
     T sparsity_factor = 0.5;
@@ -75,3 +76,4 @@ TEST(LDLT, Solve)
 
     EXPECT_TRUE(b.isApprox(P_full * x, 1e-8));
 }
+

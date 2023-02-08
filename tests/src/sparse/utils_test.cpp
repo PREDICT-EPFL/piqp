@@ -10,12 +10,13 @@
 
 #include "piqp/piqp.hpp"
 #include "piqp/utils/random_utils.hpp"
-#include "piqp/utils/sparse_utils.hpp"
+#include "piqp/sparse/utils.hpp"
 
 #include "gtest/gtest.h"
 #include "utils.hpp"
 
 using namespace piqp;
+using namespace piqp::sparse;
 
 using T = double;
 using I = int;

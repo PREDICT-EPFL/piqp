@@ -6,13 +6,18 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_DATA_HPP
-#define PIQP_DATA_HPP
+#ifndef PIQP_SPARSE_DATA_HPP
+#define PIQP_SPARSE_DATA_HPP
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
+#include "piqp/typedefs.hpp"
+
 namespace piqp
+{
+
+namespace sparse
 {
 
 template<typename T, typename I>
@@ -31,6 +36,8 @@ struct Data
     Vec<T> h;
 };
 
+} // namespace sparse
+
 } // namespace piqp
 
-#endif //PIQP_DATA_HPP
+#endif //PIQP_SPARSE_DATA_HPP

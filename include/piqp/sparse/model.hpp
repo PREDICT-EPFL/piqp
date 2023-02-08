@@ -6,13 +6,16 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_MODEL_HPP
-#define PIQP_MODEL_HPP
+#ifndef PIQP_SPARSE_MODEL_HPP
+#define PIQP_SPARSE_MODEL_HPP
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
 namespace piqp
+{
+
+namespace sparse
 {
 
 template<typename T_, typename I_>
@@ -38,6 +41,8 @@ struct Model
       : P(P), A(A), G(G), c(c), b(b), h(h) {}
 };
 
+} // namespace sparse
+
 } // namespace piqp
 
-#endif //PIQP_MODEL_HPP
+#endif //PIQP_SPARSE_MODEL_HPP
