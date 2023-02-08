@@ -7,7 +7,6 @@
 
 #include <benchmark/benchmark.h>
 
-#include "piqp/piqp.hpp"
 #include "piqp/dense/ldlt_no_pivot.hpp"
 #include "piqp/utils/random_utils.hpp"
 
