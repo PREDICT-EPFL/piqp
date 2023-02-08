@@ -23,3 +23,6 @@ target_link_libraries(pipq-benchmark INTERFACE piqp benchmark::benchmark)
 
 add_executable(dense_cholesky_factorization_benchmark src/dense_cholesky_factorization_benchmark.cpp)
 target_link_libraries(dense_cholesky_factorization_benchmark PRIVATE pipq-benchmark)
+
+add_executable(dense_sparse_solver_benchmark src/dense_sparse_solver_benchmark.cpp)
+target_link_libraries(dense_sparse_solver_benchmark PRIVATE pipq-benchmark)
