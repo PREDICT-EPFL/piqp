@@ -115,6 +115,7 @@ public:
       */
     LDLTNoPivot()
         : m_matrix(),
+          m_l1_norm(0),
           m_isInitialized(false),
           m_info(Eigen::NumericalIssue)
     {}
@@ -127,6 +128,7 @@ public:
       */
     explicit LDLTNoPivot(Eigen::Index size)
         : m_matrix(size, size),
+          m_l1_norm(0),
           m_temporary(size),
           m_isInitialized(false),
           m_info(Eigen::NumericalIssue)
@@ -135,6 +137,7 @@ public:
     template<typename InputType>
     explicit LDLTNoPivot(const Eigen::EigenBase<InputType>& matrix)
         : m_matrix(matrix.rows(), matrix.cols()),
+          m_l1_norm(0),
           m_temporary(matrix.rows()),
           m_isInitialized(false),
           m_info(Eigen::NumericalIssue)
@@ -152,6 +155,7 @@ public:
     template<typename InputType>
     explicit LDLTNoPivot(Eigen::EigenBase<InputType>& matrix)
         : m_matrix(matrix.derived()),
+          m_l1_norm(0),
           m_temporary(matrix.rows()),
           m_isInitialized(false),
           m_info(Eigen::NumericalIssue)
