@@ -6,13 +6,10 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_SPARSE_KKT_FWD_HPP
-#define PIQP_SPARSE_KKT_FWD_HPP
+#ifndef PIQP_KKT_FWD_HPP
+#define PIQP_KKT_FWD_HPP
 
 namespace piqp
-{
-
-namespace sparse
 {
 
 enum KKTMode
@@ -31,6 +28,9 @@ enum KKTUpdateOptions
     KKT_UPDATE_G = 0x4
 };
 
+namespace sparse
+{
+
 template<typename Derived, typename T, typename I, int Mode>
 struct KKTImpl;
 
@@ -38,4 +38,4 @@ struct KKTImpl;
 
 } // namespace piqp
 
-#endif //PIQP_SPARSE_KKT_FWD_HPP
+#endif //PIQP_KKT_FWD_HPP

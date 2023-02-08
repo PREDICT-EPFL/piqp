@@ -10,7 +10,7 @@
 #define PIQP_SPARSE_KKT_EQ_ELIMINATED_HPP
 
 #include "piqp/typedefs.hpp"
-#include "piqp/sparse/kkt_fwd.hpp"
+#include "piqp/kkt_fwd.hpp"
 
 namespace piqp
 {
