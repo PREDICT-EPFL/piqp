@@ -27,9 +27,9 @@ struct Data
     isize p; // number of equality constraints
     isize m; // number of inequality constraints
 
-    Mat<T> P_ltri; // lower triangular part of P
-    Mat<T> A;
-    Mat<T> G;
+    Mat<T> P_utri; // upper triangular part of P
+    Mat<T> AT;     // A transpose
+    Mat<T> GT;     // G transpose
 
     Vec<T> c;
     Vec<T> b;

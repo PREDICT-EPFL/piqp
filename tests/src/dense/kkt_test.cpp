@@ -31,15 +31,15 @@ TEST(SparseKKTTest, UpdateScalings)
     data.n = dim;
     data.p = n_eq;
     data.m = n_ineq;
-    data.P_ltri = qp_model.P.triangularView<Eigen::Lower>();
-    data.A = qp_model.A;
-    data.G = qp_model.G;
+    data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
+    data.AT = qp_model.A.transpose();
+    data.GT = qp_model.G.transpose();
     data.c = qp_model.c;
     data.b = qp_model.b;
     data.h = qp_model.h;
 
     // make sure P_utri has not complete diagonal filled
-    data.P_ltri(1, 1) = 0;
+    data.P_utri(1, 1) = 0;
 
     T rho = 0.9;
     T delta = 1.2;
@@ -75,15 +75,15 @@ TEST(SparseKKTTest, UpdateData)
     data.n = dim;
     data.p = n_eq;
     data.m = n_ineq;
-    data.P_ltri = qp_model.P.triangularView<Eigen::Lower>();
-    data.A = qp_model.A;
-    data.G = qp_model.G;
+    data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
+    data.AT = qp_model.A.transpose();
+    data.GT = qp_model.G.transpose();
     data.c = qp_model.c;
     data.b = qp_model.b;
     data.h = qp_model.h;
 
     // make sure P_utri has not complete diagonal filled
-    data.P_ltri(1, 1) = 0;
+    data.P_utri(1, 1) = 0;
 
     T rho = 0.9;
     T delta = 1.2;
@@ -93,9 +93,9 @@ TEST(SparseKKTTest, UpdateData)
 
     // update data
     Model<T> qp_model_new = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
-    data.P_ltri = qp_model_new.P.triangularView<Eigen::Lower>();
-    data.A = qp_model_new.A;
-    data.G = qp_model_new.G;
+    data.P_utri = qp_model_new.P.triangularView<Eigen::Upper>();
+    data.AT = qp_model_new.A.transpose();
+    data.GT = qp_model_new.G.transpose();
     int update_options = KKTUpdateOptions::KKT_UPDATE_P | KKTUpdateOptions::KKT_UPDATE_A | KKTUpdateOptions::KKT_UPDATE_G;
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
@@ -121,9 +121,9 @@ TEST(SparseKKTTest, FactorizeSolve)
     data.n = dim;
     data.p = n_eq;
     data.m = n_ineq;
-    data.P_ltri = qp_model.P.triangularView<Eigen::Lower>();
-    data.A = qp_model.A;
-    data.G = qp_model.G;
+    data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
+    data.AT = qp_model.A.transpose();
+    data.GT = qp_model.G.transpose();
     data.c = qp_model.c;
     data.b = qp_model.b;
     data.h = qp_model.h;

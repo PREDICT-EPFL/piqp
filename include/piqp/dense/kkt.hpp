@@ -9,6 +9,7 @@
 #ifndef PIQP_DENSE_KKT_HPP
 #define PIQP_DENSE_KKT_HPP
 
+#include "piqp/kkt_fwd.hpp"
 #include "piqp/dense/data.hpp"
 #include "piqp/dense/ldlt_no_pivot.hpp"
 
@@ -78,27 +79,27 @@ struct KKT
 
     void update_kkt()
     {
-        kkt_mat.template triangularView<Eigen::Lower>() = data.P_ltri + m_rho * Mat<T>::Identity(data.n, data.n);
+        kkt_mat.template triangularView<Eigen::Lower>() = data.P_utri.transpose() + m_rho * Mat<T>::Identity(data.n, data.n);
 
-        W_delta_inv_G = (m_z_inv.cwiseProduct(m_s) + Vec<T>::Constant(data.m, m_delta)).asDiagonal().inverse() * data.G;
-        kkt_mat.template triangularView<Eigen::Lower>() += data.G.transpose() * W_delta_inv_G;
+        W_delta_inv_G = (m_z_inv.cwiseProduct(m_s) + Vec<T>::Constant(data.m, m_delta)).asDiagonal().inverse() * data.GT.transpose();
+        kkt_mat.template triangularView<Eigen::Lower>() += data.GT * W_delta_inv_G;
 
-        kkt_mat.template triangularView<Eigen::Lower>() += T(1) / m_delta * data.A.transpose() * data.A;
+        kkt_mat.template triangularView<Eigen::Lower>() += T(1) / m_delta * data.AT * data.AT.transpose();
     }
 
     void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,
                   const CVecRef<T>& delta_z, const CVecRef<T>& delta_s,
                   VecRef<T> rhs_x, VecRef<T> rhs_y, VecRef<T> rhs_z, VecRef<T> rhs_s)
     {
-        rhs_x.noalias() = data.P_ltri * delta_x;
-        rhs_x.noalias() += data.P_ltri.transpose().template triangularView<Eigen::StrictlyUpper>() * delta_x;
+        rhs_x.noalias() = data.P_utri * delta_x;
+        rhs_x.noalias() += data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * delta_x;
         rhs_x.noalias() += m_rho * delta_x;
-        rhs_x.noalias() += data.A.transpose() * delta_y + data.G.transpose() * delta_z;
+        rhs_x.noalias() += data.AT * delta_y + data.GT * delta_z;
 
-        rhs_y.noalias() = data.A * delta_x;
+        rhs_y.noalias() = data.AT.transpose() * delta_x;
         rhs_y.noalias() -= m_delta * delta_y;
 
-        rhs_z.noalias() = data.G * delta_x;
+        rhs_z.noalias() = data.GT.transpose() * delta_x;
         rhs_z.noalias() -= m_delta * delta_z;
         rhs_z.noalias() += delta_s;
 
@@ -120,15 +121,15 @@ struct KKT
 
         rhs = rhs_x;
         rhs_z_bar.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
-        rhs.noalias() += data.G.transpose() * rhs_z_bar;
-        rhs.noalias() += delta_inv * data.A.transpose() * rhs_y;
+        rhs.noalias() += data.GT * rhs_z_bar;
+        rhs.noalias() += delta_inv * data.AT * rhs_y;
 
         ldlt.solveInPlace(rhs);
 
         delta_x.noalias() = rhs;
-        delta_y.noalias() = delta_inv * data.A * delta_x;
+        delta_y.noalias() = delta_inv * data.AT.transpose() * delta_x;
         delta_y.noalias() -= delta_inv * rhs_y;
-        delta_z.noalias() = data.G * delta_x;
+        delta_z.noalias() = data.GT.transpose() * delta_x;
         delta_z.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
         delta_z.noalias() -= rhs_z_bar;
         delta_s.array() = m_z_inv.array() * (rhs_s.array() - m_s.array() * delta_z.array());
