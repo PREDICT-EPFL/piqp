@@ -21,7 +21,7 @@ using T = double;
 
 TEST(DenseLDLT, SolveLower)
 {
-    isize dim = 10;
+    isize dim = 50;
 
     Mat<T> P = rand::dense_positive_definite_upper_triangular_rand<T>(dim);
     P.transposeInPlace();
@@ -50,7 +50,7 @@ TEST(DenseLDLT, SolveLower)
 
 TEST(DenseLDLT, SolveUpper)
 {
-    isize dim = 10;
+    isize dim = 50;
 
     Mat<T> P = rand::dense_positive_definite_upper_triangular_rand<T>(dim);
 

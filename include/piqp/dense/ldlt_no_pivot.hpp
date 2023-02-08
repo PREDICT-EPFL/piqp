@@ -20,6 +20,7 @@
 #ifndef PIQP_LDLT_NO_PIVOT_HPP
 #define PIQP_LDLT_NO_PIVOT_HPP
 
+#include <iostream>
 #include <Eigen/Dense>
 
 namespace piqp
@@ -329,6 +330,9 @@ template<> struct ldlt_no_pivot_inplace<Eigen::Lower>
             Eigen::Block<MatrixType, Eigen::Dynamic, Eigen::Dynamic> A21(m, k + bs, k, rs, bs);
             Eigen::Block<MatrixType, Eigen::Dynamic, Eigen::Dynamic> A22(m, k + bs, k + bs, rs, rs);
 
+            // we use the unused upper triangular part as temporary storage
+            Eigen::Block<MatrixType, Eigen::Dynamic, Eigen::Dynamic> A21_tmp(m, 0, size - bs, rs, bs);
+
             Eigen::Index ret;
             if ((ret = unblocked(A11, temp)) >= 0) return k + ret;
             if (rs > 0)
@@ -338,7 +342,8 @@ template<> struct ldlt_no_pivot_inplace<Eigen::Lower>
                 A21 = A21 * A11.diagonal().real().asDiagonal().inverse();
 
                 // A22 -= A21 * D11 * A21^
-                A22.template triangularView<Eigen::Lower>() -= A21 * A11.diagonal().real().asDiagonal() * A21.transpose();
+                A21_tmp = A21 * A11.diagonal().real().asDiagonal();
+                A22.template triangularView<Eigen::Lower>() -= A21_tmp * A21.transpose();
             }
         }
         return -1;
