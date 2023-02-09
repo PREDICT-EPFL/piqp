@@ -45,7 +45,6 @@ struct KKT
         // init workspace
         m_s.resize(data.m);
         m_z_inv.resize(data.m);
-        AT_A.resize(data.n, data.n);
         W_delta_inv_G.resize(data.m, data.n);
         rhs_z_bar.resize(data.m);
         rhs.resize(data.n);
@@ -58,7 +57,11 @@ struct KKT
         kkt_mat.resize(data.n, data.n);
         ldlt = LDLTNoPivot<Mat<T>>(data.n);
 
-        AT_A.template triangularView<Eigen::Lower>() = data.AT * data.AT.transpose();
+        if (data.p > 0)
+        {
+            AT_A.resize(data.n, data.n);
+            AT_A.template triangularView<Eigen::Lower>() = data.AT * data.AT.transpose();
+        }
         update_kkt();
     }
 
@@ -76,7 +79,10 @@ struct KKT
     {
         if (options & KKTUpdateOptions::KKT_UPDATE_A)
         {
-            AT_A.template triangularView<Eigen::Lower>() = data.AT * data.AT.transpose();
+            if (data.p > 0)
+            {
+                AT_A.template triangularView<Eigen::Lower>() = data.AT * data.AT.transpose();
+            }
         }
 
         if (options != KKTUpdateOptions::KKT_UPDATE_NONE)
@@ -89,10 +95,16 @@ struct KKT
     {
         kkt_mat.template triangularView<Eigen::Lower>() = data.P_utri.transpose() + m_rho * Mat<T>::Identity(data.n, data.n);
 
-        W_delta_inv_G = (m_z_inv.cwiseProduct(m_s) + Vec<T>::Constant(data.m, m_delta)).asDiagonal().inverse() * data.GT.transpose();
-        kkt_mat.template triangularView<Eigen::Lower>() += data.GT * W_delta_inv_G;
+        if (data.m > 0)
+        {
+            W_delta_inv_G = (m_z_inv.cwiseProduct(m_s) + Vec<T>::Constant(data.m, m_delta)).asDiagonal().inverse() * data.GT.transpose();
+            kkt_mat.template triangularView<Eigen::Lower>() += data.GT * W_delta_inv_G;
+        }
 
-        kkt_mat.template triangularView<Eigen::Lower>() += T(1) / m_delta * AT_A;
+        if (data.p > 0)
+        {
+            kkt_mat.template triangularView<Eigen::Lower>() += T(1) / m_delta * AT_A;
+        }
     }
 
     void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,

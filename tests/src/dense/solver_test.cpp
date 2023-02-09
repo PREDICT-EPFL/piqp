@@ -183,7 +183,7 @@ TEST(DenseSolverTest, NonStronglyConvexWithEqualityAndInequalities)
 
 TEST(DenseSolverTest, StronglyConvexOnlyEqualities)
 {
-    isize dim = 20;
+    isize dim = 64;
     isize n_eq = 10;
     isize n_ineq = 0;
 
@@ -221,7 +221,7 @@ TEST(DenseSolverTest, StronglyConvexOnlyInequalities)
 
 TEST(DenseSolverTest, StronglyConvexNoConstraints)
 {
-    isize dim = 20;
+    isize dim = 64;
     isize n_eq = 0;
     isize n_ineq = 0;
 
