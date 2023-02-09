@@ -36,7 +36,7 @@ struct Settings
         return rho_init > 0 &&
                delta_init > 0 &&
                feas_tol_abs > 0 &&
-               feas_tol_rel > 0 &&
+               feas_tol_rel >= 0 &&
                dual_tol > 0 &&
                reg_lower_limit > 0 &&
                max_iter > 0 &&
