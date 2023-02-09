@@ -33,6 +33,7 @@ struct KKT
     Mat<T> kkt_mat;
     LDLTNoPivot<Mat<T>, Eigen::Lower> ldlt;
 
+    Mat<T> AT_A;
     Mat<T> W_delta_inv_G; // temporary matrix
     Vec<T> rhs_z_bar;     // temporary variable needed for back solve
     Vec<T> rhs;           // stores the rhs and the solution for back solve
@@ -44,6 +45,7 @@ struct KKT
         // init workspace
         m_s.resize(data.m);
         m_z_inv.resize(data.m);
+        AT_A.resize(data.n, data.n);
         W_delta_inv_G.resize(data.m, data.n);
         rhs_z_bar.resize(data.m);
         rhs.resize(data.n);
@@ -56,6 +58,7 @@ struct KKT
         kkt_mat.resize(data.n, data.n);
         ldlt = LDLTNoPivot<Mat<T>>(data.n);
 
+        AT_A.template triangularView<Eigen::Lower>() = data.AT * data.AT.transpose();
         update_kkt();
     }
 
@@ -71,6 +74,11 @@ struct KKT
 
     void update_data(int options)
     {
+        if (options & KKTUpdateOptions::KKT_UPDATE_A)
+        {
+            AT_A.template triangularView<Eigen::Lower>() = data.AT * data.AT.transpose();
+        }
+
         if (options != KKTUpdateOptions::KKT_UPDATE_NONE)
         {
             update_kkt();
@@ -84,7 +92,7 @@ struct KKT
         W_delta_inv_G = (m_z_inv.cwiseProduct(m_s) + Vec<T>::Constant(data.m, m_delta)).asDiagonal().inverse() * data.GT.transpose();
         kkt_mat.template triangularView<Eigen::Lower>() += data.GT * W_delta_inv_G;
 
-        kkt_mat.template triangularView<Eigen::Lower>() += T(1) / m_delta * data.AT * data.AT.transpose();
+        kkt_mat.template triangularView<Eigen::Lower>() += T(1) / m_delta * AT_A;
     }
 
     void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,
