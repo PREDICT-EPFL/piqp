@@ -84,13 +84,13 @@ public:
             printf("----------------------------------------------------------\n");
             if (MatrixType == PIQP_DENSE)
             {
-                printf("variables n = %ld\n", m_data.m);
+                printf("variables n = %ld\n", m_data.n);
                 printf("equality constraints p = %ld\n", m_data.p);
                 printf("inequality constraints m = %ld\n", m_data.m);
             }
             else
             {
-                printf("variables n = %ld, nzz(P upper triangular) = %ld\n", m_data.m, m_data.non_zeros_P_utri());
+                printf("variables n = %ld, nzz(P upper triangular) = %ld\n", m_data.n, m_data.non_zeros_P_utri());
                 printf("equality constraints p = %ld, nnz(A) = %ld\n", m_data.p, m_data.non_zeros_A());
                 printf("inequality constraints m = %ld, nnz(G) = %ld\n", m_data.m, m_data.non_zeros_G());
             }
