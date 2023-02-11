@@ -85,19 +85,19 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
             {
                 isize KKT_i = KKT.innerIndexPtr()[KKT_k];
 
-                while (data.P_utri.innerIndexPtr()[P_utri_k] < KKT_i && P_utri_k != P_utri_end) P_utri_k++;
-                while (AT_A.innerIndexPtr()[AT_A_k] < KKT_i && AT_A_k != AT_A_end) AT_A_k++;
-                while (GT_W_delta_inv_G.innerIndexPtr()[GT_G_k] < KKT_i && GT_G_k != GT_G_end) GT_G_k++;
+                while (P_utri_k != P_utri_end && data.P_utri.innerIndexPtr()[P_utri_k] < KKT_i) P_utri_k++;
+                while (AT_A_k != AT_A_end && AT_A.innerIndexPtr()[AT_A_k] < KKT_i) AT_A_k++;
+                while (GT_G_k != GT_G_end && GT_W_delta_inv_G.innerIndexPtr()[GT_G_k] < KKT_i) GT_G_k++;
 
-                if (data.P_utri.innerIndexPtr()[P_utri_k] == KKT_i && P_utri_k != P_utri_end)
+                if (P_utri_k != P_utri_end && data.P_utri.innerIndexPtr()[P_utri_k] == KKT_i)
                 {
                     P_utri_to_Ki(P_utri_k) = KKT_k;
                 }
-                if (AT_A.innerIndexPtr()[AT_A_k] == KKT_i && AT_A_k != AT_A_end)
+                if (AT_A_k != AT_A_end && AT_A.innerIndexPtr()[AT_A_k] == KKT_i)
                 {
                     AT_A_to_Ki(AT_A_k) = KKT_k;
                 }
-                if (GT_W_delta_inv_G.innerIndexPtr()[GT_G_k] == KKT_i && GT_G_k != GT_G_end)
+                if (GT_G_k != GT_G_end && GT_W_delta_inv_G.innerIndexPtr()[GT_G_k] == KKT_i)
                 {
                     GT_G_to_Ki(GT_G_k) = KKT_k;
                 }
