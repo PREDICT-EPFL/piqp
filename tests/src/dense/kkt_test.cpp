@@ -19,7 +19,7 @@ using namespace piqp::dense;
 
 using T = double;
 
-TEST(SparseKKTTest, UpdateScalings)
+TEST(DenseKKTTest, UpdateScalings)
 {
     isize dim = 10;
     isize n_eq = 8;
@@ -57,7 +57,7 @@ TEST(SparseKKTTest, UpdateScalings)
     EXPECT_TRUE(kkt.kkt_mat.isApprox(kkt2.kkt_mat, 1e-8));
 }
 
-TEST(SparseKKTTest, UpdateData)
+TEST(DenseKKTTest, UpdateData)
 {
     isize dim = 10;
     isize n_eq = 8;
@@ -93,7 +93,7 @@ TEST(SparseKKTTest, UpdateData)
     EXPECT_TRUE(kkt.kkt_mat.isApprox(kkt2.kkt_mat, 1e-8));
 }
 
-TEST(SparseKKTTest, FactorizeSolve)
+TEST(DenseKKTTest, FactorizeSolve)
 {
     isize dim = 20;
     isize n_eq = 8;
