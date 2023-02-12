@@ -28,7 +28,11 @@ struct KKT
     T m_delta;
 
     Vec<T> m_s;
+    Vec<T> m_s_lb;
+    Vec<T> m_s_ub;
     Vec<T> m_z_inv;
+    Vec<T> m_z_lb_inv;
+    Vec<T> m_z_ub_inv;
 
     Mat<T> kkt_mat;
     LDLTNoPivot<Mat<T>, Eigen::Lower> ldlt;
@@ -44,7 +48,11 @@ struct KKT
     {
         // init workspace
         m_s.resize(data.m);
+        m_s_lb.resize(data.n);
+        m_s_ub.resize(data.n);
         m_z_inv.resize(data.m);
+        m_z_lb_inv.resize(data.n);
+        m_z_ub_inv.resize(data.n);
         W_delta_inv_G.resize(data.m, data.n);
         rhs_z_bar.resize(data.m);
         rhs.resize(data.n);
@@ -52,7 +60,11 @@ struct KKT
         m_rho = rho;
         m_delta = delta;
         m_s.setConstant(1);
+        m_s_lb.head(data.n_lb).setConstant(1);
+        m_s_ub.head(data.n_ub).setConstant(1);
         m_z_inv.setConstant(1);
+        m_z_lb_inv.head(data.n_lb).setConstant(1);
+        m_z_ub_inv.head(data.n_ub).setConstant(1);
 
         kkt_mat.resize(data.n, data.n);
         ldlt = LDLTNoPivot<Mat<T>>(data.n);
@@ -65,12 +77,18 @@ struct KKT
         update_kkt();
     }
 
-    void update_scalings(const T& rho, const T& delta, const CVecRef<T>& s, const CVecRef<T>& z)
+    void update_scalings(const T& rho, const T& delta,
+                         const CVecRef<T>& s, const CVecRef<T>& s_lb, const CVecRef<T>& s_ub,
+                         const CVecRef<T>& z, const CVecRef<T>& z_lb, const CVecRef<T>& z_ub)
     {
         m_rho = rho;
         m_delta = delta;
         m_s = s;
+        m_s_lb.head(data.n_lb) = s_lb.head(data.n_lb);
+        m_s_ub.head(data.n_ub) = s_ub.head(data.n_ub);
         m_z_inv.array() = T(1) / z.array();
+        m_z_lb_inv.head(data.n_lb).array() = T(1) / z_lb.head(data.n_lb).array();
+        m_z_ub_inv.head(data.n_ub).array() = T(1) / z_ub.head(data.n_ub).array();
 
         update_kkt();
     }
@@ -101,6 +119,16 @@ struct KKT
             kkt_mat.template triangularView<Eigen::Lower>() += data.GT * W_delta_inv_G;
         }
 
+        for (isize i = 0; i < data.n_lb; i++)
+        {
+            kkt_mat.diagonal()(data.x_lb_idx(i)) += T(1) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
+        }
+
+        for (isize i = 0; i < data.n_ub; i++)
+        {
+            kkt_mat.diagonal()(data.x_ub_idx(i)) += T(1) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
+        }
+
         if (data.p > 0)
         {
             kkt_mat.template triangularView<Eigen::Lower>() += T(1) / m_delta * AT_A;
@@ -108,13 +136,24 @@ struct KKT
     }
 
     void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,
-                  const CVecRef<T>& delta_z, const CVecRef<T>& delta_s,
-                  VecRef<T> rhs_x, VecRef<T> rhs_y, VecRef<T> rhs_z, VecRef<T> rhs_s)
+                  const CVecRef<T>& delta_z, const CVecRef<T>& delta_z_lb, const CVecRef<T>& delta_z_ub,
+                  const CVecRef<T>& delta_s, const CVecRef<T>& delta_s_lb, const CVecRef<T>& delta_s_ub,
+                  VecRef<T> rhs_x, VecRef<T> rhs_y,
+                  VecRef<T> rhs_z, VecRef<T> rhs_z_lb, VecRef<T> rhs_z_ub,
+                  VecRef<T> rhs_s, VecRef<T> rhs_s_lb, VecRef<T> rhs_s_ub)
     {
         rhs_x.noalias() = data.P_utri * delta_x;
         rhs_x.noalias() += data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * delta_x;
         rhs_x.noalias() += m_rho * delta_x;
         rhs_x.noalias() += data.AT * delta_y + data.GT * delta_z;
+        for (isize i = 0; i < data.n_lb; i++)
+        {
+            rhs_x(data.x_lb_idx(i)) -= delta_z_lb(i);
+        }
+        for (isize i = 0; i < data.n_ub; i++)
+        {
+            rhs_x(data.x_ub_idx(i)) += delta_z_ub(i);
+        }
 
         rhs_y.noalias() = data.AT.transpose() * delta_x;
         rhs_y.noalias() -= m_delta * delta_y;
@@ -123,7 +162,27 @@ struct KKT
         rhs_z.noalias() -= m_delta * delta_z;
         rhs_z.noalias() += delta_s;
 
+        for (isize i = 0; i < data.n_lb; i++)
+        {
+            rhs_z_lb(i) = -delta_x(data.x_lb_idx(i));
+        }
+        rhs_z_lb.head(data.n_lb).noalias() -= m_delta * delta_z_lb.head(data.n_lb);
+        rhs_z_lb.head(data.n_lb).noalias() += delta_s_lb.head(data.n_lb);
+
+        for (isize i = 0; i < data.n_ub; i++)
+        {
+            rhs_z_ub(i) = delta_x(data.x_ub_idx(i));
+        }
+        rhs_z_ub.head(data.n_ub).noalias() -= m_delta * delta_z_ub.head(data.n_ub);
+        rhs_z_ub.head(data.n_ub).noalias() += delta_s_ub.head(data.n_ub);
+
         rhs_s.array() = m_s.array() * delta_z.array() + m_z_inv.array().cwiseInverse() * delta_s.array();
+
+        rhs_s_lb.head(data.n_lb).array() = m_s_lb.head(data.n_lb).array() * delta_z_lb.head(data.n_lb).array();
+        rhs_s_lb.head(data.n_lb).array() += m_z_lb_inv.head(data.n_lb).array().cwiseInverse() * delta_s_lb.head(data.n_lb).array();
+
+        rhs_s_ub.head(data.n_ub).array() = m_s_ub.head(data.n_ub).array() * delta_z_ub.head(data.n_ub).array();
+        rhs_s_ub.head(data.n_ub).array() += m_z_ub_inv.head(data.n_ub).array().cwiseInverse() * delta_s_ub.head(data.n_ub).array();
     }
 
     bool factorize()
@@ -132,8 +191,12 @@ struct KKT
         return ldlt.info() == Eigen::Success;
     }
 
-    void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y, const CVecRef<T>& rhs_z, const CVecRef<T>& rhs_s,
-               VecRef<T> delta_x, VecRef<T> delta_y, VecRef<T> delta_z, VecRef<T> delta_s)
+    void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y,
+               const CVecRef<T>& rhs_z, const CVecRef<T>& rhs_z_lb, const CVecRef<T>& rhs_z_ub,
+               const CVecRef<T>& rhs_s, const CVecRef<T>& rhs_s_lb, const CVecRef<T>& rhs_s_ub,
+               VecRef<T> delta_x, VecRef<T> delta_y,
+               VecRef<T> delta_z, VecRef<T> delta_z_lb, VecRef<T> delta_z_ub,
+               VecRef<T> delta_s, VecRef<T> delta_s_lb, VecRef<T> delta_s_ub)
     {
         T delta_inv = T(1) / m_delta;
 
@@ -144,15 +207,44 @@ struct KKT
         rhs.noalias() += data.GT * rhs_z_bar;
         rhs.noalias() += delta_inv * data.AT * rhs_y;
 
+        for (isize i = 0; i < data.n_lb; i++)
+        {
+            rhs(data.x_lb_idx(i)) -= (rhs_z_lb(i) - m_z_lb_inv(i) * rhs_s_lb(i)) / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
+        }
+        for (isize i = 0; i < data.n_ub; i++)
+        {
+            rhs(data.x_ub_idx(i)) += (rhs_z_ub(i) - m_z_ub_inv(i) * rhs_s_ub(i)) / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
+        }
+
         ldlt.solveInPlace(rhs);
 
         delta_x.noalias() = rhs;
+
         delta_y.noalias() = delta_inv * data.AT.transpose() * delta_x;
         delta_y.noalias() -= delta_inv * rhs_y;
+
         delta_z.noalias() = data.GT.transpose() * delta_x;
         delta_z.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
         delta_z.noalias() -= rhs_z_bar;
+
+        for (isize i = 0; i < data.n_lb; i++)
+        {
+            delta_z_lb(i) = (-delta_x(data.x_lb_idx(i)) - rhs_z_lb(i) + m_z_lb_inv(i) * rhs_s_lb(i))
+                / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
+        }
+        for (isize i = 0; i < data.n_ub; i++)
+        {
+            delta_z_ub(i) = (delta_x(data.x_ub_idx(i)) - rhs_z_ub(i) + m_z_ub_inv(i) * rhs_s_ub(i))
+                            / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
+        }
+
         delta_s.array() = m_z_inv.array() * (rhs_s.array() - m_s.array() * delta_z.array());
+
+        delta_s_lb.head(data.n_lb).array() = m_z_lb_inv.head(data.n_lb).array()
+            * (rhs_s_lb.head(data.n_lb).array() - m_s_lb.head(data.n_lb).array() * delta_z_lb.head(data.n_lb).array());
+
+        delta_s_ub.head(data.n_ub).array() = m_z_ub_inv.head(data.n_ub).array()
+            * (rhs_s_ub.head(data.n_ub).array() - m_s_ub.head(data.n_ub).array() * delta_z_ub.head(data.n_ub).array());
     }
 };
 

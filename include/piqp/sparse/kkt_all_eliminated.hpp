@@ -185,6 +185,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
             update_kkt_cost_scalings();
             update_kkt_equality_scalings();
             update_kkt_inequality_scaling();
+            static_cast<Derived*>(this)->update_kkt_box_scalings();
         }
     }
 

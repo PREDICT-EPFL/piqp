@@ -12,6 +12,8 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
+#include "piqp/typedefs.hpp"
+
 namespace piqp
 {
 
@@ -31,14 +33,18 @@ struct Model
     Vec<T> c;
     Vec<T> b;
     Vec<T> h;
+    Vec<T> x_lb;
+    Vec<T> x_ub;
 
     Model(const SparseMat<T, I>& P,
           const SparseMat<T, I>& A,
           const SparseMat<T, I>& G,
           const CVecRef<T>& c,
           const CVecRef<T>& b,
-          const CVecRef<T>& h) noexcept
-      : P(P), A(A), G(G), c(c), b(b), h(h) {}
+          const CVecRef<T>& h,
+          const CVecRef<T>& x_lb,
+          const CVecRef<T>& x_ub) noexcept
+      : P(P), A(A), G(G), c(c), b(b), h(h), x_lb(x_lb), x_ub(x_ub) {}
 };
 
 } // namespace sparse

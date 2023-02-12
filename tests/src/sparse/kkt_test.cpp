@@ -36,17 +36,7 @@ TYPED_TEST(SparseKKTTest, UpdateScalings)
     T sparsity_factor = 0.2;
 
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
-
-    Data<T, I> data;
-    data.n = dim;
-    data.p = n_eq;
-    data.m = n_ineq;
-    data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
-    data.AT = qp_model.A.transpose();
-    data.GT = qp_model.G.transpose();
-    data.c = qp_model.c;
-    data.b = qp_model.b;
-    data.h = qp_model.h;
+    Data<T, I> data(qp_model);
 
     // make sure P_utri has not complete diagonal filled
     data.P_utri.coeffRef(1, 1) = 0;
@@ -61,10 +51,14 @@ TYPED_TEST(SparseKKTTest, UpdateScalings)
     rho = 0.8;
     delta = 0.2;
     Vec<T> s(n_ineq); s.setConstant(1);
+    Vec<T> s_lb(dim); s_lb.setConstant(1);
+    Vec<T> s_ub(dim); s_ub.setConstant(1);
     Vec<T> z(n_ineq); z.setConstant(1);
+    Vec<T> z_lb(dim); z_lb.setConstant(1);
+    Vec<T> z_ub(dim); z_ub.setConstant(1);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings(rho, delta, s, z);
+    kkt.update_scalings(rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert PKPt matrix is upper triangular
@@ -86,17 +80,7 @@ TYPED_TEST(SparseKKTTest, UpdateData)
     T sparsity_factor = 0.2;
 
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
-
-    Data<T, I> data;
-    data.n = dim;
-    data.p = n_eq;
-    data.m = n_ineq;
-    data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
-    data.AT = qp_model.A.transpose();
-    data.GT = qp_model.G.transpose();
-    data.c = qp_model.c;
-    data.b = qp_model.b;
-    data.h = qp_model.h;
+    Data<T, I> data(qp_model);
 
     // make sure P_utri has not complete diagonal filled
     data.P_utri.coeffRef(1, 1) = 0;
@@ -131,23 +115,13 @@ TYPED_TEST(SparseKKTTest, UpdateData)
 
 TYPED_TEST(SparseKKTTest, FactorizeSolve)
 {
-    isize dim = 10;
+    isize dim = 20;
     isize n_eq = 8;
     isize n_ineq = 9;
     T sparsity_factor = 0.2;
 
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
-
-    Data<T, I> data;
-    data.n = dim;
-    data.p = n_eq;
-    data.m = n_ineq;
-    data.P_utri = qp_model.P.triangularView<Eigen::Upper>();
-    data.AT = qp_model.A.transpose();
-    data.GT = qp_model.G.transpose();
-    data.c = qp_model.c;
-    data.b = qp_model.b;
-    data.h = qp_model.h;
+    Data<T, I> data(qp_model);
 
     T rho = 0.9;
     T delta = 1.2;
@@ -162,28 +136,46 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
     Vec<T> rhs_x = rand::vector_rand<T>(dim);
     Vec<T> rhs_y = rand::vector_rand<T>(n_eq);
     Vec<T> rhs_z = rand::vector_rand<T>(n_ineq);
+    Vec<T> rhs_z_lb = rand::vector_rand<T>(dim);
+    Vec<T> rhs_z_ub = rand::vector_rand<T>(dim);
     Vec<T> rhs_s = rand::vector_rand<T>(n_ineq);
+    Vec<T> rhs_s_lb = rand::vector_rand<T>(dim);
+    Vec<T> rhs_s_ub = rand::vector_rand<T>(dim);
 
     Vec<T> delta_x(dim);
     Vec<T> delta_y(n_eq);
     Vec<T> delta_z(n_ineq);
+    Vec<T> delta_z_lb(dim);
+    Vec<T> delta_z_ub(dim);
     Vec<T> delta_s(n_ineq);
+    Vec<T> delta_s_lb(dim);
+    Vec<T> delta_s_ub(dim);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.solve(rhs_x, rhs_y, rhs_z, rhs_s, delta_x, delta_y, delta_z, delta_s);
+    kkt.solve(rhs_x, rhs_y, rhs_z, rhs_z_lb, rhs_z_ub, rhs_s, rhs_s_lb, rhs_s_ub,
+              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Vec<T> rhs_x_sol(dim);
     Vec<T> rhs_y_sol(n_eq);
     Vec<T> rhs_z_sol(n_ineq);
+    Vec<T> rhs_z_lb_sol(dim);
+    Vec<T> rhs_z_ub_sol(dim);
     Vec<T> rhs_s_sol(n_ineq);
+    Vec<T> rhs_s_lb_sol(dim);
+    Vec<T> rhs_s_ub_sol(dim);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.multiply(delta_x, delta_y, delta_z, delta_s, rhs_x_sol, rhs_y_sol, rhs_z_sol, rhs_s_sol);
+    kkt.multiply(delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub,
+                 rhs_x_sol, rhs_y_sol, rhs_z_sol, rhs_z_lb_sol, rhs_z_ub_sol, rhs_s_sol, rhs_s_lb_sol, rhs_s_ub_sol);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     ASSERT_TRUE(rhs_x.isApprox(rhs_x_sol, 1e-8));
     ASSERT_TRUE(rhs_y.isApprox(rhs_y_sol, 1e-8));
     ASSERT_TRUE(rhs_z.isApprox(rhs_z_sol, 1e-8));
+    ASSERT_TRUE(rhs_z_lb.head(data.n_lb).isApprox(rhs_z_lb_sol.head(data.n_lb), 1e-8));
+    ASSERT_TRUE(rhs_z_ub.head(data.n_ub).isApprox(rhs_z_ub_sol.head(data.n_ub), 1e-8));
     ASSERT_TRUE(rhs_s.isApprox(rhs_s_sol, 1e-8));
+    ASSERT_TRUE(rhs_s_lb.head(data.n_lb).isApprox(rhs_s_lb_sol.head(data.n_lb), 1e-8));
+    ASSERT_TRUE(rhs_s_ub.head(data.n_ub).isApprox(rhs_s_ub_sol.head(data.n_ub), 1e-8));
 }

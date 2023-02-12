@@ -17,35 +17,34 @@ def test_main():
     c = np.array([1, 1], dtype=np.float64)
     A = sparse.csc_matrix([[1, 1]], dtype=np.float64)
     b = np.array([1], dtype=np.float64)
-    G = sparse.csc_matrix([[1, 0], [0, 1], [-1, 0], [0, -1]], dtype=np.float64)
-    h = np.array([0.7, 0.7, 0, 0], dtype=np.float64)
+    G = sparse.csc_matrix([[1, 0], [-1, 0]], dtype=np.float64)
+    h = np.array([0.7, 0], dtype=np.float64)
+    x_lb = np.array([-np.inf, 0], dtype=np.float64)
+    x_ub = np.array([np.inf, 0.7], dtype=np.float64)
 
     start_time = time.time()
 
     solver = piqp.SparseSolver()
     solver.settings.verbose = True
     solver.settings.compute_timings = True
-    solver.setup(P, c, A, b, G, h)
-    solver.update(None, c, A, None, G, h)
+    solver.setup(P, c, A, b, G, h, x_lb, x_ub)
+    solver.update(None, c, A, None, G, h, None, x_ub)
     solver.solve()
 
     end_time = time.time()
     print(f'Execution time python sparse: {end_time - start_time:.3e}s')
 
     P = P.todense()
-    c = np.array([1, 1], dtype=np.float64)
     A = A.todense()
-    b = np.array([1], dtype=np.float64)
     G = G.todense()
-    h = np.array([0.7, 0.7, 0, 0], dtype=np.float64)
 
     start_time = time.time()
 
     solver = piqp.DenseSolver()
     solver.settings.verbose = True
     solver.settings.compute_timings = True
-    solver.setup(P, c, A, b, G, h)
-    solver.update(None, c, A, None, G, h)
+    solver.setup(P, c, A, b, G, h, x_lb, x_ub)
+    solver.update(None, c, A, None, G, h, None, x_ub)
     solver.solve()
 
     end_time = time.time()

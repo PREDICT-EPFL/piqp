@@ -56,10 +56,16 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("x", &piqp::Result<T>::x)
         .def_readwrite("y", &piqp::Result<T>::y)
         .def_readwrite("z", &piqp::Result<T>::z)
+        .def_readwrite("z_lb", &piqp::Result<T>::z_lb)
+        .def_readwrite("z_ub", &piqp::Result<T>::z_ub)
         .def_readwrite("s", &piqp::Result<T>::s)
+        .def_readwrite("s_lb", &piqp::Result<T>::s_lb)
+        .def_readwrite("s_ub", &piqp::Result<T>::s_ub)
         .def_readwrite("zeta", &piqp::Result<T>::zeta)
         .def_readwrite("lambda", &piqp::Result<T>::lambda)
         .def_readwrite("nu", &piqp::Result<T>::nu)
+        .def_readwrite("nu_lb", &piqp::Result<T>::nu_lb)
+        .def_readwrite("nu_ub", &piqp::Result<T>::nu_ub)
         .def_readwrite("info", &piqp::Result<T>::info);
 
     py::class_<piqp::Settings<T>>(m, "Settings")

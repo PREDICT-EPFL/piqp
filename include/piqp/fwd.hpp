@@ -51,4 +51,6 @@
 #define PIQP_EIGEN_MALLOC_NOT_ALLOWED()
 #endif
 
+#define PIQP_INF 1e30
+
 #endif //PIQP_FWD_HPP

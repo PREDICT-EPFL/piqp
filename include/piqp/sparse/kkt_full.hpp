@@ -240,6 +240,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
                 }
             }
             update_kkt_cost_scalings();
+            static_cast<Derived*>(this)->update_kkt_box_scalings();
         }
 
         if (options & KKTUpdateOptions::KKT_UPDATE_A)

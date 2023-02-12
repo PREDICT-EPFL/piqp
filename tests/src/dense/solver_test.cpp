@@ -35,12 +35,15 @@ TEST(DenseSolverTest, SimpleQPWithUpdate)
     Mat<T> A(1, 2); A << 1, -2;
     Vec<T> b(1); b << 0;
 
-    Mat<T> G(4, 2); G << 1, 0, 0, 1, -1, 0, 0, -1;
-    Vec<T> h(4); h << 1, 1, 1, 1;
+    Mat<T> G(2, 2); G << 1, 0, -1, 0;
+    Vec<T> h(2); h << 1, 1;
+
+    Vec<T> x_lb(2); x_lb << -std::numeric_limits<T>::infinity(), -1;
+    Vec<T> x_ub(2); x_ub << std::numeric_limits<T>::infinity(), 1;
 
     DenseSolver<T> solver;
     solver.settings().verbose = true;
-    solver.setup(P, c, A, b, G, h);
+    solver.setup(P, c, A, b, G, h, x_lb, x_ub);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -49,14 +52,21 @@ TEST(DenseSolverTest, SimpleQPWithUpdate)
     ASSERT_EQ(status, Status::PIQP_SOLVED);
     ASSERT_NEAR(solver.result().x(0), 0.4285714, 1e-6);
     ASSERT_NEAR(solver.result().x(1), 0.2142857, 1e-6);
+    ASSERT_NEAR(solver.result().y(0), -1.5714286, 1e-6);
+    ASSERT_NEAR(solver.result().z(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_lb(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_lb(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_ub(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_ub(1), 0, 1e-6);
 
     P(0, 0) = 8;
     A(0, 1) = -3;
     h(0) = 2;
-    h(1) = 2;
+    x_ub(1) = 2;
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    solver.update(P, c, A, b, nullopt, h);
+    solver.update(P, c, A, b, nullopt, h, nullopt, x_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
@@ -66,6 +76,13 @@ TEST(DenseSolverTest, SimpleQPWithUpdate)
     ASSERT_EQ(status, Status::PIQP_SOLVED);
     ASSERT_NEAR(solver.result().x(0), 0.2763157, 1e-6);
     ASSERT_NEAR(solver.result().x(1), 0.0921056, 1e-6);
+    ASSERT_NEAR(solver.result().y(0), -1.2105263, 1e-6);
+    ASSERT_NEAR(solver.result().z(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_lb(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_lb(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_ub(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_ub(1), 0, 1e-6);
 }
 
 /*
@@ -85,7 +102,7 @@ TEST(DenseSolverTest, PrimalInfeasibleQP)
 
     DenseSolver<T> solver;
     solver.settings().verbose = true;
-    solver.setup(P, c, A, b, G, h);
+    solver.setup(P, c, A, b, G, h, nullopt, nullopt);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -112,7 +129,7 @@ TEST(DenseSolverTest, DualInfeasibleQP)
 
     DenseSolver<T> solver;
     solver.settings().verbose = true;
-    solver.setup(P, c, A, b, G, h);
+    solver.setup(P, c, A, b, G, h, nullopt, nullopt);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -134,7 +151,7 @@ TEST(DenseSolverTest, DualInfeasibleQP)
 //
 //    DenseSolver<T> solver;
 //    solver.settings().verbose = true;
-//    solver.setup(P.sparseView(), A, G.sparseView(), c, b, h);
+//    solver.setup(P, c, A, b, G, h, nullopt, nullopt);
 //
 //    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
 //    Status status = solver.solve();
@@ -153,7 +170,7 @@ TEST(DenseSolverTest, StronglyConvexWithEqualityAndInequalities)
 
     DenseSolver<T> solver;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -168,11 +185,11 @@ TEST(DenseSolverTest, NonStronglyConvexWithEqualityAndInequalities)
     isize n_eq = 10;
     isize n_ineq = 12;
 
-    dense::Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq, 0.0);
+    dense::Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq, 0.5, 0.0);
 
     DenseSolver<T> solver;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -187,11 +204,11 @@ TEST(DenseSolverTest, StronglyConvexOnlyEqualities)
     isize n_eq = 10;
     isize n_ineq = 0;
 
-    dense::Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
+    dense::Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq, 0.0);
 
     DenseSolver<T> solver;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -210,7 +227,7 @@ TEST(DenseSolverTest, StronglyConvexOnlyInequalities)
 
     DenseSolver<T> solver;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -225,11 +242,11 @@ TEST(DenseSolverTest, StronglyConvexNoConstraints)
     isize n_eq = 0;
     isize n_ineq = 0;
 
-    dense::Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
+    dense::Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq, 0.0);
 
     DenseSolver<T> solver;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
