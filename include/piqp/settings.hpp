@@ -23,7 +23,7 @@ struct Settings
     T dual_tol         = 1e-8;
     T reg_lower_limit  = 1e-10;
 
-    isize max_iter           = 100;
+    isize max_iter           = 200;
     isize max_factor_retires = 10;
 
     T tau = 0.995;
