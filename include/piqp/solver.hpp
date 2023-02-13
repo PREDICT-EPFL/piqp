@@ -173,8 +173,8 @@ protected:
         eigen_assert(c.size() == m_data.n && "c must have correct dimensions");
         eigen_assert(b.size() == m_data.p && "b must have correct dimensions");
         eigen_assert(h.size() == m_data.m && "h must have correct dimensions");
-        if (x_lb.has_value()) eigen_assert(x_lb->size() == m_data.n && "x_lb must have correct dimensions");
-        if (x_ub.has_value()) eigen_assert(x_ub->size() == m_data.n && "x_ub must have correct dimensions");
+        if (x_lb.has_value()) { eigen_assert(x_lb->size() == m_data.n && "x_lb must have correct dimensions"); }
+        if (x_ub.has_value()) { eigen_assert(x_ub->size() == m_data.n && "x_ub must have correct dimensions"); }
 
         m_data.P_utri = P.template triangularView<Eigen::Upper>();
         m_data.AT = A.transpose();
@@ -910,10 +910,10 @@ public:
             this->m_data.h = *h;
         }
 
-        if (x_lb.has_value()) eigen_assert(x_lb->size() == this->m_data.n && "x_lb has wrong dimensions");
-        if (x_ub.has_value()) eigen_assert(x_ub->size() == this->m_data.n && "x_ub has wrong dimensions");
-        if (x_lb.has_value()) this->setup_lb_data(x_lb);
-        if (x_ub.has_value()) this->setup_ub_data(x_ub);
+        if (x_lb.has_value()) { eigen_assert(x_lb->size() == this->m_data.n && "x_lb has wrong dimensions"); }
+        if (x_ub.has_value()) { eigen_assert(x_ub->size() == this->m_data.n && "x_ub has wrong dimensions"); }
+        if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
+        if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
 
         this->m_preconditioner.scale_data(this->m_data, reuse_preconditioner, this->m_settings.preconditioner_iter);
 
@@ -1026,10 +1026,10 @@ public:
             this->m_data.h = *h;
         }
 
-        if (x_lb.has_value()) eigen_assert(x_lb->size() == this->m_data.n && "x_lb has wrong dimensions");
-        if (x_ub.has_value()) eigen_assert(x_ub->size() == this->m_data.n && "x_ub has wrong dimensions");
-        if (x_lb.has_value()) this->setup_lb_data(x_lb);
-        if (x_ub.has_value()) this->setup_ub_data(x_ub);
+        if (x_lb.has_value()) { eigen_assert(x_lb->size() == this->m_data.n && "x_lb has wrong dimensions"); }
+        if (x_ub.has_value()) { eigen_assert(x_ub->size() == this->m_data.n && "x_ub has wrong dimensions"); }
+        if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
+        if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
 
         this->m_preconditioner.scale_data(this->m_data, reuse_preconditioner, this->m_settings.preconditioner_iter);
 
