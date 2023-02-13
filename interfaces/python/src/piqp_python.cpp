@@ -87,8 +87,15 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def(py::init<>())
         .def_property("settings", &SparseSolver::settings, &SparseSolver::settings)
         .def_property_readonly("result", &SparseSolver::result)
-        .def("setup", &SparseSolver::setup)
-        .def("update", &SparseSolver::update)
+        .def("setup", &SparseSolver::setup,
+             py::arg("P"), py::arg("c"), py::arg("A"), py::arg("b"), py::arg("G"), py::arg("h"),
+             py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt)
+        .def("update", &SparseSolver::update,
+             py::arg("P") = piqp::nullopt, py::arg("c") = piqp::nullopt,
+             py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
+             py::arg("G") = piqp::nullopt, py::arg("h") = piqp::nullopt,
+             py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt,
+             py::arg("reuse_preconditioner") = true)
         .def("solve", &SparseSolver::solve);
 
     using DenseSolver = piqp::DenseSolver<T>;
@@ -96,8 +103,15 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def(py::init<>())
         .def_property("settings", &DenseSolver::settings, &DenseSolver::settings)
         .def_property_readonly("result", &DenseSolver::result)
-        .def("setup", &DenseSolver::setup)
-        .def("update", &DenseSolver::update)
+        .def("setup", &DenseSolver::setup,
+             py::arg("P"), py::arg("c"), py::arg("A"), py::arg("b"), py::arg("G"), py::arg("h"),
+             py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt)
+        .def("update", &DenseSolver::update,
+             py::arg("P") = piqp::nullopt, py::arg("c") = piqp::nullopt,
+             py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
+             py::arg("G") = piqp::nullopt, py::arg("h") = piqp::nullopt,
+             py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt,
+             py::arg("reuse_preconditioner") = true)
         .def("solve", &DenseSolver::solve);
 
 #ifdef VERSION_INFO
