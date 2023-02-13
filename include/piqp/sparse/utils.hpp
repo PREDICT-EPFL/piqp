@@ -152,7 +152,7 @@ void transpose_no_allocation(const SparseMat<T, I>& A, SparseMat<T, I>& C)
     }
     // revert outer index pointer which has been abused as a temporary
     isize m = A.innerSize();
-    eigen_assert(C.outerIndexPtr()[m - 1] == C.outerIndexPtr()[m] && "sparsity pattern of C does not match AT!");
+    eigen_assert(m == 0 || (C.outerIndexPtr()[m - 1] == C.outerIndexPtr()[m]) && "sparsity pattern of C does not match AT!");
     for (isize j = m - 1; j > 0; j--)
     {
         C.outerIndexPtr()[j] = C.outerIndexPtr()[j - 1];
