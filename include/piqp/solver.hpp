@@ -837,20 +837,20 @@ public:
                const CVecRef<T>& b,
                const CMatRef<T>& G,
                const CVecRef<T>& h,
-               const optional<CVecRef<T>> x_lb,
-               const optional<CVecRef<T>> x_ub)
+               const optional<CVecRef<T>> x_lb = nullopt,
+               const optional<CVecRef<T>> x_ub = nullopt)
     {
         this->setup_impl(P, c, A, b, G, h, x_lb, x_ub);
     }
 
-    void update(const optional<CMatRef<T>> P,
-                const optional<CVecRef<T>> c,
-                const optional<CMatRef<T>> A,
-                const optional<CVecRef<T>> b,
-                const optional<CMatRef<T>> G,
-                const optional<CVecRef<T>> h,
-                const optional<CVecRef<T>> x_lb,
-                const optional<CVecRef<T>> x_ub,
+    void update(const optional<CMatRef<T>> P = nullopt,
+                const optional<CVecRef<T>> c = nullopt,
+                const optional<CMatRef<T>> A = nullopt,
+                const optional<CVecRef<T>> b = nullopt,
+                const optional<CMatRef<T>> G = nullopt,
+                const optional<CVecRef<T>> h = nullopt,
+                const optional<CVecRef<T>> x_lb = nullopt,
+                const optional<CVecRef<T>> x_ub = nullopt,
                 bool reuse_preconditioner = true)
     {
         if (!this->m_setup_done)
@@ -938,20 +938,20 @@ public:
                const CVecRef<T>& b,
                const SparseMat<T, I>& G,
                const CVecRef<T>& h,
-               const optional<CVecRef<T>> x_lb,
-               const optional<CVecRef<T>> x_ub)
+               const optional<CVecRef<T>> x_lb = nullopt,
+               const optional<CVecRef<T>> x_ub = nullopt)
     {
         this->setup_impl(P, c, A, b, G, h, x_lb, x_ub);
     }
 
-    void update(const optional<SparseMat<T, I>> P,
-                const optional<CVecRef<T>> c,
-                const optional<SparseMat<T, I>> A,
-                const optional<CVecRef<T>> b,
-                const optional<SparseMat<T, I>> G,
-                const optional<CVecRef<T>> h,
-                const optional<CVecRef<T>> x_lb,
-                const optional<CVecRef<T>> x_ub,
+    void update(const optional<SparseMat<T, I>> P = nullopt,
+                const optional<CVecRef<T>> c = nullopt,
+                const optional<SparseMat<T, I>> A = nullopt,
+                const optional<CVecRef<T>> b = nullopt,
+                const optional<SparseMat<T, I>> G = nullopt,
+                const optional<CVecRef<T>> h = nullopt,
+                const optional<CVecRef<T>> x_lb = nullopt,
+                const optional<CVecRef<T>> x_ub = nullopt,
                 bool reuse_preconditioner = true)
     {
         if (!this->m_setup_done)
