@@ -23,8 +23,9 @@ struct Settings
     T dual_tol         = 1e-8;
     T reg_lower_limit  = 1e-10;
 
-    isize max_iter           = 200;
-    isize max_factor_retires = 10;
+    isize max_iter            = 200;
+    isize max_factor_retires  = 10;
+    isize preconditioner_iter = 10;
 
     T tau = 0.995;
 
@@ -41,6 +42,7 @@ struct Settings
                reg_lower_limit > 0 &&
                max_iter > 0 &&
                max_factor_retires > 0 &&
+               preconditioner_iter >= 0 &&
                tau > 0 && tau <= 1;
     }
 };

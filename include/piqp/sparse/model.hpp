@@ -13,6 +13,7 @@
 #include <Eigen/Sparse>
 
 #include "piqp/typedefs.hpp"
+#include "piqp/dense/model.hpp"
 
 namespace piqp
 {
@@ -45,6 +46,11 @@ struct Model
           const CVecRef<T>& x_lb,
           const CVecRef<T>& x_ub) noexcept
       : P(P), A(A), G(G), c(c), b(b), h(h), x_lb(x_lb), x_ub(x_ub) {}
+
+    dense::Model<T> dense_model()
+    {
+        return dense::Model<T>(Mat<T>(P), Mat<T>(A), Mat<T>(G), c, b, h, x_lb, x_ub);
+    }
 };
 
 } // namespace sparse

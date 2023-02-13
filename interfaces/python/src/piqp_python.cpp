@@ -77,6 +77,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("reg_lower_limit", &piqp::Settings<T>::reg_lower_limit)
         .def_readwrite("max_iter", &piqp::Settings<T>::max_iter)
         .def_readwrite("max_factor_retires", &piqp::Settings<T>::max_factor_retires)
+        .def_readwrite("preconditioner_iter", &piqp::Settings<T>::preconditioner_iter)
         .def_readwrite("tau", &piqp::Settings<T>::tau)
         .def_readwrite("verbose", &piqp::Settings<T>::verbose)
         .def_readwrite("compute_timings", &piqp::Settings<T>::compute_timings);
