@@ -827,7 +827,7 @@ protected:
     }
 };
 
-template<typename T, typename Preconditioner = dense::RuizEquilibration<T>>
+template<typename T, typename Preconditioner = dense::IdentityPreconditioner<T>>
 class DenseSolver : public SolverBase<DenseSolver<T, Preconditioner>, T, int, Preconditioner, PIQP_DENSE, KKTMode::KKT_FULL>
 {
 public:
@@ -928,7 +928,7 @@ public:
     }
 };
 
-template<typename T, typename I, int Mode = KKTMode::KKT_FULL, typename Preconditioner = sparse::RuizEquilibration<T, I>>
+template<typename T, typename I, int Mode = KKTMode::KKT_FULL, typename Preconditioner = sparse::IdentityPreconditioner<T, I>>
 class SparseSolver : public SolverBase<SparseSolver<T, I, Mode, Preconditioner>, T, I, Preconditioner, PIQP_SPARSE, Mode>
 {
 public:
