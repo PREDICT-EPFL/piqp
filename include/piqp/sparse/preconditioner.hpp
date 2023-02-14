@@ -14,6 +14,7 @@
 
 #include "piqp/typedefs.hpp"
 #include "piqp/sparse/data.hpp"
+#include "piqp/sparse/utils.hpp"
 
 namespace piqp
 {
@@ -69,7 +70,7 @@ public:
         delta_ub_inv.setConstant(1);
     }
 
-    inline void scale_data(Data<T, I>& data, bool reuse_prev_scaling = false, isize max_iter = 10, T epsilon = T(1e-3))
+    inline void scale_data(Data<T, I>& data, bool reuse_prev_scaling = false, bool scale_cost = false, isize max_iter = 10, T epsilon = T(1e-3))
     {
         if (!reuse_prev_scaling)
         {
@@ -121,39 +122,46 @@ public:
                 delta_iter.array() = delta_iter.array().sqrt().inverse();
 
                 // scale cost
-                data.P_utri = delta_iter.head(n).asDiagonal() * data.P_utri * delta_iter.head(n).asDiagonal();
+                pre_mult_diagonal<T, I>(data.P_utri, delta_iter.head(n));
+                post_mult_diagonal<T, I>(data.P_utri, delta_iter.head(n));
                 data.c.array() *= delta_iter.head(n).array();
 
                 // scale AT and GT
-                data.AT = delta_iter.head(n).asDiagonal() * data.AT * delta_iter.segment(n, p).asDiagonal();
-                data.GT = delta_iter.head(n).asDiagonal() * data.GT * delta_iter.tail(m).asDiagonal();
-
-                // scaling for the cost
-                delta_lb.setZero(); // we use delta_lb as a temporary storage
-                for (isize j = 0; j < n; j++)
-                {
-                    for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
-                    {
-                        I i_row = P_utri_it.index();
-                        delta_lb(j) = std::max(delta_lb(j), std::abs(P_utri_it.value()));
-                        if (i_row != j)
-                        {
-                            delta_lb(i_row) = std::max(delta_lb(i_row), std::abs(P_utri_it.value()));
-                        }
-                    }
-                }
-                T gamma = delta_lb.sum() / n;
-                limit_scaling(gamma);
-                gamma = std::max(gamma, data.c.template lpNorm<Eigen::Infinity>());
-                limit_scaling(gamma);
-                gamma = T(1) / gamma;
-
-                // scale cost
-                data.P_utri *= gamma;
-                data.c *= gamma;
+                pre_mult_diagonal<T, I>(data.AT, delta_iter.head(n));
+                post_mult_diagonal<T, I>(data.AT, delta_iter.segment(n, p));
+                pre_mult_diagonal<T, I>(data.GT, delta_iter.head(n));
+                post_mult_diagonal<T, I>(data.GT, delta_iter.tail(m));
 
                 delta.array() *= delta_iter.array();
-                c *= gamma;
+
+                if (scale_cost)
+                {
+                    // scaling for the cost
+                    delta_lb.setZero(); // we use delta_lb as a temporary storage
+                    for (isize j = 0; j < n; j++)
+                    {
+                        for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
+                        {
+                            I i_row = P_utri_it.index();
+                            delta_lb(j) = std::max(delta_lb(j), std::abs(P_utri_it.value()));
+                            if (i_row != j)
+                            {
+                                delta_lb(i_row) = std::max(delta_lb(i_row), std::abs(P_utri_it.value()));
+                            }
+                        }
+                    }
+                    T gamma = delta_lb.sum() / n;
+                    limit_scaling(gamma);
+                    gamma = std::max(gamma, data.c.template lpNorm<Eigen::Infinity>());
+                    limit_scaling(gamma);
+                    gamma = T(1) / gamma;
+
+                    // scale cost
+                    data.P_utri *= gamma;
+                    data.c *= gamma;
+
+                    c *= gamma;
+                }
             }
 
             c_inv = T(1) / c;
@@ -164,12 +172,15 @@ public:
         {
             // scale cost
             data.P_utri *= c;
-            data.P_utri = delta.head(n).asDiagonal() * data.P_utri * delta.head(n).asDiagonal();
+            pre_mult_diagonal<T, I>(data.P_utri, delta.head(n));
+            post_mult_diagonal<T, I>(data.P_utri, delta.head(n));
             data.c.array() *= c * delta.head(n).array();
 
             // scale AT and GT
-            data.AT = delta.head(n).asDiagonal() * data.AT * delta.segment(n, p).asDiagonal();
-            data.GT = delta.head(n).asDiagonal() * data.GT * delta.tail(m).asDiagonal();
+            pre_mult_diagonal<T, I>(data.AT, delta.head(n));
+            post_mult_diagonal<T, I>(data.AT, delta.segment(n, p));
+            pre_mult_diagonal<T, I>(data.GT, delta.head(n));
+            post_mult_diagonal<T, I>(data.GT, delta.tail(m));
         }
 
         for (isize i = 0; i < n_lb; i++)
@@ -194,12 +205,15 @@ public:
     {
         // unscale cost
         data.P_utri *= c_inv;
-        data.P_utri = delta_inv.head(n).asDiagonal() * data.P_utri * delta_inv.head(n).asDiagonal();
+        pre_mult_diagonal<T, I>(data.P_utri, delta_inv.head(n));
+        post_mult_diagonal<T, I>(data.P_utri, delta_inv.head(n));
         data.c.array() *= c_inv * delta_inv.head(n).array();
 
         // unscale AT and GT
-        data.AT = delta_inv.head(n).asDiagonal() * data.AT * delta_inv.segment(n, p).asDiagonal();
-        data.GT = delta_inv.head(n).asDiagonal() * data.GT * delta_inv.tail(m).asDiagonal();
+        pre_mult_diagonal<T, I>(data.AT, delta_inv.head(n));
+        post_mult_diagonal<T, I>(data.AT, delta_inv.segment(n, p));
+        pre_mult_diagonal<T, I>(data.GT, delta_inv.head(n));
+        post_mult_diagonal<T, I>(data.GT, delta_inv.tail(m));
 
         // unscale bounds
         data.b.array() *= delta_inv.segment(n, p).array();
@@ -401,7 +415,7 @@ class IdentityPreconditioner
 public:
     void init(const Data<T, I>&) {}
 
-    inline void scale_data(Data<T, I>&, bool = false, isize = 0, T = T(0)) {}
+    inline void scale_data(Data<T, I>&, bool = false, bool = false, isize = 0, T = T(0)) {}
 
     inline void unscale_data(Data<T, I>&) {}
 

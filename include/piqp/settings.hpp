@@ -25,7 +25,9 @@ struct Settings
 
     isize max_iter            = 200;
     isize max_factor_retires  = 10;
-    isize preconditioner_iter = 10;
+
+    bool preconditioner_scale_cost = false;
+    isize preconditioner_iter      = 10;
 
     T tau = 0.995;
 

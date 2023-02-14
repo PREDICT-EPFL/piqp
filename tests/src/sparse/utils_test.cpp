@@ -90,3 +90,31 @@ TEST(SparseUtils, TransposeNoAlloc)
 
     assert_sparse_matrices_equal(C, AT);
 }
+
+TEST(SparseUtils, PreMultDiagonal)
+{
+    SparseMat<T, I> A = rand::sparse_matrix_rand<T, I>(10, 9, 0.5);
+    Vec<T> diag = rand::vector_rand<T>(10);
+
+    SparseMat<T, I> res = diag.asDiagonal() * A;
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    pre_mult_diagonal<T, I>(A, diag);
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    assert_sparse_matrices_equal(A, res);
+}
+
+TEST(SparseUtils, PostMultDiagonal)
+{
+    SparseMat<T, I> A = rand::sparse_matrix_rand<T, I>(10, 9, 0.5);
+    Vec<T> diag = rand::vector_rand<T>(9);
+
+    SparseMat<T, I> res = A * diag.asDiagonal();
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    post_mult_diagonal<T, I>(A, diag);
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    assert_sparse_matrices_equal(A, res);
+}

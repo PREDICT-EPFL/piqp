@@ -160,6 +160,42 @@ void transpose_no_allocation(const SparseMat<T, I>& A, SparseMat<T, I>& C)
     C.outerIndexPtr()[0] = 0;
 }
 
+/*
+ * Pre multiplies a sparse matrix A with a diagonal matrix D, i.e. A = D * A
+ *
+ * @param A     input matrix A
+ * @param diag  diagonal elements of D
+ */
+template<typename T, typename I>
+void pre_mult_diagonal(SparseMat<T, I>& A, const CVecRef<T>& diag)
+{
+    isize n = A.outerSize();
+    for (isize j = 0; j < n; j++)
+    {
+        for (typename SparseMat<T, I>::InnerIterator A_it(A, j); A_it; ++A_it)
+        {
+            A_it.valueRef() *= diag(A_it.row());
+        }
+    }
+}
+
+/*
+ * Post multiplies a sparse matrix A with a diagonal matrix D, i.e. A = A * D
+ *
+ * @param A     input matrix A
+ * @param diag  diagonal elements of D
+ */
+template<typename T, typename I>
+void post_mult_diagonal(SparseMat<T, I>& A, const CVecRef<T>& diag)
+{
+    isize n = A.outerSize();
+    for (isize j = 0; j < n; j++)
+    {
+        isize col_nnz = A.outerIndexPtr()[j + 1] - A.outerIndexPtr()[j];
+        Eigen::Map<Vec<T>>(A.valuePtr() + A.outerIndexPtr()[j], col_nnz).array() *= diag(j);
+    }
+}
+
 } // namespace sparse
 
 } // namespace piqp

@@ -69,7 +69,7 @@ public:
         delta_ub_inv.setConstant(1);
     }
 
-    inline void scale_data(Data<T>& data, bool reuse_prev_scaling = false, isize max_iter = 10, T epsilon = T(1e-3))
+    inline void scale_data(Data<T>& data, bool reuse_prev_scaling = false, bool scale_cost = false, isize max_iter = 10, T epsilon = T(1e-3))
     {
         if (!reuse_prev_scaling)
         {
@@ -116,25 +116,29 @@ public:
                 data.AT = delta_iter.head(n).asDiagonal() * data.AT * delta_iter.segment(n, p).asDiagonal();
                 data.GT = delta_iter.head(n).asDiagonal() * data.GT * delta_iter.tail(m).asDiagonal();
 
-                // scaling for the cost
-                T gamma = 0;
-                for (isize k = 0; k < n; k++)
-                {
-                    gamma += std::max(data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
-                                      data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>());
-                }
-                gamma /= n;
-                limit_scaling(gamma);
-                gamma = std::max(gamma, data.c.template lpNorm<Eigen::Infinity>());
-                limit_scaling(gamma);
-                gamma = T(1) / gamma;
-
-                // scale cost
-                data.P_utri *= gamma;
-                data.c *= gamma;
-
                 delta.array() *= delta_iter.array();
-                c *= gamma;
+
+                if (scale_cost)
+                {
+                    // scaling for the cost
+                    T gamma = 0;
+                    for (isize k = 0; k < n; k++)
+                    {
+                        gamma += std::max(data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
+                                          data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>());
+                    }
+                    gamma /= n;
+                    limit_scaling(gamma);
+                    gamma = std::max(gamma, data.c.template lpNorm<Eigen::Infinity>());
+                    limit_scaling(gamma);
+                    gamma = T(1) / gamma;
+
+                    // scale cost
+                    data.P_utri *= gamma;
+                    data.c *= gamma;
+
+                    c *= gamma;
+                }
             }
 
             c_inv = T(1) / c;
@@ -392,7 +396,7 @@ class IdentityPreconditioner
 public:
     void init(const Data<T>&) {}
 
-    inline void scale_data(Data<T>&, bool = false, isize = 0, T = T(0)) {}
+    inline void scale_data(Data<T>&, bool = false, bool = false, isize = 0, T = T(0)) {}
 
     inline void unscale_data(Data<T>&) {}
 

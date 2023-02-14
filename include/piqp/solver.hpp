@@ -194,7 +194,10 @@ protected:
         init_workspace();
 
         m_preconditioner.init(m_data);
-        m_preconditioner.scale_data(m_data, false, m_settings.preconditioner_iter);
+        m_preconditioner.scale_data(m_data,
+                                    false,
+                                    m_settings.preconditioner_scale_cost,
+                                    m_settings.preconditioner_iter);
 
         m_kkt.init(m_result.info.rho, m_result.info.delta);
         m_kkt_init_state = true;
@@ -827,7 +830,7 @@ protected:
     }
 };
 
-template<typename T, typename Preconditioner = dense::IdentityPreconditioner<T>>
+template<typename T, typename Preconditioner = dense::RuizEquilibration<T>>
 class DenseSolver : public SolverBase<DenseSolver<T, Preconditioner>, T, int, Preconditioner, PIQP_DENSE, KKTMode::KKT_FULL>
 {
 public:
@@ -915,7 +918,10 @@ public:
         if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
         if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
 
-        this->m_preconditioner.scale_data(this->m_data, reuse_preconditioner, this->m_settings.preconditioner_iter);
+        this->m_preconditioner.scale_data(this->m_data,
+                                          reuse_preconditioner,
+                                          this->m_settings.preconditioner_scale_cost,
+                                          this->m_settings.preconditioner_iter);
 
         this->m_kkt.update_data(update_options);
 
@@ -928,7 +934,7 @@ public:
     }
 };
 
-template<typename T, typename I, int Mode = KKTMode::KKT_FULL, typename Preconditioner = sparse::IdentityPreconditioner<T, I>>
+template<typename T, typename I, int Mode = KKTMode::KKT_FULL, typename Preconditioner = sparse::RuizEquilibration<T, I>>
 class SparseSolver : public SolverBase<SparseSolver<T, I, Mode, Preconditioner>, T, I, Preconditioner, PIQP_SPARSE, Mode>
 {
 public:
@@ -1031,7 +1037,10 @@ public:
         if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
         if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
 
-        this->m_preconditioner.scale_data(this->m_data, reuse_preconditioner, this->m_settings.preconditioner_iter);
+        this->m_preconditioner.scale_data(this->m_data,
+                                          reuse_preconditioner,
+                                          this->m_settings.preconditioner_scale_cost,
+                                          this->m_settings.preconditioner_iter);
 
         this->m_kkt.update_data(update_options);
 
