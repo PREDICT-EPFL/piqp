@@ -52,16 +52,22 @@ using isize = meta::make_signed<usize>::type;
 
 template<typename T, typename I>
 using SparseMat = Eigen::SparseMatrix<T, Eigen::ColMajor, I>;
+template<typename T, typename I>
+using SparseMatRef = Eigen::Ref<Eigen::SparseMatrix<T, Eigen::ColMajor, I>>;
+template<typename T, typename I>
+using CSparseMatRef = Eigen::Ref<const Eigen::SparseMatrix<T, Eigen::ColMajor, I>>;
+
 template<typename T>
 using Vec = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 template<typename T>
 using VecRef = Eigen::Ref<Eigen::Matrix<T, Eigen::Dynamic, 1>>;
 template<typename T>
+using CVecRef = Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>>;
+
+template<typename T>
 using Mat = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 template<typename T>
 using MatRef = Eigen::Ref<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>;
-template<typename T>
-using CVecRef = Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>>;
 template<typename T>
 using CMatRef = Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>;
 

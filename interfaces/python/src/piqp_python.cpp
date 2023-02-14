@@ -88,10 +88,35 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def(py::init<>())
         .def_property("settings", &SparseSolver::settings, &SparseSolver::settings)
         .def_property_readonly("result", &SparseSolver::result)
-        .def("setup", &SparseSolver::setup,
+        .def("setup",
+             [](SparseSolver &solver,
+                const piqp::SparseMat<T, I>& P,
+                const piqp::CVecRef<T>& c,
+                const piqp::SparseMat<T, I>& A,
+                const piqp::CVecRef<T>& b,
+                const piqp::SparseMat<T, I>& G,
+                const piqp::CVecRef<T>& h,
+                const piqp::optional<piqp::CVecRef<T>>& x_lb = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& x_ub = piqp::nullopt)
+             {
+                 solver.setup(P, c, A, b, G, h, x_lb, x_ub);
+             },
              py::arg("P"), py::arg("c"), py::arg("A"), py::arg("b"), py::arg("G"), py::arg("h"),
              py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt)
-        .def("update", &SparseSolver::update,
+        .def("update",
+             [](SparseSolver &solver,
+                const piqp::optional<piqp::SparseMat<T, I>>& P = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& c = piqp::nullopt,
+                const piqp::optional<piqp::SparseMat<T, I>>& A = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& b = piqp::nullopt,
+                const piqp::optional<piqp::SparseMat<T, I>>& G = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& h = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& x_lb = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& x_ub = piqp::nullopt,
+                bool reuse_preconditioner = true)
+             {
+                 solver.update(P, c, A, b, G, h, x_lb, x_ub, reuse_preconditioner);
+             },
              py::arg("P") = piqp::nullopt, py::arg("c") = piqp::nullopt,
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
              py::arg("G") = piqp::nullopt, py::arg("h") = piqp::nullopt,

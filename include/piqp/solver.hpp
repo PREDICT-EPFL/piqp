@@ -155,8 +155,8 @@ protected:
                     const CVecRef<T>& b,
                     const MatType& G,
                     const CVecRef<T>& h,
-                    const optional<CVecRef<T>> x_lb,
-                    const optional<CVecRef<T>> x_ub)
+                    const optional<CVecRef<T>>& x_lb,
+                    const optional<CVecRef<T>>& x_ub)
     {
         if (m_settings.compute_timings)
         {
@@ -212,7 +212,7 @@ protected:
         }
     }
 
-    void setup_lb_data(const optional<CVecRef<T>> x_lb)
+    void setup_lb_data(const optional<CVecRef<T>>& x_lb)
     {
         isize n_lb = 0;
         if (x_lb.has_value())
@@ -232,7 +232,7 @@ protected:
         m_data.n_lb = n_lb;
     }
 
-    void setup_ub_data(const optional<CVecRef<T>> x_ub)
+    void setup_ub_data(const optional<CVecRef<T>>& x_ub)
     {
         isize n_ub = 0;
         if (x_ub.has_value())
@@ -840,20 +840,20 @@ public:
                const CVecRef<T>& b,
                const CMatRef<T>& G,
                const CVecRef<T>& h,
-               const optional<CVecRef<T>> x_lb = nullopt,
-               const optional<CVecRef<T>> x_ub = nullopt)
+               const optional<CVecRef<T>>& x_lb = nullopt,
+               const optional<CVecRef<T>>& x_ub = nullopt)
     {
         this->setup_impl(P, c, A, b, G, h, x_lb, x_ub);
     }
 
-    void update(const optional<CMatRef<T>> P = nullopt,
-                const optional<CVecRef<T>> c = nullopt,
-                const optional<CMatRef<T>> A = nullopt,
-                const optional<CVecRef<T>> b = nullopt,
-                const optional<CMatRef<T>> G = nullopt,
-                const optional<CVecRef<T>> h = nullopt,
-                const optional<CVecRef<T>> x_lb = nullopt,
-                const optional<CVecRef<T>> x_ub = nullopt,
+    void update(const optional<CMatRef<T>>& P = nullopt,
+                const optional<CVecRef<T>>& c = nullopt,
+                const optional<CMatRef<T>>& A = nullopt,
+                const optional<CVecRef<T>>& b = nullopt,
+                const optional<CMatRef<T>>& G = nullopt,
+                const optional<CVecRef<T>>& h = nullopt,
+                const optional<CVecRef<T>>& x_lb = nullopt,
+                const optional<CVecRef<T>>& x_ub = nullopt,
                 bool reuse_preconditioner = true)
     {
         if (!this->m_setup_done)
@@ -938,26 +938,26 @@ template<typename T, typename I, int Mode = KKTMode::KKT_FULL, typename Precondi
 class SparseSolver : public SolverBase<SparseSolver<T, I, Mode, Preconditioner>, T, I, Preconditioner, PIQP_SPARSE, Mode>
 {
 public:
-    void setup(const SparseMat<T, I>& P,
+    void setup(const CSparseMatRef<T, I>& P,
                const CVecRef<T>& c,
-               const SparseMat<T, I>& A,
+               const CSparseMatRef<T, I>& A,
                const CVecRef<T>& b,
-               const SparseMat<T, I>& G,
+               const CSparseMatRef<T, I>& G,
                const CVecRef<T>& h,
-               const optional<CVecRef<T>> x_lb = nullopt,
-               const optional<CVecRef<T>> x_ub = nullopt)
+               const optional<CVecRef<T>>& x_lb = nullopt,
+               const optional<CVecRef<T>>& x_ub = nullopt)
     {
         this->setup_impl(P, c, A, b, G, h, x_lb, x_ub);
     }
 
-    void update(const optional<SparseMat<T, I>> P = nullopt,
-                const optional<CVecRef<T>> c = nullopt,
-                const optional<SparseMat<T, I>> A = nullopt,
-                const optional<CVecRef<T>> b = nullopt,
-                const optional<SparseMat<T, I>> G = nullopt,
-                const optional<CVecRef<T>> h = nullopt,
-                const optional<CVecRef<T>> x_lb = nullopt,
-                const optional<CVecRef<T>> x_ub = nullopt,
+    void update(const optional<CSparseMatRef<T, I>>& P = nullopt,
+                const optional<CVecRef<T>>& c = nullopt,
+                const optional<CSparseMatRef<T, I>>& A = nullopt,
+                const optional<CVecRef<T>>& b = nullopt,
+                const optional<CSparseMatRef<T, I>>& G = nullopt,
+                const optional<CVecRef<T>>& h = nullopt,
+                const optional<CVecRef<T>>& x_lb = nullopt,
+                const optional<CVecRef<T>>& x_ub = nullopt,
                 bool reuse_preconditioner = true)
     {
         if (!this->m_setup_done)
