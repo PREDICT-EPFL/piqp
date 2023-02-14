@@ -133,7 +133,7 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
  * @param C  transpose of matrix A, C has to already be allocated, only values are copied
  */
 template<typename T, typename I>
-void transpose_no_allocation(const SparseMat<T, I>& A, SparseMat<T, I>& C)
+void transpose_no_allocation(const CSparseMatRef<T, I>& A, SparseMat<T, I>& C)
 {
     eigen_assert(A.outerSize() == C.innerSize() && A.innerSize() == C.outerSize() && "sparsity pattern of C does not match AT!");
     isize jj = A.outerSize();

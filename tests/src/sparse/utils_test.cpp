@@ -85,7 +85,7 @@ TEST(SparseUtils, TransposeNoAlloc)
     Eigen::Map<Vec<T>>(C.valuePtr(), C.nonZeros()) = rand::vector_rand<T>(C.nonZeros());
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    transpose_no_allocation(A, C);
+    transpose_no_allocation<T, I>(A, C);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     assert_sparse_matrices_equal(C, AT);

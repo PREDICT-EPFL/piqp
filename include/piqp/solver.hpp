@@ -977,16 +977,14 @@ public:
 
         if (P.has_value())
         {
-            const SparseMat<T, I>& P_ = *P;
-
-            eigen_assert(P_.rows() == this->m_data.n && P_.cols() == this->m_data.n && "P has wrong dimensions");
-            isize n = P_.outerSize();
+            eigen_assert(P->rows() == this->m_data.n && P->cols() == this->m_data.n && "P has wrong dimensions");
+            isize n = P->outerSize();
             for (isize j = 0; j < n; j++)
             {
-                PIQP_MAYBE_UNUSED isize P_col_nnz = P_.outerIndexPtr()[j + 1] - P_.outerIndexPtr()[j];
+                PIQP_MAYBE_UNUSED isize P_col_nnz = P->outerIndexPtr()[j + 1] - P->outerIndexPtr()[j];
                 isize P_utri_col_nnz = this->m_data.P_utri.outerIndexPtr()[j + 1] - this->m_data.P_utri.outerIndexPtr()[j];
                 eigen_assert(P_col_nnz >= P_utri_col_nnz && "P nonzeros missmatch");
-                Eigen::Map<Vec<T>>(this->m_data.P_utri.valuePtr() + this->m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P_.valuePtr() + P_.outerIndexPtr()[j], P_utri_col_nnz);
+                Eigen::Map<Vec<T>>(this->m_data.P_utri.valuePtr() + this->m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P->valuePtr() + P->outerIndexPtr()[j], P_utri_col_nnz);
             }
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_P;
@@ -994,22 +992,18 @@ public:
 
         if (A.has_value())
         {
-            const SparseMat<T, I>& A_ = *A;
-
-            eigen_assert(A_.rows() == this->m_data.p && A_.cols() == this->m_data.n && "A has wrong dimensions");
-            eigen_assert(A_.nonZeros() == this->m_data.AT.nonZeros() && "A nonzeros missmatch");
-            sparse::transpose_no_allocation(A_, this->m_data.AT);
+            eigen_assert(A->rows() == this->m_data.p && A->cols() == this->m_data.n && "A has wrong dimensions");
+            eigen_assert(A->nonZeros() == this->m_data.AT.nonZeros() && "A nonzeros missmatch");
+            sparse::transpose_no_allocation(*A, this->m_data.AT);
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_A;
         }
 
         if (G.has_value())
         {
-            const SparseMat<T, I>& G_ = *G;
-
-            eigen_assert(G_.rows() == this->m_data.m && G_.cols() == this->m_data.n && "G has wrong dimensions");
-            eigen_assert(G_.nonZeros() == this->m_data.GT.nonZeros() && "G nonzeros missmatch");
-            sparse::transpose_no_allocation(G_, this->m_data.GT);
+            eigen_assert(G->rows() == this->m_data.m && G->cols() == this->m_data.n && "G has wrong dimensions");
+            eigen_assert(G->nonZeros() == this->m_data.GT.nonZeros() && "G nonzeros missmatch");
+            sparse::transpose_no_allocation(*G, this->m_data.GT);
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_G;
         }

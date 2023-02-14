@@ -227,7 +227,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
 
         if (options & KKTUpdateOptions::KKT_UPDATE_A)
         {
-            transpose_no_allocation(data.AT, A);
+            transpose_no_allocation<T, I>(data.AT, A);
             update_AT_A();
         }
 

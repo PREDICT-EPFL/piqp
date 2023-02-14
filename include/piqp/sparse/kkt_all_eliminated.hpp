@@ -171,13 +171,13 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
 
         if (options & KKTUpdateOptions::KKT_UPDATE_A)
         {
-            transpose_no_allocation(data.AT, A);
+            transpose_no_allocation<T, I>(data.AT, A);
             update_AT_A();
         }
 
         if (options & KKTUpdateOptions::KKT_UPDATE_G)
         {
-            transpose_no_allocation(data.GT, G);
+            transpose_no_allocation<T, I>(data.GT, G);
         }
 
         if (options != KKTUpdateOptions::KKT_UPDATE_NONE)

@@ -225,7 +225,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_INEQ_ELIMINATED>
 
         if (options & KKTUpdateOptions::KKT_UPDATE_G)
         {
-            transpose_no_allocation(data.GT, G);
+            transpose_no_allocation<T, I>(data.GT, G);
         }
 
         if (options != KKTUpdateOptions::KKT_UPDATE_NONE)
