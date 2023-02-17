@@ -358,7 +358,7 @@ protected:
                 m_result.info.delta *= 100;
                 m_result.info.rho *= 100;
                 m_result.info.factor_retires++;
-                m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.feas_tol_abs);
+                m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.eps_abs);
             }
             else
             {
@@ -469,9 +469,8 @@ protected:
                        m_result.info.dual_step);
             }
 
-            if (m_result.info.primal_inf < m_settings.feas_tol_abs + m_settings.feas_tol_rel * primal_rel_inf &&
-                m_result.info.dual_inf < m_settings.feas_tol_abs + m_settings.feas_tol_rel * dual_rel_inf &&
-                m_result.info.mu < m_settings.dual_tol)
+            if (m_result.info.primal_inf < m_settings.eps_abs + m_settings.eps_rel * primal_rel_inf &&
+                m_result.info.dual_inf < m_settings.eps_abs + m_settings.eps_rel * dual_rel_inf)
             {
                 m_result.info.status = Status::PIQP_SOLVED;
                 return m_result.info.status;
@@ -483,13 +482,13 @@ protected:
             rz_lb.head(m_data.n_lb) = rz_lb_nr.head(m_data.n_lb) - m_result.info.delta * (nu_lb - z_lb);
             rz_ub.head(m_data.n_ub) = rz_ub_nr.head(m_data.n_ub) - m_result.info.delta * (nu_ub - z_ub);
 
-            if (m_result.info.no_dual_update > 5 && primal_prox_inf() > 1e10 && primal_inf_r() < m_settings.feas_tol_abs)
+            if (m_result.info.no_dual_update > 5 && primal_prox_inf() > 1e10 && primal_inf_r() < m_settings.eps_abs)
             {
                 m_result.info.status = Status::PIQP_PRIMAL_INFEASIBLE;
                 return m_result.info.status;
             }
 
-            if (m_result.info.no_primal_update > 5 && dual_prox_inf() > 1e10 && dual_inf_r() < m_settings.feas_tol_abs)
+            if (m_result.info.no_primal_update > 5 && dual_prox_inf() > 1e10 && dual_inf_r() < m_settings.eps_abs)
             {
                 m_result.info.status = Status::PIQP_DUAL_INFEASIBLE;
                 return m_result.info.status;
@@ -519,7 +518,7 @@ protected:
                     m_result.info.rho *= 100;
                     m_result.info.iter--;
                     m_result.info.factor_retires++;
-                    m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.feas_tol_abs);
+                    m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.eps_abs);
                     continue;
                 }
                 else

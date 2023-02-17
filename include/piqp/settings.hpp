@@ -18,10 +18,9 @@ struct Settings
     T rho_init   = 1e-6;
     T delta_init = 1e-4;
 
-    T feas_tol_abs     = 1e-8;
-    T feas_tol_rel     = 1e-8;
-    T dual_tol         = 1e-8;
-    T reg_lower_limit  = 1e-10;
+    T eps_abs         = 1e-8;
+    T eps_rel         = 1e-8;
+    T reg_lower_limit = 1e-10;
 
     isize max_iter            = 200;
     isize max_factor_retires  = 10;
@@ -38,9 +37,8 @@ struct Settings
     {
         return rho_init > 0 &&
                delta_init > 0 &&
-               feas_tol_abs > 0 &&
-               feas_tol_rel >= 0 &&
-               dual_tol > 0 &&
+               eps_abs > 0 &&
+               eps_rel >= 0 &&
                reg_lower_limit > 0 &&
                max_iter > 0 &&
                max_factor_retires > 0 &&
