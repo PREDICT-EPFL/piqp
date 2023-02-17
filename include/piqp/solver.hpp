@@ -438,11 +438,8 @@ protected:
                 update_nr_residuals();
             }
 
-            m_result.info.primal_inf = m_preconditioner.unscale_primal_res_eq(ry_nr).template lpNorm<Eigen::Infinity>();
-            m_result.info.primal_inf = std::max(m_result.info.primal_inf, m_preconditioner.unscale_primal_res_ineq(rz_nr).template lpNorm<Eigen::Infinity>());
-            m_result.info.primal_inf = std::max(m_result.info.primal_inf, m_preconditioner.unscale_primal_res_lb(rz_lb_nr.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
-            m_result.info.primal_inf = std::max(m_result.info.primal_inf, m_preconditioner.unscale_primal_res_ub(rz_ub_nr.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
-            m_result.info.dual_inf = m_preconditioner.unscale_dual_res(rx_nr).template lpNorm<Eigen::Infinity>();
+            m_result.info.primal_inf = primal_inf_nr();
+            m_result.info.dual_inf = dual_inf_nr();
 
             if (m_settings.verbose)
             {
@@ -486,25 +483,13 @@ protected:
             rz_lb.head(m_data.n_lb) = rz_lb_nr.head(m_data.n_lb) - m_result.info.delta * (nu_lb - z_lb);
             rz_ub.head(m_data.n_ub) = rz_ub_nr.head(m_data.n_ub) - m_result.info.delta * (nu_ub - z_ub);
 
-            T dual_prox_inf_norm = m_preconditioner.unscale_dual_eq(m_result.lambda - m_result.y).template lpNorm<Eigen::Infinity>();
-            dual_prox_inf_norm = std::max(dual_prox_inf_norm, m_preconditioner.unscale_dual_ineq(m_result.nu - m_result.z).template lpNorm<Eigen::Infinity>());
-            dual_prox_inf_norm = std::max(dual_prox_inf_norm, m_preconditioner.unscale_dual_lb(nu_lb - z_lb).template lpNorm<Eigen::Infinity>());
-            dual_prox_inf_norm = std::max(dual_prox_inf_norm, m_preconditioner.unscale_dual_ub(nu_ub - z_ub).template lpNorm<Eigen::Infinity>());
-
-            T dual_inf_norm = m_preconditioner.unscale_primal_res_eq(ry).template lpNorm<Eigen::Infinity>();
-            dual_inf_norm = std::max(dual_inf_norm, m_preconditioner.unscale_primal_res_ineq(rz).template lpNorm<Eigen::Infinity>());
-            dual_inf_norm = std::max(dual_inf_norm, m_preconditioner.unscale_primal_res_lb(rz_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
-            dual_inf_norm = std::max(dual_inf_norm, m_preconditioner.unscale_primal_res_ub(rz_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
-
-            if (m_result.info.no_dual_update > 5 && dual_prox_inf_norm > 1e10 && dual_inf_norm < m_settings.feas_tol_abs)
+            if (m_result.info.no_dual_update > 5 && primal_prox_inf() > 1e10 && primal_inf_r() < m_settings.feas_tol_abs)
             {
                 m_result.info.status = Status::PIQP_PRIMAL_INFEASIBLE;
                 return m_result.info.status;
             }
 
-            if (m_result.info.no_primal_update > 5 &&
-                m_preconditioner.unscale_primal(m_result.x - m_result.zeta).template lpNorm<Eigen::Infinity>() > 1e10 &&
-                m_preconditioner.unscale_dual_res(rx).template lpNorm<Eigen::Infinity>() < m_settings.feas_tol_abs)
+            if (m_result.info.no_primal_update > 5 && dual_prox_inf() > 1e10 && dual_inf_r() < m_settings.feas_tol_abs)
             {
                 m_result.info.status = Status::PIQP_DUAL_INFEASIBLE;
                 return m_result.info.status;
@@ -666,7 +651,7 @@ protected:
                 // ------------------ update regularization ------------------
                 update_nr_residuals();
 
-                if (m_preconditioner.unscale_dual_res(rx_nr).template lpNorm<Eigen::Infinity>() < 0.95 * m_result.info.dual_inf)
+                if (dual_inf_nr() < 0.95 * m_result.info.dual_inf)
                 {
                     m_result.zeta = m_result.x;
                     m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.rho);
@@ -677,11 +662,7 @@ protected:
                     m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * m_result.info.rho);
                 }
 
-                T dual_nr_inf_norm = m_preconditioner.unscale_primal_res_eq(ry_nr).template lpNorm<Eigen::Infinity>();
-                dual_nr_inf_norm = std::max(dual_nr_inf_norm, m_preconditioner.unscale_primal_res_ineq(rz_nr).template lpNorm<Eigen::Infinity>());
-                dual_nr_inf_norm = std::max(dual_nr_inf_norm, m_preconditioner.unscale_primal_res_lb(rz_lb_nr.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
-                dual_nr_inf_norm = std::max(dual_nr_inf_norm, m_preconditioner.unscale_primal_res_ub(rz_ub_nr.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
-                if (dual_nr_inf_norm < 0.95 * m_result.info.primal_inf)
+                if (primal_inf_nr() < 0.95 * m_result.info.primal_inf)
                 {
                     m_result.lambda = m_result.y;
                     m_result.nu = m_result.z;
@@ -709,7 +690,7 @@ protected:
                 // ------------------ update regularization ------------------
                 update_nr_residuals();
 
-                if (m_preconditioner.unscale_dual_res(rx_nr).template lpNorm<Eigen::Infinity>() < 0.95 * m_result.info.dual_inf)
+                if (dual_inf_nr() < 0.95 * m_result.info.dual_inf)
                 {
                     m_result.zeta = m_result.x;
                     m_result.info.rho = std::max(m_result.info.reg_limit, 0.1 * m_result.info.rho);
@@ -720,7 +701,7 @@ protected:
                     m_result.info.rho = std::max(m_result.info.reg_limit, 0.5 * m_result.info.rho);
                 }
 
-                if (m_preconditioner.unscale_primal_res_eq(ry_nr).template lpNorm<Eigen::Infinity>() < 0.95 * m_result.info.primal_inf)
+                if (primal_inf_nr() < 0.95 * m_result.info.primal_inf)
                 {
                     m_result.lambda = m_result.y;
                     m_result.info.delta = std::max(m_result.info.reg_limit, 0.1 * m_result.info.delta);
@@ -743,6 +724,7 @@ protected:
         rx_nr.noalias() -= m_data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * m_result.x;
         dual_rel_inf = m_preconditioner.unscale_dual_res(rx_nr).template lpNorm<Eigen::Infinity>();
         rx_nr.noalias() -= m_data.c;
+        dual_rel_inf = std::max(dual_rel_inf, m_preconditioner.unscale_dual_res(m_data.c).template lpNorm<Eigen::Infinity>());
         dx.noalias() = m_data.AT * m_result.y; // use dx as a temporary
         dual_rel_inf = std::max(dual_rel_inf, m_preconditioner.unscale_dual_res(dx).template lpNorm<Eigen::Infinity>());
         rx_nr.noalias() -= dx;
@@ -773,21 +755,69 @@ protected:
         primal_rel_inf = std::max(primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(rz_nr).template lpNorm<Eigen::Infinity>());
         rz_nr.noalias() += m_data.h - m_result.s;
         primal_rel_inf = std::max(primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_data.h).template lpNorm<Eigen::Infinity>());
+        primal_rel_inf = std::max(primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_result.s).template lpNorm<Eigen::Infinity>());
 
         for (isize i = 0; i < m_data.n_lb; i++)
         {
-            rz_lb_nr(i) = m_result.x(m_data.x_lb_idx(i)) + m_data.x_lb_n(i) - m_result.s_lb(i);
+            rz_lb_nr(i) = m_result.x(m_data.x_lb_idx(i));
 
         }
         primal_rel_inf = std::max(primal_rel_inf, m_preconditioner.unscale_primal_res_lb(rz_lb_nr.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        rz_lb_nr.head(m_data.n_lb).noalias() += m_data.x_lb_n.head(m_data.n_lb) - m_result.s_lb.head(m_data.n_lb);
         primal_rel_inf = std::max(primal_rel_inf, m_preconditioner.unscale_primal_res_lb(m_data.x_lb_n.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        primal_rel_inf = std::max(primal_rel_inf, m_preconditioner.unscale_primal_res_lb(m_result.s_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+
         for (isize i = 0; i < m_data.n_ub; i++)
         {
-            rz_ub_nr(i) = -m_result.x(m_data.x_ub_idx(i)) + m_data.x_ub(i) - m_result.s_ub(i);
+            rz_ub_nr(i) = -m_result.x(m_data.x_ub_idx(i));
 
         }
         primal_rel_inf = std::max(primal_rel_inf, m_preconditioner.unscale_primal_res_ub(rz_ub_nr.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        rz_ub_nr.head(m_data.n_ub).noalias() += m_data.x_ub.head(m_data.n_ub) - m_result.s_ub.head(m_data.n_ub);
         primal_rel_inf = std::max(primal_rel_inf, m_preconditioner.unscale_primal_res_ub(m_data.x_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        primal_rel_inf = std::max(primal_rel_inf, m_preconditioner.unscale_primal_res_ub(m_result.s_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+    }
+
+    T primal_inf_nr()
+    {
+        T inf = m_preconditioner.unscale_primal_res_eq(ry_nr).template lpNorm<Eigen::Infinity>();
+        inf = std::max(inf, m_preconditioner.unscale_primal_res_ineq(rz_nr).template lpNorm<Eigen::Infinity>());
+        inf = std::max(inf, m_preconditioner.unscale_primal_res_lb(rz_lb_nr.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        inf = std::max(inf, m_preconditioner.unscale_primal_res_ub(rz_ub_nr.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        return inf;
+    }
+
+    T primal_inf_r()
+    {
+        T inf = m_preconditioner.unscale_primal_res_eq(ry).template lpNorm<Eigen::Infinity>();
+        inf = std::max(inf, m_preconditioner.unscale_primal_res_ineq(rz).template lpNorm<Eigen::Infinity>());
+        inf = std::max(inf, m_preconditioner.unscale_primal_res_lb(rz_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        inf = std::max(inf, m_preconditioner.unscale_primal_res_ub(rz_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        return inf;
+    }
+
+    T primal_prox_inf()
+    {
+        T inf = m_preconditioner.unscale_dual_eq(m_result.lambda - m_result.y).template lpNorm<Eigen::Infinity>();
+        inf = std::max(inf, m_preconditioner.unscale_dual_ineq(m_result.nu - m_result.z).template lpNorm<Eigen::Infinity>());
+        inf = std::max(inf, m_preconditioner.unscale_dual_lb(m_result.nu_lb.head(m_data.n_lb) - m_result.z_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        inf = std::max(inf, m_preconditioner.unscale_dual_ub(m_result.nu_ub.head(m_data.n_ub) - m_result.z_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        return inf;
+    }
+
+    T dual_inf_nr()
+    {
+        return m_preconditioner.unscale_dual_res(rx_nr).template lpNorm<Eigen::Infinity>();
+    }
+
+    T dual_inf_r()
+    {
+        return m_preconditioner.unscale_dual_res(rx).template lpNorm<Eigen::Infinity>();
+    }
+
+    T dual_prox_inf()
+    {
+        return m_preconditioner.unscale_primal(m_result.x - m_result.zeta).template lpNorm<Eigen::Infinity>();
     }
 
     void restore_box_dual()
