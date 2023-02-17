@@ -56,6 +56,10 @@ struct Info
     T primal_inf;
     T dual_inf;
 
+    T primal_cost;
+    T dual_cost;
+    T duality_gap;
+
     T factor_retires;
     T reg_limit;
     T no_primal_update; // dual infeasibility detection counter

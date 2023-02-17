@@ -18,8 +18,13 @@ struct Settings
     T rho_init   = 1e-6;
     T delta_init = 1e-4;
 
-    T eps_abs         = 1e-8;
-    T eps_rel         = 1e-8;
+    T eps_abs = 1e-8;
+    T eps_rel = 1e-9;
+
+    bool check_duality_gap = true;
+    T eps_duality_gap_abs = 1e-6;
+    T eps_duality_gap_rel = 1e-9;
+
     T reg_lower_limit = 1e-10;
 
     isize max_iter            = 200;
@@ -39,6 +44,8 @@ struct Settings
                delta_init > 0 &&
                eps_abs > 0 &&
                eps_rel >= 0 &&
+               eps_duality_gap_abs > 0 &&
+               eps_duality_gap_rel >= 0 &&
                reg_lower_limit > 0 &&
                max_iter > 0 &&
                max_factor_retires > 0 &&
