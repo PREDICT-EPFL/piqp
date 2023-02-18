@@ -54,11 +54,14 @@ struct Info
     T dual_step;
 
     T primal_inf;
+    T primal_rel_inf;
     T dual_inf;
+    T dual_rel_inf;
 
     T primal_cost;
     T dual_cost;
     T duality_gap;
+    T duality_gap_rel;
 
     T factor_retires;
     T reg_limit;
