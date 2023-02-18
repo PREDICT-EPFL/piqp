@@ -741,22 +741,14 @@ protected:
         rx_nr.noalias() -= m_data.c;
         m_result.info.dual_rel_inf = std::max(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(m_data.c).template lpNorm<Eigen::Infinity>());
         dx.noalias() = m_data.AT * m_result.y; // use dx as a temporary
-        m_result.info.dual_rel_inf = std::max(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(dx).template lpNorm<Eigen::Infinity>());
-        rx_nr.noalias() -= dx;
-        dx.noalias() = m_data.GT * m_result.z; // use dx as a temporary
-        m_result.info.dual_rel_inf = std::max(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(dx).template lpNorm<Eigen::Infinity>());
-        rx_nr.noalias() -= dx;
-        dx.setZero(); // use dx as a temporary
+        dx.noalias() += m_data.GT * m_result.z;
         for (isize i = 0; i < m_data.n_lb; i++)
         {
-            dx(m_data.x_lb_idx(i)) = -m_result.z_lb(i);
+            dx(m_data.x_lb_idx(i)) -= m_result.z_lb(i);
         }
-        m_result.info.dual_rel_inf = std::max(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(dx).template lpNorm<Eigen::Infinity>());
-        rx_nr.noalias() -= dx;
-        dx.setZero(); // use dx as a temporary
         for (isize i = 0; i < m_data.n_ub; i++)
         {
-            dx(m_data.x_ub_idx(i)) = m_result.z_ub(i);
+            dx(m_data.x_ub_idx(i)) += m_result.z_ub(i);
         }
         m_result.info.dual_rel_inf = std::max(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(dx).template lpNorm<Eigen::Infinity>());
         rx_nr.noalias() -= dx;
