@@ -107,7 +107,7 @@ public:
             printf("variable lower bounds n_lb = %ld\n", m_data.n_lb);
             printf("variable upper bounds n_ub = %ld\n", m_data.n_ub);
             printf("\n");
-            printf("iter  prim_cost      dual_cost      duality_gap   prim_inf      dual_inf      rho         delta       mu          prim_step   dual_step\n");
+            printf("iter  prim_obj       dual_obj       duality_gap   prim_inf      dual_inf      rho         delta       mu          prim_step   dual_step\n");
         }
 
         if (m_settings.compute_timings)
@@ -442,8 +442,8 @@ protected:
             {
                 printf("%3ld   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.3e   %.3e\n",
                        m_result.info.iter,
-                       m_result.info.primal_cost,
-                       m_result.info.dual_cost,
+                       m_result.info.primal_obj,
+                       m_result.info.dual_obj,
                        m_result.info.duality_gap,
                        m_result.info.primal_inf,
                        m_result.info.dual_inf,
@@ -712,29 +712,29 @@ protected:
 
         // calculate primal cost, dual cost, and duality gap
         T tmp = -m_result.x.dot(rx_nr); // x'Px
-        m_result.info.primal_cost = T(0.5) * tmp;
-        m_result.info.dual_cost = -T(0.5) * tmp;
+        m_result.info.primal_obj = T(0.5) * tmp;
+        m_result.info.dual_obj = -T(0.5) * tmp;
         m_result.info.duality_gap_rel = m_preconditioner.unscale_cost(std::abs(tmp));
         tmp = m_data.c.dot(m_result.x);
-        m_result.info.primal_cost += tmp;
+        m_result.info.primal_obj += tmp;
         m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
         tmp = m_data.b.dot(m_result.y);
-        m_result.info.dual_cost -= tmp;
+        m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
         tmp = m_data.h.dot(m_result.z);
-        m_result.info.dual_cost -= tmp;
+        m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
         tmp = m_data.x_lb_n.head(m_data.n_lb).dot(m_result.z_lb.head(m_data.n_lb));
-        m_result.info.dual_cost -= tmp;
+        m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
         tmp = m_data.x_ub.head(m_data.n_ub).dot(m_result.z_ub.head(m_data.n_ub));
-        m_result.info.dual_cost -= tmp;
+        m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
 
-        m_result.info.duality_gap = std::abs(m_result.info.primal_cost - m_result.info.dual_cost);
+        m_result.info.duality_gap = std::abs(m_result.info.primal_obj - m_result.info.dual_obj);
 
-        m_result.info.primal_cost = m_preconditioner.unscale_cost(m_result.info.primal_cost);
-        m_result.info.dual_cost = m_preconditioner.unscale_cost(m_result.info.dual_cost);
+        m_result.info.primal_obj = m_preconditioner.unscale_cost(m_result.info.primal_obj);
+        m_result.info.dual_obj = m_preconditioner.unscale_cost(m_result.info.dual_obj);
         m_result.info.duality_gap = m_preconditioner.unscale_cost(m_result.info.duality_gap);
 
         // dual residual and infeasibility calculation

@@ -58,8 +58,8 @@ struct Info
     T dual_inf;
     T dual_rel_inf;
 
-    T primal_cost;
-    T dual_cost;
+    T primal_obj;
+    T dual_obj;
     T duality_gap;
     T duality_gap_rel;
 
