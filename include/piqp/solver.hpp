@@ -89,7 +89,7 @@ public:
         {
             printf("----------------------------------------------------------\n");
             printf("                           PIQP                           \n");
-            printf("           (c) Roland Schwan, Colin N. Jones              \n");
+            printf("                    (c) Roland Schwan                     \n");
             printf("   École Polytechnique Fédérale de Lausanne (EPFL) 2023   \n");
             printf("----------------------------------------------------------\n");
             if (MatrixType == PIQP_DENSE)
@@ -132,6 +132,7 @@ public:
             printf("\n");
             printf("status:               %s\n", status_to_string(status));
             printf("number of iterations: %ld\n", m_result.info.iter);
+            printf("objective:            %.5e\n", m_result.info.primal_obj);
             if (m_settings.compute_timings)
             {
                 printf("total run time:       %.3es\n", m_result.info.run_time);
