@@ -181,10 +181,12 @@ protected:
         m_data.b = b;
         m_data.h = h;
 
-        m_data.x_lb_n.resize(m_data.n);
-        m_data.x_ub.resize(m_data.n);
         m_data.x_lb_idx.resize(m_data.n);
         m_data.x_ub_idx.resize(m_data.n);
+        m_data.x_lb_scaling = Vec<T>::Constant(m_data.n, T(1));
+        m_data.x_ub_scaling = Vec<T>::Constant(m_data.n, T(1));
+        m_data.x_lb_n.resize(m_data.n);
+        m_data.x_ub.resize(m_data.n);
 
         setup_lb_data(x_lb);
         setup_ub_data(x_ub);
@@ -745,11 +747,11 @@ protected:
         dx.noalias() += m_data.GT * m_result.z;
         for (isize i = 0; i < m_data.n_lb; i++)
         {
-            dx(m_data.x_lb_idx(i)) -= m_result.z_lb(i);
+            dx(m_data.x_lb_idx(i)) -= m_data.x_lb_scaling(i) * m_result.z_lb(i);
         }
         for (isize i = 0; i < m_data.n_ub; i++)
         {
-            dx(m_data.x_ub_idx(i)) += m_result.z_ub(i);
+            dx(m_data.x_ub_idx(i)) += m_data.x_ub_scaling(i) * m_result.z_ub(i);
         }
         m_result.info.dual_rel_inf = std::max(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(dx).template lpNorm<Eigen::Infinity>());
         rx_nr.noalias() -= dx;
@@ -768,8 +770,7 @@ protected:
 
         for (isize i = 0; i < m_data.n_lb; i++)
         {
-            rz_lb_nr(i) = m_result.x(m_data.x_lb_idx(i));
-
+            rz_lb_nr(i) = m_data.x_lb_scaling(i) * m_result.x(m_data.x_lb_idx(i));
         }
         m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_lb(rz_lb_nr.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
         rz_lb_nr.head(m_data.n_lb).noalias() += m_data.x_lb_n.head(m_data.n_lb) - m_result.s_lb.head(m_data.n_lb);
@@ -778,8 +779,7 @@ protected:
 
         for (isize i = 0; i < m_data.n_ub; i++)
         {
-            rz_ub_nr(i) = -m_result.x(m_data.x_ub_idx(i));
-
+            rz_ub_nr(i) = -m_data.x_ub_scaling(i) * m_result.x(m_data.x_ub_idx(i));
         }
         m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ub(rz_ub_nr.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
         rz_ub_nr.head(m_data.n_ub).noalias() += m_data.x_ub.head(m_data.n_ub) - m_result.s_ub.head(m_data.n_ub);

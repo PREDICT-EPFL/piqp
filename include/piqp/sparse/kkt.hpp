@@ -128,12 +128,14 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         for (isize i = 0; i < data.n_lb; i++)
         {
             isize col = data.x_lb_idx(i);
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += T(1) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] +=
+                data.x_lb_scaling(i) * data.x_lb_scaling(i) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
         }
         for (isize i = 0; i < data.n_ub; i++)
         {
             isize col = data.x_ub_idx(i);
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += T(1) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] +=
+                data.x_ub_scaling(i) * data.x_ub_scaling(i) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
         }
     }
 
@@ -150,11 +152,11 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         rhs_x.noalias() += data.AT * delta_y + data.GT * delta_z;
         for (isize i = 0; i < data.n_lb; i++)
         {
-            rhs_x(data.x_lb_idx(i)) -= delta_z_lb(i);
+            rhs_x(data.x_lb_idx(i)) -= data.x_lb_scaling(i) * delta_z_lb(i);
         }
         for (isize i = 0; i < data.n_ub; i++)
         {
-            rhs_x(data.x_ub_idx(i)) += delta_z_ub(i);
+            rhs_x(data.x_ub_idx(i)) += data.x_ub_scaling(i) * delta_z_ub(i);
         }
 
         rhs_y.noalias() = data.AT.transpose() * delta_x;
@@ -166,14 +168,14 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
 
         for (isize i = 0; i < data.n_lb; i++)
         {
-            rhs_z_lb(i) = -delta_x(data.x_lb_idx(i));
+            rhs_z_lb(i) = -data.x_lb_scaling(i) * delta_x(data.x_lb_idx(i));
         }
         rhs_z_lb.head(data.n_lb).noalias() -= m_delta * delta_z_lb.head(data.n_lb);
         rhs_z_lb.head(data.n_lb).noalias() += delta_s_lb.head(data.n_lb);
 
         for (isize i = 0; i < data.n_ub; i++)
         {
-            rhs_z_ub(i) = delta_x(data.x_ub_idx(i));
+            rhs_z_ub(i) = data.x_ub_scaling(i) * delta_x(data.x_ub_idx(i));
         }
         rhs_z_ub.head(data.n_ub).noalias() -= m_delta * delta_z_ub.head(data.n_ub);
         rhs_z_ub.head(data.n_ub).noalias() += delta_s_ub.head(data.n_ub);
@@ -217,23 +219,25 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         }
         else if (Mode == KKTMode::KKT_INEQ_ELIMINATED)
         {
-            rhs_z_bar.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
+            rhs_z_bar.array() /= m_s.array() * m_z_inv.array() + m_delta;
             rhs.head(data.n).noalias() += data.GT * rhs_z_bar;
             rhs.tail(data.p).noalias() = rhs_y;
         }
         else
         {
-            rhs_z_bar.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
+            rhs_z_bar.array() /= m_s.array() * m_z_inv.array() + m_delta;
             rhs.noalias() += data.GT * rhs_z_bar;
             rhs.noalias() += delta_inv * data.AT * rhs_y;
         }
         for (isize i = 0; i < data.n_lb; i++)
         {
-            rhs(data.x_lb_idx(i)) -= (rhs_z_lb(i) - m_z_lb_inv(i) * rhs_s_lb(i)) / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
+            rhs(data.x_lb_idx(i)) -= data.x_lb_scaling(i) * (rhs_z_lb(i) - m_z_lb_inv(i) * rhs_s_lb(i))
+                                     / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
         }
         for (isize i = 0; i < data.n_ub; i++)
         {
-            rhs(data.x_ub_idx(i)) += (rhs_z_ub(i) - m_z_ub_inv(i) * rhs_s_ub(i)) / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
+            rhs(data.x_ub_idx(i)) += data.x_ub_scaling(i) * (rhs_z_ub(i) - m_z_ub_inv(i) * rhs_s_ub(i))
+                                     / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
         }
 
         ordering.template perm<T>(rhs_perm, rhs);
@@ -262,7 +266,7 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
             delta_y.noalias() = rhs.tail(data.p);
 
             delta_z.noalias() = data.GT.transpose() * delta_x;
-            delta_z.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
+            delta_z.array() /= m_s.array() * m_z_inv.array() + m_delta;
             delta_z.noalias() -= rhs_z_bar;
         }
         else
@@ -271,18 +275,18 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
             delta_y.noalias() -= delta_inv * rhs_y;
 
             delta_z.noalias() = data.GT.transpose() * delta_x;
-            delta_z.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
+            delta_z.array() /= m_s.array() * m_z_inv.array() + m_delta;
             delta_z.noalias() -= rhs_z_bar;
         }
 
         for (isize i = 0; i < data.n_lb; i++)
         {
-            delta_z_lb(i) = (-delta_x(data.x_lb_idx(i)) - rhs_z_lb(i) + m_z_lb_inv(i) * rhs_s_lb(i))
+            delta_z_lb(i) = (-data.x_lb_scaling(i) * delta_x(data.x_lb_idx(i)) - rhs_z_lb(i) + m_z_lb_inv(i) * rhs_s_lb(i))
                             / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
         }
         for (isize i = 0; i < data.n_ub; i++)
         {
-            delta_z_ub(i) = (delta_x(data.x_ub_idx(i)) - rhs_z_ub(i) + m_z_ub_inv(i) * rhs_s_ub(i))
+            delta_z_ub(i) = (data.x_ub_scaling(i) * delta_x(data.x_ub_idx(i)) - rhs_z_ub(i) + m_z_ub_inv(i) * rhs_s_ub(i))
                             / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
         }
 

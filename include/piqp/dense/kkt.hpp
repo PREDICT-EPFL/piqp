@@ -121,12 +121,12 @@ struct KKT
 
         for (isize i = 0; i < data.n_lb; i++)
         {
-            kkt_mat.diagonal()(data.x_lb_idx(i)) += T(1) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
+            kkt_mat.diagonal()(data.x_lb_idx(i)) += data.x_lb_scaling(i) * data.x_lb_scaling(i) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
         }
 
         for (isize i = 0; i < data.n_ub; i++)
         {
-            kkt_mat.diagonal()(data.x_ub_idx(i)) += T(1) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
+            kkt_mat.diagonal()(data.x_ub_idx(i)) += data.x_ub_scaling(i) * data.x_ub_scaling(i) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
         }
 
         if (data.p > 0)
@@ -148,11 +148,11 @@ struct KKT
         rhs_x.noalias() += data.AT * delta_y + data.GT * delta_z;
         for (isize i = 0; i < data.n_lb; i++)
         {
-            rhs_x(data.x_lb_idx(i)) -= delta_z_lb(i);
+            rhs_x(data.x_lb_idx(i)) -= data.x_lb_scaling(i) * delta_z_lb(i);
         }
         for (isize i = 0; i < data.n_ub; i++)
         {
-            rhs_x(data.x_ub_idx(i)) += delta_z_ub(i);
+            rhs_x(data.x_ub_idx(i)) += data.x_ub_scaling(i) * delta_z_ub(i);
         }
 
         rhs_y.noalias() = data.AT.transpose() * delta_x;
@@ -164,14 +164,14 @@ struct KKT
 
         for (isize i = 0; i < data.n_lb; i++)
         {
-            rhs_z_lb(i) = -delta_x(data.x_lb_idx(i));
+            rhs_z_lb(i) = -data.x_lb_scaling(i) * delta_x(data.x_lb_idx(i));
         }
         rhs_z_lb.head(data.n_lb).noalias() -= m_delta * delta_z_lb.head(data.n_lb);
         rhs_z_lb.head(data.n_lb).noalias() += delta_s_lb.head(data.n_lb);
 
         for (isize i = 0; i < data.n_ub; i++)
         {
-            rhs_z_ub(i) = delta_x(data.x_ub_idx(i));
+            rhs_z_ub(i) = data.x_ub_scaling(i) * delta_x(data.x_ub_idx(i));
         }
         rhs_z_ub.head(data.n_ub).noalias() -= m_delta * delta_z_ub.head(data.n_ub);
         rhs_z_ub.head(data.n_ub).noalias() += delta_s_ub.head(data.n_ub);
@@ -209,11 +209,13 @@ struct KKT
 
         for (isize i = 0; i < data.n_lb; i++)
         {
-            rhs(data.x_lb_idx(i)) -= (rhs_z_lb(i) - m_z_lb_inv(i) * rhs_s_lb(i)) / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
+            rhs(data.x_lb_idx(i)) -= data.x_lb_scaling(i) * (rhs_z_lb(i) - m_z_lb_inv(i) * rhs_s_lb(i))
+                                     / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
         }
         for (isize i = 0; i < data.n_ub; i++)
         {
-            rhs(data.x_ub_idx(i)) += (rhs_z_ub(i) - m_z_ub_inv(i) * rhs_s_ub(i)) / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
+            rhs(data.x_ub_idx(i)) += data.x_ub_scaling(i) * (rhs_z_ub(i) - m_z_ub_inv(i) * rhs_s_ub(i))
+                                     / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
         }
 
         ldlt.solveInPlace(rhs);
@@ -229,12 +231,12 @@ struct KKT
 
         for (isize i = 0; i < data.n_lb; i++)
         {
-            delta_z_lb(i) = (-delta_x(data.x_lb_idx(i)) - rhs_z_lb(i) + m_z_lb_inv(i) * rhs_s_lb(i))
+            delta_z_lb(i) = (-data.x_lb_scaling(i) * delta_x(data.x_lb_idx(i)) - rhs_z_lb(i) + m_z_lb_inv(i) * rhs_s_lb(i))
                 / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
         }
         for (isize i = 0; i < data.n_ub; i++)
         {
-            delta_z_ub(i) = (delta_x(data.x_ub_idx(i)) - rhs_z_ub(i) + m_z_ub_inv(i) * rhs_s_ub(i))
+            delta_z_ub(i) = (data.x_ub_scaling(i) * delta_x(data.x_ub_idx(i)) - rhs_z_ub(i) + m_z_ub_inv(i) * rhs_s_ub(i))
                             / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
         }
 

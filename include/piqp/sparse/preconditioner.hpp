@@ -72,13 +72,20 @@ public:
 
     inline void scale_data(Data<T, I>& data, bool reuse_prev_scaling = false, bool scale_cost = false, isize max_iter = 10, T epsilon = T(1e-3))
     {
+        n_lb = data.n_lb;
+        n_ub = data.n_ub;
+
         if (!reuse_prev_scaling)
         {
             // init scaling in case max_iter is 0
             c = T(1);
             delta.setConstant(1);
+            delta_lb.setConstant(1);
+            delta_ub.setConstant(1);
 
             Vec<T>& delta_iter = delta_inv; // we use the memory of delta_inv as temporary storage
+            Vec<T>& delta_iter_lb = delta_lb_inv; // we use the memory of delta_lb_inv as temporary storage
+            Vec<T>& delta_iter_ub = delta_ub_inv; // we use the memory of delta_ub_inv as temporary storage
             delta_iter.setZero();
             for (isize i = 0; i < max_iter && (1 - delta_iter.array()).matrix().template lpNorm<Eigen::Infinity>() > epsilon; i++)
             {
@@ -118,8 +125,24 @@ public:
                         delta_iter(n + p + j) = std::max(delta_iter(n + p + j), std::abs(GT_it.value()));
                     }
                 }
+                for (isize j = 0; j < n_lb; j++)
+                {
+                    delta_iter(data.x_lb_idx(j)) = std::max(delta_iter(data.x_lb_idx(j)), data.x_lb_scaling(j));
+                    delta_iter_lb(j) = std::max(delta_iter_lb(j), data.x_lb_scaling(j));
+                }
+                for (isize j = 0; j < n_ub; j++)
+                {
+                    delta_iter(data.x_ub_idx(j)) = std::max(delta_iter(data.x_ub_idx(j)), data.x_ub_scaling(j));
+                    delta_iter_ub(j) = std::max(delta_iter_ub(j), data.x_ub_scaling(j));
+                }
+
                 limit_scaling(delta_iter);
+                limit_scaling(delta_iter_lb);
+                limit_scaling(delta_iter_ub);
+
                 delta_iter.array() = delta_iter.array().sqrt().inverse();
+                delta_iter_lb.array() = delta_iter_lb.array().sqrt().inverse();
+                delta_iter_ub.array() = delta_iter_ub.array().sqrt().inverse();
 
                 // scale cost
                 pre_mult_diagonal<T, I>(data.P_utri, delta_iter.head(n));
@@ -132,25 +155,40 @@ public:
                 pre_mult_diagonal<T, I>(data.GT, delta_iter.head(n));
                 post_mult_diagonal<T, I>(data.GT, delta_iter.tail(m));
 
+                // scale box scalings
+                data.x_lb_scaling.array() *= delta_iter_lb.array();
+                for (isize j = 0; j < n_lb; j++)
+                {
+                    data.x_lb_scaling(j) *= delta_iter(data.x_lb_idx(j));
+                }
+                data.x_ub_scaling.array() *= delta_iter_ub.array();
+                for (isize j = 0; j < n_ub; j++)
+                {
+                    data.x_ub_scaling(j) *= delta_iter(data.x_ub_idx(j));
+                }
+
                 delta.array() *= delta_iter.array();
+                delta_lb.array() *= delta_iter_lb.array();
+                delta_ub.array() *= delta_iter_ub.array();
 
                 if (scale_cost)
                 {
                     // scaling for the cost
-                    delta_lb.setZero(); // we use delta_lb as a temporary storage
+                    Vec<T>& delta_iter_cost = delta_lb_inv; // we use delta_lb_inv as a temporary storage
+                    delta_iter_cost.setZero();
                     for (isize j = 0; j < n; j++)
                     {
                         for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
                         {
                             I i_row = P_utri_it.index();
-                            delta_lb(j) = std::max(delta_lb(j), std::abs(P_utri_it.value()));
+                            delta_iter_cost(j) = std::max(delta_iter_cost(j), std::abs(P_utri_it.value()));
                             if (i_row != j)
                             {
-                                delta_lb(i_row) = std::max(delta_lb(i_row), std::abs(P_utri_it.value()));
+                                delta_iter_cost(i_row) = std::max(delta_iter_cost(i_row), std::abs(P_utri_it.value()));
                             }
                         }
                     }
-                    T gamma = delta_lb.sum() / n;
+                    T gamma = delta_iter_cost.sum() / n;
                     limit_scaling(gamma);
                     gamma = std::max(gamma, data.c.template lpNorm<Eigen::Infinity>());
                     limit_scaling(gamma);
@@ -166,7 +204,8 @@ public:
 
             c_inv = T(1) / c;
             delta_inv.array() = delta.array().inverse();
-
+            delta_lb_inv.array() = delta_lb.array().inverse();
+            delta_ub_inv.array() = delta_ub.array().inverse();
         }
         else
         {
@@ -181,24 +220,25 @@ public:
             post_mult_diagonal<T, I>(data.AT, delta.segment(n, p));
             pre_mult_diagonal<T, I>(data.GT, delta.head(n));
             post_mult_diagonal<T, I>(data.GT, delta.tail(m));
-        }
 
-        for (isize i = 0; i < n_lb; i++)
-        {
-            delta_lb(i) = delta(data.x_lb_idx(i));
+            // scale box scalings
+            data.x_lb_scaling.array() *= delta_lb.array();
+            for (isize j = 0; j < n_lb; j++)
+            {
+                data.x_lb_scaling(j) *= delta(data.x_lb_idx(j));
+            }
+            data.x_ub_scaling.array() *= delta_ub.array();
+            for (isize j = 0; j < n_ub; j++)
+            {
+                data.x_ub_scaling(j) *= delta(data.x_ub_idx(j));
+            }
         }
-        for (isize i = 0; i < n_ub; i++)
-        {
-            delta_ub(i) = delta(data.x_ub_idx(i));
-        }
-        delta_lb_inv.head(n_lb).array() = delta_lb.head(n_lb).array().inverse();
-        delta_ub_inv.head(n_ub).array() = delta_ub.head(n_ub).array().inverse();
 
         // scale bounds
         data.b.array() *= delta.segment(n, p).array();
         data.h.array() *= delta.tail(m).array();
-        data.x_lb_n.head(n_lb).array() *= delta_lb_inv.head(n_lb).array();
-        data.x_ub.head(n_ub).array() *= delta_ub_inv.head(n_ub).array();
+        data.x_lb_n.head(n_lb).array() *= delta_lb.head(n_lb).array();
+        data.x_ub.head(n_ub).array() *= delta_ub.head(n_ub).array();
     }
 
     inline void unscale_data(Data<T, I>& data)
@@ -215,11 +255,23 @@ public:
         pre_mult_diagonal<T, I>(data.GT, delta_inv.head(n));
         post_mult_diagonal<T, I>(data.GT, delta_inv.tail(m));
 
+        // unscale box scalings
+        data.x_lb_scaling.array() *= delta_lb_inv.array();
+        for (isize j = 0; j < n_lb; j++)
+        {
+            data.x_lb_scaling(j) *= delta_inv(data.x_lb_idx(j));
+        }
+        data.x_ub_scaling.array() *= delta_ub_inv.array();
+        for (isize j = 0; j < n_ub; j++)
+        {
+            data.x_ub_scaling(j) *= delta_inv(data.x_ub_idx(j));
+        }
+
         // unscale bounds
         data.b.array() *= delta_inv.segment(n, p).array();
         data.h.array() *= delta_inv.tail(m).array();
-        data.x_lb_n.head(n_lb).array() *= delta_lb.head(n_lb).array();
-        data.x_ub.head(n_ub).array() *= delta_ub.head(n_ub).array();
+        data.x_lb_n.head(n_lb).array() *= delta_lb_inv.head(n_lb).array();
+        data.x_ub.head(n_ub).array() *= delta_ub_inv.head(n_ub).array();
     }
 
     inline T scale_cost(T cost) const
@@ -271,25 +323,25 @@ public:
     template<typename Derived>
     inline auto scale_dual_lb(const Eigen::MatrixBase<Derived>& z_lb) const
     {
-        return (z_lb.array() * c * delta_lb.head(n_lb).array()).matrix();
+        return (z_lb.array() * c * delta_lb_inv.head(n_lb).array()).matrix();
     }
 
     template<typename Derived>
     inline auto unscale_dual_lb(const Eigen::MatrixBase<Derived>& z_lb) const
     {
-        return (z_lb.array() * c_inv * delta_lb_inv.head(n_lb).array()).matrix();
+        return (z_lb.array() * c_inv * delta_lb.head(n_lb).array()).matrix();
     }
 
     template<typename Derived>
     inline auto scale_dual_ub(const Eigen::MatrixBase<Derived>& z_ub) const
     {
-        return (z_ub.array() * c * delta_ub.head(n_ub).array()).matrix();
+        return (z_ub.array() * c * delta_ub_inv.head(n_ub).array()).matrix();
     }
 
     template<typename Derived>
     inline auto unscale_dual_ub(const Eigen::MatrixBase<Derived>& z_ub) const
     {
-        return (z_ub.array() * c_inv * delta_ub_inv.head(n_ub).array()).matrix();
+        return (z_ub.array() * c_inv * delta_ub.head(n_ub).array()).matrix();
     }
 
     template<typename Derived>
@@ -307,25 +359,25 @@ public:
     template<typename Derived>
     inline auto scale_slack_lb(const Eigen::MatrixBase<Derived>& s_lb) const
     {
-        return (s_lb.array() * delta_lb_inv.head(n_lb).array()).matrix();
+        return (s_lb.array() * delta_lb.head(n_lb).array()).matrix();
     }
 
     template<typename Derived>
     inline auto unscale_slack_lb(const Eigen::MatrixBase<Derived>& s_lb) const
     {
-        return (s_lb.array() * delta_lb.head(n_lb).array()).matrix();
+        return (s_lb.array() * delta_lb_inv.head(n_lb).array()).matrix();
     }
 
     template<typename Derived>
     inline auto scale_slack_ub(const Eigen::MatrixBase<Derived>& s_ub) const
     {
-        return (s_ub.array() * delta_ub_inv.head(n_ub).array()).matrix();
+        return (s_ub.array() * delta_ub.head(n_ub).array()).matrix();
     }
 
     template<typename Derived>
     inline auto unscale_slack_ub(const Eigen::MatrixBase<Derived>& s_ub) const
     {
-        return (s_ub.array() * delta_ub.head(n_ub).array()).matrix();
+        return (s_ub.array() * delta_ub_inv.head(n_ub).array()).matrix();
     }
 
     template<typename Derived>
@@ -355,25 +407,25 @@ public:
     template<typename Derived>
     inline auto scale_primal_res_lb(const Eigen::MatrixBase<Derived>& p_res_lb) const
     {
-        return (p_res_lb.array() * delta_lb_inv.head(n_lb).array()).matrix();
+        return (p_res_lb.array() * delta_lb.head(n_lb).array()).matrix();
     }
 
     template<typename Derived>
     inline auto unscale_primal_res_lb(const Eigen::MatrixBase<Derived>& p_res_lb) const
     {
-        return (p_res_lb.array() * delta_lb.head(n_lb).array()).matrix();
+        return (p_res_lb.array() * delta_lb_inv.head(n_lb).array()).matrix();
     }
 
     template<typename Derived>
     inline auto scale_primal_res_ub(const Eigen::MatrixBase<Derived>& p_res_ub) const
     {
-        return (p_res_ub.array() * delta_ub_inv.head(n_ub).array()).matrix();
+        return (p_res_ub.array() * delta_ub.head(n_ub).array()).matrix();
     }
 
     template<typename Derived>
     inline auto unscale_primal_res_ub(const Eigen::MatrixBase<Derived>& p_res_ub) const
     {
-        return (p_res_ub.array() * delta_ub.head(n_ub).array()).matrix();
+        return (p_res_ub.array() * delta_ub_inv.head(n_ub).array()).matrix();
     }
 
     template<typename Derived>
