@@ -634,7 +634,7 @@ protected:
 
                 T mu_prev = m_result.info.mu;
                 m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / (m_data.m + m_data.n_lb + m_data.n_ub);
-                T mu_rate = std::abs(mu_prev - m_result.info.mu) / mu_prev;
+                T mu_rate = std::max(T(0), (mu_prev - m_result.info.mu) / mu_prev);
 
                 // ------------------ update regularization ------------------
                 update_nr_residuals();
