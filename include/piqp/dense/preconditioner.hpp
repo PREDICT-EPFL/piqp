@@ -88,7 +88,11 @@ public:
             delta_iter.setZero();
             delta_iter_lb.setZero();
             delta_iter_ub.setZero();
-            for (isize i = 0; i < max_iter && (1 - delta_iter.array()).matrix().template lpNorm<Eigen::Infinity>() > epsilon; i++)
+            for (isize i = 0; i < max_iter && std::max({
+                    (1 - delta_iter.array()).matrix().template lpNorm<Eigen::Infinity>(),
+                    (1 - delta_iter_lb.head(n_lb).array()).matrix().template lpNorm<Eigen::Infinity>(),
+                    (1 - delta_iter_ub.head(n_ub).array()).matrix().template lpNorm<Eigen::Infinity>()
+                }) > epsilon; i++)
             {
                 // calculate scaling of full KKT matrix
                 // [ P AT GT ]
@@ -112,12 +116,12 @@ public:
                 for (isize k = 0; k < n_lb; k++)
                 {
                     delta_iter(data.x_lb_idx(k)) = std::max(delta_iter(data.x_lb_idx(k)), data.x_lb_scaling(k));
-                    delta_iter_lb(k) = std::max(delta_iter_lb(k), data.x_lb_scaling(k));
+                    delta_iter_lb(k) = data.x_lb_scaling(k);
                 }
                 for (isize k = 0; k < n_ub; k++)
                 {
                     delta_iter(data.x_ub_idx(k)) = std::max(delta_iter(data.x_ub_idx(k)), data.x_ub_scaling(k));
-                    delta_iter_ub(k) = std::max(delta_iter_ub(k), data.x_ub_scaling(k));
+                    delta_iter_ub(k) = data.x_ub_scaling(k);
                 }
 
                 limit_scaling(delta_iter);

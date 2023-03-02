@@ -87,7 +87,11 @@ public:
             Vec<T>& delta_iter_lb = delta_lb_inv; // we use the memory of delta_lb_inv as temporary storage
             Vec<T>& delta_iter_ub = delta_ub_inv; // we use the memory of delta_ub_inv as temporary storage
             delta_iter.setZero();
-            for (isize i = 0; i < max_iter && (1 - delta_iter.array()).matrix().template lpNorm<Eigen::Infinity>() > epsilon; i++)
+            for (isize i = 0; i < max_iter && std::max({
+                    (1 - delta_iter.array()).matrix().template lpNorm<Eigen::Infinity>(),
+                    (1 - delta_iter_lb.head(n_lb).array()).matrix().template lpNorm<Eigen::Infinity>(),
+                    (1 - delta_iter_ub.head(n_ub).array()).matrix().template lpNorm<Eigen::Infinity>()
+                }) > epsilon; i++)
             {
                 delta_iter.setZero();
 
@@ -128,12 +132,12 @@ public:
                 for (isize j = 0; j < n_lb; j++)
                 {
                     delta_iter(data.x_lb_idx(j)) = std::max(delta_iter(data.x_lb_idx(j)), data.x_lb_scaling(j));
-                    delta_iter_lb(j) = std::max(delta_iter_lb(j), data.x_lb_scaling(j));
+                    delta_iter_lb(j) = data.x_lb_scaling(j);
                 }
                 for (isize j = 0; j < n_ub; j++)
                 {
                     delta_iter(data.x_ub_idx(j)) = std::max(delta_iter(data.x_ub_idx(j)), data.x_ub_scaling(j));
-                    delta_iter_ub(j) = std::max(delta_iter_ub(j), data.x_ub_scaling(j));
+                    delta_iter_ub(j) = data.x_ub_scaling(j);
                 }
 
                 limit_scaling(delta_iter);
