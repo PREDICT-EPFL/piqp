@@ -486,10 +486,10 @@ protected:
             m_result.info.iter++;
 
             // avoid possibility of converging to a local minimum -> decrease the minimum regularization value
-            if ((m_result.info.no_primal_update > 5 && m_result.info.rho == m_result.info.reg_limit && m_result.info.reg_limit != 1e-13) ||
-                (m_result.info.no_dual_update > 5 && m_result.info.delta == m_result.info.reg_limit && m_result.info.reg_limit != 1e-13))
+            if ((m_result.info.no_primal_update > 5 && m_result.info.rho == m_result.info.reg_limit && m_result.info.reg_limit != m_settings.reg_finetune_lower_limit) ||
+                (m_result.info.no_dual_update > 5 && m_result.info.delta == m_result.info.reg_limit && m_result.info.reg_limit != m_settings.reg_finetune_lower_limit))
             {
-                m_result.info.reg_limit = 1e-13;
+                m_result.info.reg_limit = m_settings.reg_finetune_lower_limit;
                 m_result.info.no_primal_update = 0;
                 m_result.info.no_dual_update = 0;
             }
@@ -639,7 +639,7 @@ protected:
                 // ------------------ update regularization ------------------
                 update_nr_residuals();
 
-                if (dual_inf_nr() < 0.95 * m_result.info.dual_inf)
+                if (dual_inf_nr() < 0.95 * m_result.info.dual_inf || m_result.info.rho == m_settings.reg_finetune_lower_limit)
                 {
                     m_result.zeta = m_result.x;
                     m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.rho);
@@ -650,7 +650,7 @@ protected:
                     m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * m_result.info.rho);
                 }
 
-                if (primal_inf_nr() < 0.95 * m_result.info.primal_inf)
+                if (primal_inf_nr() < 0.95 * m_result.info.primal_inf || m_result.info.delta == m_settings.reg_finetune_lower_limit)
                 {
                     m_result.lambda = m_result.y;
                     m_result.nu = m_result.z;

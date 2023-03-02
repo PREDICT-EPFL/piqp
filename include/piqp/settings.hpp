@@ -26,6 +26,7 @@ struct Settings
     T eps_duality_gap_rel = 1e-9;
 
     T reg_lower_limit = 1e-10;
+    T reg_finetune_lower_limit = 1e-13;
 
     isize max_iter            = 200;
     isize max_factor_retires  = 10;

@@ -83,6 +83,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("eps_duality_gap_abs", &piqp::Settings<T>::eps_duality_gap_abs)
         .def_readwrite("eps_duality_gap_rel", &piqp::Settings<T>::eps_duality_gap_rel)
         .def_readwrite("reg_lower_limit", &piqp::Settings<T>::reg_lower_limit)
+        .def_readwrite("reg_finetune_lower_limit", &piqp::Settings<T>::reg_finetune_lower_limit)
         .def_readwrite("max_iter", &piqp::Settings<T>::max_iter)
         .def_readwrite("max_factor_retires", &piqp::Settings<T>::max_factor_retires)
         .def_readwrite("preconditioner_scale_cost", &piqp::Settings<T>::preconditioner_scale_cost)
