@@ -16,7 +16,7 @@ template<typename T>
 struct Settings
 {
     T rho_init   = 1e-6;
-    T delta_init = 1e-4;
+    T delta_init = 1e-3;
 
     T eps_abs = 1e-8;
     T eps_rel = 1e-9;
