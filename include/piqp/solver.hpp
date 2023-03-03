@@ -471,13 +471,13 @@ protected:
             rz_lb.head(m_data.n_lb) = rz_lb_nr.head(m_data.n_lb) - m_result.info.delta * (nu_lb - z_lb);
             rz_ub.head(m_data.n_ub) = rz_ub_nr.head(m_data.n_ub) - m_result.info.delta * (nu_ub - z_ub);
 
-            if (m_result.info.no_dual_update > 5 && primal_prox_inf() > 1e10 && primal_inf_r() < m_settings.eps_abs)
+            if (m_result.info.no_dual_update > 5 && primal_prox_inf() > 1e10 && primal_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf)
             {
                 m_result.info.status = Status::PIQP_PRIMAL_INFEASIBLE;
                 return m_result.info.status;
             }
 
-            if (m_result.info.no_primal_update > 5 && dual_prox_inf() > 1e10 && dual_inf_r() < m_settings.eps_abs)
+            if (m_result.info.no_primal_update > 5 && dual_prox_inf() > 1e10 && dual_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.dual_rel_inf)
             {
                 m_result.info.status = Status::PIQP_DUAL_INFEASIBLE;
                 return m_result.info.status;
@@ -639,7 +639,7 @@ protected:
                 // ------------------ update regularization ------------------
                 update_nr_residuals();
 
-                if (dual_inf_nr() < 0.95 * m_result.info.dual_inf || m_result.info.rho == m_settings.reg_finetune_lower_limit)
+                if (dual_inf_nr() < 0.95 * m_result.info.dual_inf || (m_result.info.rho == m_settings.reg_finetune_lower_limit && dual_prox_inf() < 1e2))
                 {
                     m_result.zeta = m_result.x;
                     m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.rho);
@@ -650,7 +650,7 @@ protected:
                     m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * m_result.info.rho);
                 }
 
-                if (primal_inf_nr() < 0.95 * m_result.info.primal_inf || m_result.info.delta == m_settings.reg_finetune_lower_limit)
+                if (primal_inf_nr() < 0.95 * m_result.info.primal_inf || (m_result.info.delta == m_settings.reg_finetune_lower_limit && primal_prox_inf() < 1e2))
                 {
                     m_result.lambda = m_result.y;
                     m_result.nu = m_result.z;
