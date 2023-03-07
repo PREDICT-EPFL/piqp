@@ -572,6 +572,7 @@ protected:
                 m_result.info.sigma += (s_lb + alpha_s * ds_lb.head(m_data.n_lb)).dot(z_lb + alpha_z * dz_lb.head(m_data.n_lb));
                 m_result.info.sigma += (s_ub + alpha_s * ds_ub.head(m_data.n_ub)).dot(z_ub + alpha_z * dz_ub.head(m_data.n_ub));
                 m_result.info.sigma /= (m_result.info.mu * (m_data.m + m_data.n_lb + m_data.n_ub));
+                m_result.info.sigma = std::max(T(0), std::min(T(1), m_result.info.sigma));
                 m_result.info.sigma = m_result.info.sigma * m_result.info.sigma * m_result.info.sigma;
 
                 // ------------------ corrector step ------------------
