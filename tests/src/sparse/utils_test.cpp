@@ -42,6 +42,14 @@ TEST(SparseUtils, OrderingNatural)
         Ai_to_Ci_expect(i) = i;
     }
     ASSERT_EQ(Ai_to_Ci, Ai_to_Ci_expect);
+
+    Vec<T> x = rand::vector_rand<T>(dim);
+    Vec<T> x_perm = x;
+    ordering.perm<T>(x_perm, x);
+    ASSERT_EQ(x, x_perm);
+    Vec<T> x_perm_back(dim);
+    ordering.permt<T>(x_perm_back, x_perm);
+    ASSERT_EQ(x, x_perm_back);
 }
 
 TEST(SparseUtils, OrderingAMD)
@@ -72,6 +80,15 @@ TEST(SparseUtils, OrderingAMD)
     Vec<I> Ai_to_Ci_expect(7);
     Ai_to_Ci_expect << 3, 0, 2, 1, 5, 4, 6;
     ASSERT_EQ(Ai_to_Ci, Ai_to_Ci_expect);
+
+    Vec<T> x(4); x << 1, 2, 3, 4;
+    Vec<T> x_perm_expect(4); x_perm_expect << 2, 3, 1, 4;
+    Vec<T> x_perm = x;
+    ordering.perm<T>(x_perm, x);
+    ASSERT_EQ(x_perm, x_perm_expect);
+    Vec<T> x_perm_back(4);
+    ordering.permt<T>(x_perm_back, x_perm);
+    ASSERT_EQ(x, x_perm_back);
 }
 
 TEST(SparseUtils, TransposeNoAlloc)
