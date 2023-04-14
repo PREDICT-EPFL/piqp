@@ -8,15 +8,19 @@
 
 cmake_minimum_required(VERSION 3.5)
 
-set(BUILD_TESTING OFF)
-add_subdirectory(external/cpu_features)
-
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
 add_subdirectory(external/pybind11 ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
 
 # add instruction set detection on x86/amd64
 pybind11_add_module(instruction_set src/instruction_set.cpp)
-target_link_libraries(instruction_set PRIVATE CpuFeature::cpu_features)
+
+# only link cpu_features on x86/amd64
+if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
+    set(BUILD_TESTING OFF)
+    add_subdirectory(external/cpu_features)
+    target_compile_definitions(instruction_set PRIVATE CPU_FEATURES_AVAILABLE=1)
+    target_link_libraries(instruction_set PRIVATE CpuFeature::cpu_features)
+endif()
 
 function(CREATE_PIQP_PYTHON_TARGET target_name COMPILE_OPTIONS)
     pybind11_add_module(${target_name} src/piqp_python.cpp)

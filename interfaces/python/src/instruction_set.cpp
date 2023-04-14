@@ -8,14 +8,18 @@
 
 #include <pybind11/pybind11.h>
 
+#if defined(CPU_FEATURES_AVAILABLE)
 #include "cpu_features_macros.h"
+#endif
 
 #if defined(CPU_FEATURES_ARCH_X86)
 #include "cpuinfo_x86.h"
 #endif
 
 namespace py = pybind11;
+#if defined(CPU_FEATURES_AVAILABLE)
 using namespace cpu_features;
+#endif
 
 #if defined(CPU_FEATURES_ARCH_X86)
 const X86Info info = GetX86Info();
