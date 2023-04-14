@@ -9,7 +9,7 @@ Documentation is work in progress.
 To cite our work in other academic papers, please use the following BibTex entry:
 ```
 @misc{schwan2023,
-author = {Roland Schwan, Yuning Jiang, Daniel Kuhn, Colin N. Jones},
+author = {Schwan, Roland and Jiang, Yuning and Kuhn, Daniel and Jones, Colin N.},
 title = {PIQP: A Proximal Interior-Point Quadratic Programming Solver},
 year = {2023},
 eprint = {arXiv:2304.00290},
