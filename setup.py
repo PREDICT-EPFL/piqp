@@ -51,6 +51,7 @@ class CMakeBuild(build_ext):
             f"-DBUILD_PYTHON_INTERFACE=ON",
             f"-DBUILD_TESTS=OFF",
             f"-DBUILD_BENCHMARKS=OFF",
+            f"-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true"
         ]
         build_args = []
         # Adding CMake arguments set as environment variable
