@@ -14,7 +14,11 @@ FetchContent_Declare(
         URL https://github.com/google/benchmark/archive/84c71faa8126e4eedc2bb520352615cb4484d6ad.zip
 )
 option(BENCHMARK_ENABLE_TESTING "Enable testing of the benchmark library." OFF)
-FetchContent_MakeAvailable(benchmark)
+FetchContent_GetProperties(benchmark)
+if(NOT benchmark_POPULATED)
+    FetchContent_Populate(benchmark)
+    add_subdirectory(${benchmark_SOURCE_DIR} ${benchmark_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 add_library(pipq-benchmark INTERFACE)
 target_compile_options(pipq-benchmark INTERFACE ${compiler_flags})
