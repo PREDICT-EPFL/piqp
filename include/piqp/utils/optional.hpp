@@ -23,6 +23,7 @@ namespace piqp
 #ifdef PIQP_WITH_CPP_17
 template<class T>
 using optional = std::optional<T>;
+using in_place_t = std::in_place_t;
 using nullopt_t = std::nullopt_t;
 inline constexpr nullopt_t nullopt = std::nullopt;
 #else
@@ -41,6 +42,7 @@ const T nullopt_instance<T>::instance =
 } // namespace detail
 template<class T>
 using optional = tl::optional<T>;
+using in_place_t = tl::in_place_t;
 using nullopt_t = tl::nullopt_t;
 constexpr nullopt_t nullopt = detail::nullopt_instance<tl::nullopt_t>::instance;
 #endif
