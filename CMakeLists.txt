@@ -13,6 +13,7 @@ project(piqp
 )
 
 #### User options ####
+option(BUILD_C_INTERFACE "Build C interface" ON)
 option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
@@ -69,6 +70,10 @@ target_include_directories(piqp INTERFACE
 )
 target_link_libraries(piqp INTERFACE Eigen3.3)
 add_library(piqp::piqp ALIAS piqp)
+
+if (BUILD_C_INTERFACE)
+    add_subdirectory(interfaces/c)
+endif()
 
 if (BUILD_PYTHON_INTERFACE)
     add_subdirectory(interfaces/python)
