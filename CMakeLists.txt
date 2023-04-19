@@ -26,7 +26,7 @@ set(CMAKE_CXX_STANDARD 14)
 # Set build type to RELEASE by default
 if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
     if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
-        set(CMAKE_BUILD_TYPE "" FORCE)
+        set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
     endif()
 endif()
 message(STATUS "Building ${CMAKE_BUILD_TYPE}")
