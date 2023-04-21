@@ -16,34 +16,20 @@ using CSparseMat = Eigen::SparseMatrix<piqp_float, Eigen::ColMajor, piqp_int>;
 using DenseSolver = piqp::DenseSolver<piqp_float>;
 using SparseSolver = piqp::SparseSolver<piqp_float, piqp_int>;
 
-piqp::optional<Eigen::Map<CVec>> piqp_optional_vec_map(piqp_float* data, piqp_int n)
+piqp_csc* piqp_csc_matrix(piqp_int m, piqp_int n, piqp_int nnz, piqp_int *p, piqp_int *i, piqp_float *x)
 {
-    piqp::optional<Eigen::Map<CVec>> vec;
-    if (data)
-    {
-        vec = Eigen::Map<CVec>(data, n);
-    }
-    return vec;
-}
+    piqp_csc* matrix = (piqp_csc*) malloc(sizeof(piqp_csc));
 
-piqp::optional<Eigen::Map<CMat>> piqp_optional_mat_map(piqp_float* data, piqp_int m, piqp_int n)
-{
-    piqp::optional<Eigen::Map<CMat>> mat;
-    if (data)
-    {
-        mat = Eigen::Map<CMat>(data, m, n);
-    }
-    return mat;
-}
+    if (!matrix) return nullptr;
 
-piqp::optional<Eigen::Map<CSparseMat>> piqp_optional_sparse_mat_map(piqp_csc* data)
-{
-    piqp::optional<Eigen::Map<CSparseMat>> mat;
-    if (data)
-    {
-        mat = Eigen::Map<CSparseMat>(data->m, data->n, data->nnz, data->p, data->i, data->x);
-    }
-    return mat;
+    matrix->m     = m;
+    matrix->n     = n;
+    matrix->nnz   = nnz;
+    matrix->p     = p;
+    matrix->i     = i;
+    matrix->x     = x;
+
+    return matrix;
 }
 
 void piqp_update_results(piqp_results* results, const piqp::Result<piqp_float>& solver_results)
@@ -109,6 +95,36 @@ void piqp_set_default_settings(piqp_settings* settings)
     settings->tau = default_settings.tau;
     settings->verbose = default_settings.verbose;
     settings->compute_timings = default_settings.compute_timings;
+}
+
+piqp::optional<Eigen::Map<CVec>> piqp_optional_vec_map(piqp_float* data, piqp_int n)
+{
+    piqp::optional<Eigen::Map<CVec>> vec;
+    if (data)
+    {
+        vec = Eigen::Map<CVec>(data, n);
+    }
+    return vec;
+}
+
+piqp::optional<Eigen::Map<CMat>> piqp_optional_mat_map(piqp_float* data, piqp_int m, piqp_int n)
+{
+    piqp::optional<Eigen::Map<CMat>> mat;
+    if (data)
+    {
+        mat = Eigen::Map<CMat>(data, m, n);
+    }
+    return mat;
+}
+
+piqp::optional<Eigen::Map<CSparseMat>> piqp_optional_sparse_mat_map(piqp_csc* data)
+{
+    piqp::optional<Eigen::Map<CSparseMat>> mat;
+    if (data)
+    {
+        mat = Eigen::Map<CSparseMat>(data->m, data->n, data->nnz, data->p, data->i, data->x);
+    }
+    return mat;
 }
 
 void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, const piqp_settings* settings)

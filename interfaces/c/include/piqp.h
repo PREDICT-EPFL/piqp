@@ -18,6 +18,8 @@ extern "C" {
 #define PIQP_INF 1e30
 #endif
 
+piqp_csc* piqp_csc_matrix(piqp_int m, piqp_int n, piqp_int nnz, piqp_int *p, piqp_int *i, piqp_float *x);
+
 void piqp_set_default_settings(piqp_settings* settings);
 
 void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, const piqp_settings* settings);

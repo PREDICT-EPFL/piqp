@@ -137,29 +137,11 @@ TEST(CInterfaceTest, SimpleSparseQPWithUpdate)
     data->n = n;
     data->p = p;
     data->m = m;
-    data->P = (piqp_csc*) malloc(sizeof(piqp_csc));
-    data->P->m = data->n;
-    data->P->n = data->n;
-    data->P->nnz = P_nnz;
-    data->P->p = P_p;
-    data->P->i = P_i;
-    data->P->x = P_x;
+    data->P = piqp_csc_matrix(data->n, data->n, P_nnz, P_p, P_i, P_x);
     data->c = c;
-    data->A = (piqp_csc*) malloc(sizeof(piqp_csc));
-    data->A->m = data->p;
-    data->A->n = data->n;
-    data->A->nnz = A_nnz;
-    data->A->p = A_p;
-    data->A->i = A_i;
-    data->A->x = A_x;
+    data->A = piqp_csc_matrix(data->p, data->n, A_nnz, A_p, A_i, A_x);
     data->b = b;
-    data->G = (piqp_csc*) malloc(sizeof(piqp_csc));
-    data->G->m = data->m;
-    data->G->n = data->n;
-    data->G->nnz = G_nnz;
-    data->G->p = G_p;
-    data->G->i = G_i;
-    data->G->x = G_x;
+    data->G = piqp_csc_matrix(data->m, data->n, G_nnz, G_p, G_i, G_x);
     data->h = h;
     data->x_lb = x_lb;
     data->x_ub = x_ub;
@@ -196,4 +178,14 @@ TEST(CInterfaceTest, SimpleSparseQPWithUpdate)
     ASSERT_NEAR(work->results->z_lb[1], 0, 1e-6);
     ASSERT_NEAR(work->results->z_ub[0], 0, 1e-6);
     ASSERT_NEAR(work->results->z_ub[1], 0, 1e-6);
+
+    piqp_cleanup(work);
+    if (settings) free(settings);
+    if (data)
+    {
+        if (data->P) free(data->P);
+        if (data->A) free(data->A);
+        if (data->G) free(data->G);
+        free(data);
+    }
 }
