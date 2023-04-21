@@ -105,6 +105,7 @@ install(
 install(
     EXPORT piqpTargets
     FILE piqpTargets.cmake
+    NAMESPACE piqp::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
 )
 
