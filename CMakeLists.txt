@@ -52,16 +52,12 @@ endif ()
 # Find Eigen3.3+
 if (DEFINED EIGEN3_INCLUDE_DIRS)
     # Create target for user-defined Eigen 3.3+ path to be used for piqp
-    add_library(Eigen3.3 INTERFACE IMPORTED)
-    target_include_directories(Eigen3.3 INTERFACE ${EIGEN3_INCLUDE_DIRS})
-    message(STATUS "Using Eigen3 from: ${EIGEN3_INCLUDE_DIRS}") # Use custom Eigen path instead of package
+    add_library(Eigen3::Eigen INTERFACE IMPORTED)
+    target_include_directories(Eigen3::Eigen INTERFACE ${EIGEN3_INCLUDE_DIRS})
 else ()
-    # Wrap Eigen3 3.3+ from system package into imported target for consistent use afterwards
     find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-    add_library(Eigen3.3 INTERFACE IMPORTED)
-    target_link_libraries(Eigen3.3 INTERFACE Eigen3::Eigen)
-    message(STATUS "Using Eigen3 from: ${EIGEN3_INCLUDE_DIRS}")
 endif ()
+message(STATUS "Using Eigen3 from: ${EIGEN3_INCLUDE_DIRS}")
 
 include(GNUInstallDirs)
 
@@ -70,7 +66,7 @@ target_include_directories(piqp INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(piqp INTERFACE Eigen3.3)
+target_link_libraries(piqp INTERFACE Eigen3::Eigen)
 add_library(piqp::piqp ALIAS piqp)
 
 if (BUILD_C_INTERFACE)
