@@ -139,7 +139,7 @@ typedef struct {
     const piqp_float* nu_ub;
 
     piqp_info info;
-} piqp_results;
+} piqp_result;
 
 struct piqp_solver_handle; // An opaque type that we'll use as a handle for the C++ solver object
 typedef struct piqp_solver_handle piqp_solver_handle;
@@ -154,7 +154,7 @@ typedef struct {
 typedef struct {
     piqp_solver_handle* solver_handle;
     pipq_solver_info    solver_info;
-    piqp_results*       results;
+    piqp_result*       result;
 } piqp_workspace;
 
 # ifdef __cplusplus

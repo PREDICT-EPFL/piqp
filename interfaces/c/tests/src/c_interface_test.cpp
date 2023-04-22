@@ -61,15 +61,15 @@ TEST(CInterfaceTest, SimpleDenseQPWithUpdate)
     piqp_status status = piqp_solve(work);
 
     ASSERT_EQ(status, PIQP_SOLVED);
-    ASSERT_NEAR(work->results->x[0], 0.4285714, 1e-6);
-    ASSERT_NEAR(work->results->x[1], 0.2142857, 1e-6);
-    ASSERT_NEAR(work->results->y[0], -1.5714286, 1e-6);
-    ASSERT_NEAR(work->results->z[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z[1], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_lb[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_lb[1], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_ub[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_ub[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->x[0], 0.4285714, 1e-6);
+    ASSERT_NEAR(work->result->x[1], 0.2142857, 1e-6);
+    ASSERT_NEAR(work->result->y[0], -1.5714286, 1e-6);
+    ASSERT_NEAR(work->result->z[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_lb[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_lb[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_ub[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_ub[1], 0, 1e-6);
 
     P[0] = 8;
     A[1] = -3;
@@ -80,15 +80,15 @@ TEST(CInterfaceTest, SimpleDenseQPWithUpdate)
     status = piqp_solve(work);
 
     ASSERT_EQ(status, PIQP_SOLVED);
-    ASSERT_NEAR(work->results->x[0], 0.2763157, 1e-6);
-    ASSERT_NEAR(work->results->x[1], 0.0921056, 1e-6);
-    ASSERT_NEAR(work->results->y[0], -1.2105263, 1e-6);
-    ASSERT_NEAR(work->results->z[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z[1], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_lb[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_lb[1], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_ub[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_ub[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->x[0], 0.2763157, 1e-6);
+    ASSERT_NEAR(work->result->x[1], 0.0921056, 1e-6);
+    ASSERT_NEAR(work->result->y[0], -1.2105263, 1e-6);
+    ASSERT_NEAR(work->result->z[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_lb[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_lb[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_ub[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_ub[1], 0, 1e-6);
 }
 
 /*
@@ -150,15 +150,15 @@ TEST(CInterfaceTest, SimpleSparseQPWithUpdate)
     piqp_status status = piqp_solve(work);
 
     ASSERT_EQ(status, PIQP_SOLVED);
-    ASSERT_NEAR(work->results->x[0], 0.4285714, 1e-6);
-    ASSERT_NEAR(work->results->x[1], 0.2142857, 1e-6);
-    ASSERT_NEAR(work->results->y[0], -1.5714286, 1e-6);
-    ASSERT_NEAR(work->results->z[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z[1], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_lb[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_lb[1], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_ub[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_ub[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->x[0], 0.4285714, 1e-6);
+    ASSERT_NEAR(work->result->x[1], 0.2142857, 1e-6);
+    ASSERT_NEAR(work->result->y[0], -1.5714286, 1e-6);
+    ASSERT_NEAR(work->result->z[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_lb[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_lb[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_ub[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_ub[1], 0, 1e-6);
 
     P_x[0] = 8;
     A_x[1] = -3;
@@ -169,15 +169,15 @@ TEST(CInterfaceTest, SimpleSparseQPWithUpdate)
     status = piqp_solve(work);
 
     ASSERT_EQ(status, PIQP_SOLVED);
-    ASSERT_NEAR(work->results->x[0], 0.2763157, 1e-6);
-    ASSERT_NEAR(work->results->x[1], 0.0921056, 1e-6);
-    ASSERT_NEAR(work->results->y[0], -1.2105263, 1e-6);
-    ASSERT_NEAR(work->results->z[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z[1], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_lb[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_lb[1], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_ub[0], 0, 1e-6);
-    ASSERT_NEAR(work->results->z_ub[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->x[0], 0.2763157, 1e-6);
+    ASSERT_NEAR(work->result->x[1], 0.0921056, 1e-6);
+    ASSERT_NEAR(work->result->y[0], -1.2105263, 1e-6);
+    ASSERT_NEAR(work->result->z[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_lb[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_lb[1], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_ub[0], 0, 1e-6);
+    ASSERT_NEAR(work->result->z_ub[1], 0, 1e-6);
 
     piqp_cleanup(work);
     if (settings) free(settings);

@@ -32,47 +32,47 @@ piqp_csc* piqp_csc_matrix(piqp_int m, piqp_int n, piqp_int nnz, piqp_int *p, piq
     return matrix;
 }
 
-void piqp_update_results(piqp_results* results, const piqp::Result<piqp_float>& solver_results)
+void piqp_update_result(piqp_result* result, const piqp::Result<piqp_float>& solver_result)
 {
-    results->x = solver_results.x.data();
-    results->y = solver_results.y.data();
-    results->z = solver_results.z.data();
-    results->z_lb = solver_results.z_lb.data();
-    results->z_ub = solver_results.z_ub.data();
-    results->s = solver_results.s.data();
-    results->s_lb = solver_results.s_lb.data();
-    results->s_ub = solver_results.s_ub.data();
+    result->x = solver_result.x.data();
+    result->y = solver_result.y.data();
+    result->z = solver_result.z.data();
+    result->z_lb = solver_result.z_lb.data();
+    result->z_ub = solver_result.z_ub.data();
+    result->s = solver_result.s.data();
+    result->s_lb = solver_result.s_lb.data();
+    result->s_ub = solver_result.s_ub.data();
 
-    results->zeta = solver_results.zeta.data();
-    results->lambda = solver_results.lambda.data();
-    results->nu = solver_results.nu.data();
-    results->nu_lb = solver_results.nu_lb.data();
-    results->nu_ub = solver_results.nu_ub.data();
+    result->zeta = solver_result.zeta.data();
+    result->lambda = solver_result.lambda.data();
+    result->nu = solver_result.nu.data();
+    result->nu_lb = solver_result.nu_lb.data();
+    result->nu_ub = solver_result.nu_ub.data();
 
-    results->info.status = (piqp_status) solver_results.info.status;
-    results->info.iter = (piqp_int) solver_results.info.iter;
-    results->info.rho = solver_results.info.rho;
-    results->info.delta = solver_results.info.delta;
-    results->info.mu = solver_results.info.mu;
-    results->info.sigma = solver_results.info.sigma;
-    results->info.primal_step = solver_results.info.primal_step;
-    results->info.dual_step = solver_results.info.dual_step;
-    results->info.primal_inf = solver_results.info.primal_inf;
-    results->info.primal_rel_inf = solver_results.info.primal_rel_inf;
-    results->info.dual_inf = solver_results.info.dual_inf;
-    results->info.dual_rel_inf = solver_results.info.dual_rel_inf;
-    results->info.primal_obj = solver_results.info.primal_obj;
-    results->info.dual_obj = solver_results.info.dual_obj;
-    results->info.duality_gap = solver_results.info.duality_gap;
-    results->info.duality_gap_rel = solver_results.info.duality_gap_rel;
-    results->info.factor_retires = solver_results.info.factor_retires;
-    results->info.reg_limit = solver_results.info.reg_limit;
-    results->info.no_primal_update = solver_results.info.no_primal_update;
-    results->info.no_dual_update = solver_results.info.no_dual_update;
-    results->info.setup_time = solver_results.info.setup_time;
-    results->info.update_time = solver_results.info.update_time;
-    results->info.solve_time = solver_results.info.solve_time;
-    results->info.run_time = solver_results.info.run_time;
+    result->info.status = (piqp_status) solver_result.info.status;
+    result->info.iter = (piqp_int) solver_result.info.iter;
+    result->info.rho = solver_result.info.rho;
+    result->info.delta = solver_result.info.delta;
+    result->info.mu = solver_result.info.mu;
+    result->info.sigma = solver_result.info.sigma;
+    result->info.primal_step = solver_result.info.primal_step;
+    result->info.dual_step = solver_result.info.dual_step;
+    result->info.primal_inf = solver_result.info.primal_inf;
+    result->info.primal_rel_inf = solver_result.info.primal_rel_inf;
+    result->info.dual_inf = solver_result.info.dual_inf;
+    result->info.dual_rel_inf = solver_result.info.dual_rel_inf;
+    result->info.primal_obj = solver_result.info.primal_obj;
+    result->info.dual_obj = solver_result.info.dual_obj;
+    result->info.duality_gap = solver_result.info.duality_gap;
+    result->info.duality_gap_rel = solver_result.info.duality_gap_rel;
+    result->info.factor_retires = solver_result.info.factor_retires;
+    result->info.reg_limit = solver_result.info.reg_limit;
+    result->info.no_primal_update = solver_result.info.no_primal_update;
+    result->info.no_dual_update = solver_result.info.no_dual_update;
+    result->info.setup_time = solver_result.info.setup_time;
+    result->info.update_time = solver_result.info.update_time;
+    result->info.solve_time = solver_result.info.solve_time;
+    result->info.run_time = solver_result.info.run_time;
 }
 
 void piqp_set_default_settings(piqp_settings* settings)
@@ -138,7 +138,7 @@ void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, c
     work->solver_info.n = data->n;
     work->solver_info.p = data->p;
     work->solver_info.m = data->m;
-    work->results = new piqp_results;
+    work->result = new piqp_result;
 
     if (settings)
     {
@@ -156,7 +156,7 @@ void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, c
 
     solver->setup(P, c, A, b, G, h, x_lb, x_ub);
 
-    piqp_update_results(work->results, solver->result());
+    piqp_update_result(work->result, solver->result());
 }
 
 void piqp_setup_sparse(piqp_workspace** workspace, const piqp_data_sparse* data, const piqp_settings* settings)
@@ -170,7 +170,7 @@ void piqp_setup_sparse(piqp_workspace** workspace, const piqp_data_sparse* data,
     work->solver_info.n = data->n;
     work->solver_info.p = data->p;
     work->solver_info.m = data->m;
-    work->results = new piqp_results;
+    work->result = new piqp_result;
 
     if (settings)
     {
@@ -188,7 +188,7 @@ void piqp_setup_sparse(piqp_workspace** workspace, const piqp_data_sparse* data,
 
     solver->setup(P, c, A, b, G, h, x_lb, x_ub);
 
-    piqp_update_results(work->results, solver->result());
+    piqp_update_result(work->result, solver->result());
 }
 
 void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settings)
@@ -282,13 +282,13 @@ piqp_status piqp_solve(piqp_workspace* workspace)
     {
         auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
         status = solver->solve();
-        piqp_update_results(workspace->results, solver->result());
+        piqp_update_result(workspace->result, solver->result());
     }
     else
     {
         auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
         status = solver->solve();
-        piqp_update_results(workspace->results, solver->result());
+        piqp_update_result(workspace->result, solver->result());
     }
 
     return (piqp_status) status;
@@ -308,7 +308,7 @@ void piqp_cleanup(piqp_workspace* workspace)
             auto* solver = reinterpret_cast<SparseSolver *>(workspace->solver_handle);
             delete solver;
         }
-        delete workspace->results;
+        delete workspace->result;
         delete workspace;
     }
 }
