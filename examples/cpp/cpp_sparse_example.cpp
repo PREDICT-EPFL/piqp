@@ -31,7 +31,6 @@ int main()
     G.insert(0, 0) = 1;
     G.insert(0, 1) = -1;
     G.insert(1, 0) = 2;
-    G.insert(1, 1) = 1;
     G.makeCompressed();
     Eigen::VectorXd h(m); h << 0.2, -1;
 

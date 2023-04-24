@@ -21,7 +21,7 @@ int main()
     Eigen::MatrixXd A(p, n); A << 1, -2;
     Eigen::VectorXd b(p); b << 1;
 
-    Eigen::MatrixXd G(m, n); G << 1, -1, 2, 1;
+    Eigen::MatrixXd G(m, n); G << 1, -1, 2, 0;
     Eigen::VectorXd h(m); h << 0.2, -1;
 
     Eigen::VectorXd x_lb(n); x_lb << -1, -std::numeric_limits<double>::infinity();

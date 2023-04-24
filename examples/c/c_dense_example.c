@@ -21,7 +21,7 @@ int main()
     piqp_float A[2] = {1, -2};
     piqp_float b[1] = {1};
 
-    piqp_float G[4] = {1, -1, 2, 1};
+    piqp_float G[4] = {1, -1, 2, 0};
     piqp_float h[2] = {0.2, -1};
 
     piqp_float x_lb[2] = {-1, -PIQP_INF};

@@ -27,10 +27,10 @@ int main()
     piqp_int A_i[2] = {0, 0};
     piqp_float b[1] = {1};
 
-    piqp_float G_x[4] = {1, 2, -1, 1};
-    piqp_int G_nnz = 4;
-    piqp_int G_p[3] = {0, 2, 4};
-    piqp_int G_i[4] = {0, 1, 0, 1};
+    piqp_float G_x[3] = {1, 2, -1};
+    piqp_int G_nnz = 3;
+    piqp_int G_p[3] = {0, 2, 3};
+    piqp_int G_i[4] = {0, 1, 0};
     piqp_float h[2] = {0.2, -1};
 
     piqp_float x_lb[2] = {-1, -PIQP_INF};
