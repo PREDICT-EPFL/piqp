@@ -22,7 +22,7 @@ struct Settings
     T eps_rel = 1e-9;
 
     bool check_duality_gap = true;
-    T eps_duality_gap_abs = 1e-6;
+    T eps_duality_gap_abs = 1e-8;
     T eps_duality_gap_rel = 1e-9;
 
     T reg_lower_limit = 1e-10;
