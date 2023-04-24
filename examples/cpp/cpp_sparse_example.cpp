@@ -37,7 +37,7 @@ int main()
     Eigen::VectorXd x_lb(n); x_lb << -1, -std::numeric_limits<double>::infinity();
     Eigen::VectorXd x_ub(n); x_ub << 1, std::numeric_limits<double>::infinity();
 
-    piqp::SparseSolver<double, int> solver;
+    piqp::SparseSolver<double> solver;
     solver.settings().verbose = true;
     solver.settings().compute_timings = true;
     solver.setup(P, c, A, b, G, h, x_lb, x_ub);
