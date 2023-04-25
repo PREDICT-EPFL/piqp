@@ -13,22 +13,16 @@ $$
 \end{aligned}
 $$
 
-with primal decision variables $$x \in \mathbb{R}^n$$, matrices $$P\in \mathbb{S}_+^n$$, $$A \in \mathbb{R}^{p \times n}$$,  $$G \in \mathbb{R}^{m \times n}$$, and vectors $$c \in \mathbb{R}^n$$, $$b \in \mathbb{R}^p$$, $$h \in \mathbb{R}^m$$, $$x_{lb} \in \mathbb{R}^n$$, and $$x_{ub} \in \mathbb{R}^n$$. Combining an infeasible interior point method with the proximal method of multipliers, the algorithm can handle ill-conditioned convex QP problems without the need for linear independence of the constraints.
+Combining an infeasible interior point method with the proximal method of multipliers, the algorithm can handle ill-conditioned convex QP problems without the need for linear independence of the constraints.
 
-For more detailed technical results see our pre-print:
-
-[**PIQP: A Proximal Interior-Point Quadratic Programming Solver**](https://arxiv.org/abs/2304.00290)<br>
-R. Schwan, Y. Jiang, D. Kuhn, C.N. Jones<br>
-ArXiv, 2023
-
-### Features
+## Features
 
 * PIQP is written in header only C++ 14 leveraging the [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) library for vectorized linear algebra.
 * Dense and sparse problem formulations are supported. For small dense problems, vectorized instructions and cache locality can be exploited more efficiently.
 * Interface to Python with many more to follow.
 * Open source under the BSD 2-Clause License.
 
-### Interfaces
+## Interfaces
 
 PIQP support a wide range of interfaces including
 * C/C++ (with Eigen support)
@@ -37,7 +31,7 @@ PIQP support a wide range of interfaces including
 * Julia (soon)
 * Rust (soon)
 
-### Credits
+## Credits
 
 PIQP is developed the following people:
 * Roland Schwan (main developer)
@@ -70,6 +64,6 @@ If you found PIQP useful in your scientific work, we encourage you to cite our a
 }
 ```
 
-### License
+## License
 
 PIQP is licensed under the BSD 2-Clause License.
