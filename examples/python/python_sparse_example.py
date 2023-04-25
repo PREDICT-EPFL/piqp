@@ -22,7 +22,6 @@ solver = piqp.SparseSolver()
 solver.settings.verbose = True
 solver.settings.compute_timings = True
 solver.setup(P, c, A, b, G, h, x_lb, x_ub)
-solver.update(None, c, A, None, G, h, None, x_ub)
 status = solver.solve()
 
 print(f'status = {status}')
