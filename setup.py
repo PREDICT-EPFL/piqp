@@ -49,6 +49,7 @@ class CMakeBuild(build_ext):
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
             f"-DBUILD_PYTHON_INTERFACE=ON",
+            f"-DBUILD_C_INTERFACE=OFF",
             f"-DBUILD_TESTS=OFF",
             f"-DBUILD_BENCHMARKS=OFF",
             f"-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true"
