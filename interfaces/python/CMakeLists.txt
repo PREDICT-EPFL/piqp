@@ -17,7 +17,7 @@ pybind11_add_module(instruction_set src/instruction_set.cpp)
 # only link cpu_features on x86/amd64
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
     set(BUILD_TESTING OFF)
-    add_subdirectory(external/cpu_features)
+    add_subdirectory(external/cpu_features EXCLUDE_FROM_ALL)
     target_compile_definitions(instruction_set PRIVATE CPU_FEATURES_AVAILABLE=1)
     target_link_libraries(instruction_set PRIVATE CpuFeature::cpu_features)
 endif()
