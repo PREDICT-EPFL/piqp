@@ -50,7 +50,7 @@ if (ENABLE_SANITIZERS)
 endif ()
 
 # Find Eigen3.3+
-if (DEFINED EIGEN3_INCLUDE_DIRS)
+if (DEFINED EIGEN3_INCLUDE_DIRS AND NOT TARGET Eigen3::Eigen)
     # Create target for user-defined Eigen 3.3+ path to be used for piqp
     add_library(Eigen3::Eigen INTERFACE IMPORTED)
     target_include_directories(Eigen3::Eigen INTERFACE ${EIGEN3_INCLUDE_DIRS})
