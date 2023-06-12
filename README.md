@@ -33,7 +33,7 @@ PIQP support a wide range of interfaces including
 
 ## Credits
 
-PIQP is developed the following people:
+PIQP is developed by the following people:
 * Roland Schwan (main developer)
 * Yuning Jiang (methods and maths)
 * Daniel Kuhn (methods and maths)
