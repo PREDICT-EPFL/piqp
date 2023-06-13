@@ -29,6 +29,9 @@ endif()
 
 enable_testing()
 
+# copy maros meszaros data
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/maros_meszaros_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 add_library(pipq-test INTERFACE)
 target_include_directories(pipq-test INTERFACE include)
 target_compile_options(pipq-test INTERFACE ${compiler_flags})
@@ -59,6 +62,16 @@ target_link_libraries(sparse_solver_test PRIVATE pipq-test)
 add_executable(preconditioner_test src/preconditioner_test.cpp)
 target_link_libraries(preconditioner_test PRIVATE pipq-test)
 
+if (BUILD_MAROS_MESZAROS_TEST)
+    add_executable(dense_maros_meszaros_tests src/dense/maros_meszaros_tests.cpp)
+    target_link_libraries(dense_maros_meszaros_tests PRIVATE pipq-test pybind11::embed)
+    target_compile_features(dense_maros_meszaros_tests PRIVATE cxx_std_17)
+
+    add_executable(sparse_maros_meszaros_tests src/sparse/maros_meszaros_tests.cpp)
+    target_link_libraries(sparse_maros_meszaros_tests PRIVATE pipq-test pybind11::embed)
+    target_compile_features(sparse_maros_meszaros_tests PRIVATE cxx_std_17)
+endif()
+
 include(GoogleTest)
 gtest_discover_tests(dense_ldlt_test)
 gtest_discover_tests(dense_kkt_test)
@@ -68,3 +81,7 @@ gtest_discover_tests(sparse_ldlt_test)
 gtest_discover_tests(sparse_utils_test)
 gtest_discover_tests(sparse_solver_test)
 gtest_discover_tests(preconditioner_test)
+if (BUILD_MAROS_MESZAROS_TEST)
+    gtest_discover_tests(dense_maros_meszaros_tests)
+    gtest_discover_tests(sparse_maros_meszaros_tests)
+endif()

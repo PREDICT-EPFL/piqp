@@ -8,9 +8,6 @@
 
 cmake_minimum_required(VERSION 3.5)
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
-add_subdirectory(external/pybind11 ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
-
 # add instruction set detection on x86/amd64
 pybind11_add_module(instruction_set src/instruction_set.cpp)
 

@@ -16,10 +16,12 @@ project(piqp
 option(BUILD_C_INTERFACE "Build C interface" ON)
 option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
 option(BUILD_TESTS "Build tests" ON)
+option(BUILD_MAROS_MESZAROS_TEST "Build maros meszaros tests" OFF)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
 
 #### Developer options ####
 option(ENABLE_SANITIZERS "Build with sanitizers enabled" OFF)
+option(DEBUG_PRINTS "Print additional debug information" OFF)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -49,6 +51,10 @@ if (ENABLE_SANITIZERS)
     unset(sanitizer_flags)
 endif ()
 
+# Find pybind11
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
+add_subdirectory(external/pybind11 ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
+
 # Find Eigen3.3+
 if (DEFINED EIGEN3_INCLUDE_DIRS AND NOT TARGET Eigen3::Eigen)
     # Create target for user-defined Eigen 3.3+ path to be used for piqp
@@ -67,6 +73,9 @@ target_include_directories(piqp INTERFACE
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_link_libraries(piqp INTERFACE Eigen3::Eigen)
+if (DEBUG_PRINTS)
+    target_compile_definitions(piqp INTERFACE PIQP_DEBUG_PRINT)
+endif ()
 add_library(piqp::piqp ALIAS piqp)
 
 if (BUILD_C_INTERFACE)
