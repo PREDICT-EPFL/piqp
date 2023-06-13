@@ -27,6 +27,7 @@ TEST(DenseKKTTest, UpdateScalings)
 
     Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
     Data<T> data(qp_model);
+    Settings<T> settings;
 
     // make sure P_utri has not complete diagonal filled
     data.P_utri(1, 1) = 0;
@@ -34,7 +35,7 @@ TEST(DenseKKTTest, UpdateScalings)
     T rho = 0.9;
     T delta = 1.2;
 
-    KKT<T> kkt(data);
+    KKT<T> kkt(data, settings);
     kkt.init(rho, delta);
 
     rho = 0.8;
@@ -50,7 +51,7 @@ TEST(DenseKKTTest, UpdateScalings)
     kkt.update_scalings(rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    KKT<T> kkt2(data);
+    KKT<T> kkt2(data, settings);
     kkt2.init(rho, delta);
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
@@ -65,6 +66,7 @@ TEST(DenseKKTTest, UpdateData)
 
     Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
     Data<T> data(qp_model);
+    Settings<T> settings;
 
     // make sure P_utri has not complete diagonal filled
     data.P_utri(1, 1) = 0;
@@ -72,7 +74,7 @@ TEST(DenseKKTTest, UpdateData)
     T rho = 0.9;
     T delta = 1.2;
 
-    KKT<T> kkt(data);
+    KKT<T> kkt(data, settings);
     kkt.init(rho, delta);
 
     // update data
@@ -86,7 +88,7 @@ TEST(DenseKKTTest, UpdateData)
     kkt.update_data(update_options);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    KKT<T> kkt2(data);
+    KKT<T> kkt2(data, settings);
     kkt2.init(rho, delta);
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
@@ -101,15 +103,16 @@ TEST(DenseKKTTest, FactorizeSolve)
 
     Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
     Data<T> data(qp_model);
+    Settings<T> settings;
 
     T rho = 0.9;
     T delta = 1.2;
 
-    KKT<T> kkt(data);
+    KKT<T> kkt(data, settings);
     kkt.init(rho, delta);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    ASSERT_TRUE(kkt.factorize());
+    ASSERT_TRUE(kkt.regularize_and_factorize(false));
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Vec<T> rhs_x = rand::vector_rand<T>(dim);
@@ -132,7 +135,8 @@ TEST(DenseKKTTest, FactorizeSolve)
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt.solve(rhs_x, rhs_y, rhs_z, rhs_z_lb, rhs_z_ub, rhs_s, rhs_s_lb, rhs_s_ub,
-              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub);
+              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub,
+              false);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Vec<T> rhs_x_sol(dim);

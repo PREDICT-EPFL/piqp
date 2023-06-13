@@ -37,6 +37,7 @@ TYPED_TEST(SparseKKTTest, UpdateScalings)
 
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
     Data<T, I> data(qp_model);
+    Settings<T> settings;
 
     // make sure P_utri has not complete diagonal filled
     data.P_utri.coeffRef(1, 1) = 0;
@@ -45,7 +46,7 @@ TYPED_TEST(SparseKKTTest, UpdateScalings)
     T rho = 0.9;
     T delta = 1.2;
 
-    TypeParam kkt(data);
+    TypeParam kkt(data, settings);
     kkt.init(rho, delta);
 
     rho = 0.8;
@@ -65,7 +66,7 @@ TYPED_TEST(SparseKKTTest, UpdateScalings)
     SparseMat<T, I> PKPt_upper = kkt.PKPt.template triangularView<Eigen::Upper>();
     assert_sparse_matrices_equal(kkt.PKPt, PKPt_upper);
 
-    TypeParam kkt2(data);
+    TypeParam kkt2(data, settings);
     kkt2.init(rho, delta);
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
@@ -81,6 +82,7 @@ TYPED_TEST(SparseKKTTest, UpdateData)
 
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
     Data<T, I> data(qp_model);
+    Settings<T> settings;
 
     // make sure P_utri has not complete diagonal filled
     data.P_utri.coeffRef(1, 1) = 0;
@@ -89,7 +91,7 @@ TYPED_TEST(SparseKKTTest, UpdateData)
     T rho = 0.9;
     T delta = 1.2;
 
-    TypeParam kkt(data);
+    TypeParam kkt(data, settings);
     kkt.init(rho, delta);
 
     // update data
@@ -106,7 +108,7 @@ TYPED_TEST(SparseKKTTest, UpdateData)
     SparseMat<T, I> PKPt_upper = kkt.PKPt.template triangularView<Eigen::Upper>();
     assert_sparse_matrices_equal(kkt.PKPt, PKPt_upper);
 
-    TypeParam kkt2(data);
+    TypeParam kkt2(data, settings);
     kkt2.init(rho, delta);
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
@@ -122,15 +124,16 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
 
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
     Data<T, I> data(qp_model);
+    Settings<T> settings;
 
     T rho = 0.9;
     T delta = 1.2;
 
-    TypeParam kkt(data);
+    TypeParam kkt(data, settings);
     kkt.init(rho, delta);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    ASSERT_TRUE(kkt.factorize());
+    ASSERT_TRUE(kkt.regularize_and_factorize(false));
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Vec<T> rhs_x = rand::vector_rand<T>(dim);
@@ -153,7 +156,8 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt.solve(rhs_x, rhs_y, rhs_z, rhs_z_lb, rhs_z_ub, rhs_s, rhs_s_lb, rhs_s_ub,
-              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub);
+              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub,
+              false);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Vec<T> rhs_x_sol(dim);
