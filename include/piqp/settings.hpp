@@ -9,6 +9,8 @@
 #ifndef PIQP_SETTINGS_HPP
 #define PIQP_SETTINGS_HPP
 
+#include <limits>
+
 namespace piqp
 {
 
@@ -36,6 +38,14 @@ struct Settings
 
     T tau = 0.995;
 
+    bool iterative_refinement_always_enabled = false;
+    T iterative_refinement_eps_abs = 1e-12;
+    T iterative_refinement_eps_rel = 1e-12;
+    isize iterative_refinement_max_iter = 10;
+    T iterative_refinement_min_improvement_rate = 5.0;
+    T iterative_refinement_static_regularization_eps = 1e-7;
+    T iterative_refinement_static_regularization_rel = std::numeric_limits<T>::epsilon() * std::numeric_limits<T>::epsilon();
+
     bool verbose = false;
     bool compute_timings = false;
 
@@ -51,7 +61,13 @@ struct Settings
                max_iter > 0 &&
                max_factor_retires > 0 &&
                preconditioner_iter >= 0 &&
-               tau > 0 && tau <= 1;
+               tau > 0 && tau <= 1 &&
+               iterative_refinement_eps_abs > 0 &&
+               iterative_refinement_eps_rel >= 0 &&
+               iterative_refinement_max_iter >= 0 &&
+               iterative_refinement_min_improvement_rate >= 1.0 &&
+               iterative_refinement_static_regularization_eps > 0 &&
+               iterative_refinement_static_regularization_rel >= 0;
     }
 };
 

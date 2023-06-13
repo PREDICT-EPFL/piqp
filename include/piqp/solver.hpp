@@ -48,6 +48,7 @@ protected:
 
     bool m_kkt_init_state = false;
     bool m_setup_done = false;
+    bool m_enable_iterative_refinement = false;
 
     // residuals
     Vec<T> rx;
@@ -77,7 +78,7 @@ protected:
     Vec<T> ds_ub;
 
 public:
-    SolverBase() : m_kkt(m_data) {};
+    SolverBase() : m_kkt(m_data, m_settings) {};
 
     Settings<T>& settings() { return m_settings; }
 
@@ -203,6 +204,8 @@ protected:
         m_kkt_init_state = true;
 
         m_setup_done = true;
+
+        m_enable_iterative_refinement = m_settings.iterative_refinement_always_enabled;
 
         if (m_settings.compute_timings)
         {
@@ -351,9 +354,13 @@ protected:
                                   m_result.z, m_result.z_lb, m_result.z_ub);
         }
 
-        while (!m_kkt.factorize())
+        while (!m_kkt.regularize_and_factorize(m_enable_iterative_refinement))
         {
-            if (m_result.info.factor_retires < m_settings.max_factor_retires)
+            if (!m_enable_iterative_refinement)
+            {
+                m_enable_iterative_refinement = true;
+            }
+            else if (m_result.info.factor_retires < m_settings.max_factor_retires)
             {
                 m_result.info.delta *= 100;
                 m_result.info.rho *= 100;
@@ -382,7 +389,8 @@ protected:
                     rs, rs_lb, rs_ub,
                     m_result.x, m_result.y,
                     m_result.z, m_result.z_lb, m_result.z_ub,
-                    m_result.s, m_result.s_lb, m_result.s_ub);
+                    m_result.s, m_result.s_lb, m_result.s_ub,
+                    m_enable_iterative_refinement);
 
         if (m_data.m + m_data.n_lb + m_data.n_ub > 0)
         {
@@ -471,13 +479,15 @@ protected:
             rz_lb.head(m_data.n_lb) = rz_lb_nr.head(m_data.n_lb) - m_result.info.delta * (nu_lb - z_lb);
             rz_ub.head(m_data.n_ub) = rz_ub_nr.head(m_data.n_ub) - m_result.info.delta * (nu_ub - z_ub);
 
-            if (m_result.info.no_dual_update > 5 && primal_prox_inf() > 1e10 && primal_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf)
+            if (m_result.info.no_dual_update > 5 && primal_prox_inf() > 1e10 &&
+                primal_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf)
             {
                 m_result.info.status = Status::PIQP_PRIMAL_INFEASIBLE;
                 return m_result.info.status;
             }
 
-            if (m_result.info.no_primal_update > 5 && dual_prox_inf() > 1e10 && dual_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.dual_rel_inf)
+            if (m_result.info.no_primal_update > 5 && dual_prox_inf() > 1e10 &&
+                dual_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.dual_rel_inf)
             {
                 m_result.info.status = Status::PIQP_DUAL_INFEASIBLE;
                 return m_result.info.status;
@@ -497,11 +507,15 @@ protected:
             m_kkt.update_scalings(m_result.info.rho, m_result.info.delta,
                                   m_result.s, m_result.s_lb, m_result.s_ub,
                                   m_result.z, m_result.z_lb, m_result.z_ub);
-            m_kkt_init_state = false;
-            bool kkt_success = m_kkt.factorize();
-            if (!kkt_success)
+
+            if (!m_kkt.regularize_and_factorize(m_enable_iterative_refinement))
             {
-                if (m_result.info.factor_retires < m_settings.max_factor_retires)
+                if (!m_enable_iterative_refinement)
+                {
+                    m_enable_iterative_refinement = true;
+                    continue;
+                }
+                else if (m_result.info.factor_retires < m_settings.max_factor_retires)
                 {
                     m_result.info.delta *= 100;
                     m_result.info.rho *= 100;
@@ -526,7 +540,8 @@ protected:
                 rs_ub.head(m_data.n_ub).array() = -s_ub.array() * z_ub.array();
 
                 m_kkt.solve(rx, ry, rz, rz_lb, rz_ub, rs, rs_lb, rs_ub,
-                            dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub);
+                            dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub,
+                            m_enable_iterative_refinement);
 
                 // step in the non-negative orthant
                 T alpha_s = T(1);
@@ -581,7 +596,8 @@ protected:
                 rs_ub.head(m_data.n_ub).array() += -ds_ub.head(m_data.n_ub).array() * dz_ub.head(m_data.n_ub).array() + m_result.info.sigma * m_result.info.mu;
 
                 m_kkt.solve(rx, ry, rz, rz_lb, rz_ub, rs, rs_lb, rs_ub,
-                            dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub);
+                            dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub,
+                            m_enable_iterative_refinement);
 
                 // step in the non-negative orthant
                 alpha_s = T(1);
@@ -669,7 +685,8 @@ protected:
             {
                 // since there are no inequalities we can take full steps
                 m_kkt.solve(rx, ry, rz, rz_lb, rz_ub, rs, rs_lb, rs_ub,
-                            dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub);
+                            dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub,
+                            m_enable_iterative_refinement);
 
                 m_result.info.primal_step = T(1);
                 m_result.info.dual_step = T(1);

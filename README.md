@@ -50,6 +50,7 @@ PIQP is build on the following open-source libraries:
 * [pybind11](https://github.com/pybind/pybind11) is used for generating the python bindings.
 * [cpu_features](https://github.com/google/cpu_features) is used for run-time instruction set detection in the interface bindings.
 * [OSQP](https://github.com/osqp/osqp) served as an inspiration for the C interface.
+* [Clarabel](https://github.com/oxfordcontrol/Clarabel.rs) served as an inspiration for the iterative refinement scheme.
 
 ## Citing our Work
 

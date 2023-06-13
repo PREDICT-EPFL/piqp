@@ -93,6 +93,13 @@ void piqp_set_default_settings(piqp_settings* settings)
     settings->preconditioner_scale_cost = default_settings.preconditioner_scale_cost;
     settings->preconditioner_iter = (piqp_int) default_settings.preconditioner_iter;
     settings->tau = default_settings.tau;
+    settings->iterative_refinement_always_enabled = (piqp_int) default_settings.iterative_refinement_always_enabled;
+    settings->iterative_refinement_eps_abs = default_settings.iterative_refinement_eps_abs;
+    settings->iterative_refinement_eps_rel = default_settings.iterative_refinement_eps_rel;
+    settings->iterative_refinement_max_iter = (piqp_int) default_settings.iterative_refinement_max_iter;
+    settings->iterative_refinement_min_improvement_rate = default_settings.iterative_refinement_min_improvement_rate;
+    settings->iterative_refinement_static_regularization_eps = default_settings.iterative_refinement_static_regularization_eps;
+    settings->iterative_refinement_static_regularization_rel = default_settings.iterative_refinement_static_regularization_rel;
     settings->verbose = default_settings.verbose;
     settings->compute_timings = default_settings.compute_timings;
 }
@@ -211,6 +218,13 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().preconditioner_scale_cost = settings->preconditioner_scale_cost;
         solver->settings().preconditioner_iter = settings->preconditioner_iter;
         solver->settings().tau = settings->tau;
+        solver->settings().iterative_refinement_always_enabled = settings->iterative_refinement_always_enabled;
+        solver->settings().iterative_refinement_eps_abs = settings->iterative_refinement_eps_abs;
+        solver->settings().iterative_refinement_eps_rel = settings->iterative_refinement_eps_rel;
+        solver->settings().iterative_refinement_max_iter = settings->iterative_refinement_max_iter;
+        solver->settings().iterative_refinement_min_improvement_rate = settings->iterative_refinement_min_improvement_rate;
+        solver->settings().iterative_refinement_static_regularization_eps = settings->iterative_refinement_static_regularization_eps;
+        solver->settings().iterative_refinement_static_regularization_rel = settings->iterative_refinement_static_regularization_rel;
         solver->settings().verbose = settings->verbose;
         solver->settings().compute_timings = settings->compute_timings;
     }
@@ -232,6 +246,13 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().preconditioner_scale_cost = settings->preconditioner_scale_cost;
         solver->settings().preconditioner_iter = settings->preconditioner_iter;
         solver->settings().tau = settings->tau;
+        solver->settings().iterative_refinement_always_enabled = settings->iterative_refinement_always_enabled;
+        solver->settings().iterative_refinement_eps_abs = settings->iterative_refinement_eps_abs;
+        solver->settings().iterative_refinement_eps_rel = settings->iterative_refinement_eps_rel;
+        solver->settings().iterative_refinement_max_iter = settings->iterative_refinement_max_iter;
+        solver->settings().iterative_refinement_min_improvement_rate = settings->iterative_refinement_min_improvement_rate;
+        solver->settings().iterative_refinement_static_regularization_eps = settings->iterative_refinement_static_regularization_eps;
+        solver->settings().iterative_refinement_static_regularization_rel = settings->iterative_refinement_static_regularization_rel;
         solver->settings().verbose = settings->verbose;
         solver->settings().compute_timings = settings->compute_timings;
     }

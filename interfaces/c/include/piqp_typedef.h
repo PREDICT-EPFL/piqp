@@ -76,6 +76,13 @@ typedef struct {
     piqp_int  preconditioner_scale_cost;
     piqp_int  preconditioner_iter;
     piqp_float tau;
+    piqp_int  iterative_refinement_always_enabled;
+    piqp_float iterative_refinement_eps_abs;
+    piqp_float iterative_refinement_eps_rel;
+    piqp_int  iterative_refinement_max_iter;
+    piqp_float iterative_refinement_min_improvement_rate;
+    piqp_float iterative_refinement_static_regularization_eps;
+    piqp_float iterative_refinement_static_regularization_rel;
     piqp_int  verbose;
     piqp_int  compute_timings;
 } piqp_settings;

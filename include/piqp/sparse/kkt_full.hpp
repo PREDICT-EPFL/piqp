@@ -95,8 +95,8 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
         {
             isize k_kkt = KKT.outerIndexPtr()[j_kkt];
             isize col_nnz = data.P_utri.outerIndexPtr()[j + 1] - data.P_utri.outerIndexPtr()[j];
-            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<Vec<I>>(data.P_utri.innerIndexPtr() + data.P_utri.outerIndexPtr()[j], col_nnz);
-            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<Vec<T>>(data.P_utri.valuePtr() + data.P_utri.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<I>>(data.P_utri.innerIndexPtr() + data.P_utri.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<T>>(data.P_utri.valuePtr() + data.P_utri.outerIndexPtr()[j], col_nnz);
 
             // diagonal
             isize kkt_col_nnz = KKT.outerIndexPtr()[j_kkt + 1] - KKT.outerIndexPtr()[j_kkt];
@@ -127,8 +127,8 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
         {
             isize k_kkt = KKT.outerIndexPtr()[j_kkt];
             isize col_nnz = data.AT.outerIndexPtr()[j + 1] - data.AT.outerIndexPtr()[j];
-            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<Vec<I>>(data.AT.innerIndexPtr() + data.AT.outerIndexPtr()[j], col_nnz);
-            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<Vec<T>>(data.AT.valuePtr() + data.AT.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<I>>(data.AT.innerIndexPtr() + data.AT.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<T>>(data.AT.valuePtr() + data.AT.outerIndexPtr()[j], col_nnz);
 
             // diagonal
             KKT.innerIndexPtr()[k_kkt + col_nnz] = j_kkt;
@@ -150,8 +150,8 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
         {
             isize k_kkt = KKT.outerIndexPtr()[j_kkt];
             isize col_nnz = data.GT.outerIndexPtr()[j + 1] - data.GT.outerIndexPtr()[j];
-            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<Vec<I>>(data.GT.innerIndexPtr() + data.GT.outerIndexPtr()[j], col_nnz);
-            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<Vec<T>>(data.GT.valuePtr() + data.GT.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<I>>(data.GT.innerIndexPtr() + data.GT.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<T>>(data.GT.valuePtr() + data.GT.outerIndexPtr()[j], col_nnz);
 
             // diagonal
             KKT.innerIndexPtr()[k_kkt + col_nnz] = j_kkt;

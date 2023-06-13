@@ -103,8 +103,8 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_INEQ_ELIMINATED>
         {
             isize k_kkt = KKT.outerIndexPtr()[j_kkt];
             isize col_nnz = data.AT.outerIndexPtr()[j + 1] - data.AT.outerIndexPtr()[j];
-            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<Vec<I>>(data.AT.innerIndexPtr() + data.AT.outerIndexPtr()[j], col_nnz);
-            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<Vec<T>>(data.AT.valuePtr() + data.AT.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<I>>(KKT.innerIndexPtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<I>>(data.AT.innerIndexPtr() + data.AT.outerIndexPtr()[j], col_nnz);
+            Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<T>>(data.AT.valuePtr() + data.AT.outerIndexPtr()[j], col_nnz);
 
             // diagonal
             KKT.innerIndexPtr()[k_kkt + col_nnz] = j_kkt;

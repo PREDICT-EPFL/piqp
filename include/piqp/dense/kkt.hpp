@@ -9,6 +9,7 @@
 #ifndef PIQP_DENSE_KKT_HPP
 #define PIQP_DENSE_KKT_HPP
 
+#include "piqp/settings.hpp"
 #include "piqp/kkt_fwd.hpp"
 #include "piqp/dense/data.hpp"
 #include "piqp/dense/ldlt_no_pivot.hpp"
@@ -22,7 +23,8 @@ namespace dense
 template<typename T>
 struct KKT
 {
-    Data<T>& data;
+    const Data<T>& data;
+    const Settings<T>& settings;
 
     T m_rho;
     T m_delta;
@@ -35,14 +37,18 @@ struct KKT
     Vec<T> m_z_ub_inv;
 
     Mat<T> kkt_mat;
+    Vec<T> kkt_diag; // unregularized diagonal of KKT matrix
     LDLTNoPivot<Mat<T>, Eigen::Lower> ldlt;
 
     Mat<T> AT_A;
     Mat<T> W_delta_inv_G; // temporary matrix
     Vec<T> rhs_z_bar;     // temporary variable needed for back solve
-    Vec<T> rhs;           // stores the rhs and the solution for back solve
+    Vec<T> rhs;           // stores the rhs
+    Vec<T> sol;           // solution of ldldt back solve
+    Vec<T> err_corr;      // temporary variable to calculate error in iterative refinement and correction term
+    Vec<T> ref_sol;       // refined solution
 
-    explicit KKT(Data<T>& data) : data(data) {}
+    KKT(const Data<T>& data, const Settings<T>& settings) : data(data), settings(settings) {}
 
     void init(const T& rho, const T& delta)
     {
@@ -56,6 +62,9 @@ struct KKT
         W_delta_inv_G.resize(data.m, data.n);
         rhs_z_bar.resize(data.m);
         rhs.resize(data.n);
+        sol.resize(data.n);
+        err_corr.resize(data.n);
+        ref_sol.resize(data.n);
 
         m_rho = rho;
         m_delta = delta;
@@ -67,6 +76,7 @@ struct KKT
         m_z_ub_inv.head(data.n_ub).setConstant(1);
 
         kkt_mat.resize(data.n, data.n);
+        kkt_diag.resize(data.n);
         ldlt = LDLTNoPivot<Mat<T>>(data.n);
 
         if (data.p > 0)
@@ -185,10 +195,53 @@ struct KKT
         rhs_s_ub.head(data.n_ub).array() += m_z_ub_inv.head(data.n_ub).array().cwiseInverse() * delta_s_ub.head(data.n_ub).array();
     }
 
-    bool factorize()
+    bool regularize_and_factorize(bool iterative_refinement)
     {
+        if (iterative_refinement)
+        {
+            T static_kkt_diag_max = data.P_utri.diagonal().template lpNorm<Eigen::Infinity>();
+            T max_diag = static_kkt_diag_max;
+            for (isize i = 0; i < data.m; i++)
+            {
+                max_diag = std::max(max_diag, m_z_inv(i) * m_s(i));
+            }
+            for (isize i = 0; i < data.n_lb; i++)
+            {
+                max_diag = std::max(max_diag, m_z_lb_inv(i) * m_s_lb(i));
+            }
+            for (isize i = 0; i < data.n_ub; i++)
+            {
+                max_diag = std::max(max_diag, m_z_ub_inv(i) * m_s_ub(i));
+            }
+
+            T reg = settings.iterative_refinement_static_regularization_eps + settings.iterative_refinement_static_regularization_rel * max_diag;
+            this->regularize_kkt(reg);
+        }
+
         ldlt.compute(kkt_mat);
+
+        if (iterative_refinement)
+        {
+            this->unregularize_kkt();
+        }
+
         return ldlt.info() == Eigen::Success;
+    }
+
+    void regularize_kkt(T reg)
+    {
+        // save unregularized diagonal
+        kkt_diag = kkt_mat.diagonal();
+
+        // regularize diagonal
+        T rho_reg = std::max(T(0), reg - m_rho);
+        kkt_mat.diagonal().array() += rho_reg;
+    }
+
+    void unregularize_kkt()
+    {
+        // restore unregularized diagonal
+        kkt_mat.diagonal() = kkt_diag;
     }
 
     void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y,
@@ -196,7 +249,8 @@ struct KKT
                const CVecRef<T>& rhs_s, const CVecRef<T>& rhs_s_lb, const CVecRef<T>& rhs_s_ub,
                VecRef<T> delta_x, VecRef<T> delta_y,
                VecRef<T> delta_z, VecRef<T> delta_z_lb, VecRef<T> delta_z_ub,
-               VecRef<T> delta_s, VecRef<T> delta_s_lb, VecRef<T> delta_s_ub)
+               VecRef<T> delta_s, VecRef<T> delta_s_lb, VecRef<T> delta_s_ub,
+               bool iterative_refinement)
     {
         T delta_inv = T(1) / m_delta;
 
@@ -218,9 +272,56 @@ struct KKT
                                      / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
         }
 
-        ldlt.solveInPlace(rhs);
+        sol = rhs;
+        solve_ldlt_in_place(sol);
 
-        delta_x.noalias() = rhs;
+        if (iterative_refinement && settings.iterative_refinement_max_iter > 0)
+        {
+            T rhs_norm = rhs.template lpNorm<Eigen::Infinity>();
+
+            err_corr = rhs;
+            err_corr -= kkt_mat.template triangularView<Eigen::Lower>() * sol;
+            err_corr -= kkt_mat.transpose().template triangularView<Eigen::StrictlyUpper>() * sol;
+            T error_norm = err_corr.template lpNorm<Eigen::Infinity>();
+
+            std::cout << "error_norm: " << error_norm << std::endl;
+
+            for (isize i = 0; i < settings.iterative_refinement_max_iter; i++)
+            {
+                if (error_norm <= (settings.iterative_refinement_eps_abs + settings.iterative_refinement_eps_rel * rhs_norm))
+                {
+                    break;
+                }
+
+                T prev_error_norm = error_norm;
+
+                solve_ldlt_in_place(err_corr);
+                ref_sol = sol + err_corr;
+
+                err_corr = rhs;
+                err_corr -= kkt_mat.template triangularView<Eigen::Lower>() * ref_sol;
+                err_corr -= kkt_mat.transpose().template triangularView<Eigen::StrictlyUpper>() * ref_sol;
+                error_norm = err_corr.template lpNorm<Eigen::Infinity>();
+
+                std::cout << i << " prev_error_norm: " << prev_error_norm << " " << error_norm << std::endl;
+
+                T improvement_rate = prev_error_norm / error_norm;
+                if (improvement_rate < settings.iterative_refinement_min_improvement_rate)
+                {
+                    if (improvement_rate > T(1))
+                    {
+                        std::swap(sol, ref_sol);
+                    }
+                    break;
+                }
+                else
+                {
+                    std::swap(sol, ref_sol);
+                }
+            }
+        }
+
+        delta_x.noalias() = sol;
 
         delta_y.noalias() = delta_inv * data.AT.transpose() * delta_x;
         delta_y.noalias() -= delta_inv * rhs_y;
@@ -247,6 +348,54 @@ struct KKT
 
         delta_s_ub.head(data.n_ub).array() = m_z_ub_inv.head(data.n_ub).array()
             * (rhs_s_ub.head(data.n_ub).array() - m_s_ub.head(data.n_ub).array() * delta_z_ub.head(data.n_ub).array());
+
+#ifdef PIQP_DEBUG_PRINT
+        Vec<T> err_x = delta_x;
+        Vec<T> err_y = delta_y;
+        Vec<T> err_z = delta_z;
+        Vec<T> err_z_lb = delta_z_lb;
+        Vec<T> err_z_ub = delta_z_ub;
+        Vec<T> err_s = delta_s;
+        Vec<T> err_s_lb = delta_s_lb;
+        Vec<T> err_s_ub = delta_s_ub;
+
+        multiply(delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub,
+                 err_x, err_y, err_z, err_z_lb, err_z_ub, err_s, err_s_lb, err_s_ub);
+
+        err_x -= rhs_x;
+        err_y -= rhs_y;
+        err_z -= rhs_z;
+        err_z_lb.head(data.n_lb) -= rhs_z_lb.head(data.n_lb);
+        err_z_ub.head(data.n_ub) -= rhs_z_ub.head(data.n_ub);
+        err_s -= rhs_s;
+        err_s_lb.head(data.n_lb) -= rhs_s_lb.head(data.n_lb);
+        err_s_ub.head(data.n_ub) -= rhs_s_ub.head(data.n_ub);
+
+        std::cout << "kkt_error: "
+                  << err_x.template lpNorm<Eigen::Infinity>() << " "
+                  << err_y.template lpNorm<Eigen::Infinity>() << " "
+                  << err_z.template lpNorm<Eigen::Infinity>() << " "
+                  << err_z_lb.head(data.n_lb).template lpNorm<Eigen::Infinity>() << " "
+                  << err_z_ub.head(data.n_ub).template lpNorm<Eigen::Infinity>() << " "
+                  << err_s.template lpNorm<Eigen::Infinity>() << " "
+                  << err_s_lb.head(data.n_lb).template lpNorm<Eigen::Infinity>() << " "
+                  << err_s_ub.head(data.n_ub).template lpNorm<Eigen::Infinity>() << std::endl;
+#endif
+    }
+
+    void solve_ldlt_in_place(VecRef<T> x)
+    {
+#ifdef PIQP_DEBUG_PRINT
+        Vec<T> x_copy = x;
+#endif
+
+        ldlt.solveInPlace(x);
+
+#ifdef PIQP_DEBUG_PRINT
+        Vec<T> rhs_x = kkt_mat.template triangularView<Eigen::Lower>() * x;
+        rhs_x += kkt_mat.transpose().template triangularView<Eigen::StrictlyUpper>() * x;
+        std::cout << "ldlt_error: " << (x_copy - rhs_x).template lpNorm<Eigen::Infinity>() << std::endl;
+#endif
     }
 };
 
