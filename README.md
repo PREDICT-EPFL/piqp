@@ -44,13 +44,13 @@ All contributors are affiliated with the [Laboratoire d'Automatique](https://www
 This work was supported by the [Swiss National Science Foundation](https://www.snf.ch/) under the [NCCR Automation](https://nccr-automation.ch/) (grant agreement 51NF40_180545).
 
 PIQP is build on the following open-source libraries:
-* [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) is the work horse under the hood, responsible for producing optimized numerical linear algebra code.
-* [ProxSuite](https://github.com/Simple-Robotics/proxsuite) served as an inspiration for the code structure, and the instruction set optimized python bindings. We also utilize some utility functions, and helper macros for cleaner code.
-* [SuiteSparse - LDL](https://github.com/DrTimothyAldenDavis/SuiteSparse) (modified version) is for solving linear systems in the sparse solver.
-* [pybind11](https://github.com/pybind/pybind11) is used for generating the python bindings.
-* [cpu_features](https://github.com/google/cpu_features) is used for run-time instruction set detection in the interface bindings.
-* [OSQP](https://github.com/osqp/osqp) served as an inspiration for the C interface.
-* [Clarabel](https://github.com/oxfordcontrol/Clarabel.rs) served as an inspiration for the iterative refinement scheme.
+* [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page): It's the work horse under the hood, responsible for producing optimized numerical linear algebra code.
+* [ProxSuite](https://github.com/Simple-Robotics/proxsuite): The code structure (folder/namespace structure, etc.), some utility functions/helper macros, and the instruction set optimized python bindings are based on ProxSuite.
+* [SuiteSparse - LDL](https://github.com/DrTimothyAldenDavis/SuiteSparse) (modified version): Used for solving linear systems in the sparse solver.
+* [pybind11](https://github.com/pybind/pybind11): Used for generating the python bindings.
+* [cpu_features](https://github.com/google/cpu_features): Used for run-time instruction set detection in the interface bindings.
+* [OSQP](https://github.com/osqp/osqp): The C interface is inspired by OSQP.
+* [Clarabel](https://github.com/oxfordcontrol/Clarabel.rs): Parts of the iterative refinement scheme are inspired by Clarabel's implementation.
 
 ## Citing our Work
 
