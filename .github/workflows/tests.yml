@@ -36,7 +36,7 @@ jobs:
 
       - name: Install Eigen
         working-directory: build_external
-        run: bash  ../ci/shared/install_eigen.sh
+        run: bash  ../ci/install_eigen.sh
         env:
           EIGEN_VERSION: ${{ matrix.eigen }}
 
