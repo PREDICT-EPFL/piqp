@@ -284,8 +284,6 @@ struct KKT
             err_corr -= kkt_mat.transpose().template triangularView<Eigen::StrictlyUpper>() * sol;
             T error_norm = err_corr.template lpNorm<Eigen::Infinity>();
 
-            std::cout << "error_norm: " << error_norm << std::endl;
-
             for (isize i = 0; i < settings.iterative_refinement_max_iter; i++)
             {
                 if (error_norm <= (settings.iterative_refinement_eps_abs + settings.iterative_refinement_eps_rel * rhs_norm))
@@ -302,8 +300,6 @@ struct KKT
                 err_corr -= kkt_mat.template triangularView<Eigen::Lower>() * ref_sol;
                 err_corr -= kkt_mat.transpose().template triangularView<Eigen::StrictlyUpper>() * ref_sol;
                 error_norm = err_corr.template lpNorm<Eigen::Infinity>();
-
-                std::cout << i << " prev_error_norm: " << prev_error_norm << " " << error_norm << std::endl;
 
                 T improvement_rate = prev_error_norm / error_norm;
                 if (improvement_rate < settings.iterative_refinement_min_improvement_rate)

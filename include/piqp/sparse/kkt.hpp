@@ -342,8 +342,6 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
             err_corr_perm -= PKPt.transpose().template triangularView<Eigen::StrictlyLower>() * sol_perm;
             T error_norm = err_corr_perm.template lpNorm<Eigen::Infinity>();
 
-            std::cout << "error_norm: " << error_norm << std::endl;
-
             for (isize i = 0; i < settings.iterative_refinement_max_iter; i++)
             {
                 if (error_norm <= (settings.iterative_refinement_eps_abs + settings.iterative_refinement_eps_rel * rhs_norm))
@@ -360,8 +358,6 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
                 err_corr_perm -= PKPt.template triangularView<Eigen::Upper>() * ref_sol_perm;
                 err_corr_perm -= PKPt.transpose().template triangularView<Eigen::StrictlyLower>() * ref_sol_perm;
                 error_norm = err_corr_perm.template lpNorm<Eigen::Infinity>();
-
-                std::cout << i << " prev_error_norm: " << prev_error_norm << " " << error_norm << std::endl;
 
                 T improvement_rate = prev_error_norm / error_norm;
                 if (improvement_rate < settings.iterative_refinement_min_improvement_rate)
