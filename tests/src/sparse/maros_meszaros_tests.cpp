@@ -124,7 +124,10 @@ std::vector<std::string> get_maros_meszaros_problems()
     std::vector<std::string> problem_names;
     for (const auto & entry : fs::directory_iterator("maros_meszaros_data"))
     {
-        problem_names.push_back(entry.path().filename());
+        std::string file_name = entry.path().filename();
+        if (file_name == "README.md" || file_name == "LICENSE") continue;
+
+        problem_names.push_back(file_name);
     }
     return problem_names;
 }
