@@ -17,6 +17,13 @@
 
 namespace py = pybind11;
 
+#ifndef PIQP_WITH_CPP_17
+template<typename T>
+struct py::detail::type_caster<tl::optional<T>> : public py::detail::optional_caster<tl::optional<T>> {};
+template<>
+struct py::detail::type_caster<tl::nullopt_t> : public py::detail::void_caster<tl::nullopt_t> {};
+#endif
+
 using T = double;
 using I = int;
 

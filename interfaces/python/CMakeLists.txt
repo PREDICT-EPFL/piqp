@@ -28,7 +28,6 @@ endif()
 
 function(CREATE_PIQP_PYTHON_TARGET target_name COMPILE_OPTIONS)
     pybind11_add_module(${target_name} src/piqp_python.cpp)
-    target_compile_features(${target_name} PRIVATE cxx_std_17) # C++17 support needed for std::optional
     target_compile_options(${target_name} PRIVATE ${COMPILE_OPTIONS})
     target_link_libraries(${target_name} PRIVATE piqp)
     target_compile_definitions(${target_name} PRIVATE PYTHON_MODULE_NAME=${target_name})
