@@ -19,9 +19,17 @@ mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j2
-if [ "$EUID" -ne 0 ]
-  then
-    sudo make install
-  else
+
+case "$(uname -sr)" in
+  CYGWIN*|MINGW*|MINGW32*|MSYS*) # detect windows
     make install
-fi
+    ;;
+  *) # other OS
+    if [ "$EUID" -ne 0 ] # check if already root
+      then
+        sudo make install
+      else
+        make install
+    fi
+    ;;
+esac
