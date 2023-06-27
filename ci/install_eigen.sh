@@ -19,4 +19,9 @@ mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j2
-sudo make install
+if [ "$EUID" -ne 0 ]
+  then
+    sudo make install
+  else
+    make install
+fi
