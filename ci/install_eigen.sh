@@ -18,18 +18,18 @@ git checkout "$EIGEN_VERSION"
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j2
+cmake --build .
 
 case "$(uname -sr)" in
   CYGWIN*|MINGW*|MINGW32*|MSYS*) # detect windows
-    make install
+    cmake --install .
     ;;
   *) # other OS
     if [ "$EUID" -ne 0 ] # check if already root
       then
-        sudo make install
+        sudo cmake --install .
       else
-        make install
+        cmake --install .
     fi
     ;;
 esac
