@@ -8,6 +8,13 @@
 
 cmake_minimum_required(VERSION 3.5)
 
+# detect arm64 cross compilation on macOS
+if(DEFINED ENV{_PYTHON_HOST_PLATFORM})
+    if($ENV{_PYTHON_HOST_PLATFORM} MATCHES "arm64")
+        set(CMAKE_SYSTEM_PROCESSOR "arm64")
+    endif()
+endif()
+
 # add instruction set detection on x86/amd64
 pybind11_add_module(instruction_set src/instruction_set.cpp)
 
