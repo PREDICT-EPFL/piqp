@@ -24,13 +24,6 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Setup working directory
-        run: mkdir -p build_external
-
-      - name: Install Eigen
-        working-directory: build_external
-        run: bash  ../ci/install_eigen.sh
-
       - name: Set up QEMU
         if: runner.os == 'Linux'
         uses: docker/setup-qemu-action@v2
@@ -40,6 +33,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.13.1
         env:
+          CIBW_BEFORE_ALL: mkdir -p build_external && cd build_external && bash ../ci/install_eigen.sh
           CIBW_ARCHS_LINUX: x86_64 i686 aarch64 ppc64le s390x
           CIBW_ARCHS_MACOS: x86_64 arm64
 
