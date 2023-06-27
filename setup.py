@@ -145,6 +145,6 @@ setup(
     packages=["piqp"],
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,
-    extras_require={"test": ["pytest>=6.0"]},
+    extras_require={"test": ["pytest>=6.0", "numpy", "scipy"]},
     python_requires=">=3.7",
 )
