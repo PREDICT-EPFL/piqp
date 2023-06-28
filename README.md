@@ -1,6 +1,9 @@
 # PIQP
 
-[![DOI](https://img.shields.io/badge/DOI-10.48550/arXiv.2304.00290-green.svg)](https://doi.org/10.48550/arXiv.2304.00290) [![Preprint](https://img.shields.io/badge/Preprint-arXiv-blue.svg)](https://arxiv.org/abs/2304.00290) [![Funding](https://img.shields.io/badge/Grant-NCCR%20Automation%20(51NF40180545)-90e3dc.svg)](https://nccr-automation.ch/)
+[![DOI](https://img.shields.io/badge/DOI-10.48550/arXiv.2304.00290-green.svg)](https://doi.org/10.48550/arXiv.2304.00290)
+[![Preprint](https://img.shields.io/badge/Preprint-arXiv-blue.svg)](https://arxiv.org/abs/2304.00290)
+[![Funding](https://img.shields.io/badge/Grant-NCCR%20Automation%20(51NF40180545)-90e3dc.svg)](https://nccr-automation.ch/)
+[![Docs](https://img.shields.io/badge/Docs-available-brightgreen.svg)](https://predict-epfl.github.io/piqp/)
 
 PIQP is an embedded Proximal Interior Point Quadratic Programming solver, which can solve dense and sparse quadratic programs of the form
 
