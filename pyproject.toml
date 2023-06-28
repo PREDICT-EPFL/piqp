@@ -34,6 +34,6 @@ testpaths = ["interfaces/python/tests"]
 test-command = "pytest {project}/interfaces/python/tests"
 test-extras = ["test"]
 # scipy has no prebuild wheels for pypy, special linux architectures, and win32
-test-skip = ["*universal2:arm64", "pp*", "*-*linux_{i686,ppc64le,s390x}", "*-win32"]
+test-skip = ["*universal2:arm64", "pp*", "*-*linux_{i686,ppc64le,s390x}", "*-musllinux*", "*-win32"]
 # Setuptools bug causes collision between pypy and cpython artifacts
 before-build = "rm -rf {project}/build"
