@@ -1,3 +1,11 @@
+# This file is part of PIQP.
+#
+# Copyright (c) 2023 EPFL
+# Copyright (c) 2016 The Pybind Development Team, All rights reserved.
+#
+# This source code is licensed under the BSD 2-Clause License found in the
+# LICENSE file in the root directory of this source tree.
+
 import os
 import re
 import subprocess
@@ -129,8 +137,9 @@ class CMakeBuild(build_ext):
         )
 
 
-# The information here can also be placed in setup.cfg - better separation of
-# logic and declaration, and simpler if you include description/version in a file.
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.md").read_text()
+
 setup(
     name="piqp",
     version="0.0.1",
@@ -139,7 +148,8 @@ setup(
     author_email="roland.schwan@epfl.ch",
     license='BSD-2-Clause',
     description="An embedded Proximal Interior Point Quadratic Programming solver",
-    long_description="",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     ext_modules=[CMakeExtension("piqp.piqp")],
     package_dir={"piqp": "interfaces/python/piqp"},
     packages=["piqp"],
