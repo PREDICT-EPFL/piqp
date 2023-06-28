@@ -36,16 +36,9 @@ jobs:
         id: set-matrix
         run: python3 ci/cibuildwheel_matrix.py
 
-  test_output:
-    runs-on: ubuntu-latest
-    needs: setup_build_targets
-    steps:
-      - env:
-          OUTPUT: ${{needs.setup_build_targets.outputs.matrix}}
-        run: echo "$OUTPUT"
-
   build_wheels:
     name: Build wheels on ${{ matrix.target.os }} for ${{ matrix.target.build }}
+    needs: setup_build_targets
     runs-on: ${{ matrix.target.os }}
     strategy:
       matrix: ${{ fromJSON(needs.setup_build_targets.outputs.matrix) }}
