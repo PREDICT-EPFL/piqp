@@ -1,3 +1,4 @@
+import os
 import subprocess
 import json
 
@@ -22,5 +23,5 @@ for platform in platforms:
             'build': platform_target,
         })
 
-with open("$GITHUB_OUTPUT", "w") as f:
-    f.write("matrix=" + json.dumps({'target': targets}))
+with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+    print('matrix=' + json.dumps({'target': targets}), file=fh)
