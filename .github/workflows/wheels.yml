@@ -37,7 +37,7 @@ jobs:
         run: python3 ci/cibuildwheel_matrix.py
 
   build_wheels:
-    name: Build wheel for ${{ matrix.target.build }}
+    name: Build wheels for ${{ matrix.target.version }} on ${{ matrix.target.os }}
     needs: setup_build_targets
     runs-on: ${{ matrix.target.os }}
     strategy:
