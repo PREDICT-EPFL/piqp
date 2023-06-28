@@ -22,4 +22,5 @@ for platform in platforms:
             'build': platform_target,
         })
 
-print('::set-output name=matrix::' + json.dumps({'target': targets}))
+with open("$GITHUB_OUTPUT", "w") as f:
+    f.write("matrix=" + json.dumps({'target': targets}))
