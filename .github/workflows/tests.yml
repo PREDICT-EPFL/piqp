@@ -52,7 +52,7 @@ jobs:
       - name: Build piqp
         if: runner.os != 'Windows'
         working-directory: build
-        run: cmake --build . -- j2
+        run: cmake --build . -- -j2
 
       - name: Test piqp
         working-directory: build
