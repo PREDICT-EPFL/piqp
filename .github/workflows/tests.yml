@@ -16,7 +16,7 @@ jobs:
   tests:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
         eigen: [ 3.3.4, 3.3.7, 3.4.0 ]
         exclude:
           - os: macos-latest
@@ -44,7 +44,7 @@ jobs:
         working-directory: build
         run: |
           cmake .. -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DENABLE_SANITIZERS=$ENABLE_SANITIZERS
-          make -j2
+          cmake --build . -- -j2
 
       - name: Test piqp
         working-directory: build
