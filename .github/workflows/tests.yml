@@ -40,11 +40,19 @@ jobs:
         env:
           EIGEN_VERSION: ${{ matrix.eigen }}
 
-      - name: Build piqp
+      - name: Configure piqp
         working-directory: build
-        run: |
-          cmake .. -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DENABLE_SANITIZERS=$ENABLE_SANITIZERS
-          cmake --build . -- -j2
+        run: cmake .. -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DENABLE_SANITIZERS=$ENABLE_SANITIZERS
+
+      - name: Build piqp
+        if: runner.os == 'Windows'
+        working-directory: build
+        run: cmake --build .
+
+      - name: Build piqp
+        if: runner.os != 'Windows'
+        working-directory: build
+        run: cmake --build . -- j2
 
       - name: Test piqp
         working-directory: build
