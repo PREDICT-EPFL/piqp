@@ -39,7 +39,7 @@ TEST(SparseUtils, OrderingNatural)
     Vec<I> Ai_to_Ci_expect(Ai_to_Ci.rows());
     for (isize i = 0; i < Ai_to_Ci.rows(); i++)
     {
-        Ai_to_Ci_expect(i) = i;
+        Ai_to_Ci_expect(i) = I(i);
     }
     ASSERT_EQ(Ai_to_Ci, Ai_to_Ci_expect);
 

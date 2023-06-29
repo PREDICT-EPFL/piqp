@@ -68,7 +68,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
             }
             non_zeros += col_nnz;
             j_kkt++;
-            KKT.outerIndexPtr()[j_kkt] = non_zeros;
+            KKT.outerIndexPtr()[j_kkt] = I(non_zeros);
         }
         jj = data.AT.outerSize();
         for (isize j = 0; j < jj; j++)
@@ -76,7 +76,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
             non_zeros += data.AT.outerIndexPtr()[j + 1] - data.AT.outerIndexPtr()[j];
             non_zeros++; // add one for the diagonal element
             j_kkt++;
-            KKT.outerIndexPtr()[j_kkt] = non_zeros;
+            KKT.outerIndexPtr()[j_kkt] = I(non_zeros);
         }
         jj = data.GT.outerSize();
         for (isize j = 0; j < jj; j++)
@@ -84,7 +84,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
             non_zeros += data.GT.outerIndexPtr()[j + 1] - data.GT.outerIndexPtr()[j];
             non_zeros++; // add one for the diagonal element
             j_kkt++;
-            KKT.outerIndexPtr()[j_kkt] = non_zeros;
+            KKT.outerIndexPtr()[j_kkt] = I(non_zeros);
         }
         KKT.resizeNonZeros(non_zeros);
 
@@ -102,7 +102,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
             isize kkt_col_nnz = KKT.outerIndexPtr()[j_kkt + 1] - KKT.outerIndexPtr()[j_kkt];
             if (kkt_col_nnz > col_nnz)
             {
-                KKT.innerIndexPtr()[k_kkt + kkt_col_nnz - 1] = j_kkt;
+                KKT.innerIndexPtr()[k_kkt + kkt_col_nnz - 1] = I(j_kkt);
                 KKT.valuePtr()[k_kkt + kkt_col_nnz - 1] = m_rho;
             }
             else
@@ -115,7 +115,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
             isize kk = data.P_utri.outerIndexPtr()[j + 1];
             for (isize k = data.P_utri.outerIndexPtr()[j]; k < kk; k++)
             {
-                P_utri_to_Ki[k] = k_kkt + i;
+                P_utri_to_Ki[k] = I(k_kkt + i);
                 i++;
             }
 
@@ -131,14 +131,14 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
             Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<T>>(data.AT.valuePtr() + data.AT.outerIndexPtr()[j], col_nnz);
 
             // diagonal
-            KKT.innerIndexPtr()[k_kkt + col_nnz] = j_kkt;
+            KKT.innerIndexPtr()[k_kkt + col_nnz] = I(j_kkt);
             KKT.valuePtr()[k_kkt + col_nnz] = -m_delta;
 
             isize i = 0;
             isize kk = data.AT.outerIndexPtr()[j + 1];
             for (isize k = data.AT.outerIndexPtr()[j]; k < kk; k++)
             {
-                AT_to_Ki[k] = k_kkt + i;
+                AT_to_Ki[k] = I(k_kkt + i);
                 i++;
             }
 
@@ -154,14 +154,14 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
             Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<T>>(data.GT.valuePtr() + data.GT.outerIndexPtr()[j], col_nnz);
 
             // diagonal
-            KKT.innerIndexPtr()[k_kkt + col_nnz] = j_kkt;
+            KKT.innerIndexPtr()[k_kkt + col_nnz] = I(j_kkt);
             KKT.valuePtr()[k_kkt + col_nnz] = -T(1) - m_delta;
 
             isize i = 0;
             isize kk = data.GT.outerIndexPtr()[j + 1];
             for (isize k = data.GT.outerIndexPtr()[j]; k < kk; k++)
             {
-                GT_to_Ki[k] = k_kkt + i;
+                GT_to_Ki[k] = I(k_kkt + i);
                 i++;
             }
 

@@ -95,18 +95,18 @@ public:
             printf("----------------------------------------------------------\n");
             if (MatrixType == PIQP_DENSE)
             {
-                printf("variables n = %ld\n", m_data.n);
-                printf("equality constraints p = %ld\n", m_data.p);
-                printf("inequality constraints m = %ld\n", m_data.m);
+                printf("variables n = %zd\n", m_data.n);
+                printf("equality constraints p = %zd\n", m_data.p);
+                printf("inequality constraints m = %zd\n", m_data.m);
             }
             else
             {
-                printf("variables n = %ld, nzz(P upper triangular) = %ld\n", m_data.n, m_data.non_zeros_P_utri());
-                printf("equality constraints p = %ld, nnz(A) = %ld\n", m_data.p, m_data.non_zeros_A());
-                printf("inequality constraints m = %ld, nnz(G) = %ld\n", m_data.m, m_data.non_zeros_G());
+                printf("variables n = %zd, nzz(P upper triangular) = %zd\n", m_data.n, m_data.non_zeros_P_utri());
+                printf("equality constraints p = %zd, nnz(A) = %zd\n", m_data.p, m_data.non_zeros_A());
+                printf("inequality constraints m = %zd, nnz(G) = %zd\n", m_data.m, m_data.non_zeros_G());
             }
-            printf("variable lower bounds n_lb = %ld\n", m_data.n_lb);
-            printf("variable upper bounds n_ub = %ld\n", m_data.n_ub);
+            printf("variable lower bounds n_lb = %zd\n", m_data.n_lb);
+            printf("variable upper bounds n_ub = %zd\n", m_data.n_ub);
             printf("\n");
             printf("iter  prim_obj       dual_obj       duality_gap   prim_inf      dual_inf      rho         delta       mu          prim_step   dual_step\n");
         }
@@ -132,7 +132,7 @@ public:
         {
             printf("\n");
             printf("status:               %s\n", status_to_string(status));
-            printf("number of iterations: %ld\n", m_result.info.iter);
+            printf("number of iterations: %zd\n", m_result.info.iter);
             printf("objective:            %.5e\n", m_result.info.primal_obj);
             if (m_settings.compute_timings)
             {
@@ -451,7 +451,7 @@ protected:
 
             if (m_settings.verbose)
             {
-                printf("%3ld   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.3e   %.3e\n",
+                printf("%3zd   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.3e   %.3e\n",
                        m_result.info.iter,
                        m_result.info.primal_obj,
                        m_result.info.dual_obj,

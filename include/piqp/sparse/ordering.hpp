@@ -34,7 +34,7 @@ public:
 
     EIGEN_STRONG_INLINE I inv(isize idx) const
     {
-        return idx;
+        return I(idx);
     }
 
     template<typename T>
@@ -73,7 +73,7 @@ public:
         P_inv.resize(n);
         for (isize i = 0; i < n; i++)
         {
-            P_inv[P[i]] = i;
+            P_inv[P[i]] = I(i);
         }
     }
 

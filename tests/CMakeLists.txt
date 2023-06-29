@@ -35,6 +35,9 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/maros_meszaros_data DESTINATION ${CMAKE_CU
 add_library(pipq-test INTERFACE)
 target_include_directories(pipq-test INTERFACE include)
 target_compile_options(pipq-test INTERFACE ${compiler_flags})
+if(${CMAKE_CXX_COMPILER_ID} IN_LIST gcc_like_cxx)
+    target_compile_options(pipq-test INTERFACE -Wno-gnu-zero-variadic-macro-arguments)
+endif()
 target_link_options(pipq-test INTERFACE ${compiler_flags})
 target_link_libraries(pipq-test INTERFACE piqp gtest_main gtest)
 

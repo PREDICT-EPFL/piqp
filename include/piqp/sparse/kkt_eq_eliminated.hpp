@@ -71,7 +71,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
         {
             non_zeros += KKT_top_left_block.outerIndexPtr()[j + 1] - KKT_top_left_block.outerIndexPtr()[j];
             j_kkt++;
-            KKT.outerIndexPtr()[j_kkt] = non_zeros;
+            KKT.outerIndexPtr()[j_kkt] = I(non_zeros);
         }
         jj = data.GT.outerSize();
         for (isize j = 0; j < jj; j++)
@@ -79,7 +79,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
             non_zeros += data.GT.outerIndexPtr()[j + 1] - data.GT.outerIndexPtr()[j];
             non_zeros++; // add one for the diagonal element
             j_kkt++;
-            KKT.outerIndexPtr()[j_kkt] = non_zeros;
+            KKT.outerIndexPtr()[j_kkt] = I(non_zeros);
         }
         KKT.resizeNonZeros(non_zeros);
 
@@ -105,14 +105,14 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
             Eigen::Map<Vec<T>>(KKT.valuePtr() + k_kkt, col_nnz) = Eigen::Map<const Vec<T>>(data.GT.valuePtr() + data.GT.outerIndexPtr()[j], col_nnz);
 
             // diagonal
-            KKT.innerIndexPtr()[k_kkt + col_nnz] = j_kkt;
+            KKT.innerIndexPtr()[k_kkt + col_nnz] = I(j_kkt);
             KKT.valuePtr()[k_kkt + col_nnz] = -T(1) - m_delta;
 
             isize i = 0;
             isize kk = data.GT.outerIndexPtr()[j + 1];
             for (isize k = data.GT.outerIndexPtr()[j]; k < kk; k++)
             {
-                GT_to_Ki[k] = k_kkt + i;
+                GT_to_Ki[k] = I(k_kkt + i);
                 i++;
             }
 
@@ -139,11 +139,11 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
 
                 if (P_utri_k != P_utri_end && data.P_utri.innerIndexPtr()[P_utri_k] == KKT_i)
                 {
-                    P_utri_to_Ki(P_utri_k) = KKT_k;
+                    P_utri_to_Ki(P_utri_k) = I(KKT_k);
                 }
                 if (AT_A_k != AT_A_end && AT_A.innerIndexPtr()[AT_A_k] == KKT_i)
                 {
-                    AT_A_to_Ki(AT_A_k) = KKT_k;
+                    AT_A_to_Ki(AT_A_k) = I(KKT_k);
                 }
             }
         }

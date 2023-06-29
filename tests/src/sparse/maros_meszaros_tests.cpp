@@ -140,7 +140,7 @@ INSTANTIATE_TEST_SUITE_P(
 //    ::testing::Values("QCAPRI"),
 //    ::testing::Values("QBRANDY"),
     [](const ::testing::TestParamInfo<std::string>& info) {
-        int i = info.param.find(".");
+        piqp::usize i = info.param.find(".");
         std::string name = info.param.substr(0, i);
         std::replace(name.begin(), name.end(), '-', '_');
         return name;

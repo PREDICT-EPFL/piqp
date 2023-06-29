@@ -91,15 +91,15 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
 
                 if (P_utri_k != P_utri_end && data.P_utri.innerIndexPtr()[P_utri_k] == KKT_i)
                 {
-                    P_utri_to_Ki(P_utri_k) = KKT_k;
+                    P_utri_to_Ki(P_utri_k) = I(KKT_k);
                 }
                 if (AT_A_k != AT_A_end && AT_A.innerIndexPtr()[AT_A_k] == KKT_i)
                 {
-                    AT_A_to_Ki(AT_A_k) = KKT_k;
+                    AT_A_to_Ki(AT_A_k) = I(KKT_k);
                 }
                 if (GT_G_k != GT_G_end && GT_W_delta_inv_G.innerIndexPtr()[GT_G_k] == KKT_i)
                 {
-                    GT_G_to_Ki(GT_G_k) = KKT_k;
+                    GT_G_to_Ki(GT_G_k) = I(KKT_k);
                 }
             }
         }

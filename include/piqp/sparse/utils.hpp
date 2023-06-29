@@ -37,7 +37,7 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
     //           with unsorted row indices
 
     // working vector
-    Vec<T> w(n);
+    Vec<I> w(n);
     w.setZero();
 
     for (isize j = 0; j < n; j++)
@@ -58,11 +58,11 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
     isize sum = 0;
     for (isize i = 0; i < n; i++)
     {
-        CT.outerIndexPtr()[i] = sum;
+        CT.outerIndexPtr()[i] = I(sum);
         sum += w(i);
         w(i) = CT.outerIndexPtr()[i];
     }
-    CT.outerIndexPtr()[n] = sum;
+    CT.outerIndexPtr()[n] = I(sum);
     CT.resizeNonZeros(sum);
 
     Vec<I> CTi_to_Ai(sum);
@@ -77,9 +77,9 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
             if (i > j) continue; // we only consider upper triangular part
             isize i2 = ordering.inv(i);
             isize q = w(i2 < j2 ? i2 : j2)++;
-            CT.innerIndexPtr()[q] = i2 > j2 ? i2 : j2;
+            CT.innerIndexPtr()[q] = I(i2 > j2 ? i2 : j2);
             CT.valuePtr()[q] = A.valuePtr()[k];
-            CTi_to_Ai(q) = k;
+            CTi_to_Ai(q) = I(k);
         }
     }
 
@@ -99,11 +99,11 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
     for (isize j = 0; j < jj; j++)
     {
         isize tmp = C.outerIndexPtr()[j];
-        C.outerIndexPtr()[j] = sum;
-        w(j) = sum;
+        C.outerIndexPtr()[j] = I(sum);
+        w(j) = I(sum);
         sum += tmp;
     }
-    C.outerIndexPtr()[n] = sum;
+    C.outerIndexPtr()[n] = I(sum);
     C.resizeNonZeros(sum);
 
     Vec<I> Ai_to_Ci(sum);
@@ -116,9 +116,9 @@ Vec<I> permute_sparse_symmetric_matrix(const SparseMat<T, I>& A, SparseMat<T, I>
         {
             isize i = CT.innerIndexPtr()[k];
             isize q = w(i)++;
-            C.innerIndexPtr()[q] = j;
+            C.innerIndexPtr()[q] = I(j);
             C.valuePtr()[q] = CT.valuePtr()[k];
-            Ai_to_Ci(CTi_to_Ai(k)) = q;
+            Ai_to_Ci(CTi_to_Ai(k)) = I(q);
         }
     }
 
@@ -146,7 +146,7 @@ void transpose_no_allocation(const CSparseMatRef<T, I>& A, SparseMat<T, I>& C)
             // we are abusing the outer index pointer as a temporary
             isize q = C.outerIndexPtr()[i]++;
             eigen_assert(C.outerIndexPtr()[i] <= C.outerIndexPtr()[i + 1] && "sparsity pattern of C does not match AT!");
-            C.innerIndexPtr()[q] = j;
+            C.innerIndexPtr()[q] = I(j);
             C.valuePtr()[q] = A.valuePtr()[k];
         }
     }

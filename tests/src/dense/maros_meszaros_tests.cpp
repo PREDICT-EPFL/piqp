@@ -147,7 +147,7 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::ValuesIn(get_maros_meszaros_problems()),
 //    ::testing::Values("QBEACONF"),
     [](const ::testing::TestParamInfo<std::string>& info) {
-        int i = info.param.find(".");
+        piqp::usize i = info.param.find(".");
         std::string name = info.param.substr(0, i);
         std::replace(name.begin(), name.end(), '-', '_');
         return name;

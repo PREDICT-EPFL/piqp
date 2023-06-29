@@ -67,7 +67,7 @@ struct LDLt
         {
             /* L(k,:) pattern: all nodes reachable in etree from nz in A(0:k-1,k) */
             etree[k] = -1;                   /* parent of k is not yet known */
-            work.flag[k] = k;                 /* mark node k as visited */
+            work.flag[k] = I(k);              /* mark node k as visited */
             L_nnz[k] = 0;                    /* count of nonzeros in column k of L */
             isize p2 = Ap[k + 1];
             for (isize p = Ap[k]; p < p2; p++)
@@ -78,9 +78,9 @@ struct LDLt
                 for (; work.flag[i] != k; i = etree[i])
                 {
                     /* find parent of i if not yet determined */
-                    if (etree[i] == -1) etree[i] = k;
-                    L_nnz[i]++;      /* L (k,i) is nonzero */
-                    work.flag[i] = k; /* mark i as visited */
+                    if (etree[i] == -1) etree[i] = I(k);
+                    L_nnz[i]++;         /* L (k,i) is nonzero */
+                    work.flag[i] = I(k); /* mark i as visited */
                 }
             }
         }
@@ -116,7 +116,7 @@ struct LDLt
             /* compute nonzero Pattern of kth row of L, in topological order */
             work.y[k] = 0.0;                   /* Y(0:k) is now all zero */
             isize top = n;                     /* stack for pattern is empty */
-            work.flag[k] = k;                   /* mark node k as visited */
+            work.flag[k] = I(k);                /* mark node k as visited */
             L_nnz[k] = 0;                      /* count of nonzeros in column k of L */
             isize p2 = Ap[k + 1];
             for (isize p = Ap[k]; p < p2; p++)
@@ -126,8 +126,8 @@ struct LDLt
                 isize len;
                 for (len = 0; work.flag[i] != k; i = etree[i])
                 {
-                    work.pattern[len++] = i; /* L(k,i) is nonzero */
-                    work.flag[i] = k ;        /* mark i as visited */
+                    work.pattern[len++] = I(i); /* L(k,i) is nonzero */
+                    work.flag[i] = I(k);         /* mark i as visited */
                 }
                 while (len > 0) work.pattern[--top] = work.pattern[--len];
             }
@@ -147,7 +147,7 @@ struct LDLt
                 }
                 T l_ki = yi / D[i]; /* the nonzero entry L(k,i) */
                 D[k] -= l_ki * yi;
-                L_ind[p] = k;       /* store L(k,i) in column form of L */
+                L_ind[p] = I(k);    /* store L(k,i) in column form of L */
                 L_vals[p] = l_ki;
                 L_nnz[i]++;         /* increment count of nonzeros in col i */
             }
