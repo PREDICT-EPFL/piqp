@@ -91,7 +91,7 @@ public:
             printf("----------------------------------------------------------\n");
             printf("                           PIQP                           \n");
             printf("                    (c) Roland Schwan                     \n");
-            printf("   École Polytechnique Fédérale de Lausanne (EPFL) 2023   \n");
+            printf("   Ecole Polytechnique Federale de Lausanne (EPFL) 2023   \n");
             printf("----------------------------------------------------------\n");
             if (MatrixType == PIQP_DENSE)
             {
