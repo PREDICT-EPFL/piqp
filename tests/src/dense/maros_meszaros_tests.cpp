@@ -121,7 +121,7 @@ std::vector<std::string> get_maros_meszaros_problems()
     std::vector<std::string> problem_names;
     for (const auto & entry : fs::directory_iterator("maros_meszaros_data"))
     {
-        std::string file_name = entry.path().filename();
+        std::string file_name = entry.path().filename().string();
         if (file_name == "README.md" || file_name == "LICENSE") continue;
         
         py::dict locals("file_name"_a = "maros_meszaros_data/" + file_name);
