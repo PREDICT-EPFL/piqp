@@ -88,6 +88,8 @@ void piqp_set_default_settings(piqp_settings* settings)
     settings->eps_duality_gap_rel = default_settings.eps_duality_gap_rel;
     settings->reg_lower_limit = default_settings.reg_lower_limit;
     settings->reg_finetune_lower_limit = default_settings.reg_finetune_lower_limit;
+    settings->reg_finetune_primal_update_threshold = (piqp_int)  default_settings.reg_finetune_primal_update_threshold;
+    settings->reg_finetune_dual_update_threshold = (piqp_int)  default_settings.reg_finetune_dual_update_threshold;
     settings->max_iter = (piqp_int) default_settings.max_iter;
     settings->max_factor_retires = (piqp_int) default_settings.max_factor_retires;
     settings->preconditioner_scale_cost = default_settings.preconditioner_scale_cost;
@@ -213,6 +215,8 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().eps_duality_gap_rel = settings->eps_duality_gap_rel;
         solver->settings().reg_lower_limit = settings->reg_lower_limit;
         solver->settings().reg_finetune_lower_limit = settings->reg_finetune_lower_limit;
+        solver->settings().reg_finetune_primal_update_threshold = settings->reg_finetune_primal_update_threshold;
+        solver->settings().reg_finetune_dual_update_threshold = settings->reg_finetune_dual_update_threshold;
         solver->settings().max_iter = settings->max_iter;
         solver->settings().max_factor_retires = settings->max_factor_retires;
         solver->settings().preconditioner_scale_cost = settings->preconditioner_scale_cost;
@@ -241,6 +245,8 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().eps_duality_gap_rel = settings->eps_duality_gap_rel;
         solver->settings().reg_lower_limit = settings->reg_lower_limit;
         solver->settings().reg_finetune_lower_limit = settings->reg_finetune_lower_limit;
+        solver->settings().reg_finetune_primal_update_threshold = settings->reg_finetune_primal_update_threshold;
+        solver->settings().reg_finetune_dual_update_threshold = settings->reg_finetune_dual_update_threshold;
         solver->settings().max_iter = settings->max_iter;
         solver->settings().max_factor_retires = settings->max_factor_retires;
         solver->settings().preconditioner_scale_cost = settings->preconditioner_scale_cost;

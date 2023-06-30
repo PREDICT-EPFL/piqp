@@ -71,6 +71,8 @@ typedef struct {
     piqp_float eps_duality_gap_rel;
     piqp_float reg_lower_limit;
     piqp_float reg_finetune_lower_limit;
+    piqp_int  reg_finetune_primal_update_threshold;
+    piqp_int  reg_finetune_dual_update_threshold;
     piqp_int  max_iter;
     piqp_int  max_factor_retires;
     piqp_int  preconditioner_scale_cost;

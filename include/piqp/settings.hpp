@@ -17,8 +17,8 @@ namespace piqp
 template<typename T>
 struct Settings
 {
-    T rho_init   = 1e-6;
-    T delta_init = 1e-3;
+    T rho_init = 1e-6;
+    T delta_init = 1e-4;
 
     T eps_abs = 1e-8;
     T eps_rel = 1e-9;
@@ -29,14 +29,16 @@ struct Settings
 
     T reg_lower_limit = 1e-10;
     T reg_finetune_lower_limit = 1e-13;
+    isize reg_finetune_primal_update_threshold = 7;
+    isize reg_finetune_dual_update_threshold = 5;
 
-    isize max_iter            = 200;
-    isize max_factor_retires  = 10;
+    isize max_iter = 250;
+    isize max_factor_retires = 10;
 
     bool preconditioner_scale_cost = false;
-    isize preconditioner_iter      = 10;
+    isize preconditioner_iter = 10;
 
-    T tau = 0.995;
+    T tau = 0.99;
 
     bool iterative_refinement_always_enabled = false;
     T iterative_refinement_eps_abs = 1e-12;
@@ -58,6 +60,8 @@ struct Settings
                eps_duality_gap_abs > 0 &&
                eps_duality_gap_rel >= 0 &&
                reg_lower_limit > 0 &&
+               reg_finetune_primal_update_threshold >= 0 &&
+               reg_finetune_dual_update_threshold >= 0 &&
                max_iter > 0 &&
                max_factor_retires > 0 &&
                preconditioner_iter >= 0 &&

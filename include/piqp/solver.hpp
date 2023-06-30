@@ -479,14 +479,16 @@ protected:
             rz_lb.head(m_data.n_lb) = rz_lb_nr.head(m_data.n_lb) - m_result.info.delta * (nu_lb - z_lb);
             rz_ub.head(m_data.n_ub) = rz_ub_nr.head(m_data.n_ub) - m_result.info.delta * (nu_ub - z_ub);
 
-            if (m_result.info.no_dual_update > 5 && primal_prox_inf() > 1e10 &&
+            if (m_result.info.no_dual_update > std::min(isize(5), m_settings.reg_finetune_dual_update_threshold) &&
+                primal_prox_inf() > 1e12 &&
                 primal_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf)
             {
                 m_result.info.status = Status::PIQP_PRIMAL_INFEASIBLE;
                 return m_result.info.status;
             }
 
-            if (m_result.info.no_primal_update > 5 && dual_prox_inf() > 1e10 &&
+            if (m_result.info.no_primal_update > std::min(isize(5), m_settings.reg_finetune_primal_update_threshold) &&
+                dual_prox_inf() > 1e12 &&
                 dual_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.dual_rel_inf)
             {
                 m_result.info.status = Status::PIQP_DUAL_INFEASIBLE;
@@ -496,8 +498,12 @@ protected:
             m_result.info.iter++;
 
             // avoid possibility of converging to a local minimum -> decrease the minimum regularization value
-            if ((m_result.info.no_primal_update > 5 && m_result.info.rho == m_result.info.reg_limit && m_result.info.reg_limit != m_settings.reg_finetune_lower_limit) ||
-                (m_result.info.no_dual_update > 5 && m_result.info.delta == m_result.info.reg_limit && m_result.info.reg_limit != m_settings.reg_finetune_lower_limit))
+            if ((m_result.info.no_primal_update > m_settings.reg_finetune_primal_update_threshold &&
+                 m_result.info.rho == m_result.info.reg_limit &&
+                 m_result.info.reg_limit != m_settings.reg_finetune_lower_limit) ||
+                (m_result.info.no_dual_update > m_settings.reg_finetune_dual_update_threshold &&
+                 m_result.info.delta == m_result.info.reg_limit &&
+                 m_result.info.reg_limit != m_settings.reg_finetune_lower_limit))
             {
                 m_result.info.reg_limit = m_settings.reg_finetune_lower_limit;
                 m_result.info.no_primal_update = 0;
