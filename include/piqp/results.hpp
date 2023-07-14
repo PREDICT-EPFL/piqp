@@ -63,10 +63,10 @@ struct Info
     T duality_gap;
     T duality_gap_rel;
 
-    T factor_retires;
+    isize factor_retires;
     T reg_limit;
-    T no_primal_update; // dual infeasibility detection counter
-    T no_dual_update;   // primal infeasibility detection counter
+    isize no_primal_update; // dual infeasibility detection counter
+    isize no_dual_update;   // primal infeasibility detection counter
 
     T setup_time;
     T update_time;

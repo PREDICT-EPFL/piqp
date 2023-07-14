@@ -65,10 +65,10 @@ void piqp_update_result(piqp_result* result, const piqp::Result<piqp_float>& sol
     result->info.dual_obj = solver_result.info.dual_obj;
     result->info.duality_gap = solver_result.info.duality_gap;
     result->info.duality_gap_rel = solver_result.info.duality_gap_rel;
-    result->info.factor_retires = solver_result.info.factor_retires;
+    result->info.factor_retires = (piqp_int) solver_result.info.factor_retires;
     result->info.reg_limit = solver_result.info.reg_limit;
-    result->info.no_primal_update = solver_result.info.no_primal_update;
-    result->info.no_dual_update = solver_result.info.no_dual_update;
+    result->info.no_primal_update = (piqp_int) solver_result.info.no_primal_update;
+    result->info.no_dual_update = (piqp_int) solver_result.info.no_dual_update;
     result->info.setup_time = solver_result.info.setup_time;
     result->info.update_time = solver_result.info.update_time;
     result->info.solve_time = solver_result.info.solve_time;

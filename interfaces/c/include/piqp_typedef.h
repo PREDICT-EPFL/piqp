@@ -120,10 +120,10 @@ typedef struct {
     piqp_float duality_gap;
     piqp_float duality_gap_rel;
 
-    piqp_float factor_retires;
+    piqp_int factor_retires;
     piqp_float reg_limit;
-    piqp_float no_primal_update;
-    piqp_float no_dual_update;
+    piqp_int no_primal_update;
+    piqp_int no_dual_update;
 
     piqp_float setup_time;
     piqp_float update_time;
