@@ -8,7 +8,8 @@
 
 #ifndef PIQP_SOLVER_HPP
 #define PIQP_SOLVER_HPP
-#include <iostream>
+
+#include <cstdio>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
@@ -21,6 +22,7 @@
 #include "piqp/sparse/data.hpp"
 #include "piqp/sparse/preconditioner.hpp"
 #include "piqp/sparse/kkt.hpp"
+#include "piqp/utils.hpp"
 #include "piqp/utils/optional.hpp"
 
 namespace piqp
@@ -166,14 +168,14 @@ protected:
         m_data.p = A.rows();
         m_data.m = G.rows();
 
-        eigen_assert(P.rows() == m_data.n && P.cols() == m_data.n && "P must be square");
-        eigen_assert(A.rows() == m_data.p && A.cols() == m_data.n && "A must have correct dimensions");
-        eigen_assert(G.rows() == m_data.m && G.cols() == m_data.n && "G must have correct dimensions");
-        eigen_assert(c.size() == m_data.n && "c must have correct dimensions");
-        eigen_assert(b.size() == m_data.p && "b must have correct dimensions");
-        eigen_assert(h.size() == m_data.m && "h must have correct dimensions");
-        if (x_lb.has_value()) { eigen_assert(x_lb->size() == m_data.n && "x_lb must have correct dimensions"); }
-        if (x_ub.has_value()) { eigen_assert(x_ub->size() == m_data.n && "x_ub must have correct dimensions"); }
+        assert_exit(P.rows() == m_data.n && P.cols() == m_data.n, "P must be square");
+        assert_exit(A.rows() == m_data.p && A.cols() == m_data.n, "A must have correct dimensions");
+        assert_exit(G.rows() == m_data.m, G.cols() == m_data.n, "G must have correct dimensions");
+        assert_exit(c.size() == m_data.n, "c must have correct dimensions");
+        assert_exit(b.size() == m_data.p, "b must have correct dimensions");
+        assert_exit(h.size() == m_data.m, "h must have correct dimensions");
+        if (x_lb.has_value()) { assert_exit(x_lb->size() == m_data.n, "x_lb must have correct dimensions"); }
+        if (x_ub.has_value()) { assert_exit(x_ub->size() == m_data.n, "x_ub must have correct dimensions"); }
 
         m_data.P_utri = P.template triangularView<Eigen::Upper>();
         m_data.AT = A.transpose();
@@ -317,9 +319,7 @@ protected:
 
         if (!m_setup_done)
         {
-            eigen_assert(false && "Solver not setup yet");
-            m_result.info.status = Status::PIQP_UNSOLVED;
-            return m_result.info.status;
+            assert_exit(false, "Solver not setup yet");
         }
 
         if (!m_settings.verify_settings())
@@ -921,8 +921,7 @@ public:
     {
         if (!this->m_setup_done)
         {
-            eigen_assert(false && "Solver not setup yet");
-            return;
+            assert_exit(false, "Solver not setup yet");
         }
 
         if (this->m_settings.compute_timings)
@@ -936,7 +935,7 @@ public:
 
         if (P.has_value())
         {
-            eigen_assert(P->rows() == this->m_data.n && P->cols() == this->m_data.n && "P has wrong dimensions");
+            assert_exit(P->rows() == this->m_data.n && P->cols() == this->m_data.n, "P has wrong dimensions");
             this->m_data.P_utri = P->template triangularView<Eigen::Upper>();
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_P;
@@ -944,7 +943,7 @@ public:
 
         if (A.has_value())
         {
-            eigen_assert(A->rows() == this->m_data.p && A->cols() == this->m_data.n && "A has wrong dimensions");
+            assert_exit(A->rows() == this->m_data.p && A->cols() == this->m_data.n, "A has wrong dimensions");
             this->m_data.AT = A->transpose();
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_A;
@@ -952,7 +951,7 @@ public:
 
         if (G.has_value())
         {
-            eigen_assert(G->rows() == this->m_data.m && G->cols() == this->m_data.n && "G has wrong dimensions");
+            assert_exit(G->rows() == this->m_data.m && G->cols() == this->m_data.n, "G has wrong dimensions");
             this->m_data.GT = G->transpose();
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_G;
@@ -960,24 +959,24 @@ public:
 
         if (c.has_value())
         {
-            eigen_assert(c->size() == this->m_data.n && "c has wrong dimensions");
+            assert_exit(c->size() == this->m_data.n, "c has wrong dimensions");
             this->m_data.c = *c;
         }
 
         if (b.has_value())
         {
-            eigen_assert(b->size() == this->m_data.p && "b has wrong dimensions");
+            assert_exit(b->size() == this->m_data.p, "b has wrong dimensions");
             this->m_data.b = *b;
         }
 
         if (h.has_value())
         {
-            eigen_assert(h->size() == this->m_data.m && "h has wrong dimensions");
+            assert_exit(h->size() == this->m_data.m, "h has wrong dimensions");
             this->m_data.h = *h;
         }
 
-        if (x_lb.has_value()) { eigen_assert(x_lb->size() == this->m_data.n && "x_lb has wrong dimensions"); }
-        if (x_ub.has_value()) { eigen_assert(x_ub->size() == this->m_data.n && "x_ub has wrong dimensions"); }
+        if (x_lb.has_value()) { assert_exit(x_lb->size() == this->m_data.n, "x_lb has wrong dimensions"); }
+        if (x_ub.has_value()) { assert_exit(x_ub->size() == this->m_data.n, "x_ub has wrong dimensions"); }
         if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
         if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
 
@@ -1025,8 +1024,7 @@ public:
     {
         if (!this->m_setup_done)
         {
-            eigen_assert(false && "Solver not setup yet");
-            return;
+            assert_exit(false, "Solver not setup yet");
         }
 
         if (this->m_settings.compute_timings)
@@ -1040,13 +1038,13 @@ public:
 
         if (P.has_value())
         {
-            eigen_assert(P->rows() == this->m_data.n && P->cols() == this->m_data.n && "P has wrong dimensions");
+            assert_exit(P->rows() == this->m_data.n && P->cols() == this->m_data.n, "P has wrong dimensions");
             isize n = P->outerSize();
             for (isize j = 0; j < n; j++)
             {
                 PIQP_MAYBE_UNUSED isize P_col_nnz = P->outerIndexPtr()[j + 1] - P->outerIndexPtr()[j];
                 isize P_utri_col_nnz = this->m_data.P_utri.outerIndexPtr()[j + 1] - this->m_data.P_utri.outerIndexPtr()[j];
-                eigen_assert(P_col_nnz >= P_utri_col_nnz && "P nonzeros missmatch");
+                assert_exit(P_col_nnz >= P_utri_col_nnz, "P nonzeros missmatch");
                 Eigen::Map<Vec<T>>(this->m_data.P_utri.valuePtr() + this->m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P->valuePtr() + P->outerIndexPtr()[j], P_utri_col_nnz);
             }
 
@@ -1055,8 +1053,8 @@ public:
 
         if (A.has_value())
         {
-            eigen_assert(A->rows() == this->m_data.p && A->cols() == this->m_data.n && "A has wrong dimensions");
-            eigen_assert(A->nonZeros() == this->m_data.AT.nonZeros() && "A nonzeros missmatch");
+            assert_exit(A->rows() == this->m_data.p && A->cols() == this->m_data.n, "A has wrong dimensions");
+            assert_exit(A->nonZeros() == this->m_data.AT.nonZeros(), "A nonzeros missmatch");
             sparse::transpose_no_allocation(*A, this->m_data.AT);
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_A;
@@ -1064,8 +1062,8 @@ public:
 
         if (G.has_value())
         {
-            eigen_assert(G->rows() == this->m_data.m && G->cols() == this->m_data.n && "G has wrong dimensions");
-            eigen_assert(G->nonZeros() == this->m_data.GT.nonZeros() && "G nonzeros missmatch");
+            assert_exit(G->rows() == this->m_data.m && G->cols() == this->m_data.n, "G has wrong dimensions");
+            assert_exit(G->nonZeros() == this->m_data.GT.nonZeros(), "G nonzeros missmatch");
             sparse::transpose_no_allocation(*G, this->m_data.GT);
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_G;
@@ -1073,24 +1071,24 @@ public:
 
         if (c.has_value())
         {
-            eigen_assert(c->size() == this->m_data.n && "c has wrong dimensions");
+            assert_exit(c->size() == this->m_data.n, "c has wrong dimensions");
             this->m_data.c = *c;
         }
 
         if (b.has_value())
         {
-            eigen_assert(b->size() == this->m_data.p && "b has wrong dimensions");
+            assert_exit(b->size() == this->m_data.p, "b has wrong dimensions");
             this->m_data.b = *b;
         }
 
         if (h.has_value())
         {
-            eigen_assert(h->size() == this->m_data.m && "h has wrong dimensions");
+            assert_exit(h->size() == this->m_data.m, "h has wrong dimensions");
             this->m_data.h = *h;
         }
 
-        if (x_lb.has_value()) { eigen_assert(x_lb->size() == this->m_data.n && "x_lb has wrong dimensions"); }
-        if (x_ub.has_value()) { eigen_assert(x_ub->size() == this->m_data.n && "x_ub has wrong dimensions"); }
+        if (x_lb.has_value()) { assert_exit(x_lb->size() == this->m_data.n, "x_lb has wrong dimensions"); }
+        if (x_ub.has_value()) { assert_exit(x_ub->size() == this->m_data.n, "x_ub has wrong dimensions"); }
         if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
         if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
 
