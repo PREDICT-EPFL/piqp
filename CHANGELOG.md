@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Fixed PyPi upload
+- Fixed incorrect type in settings
+- Added runtime dimension checks in release mode
+
 ## [0.1.1] - 2023-06-30
 
 ### Changed
