@@ -420,8 +420,8 @@ protected:
             T tmp_prod = (m_result.s.array() + delta_s).matrix().dot((m_result.z.array() + delta_z).matrix());
             tmp_prod += (s_lb.array() + delta_s).matrix().dot((z_lb.array() + delta_z).matrix());
             tmp_prod += (s_ub.array() + delta_s).matrix().dot((z_ub.array() + delta_z).matrix());
-            T delta_s_bar = delta_s + (T(0.5) * tmp_prod) / (m_result.z.sum() + z_lb.sum() + z_ub.sum() + (m_data.m + m_data.n_lb + m_data.n_ub) * delta_z);
-            T delta_z_bar = delta_z + (T(0.5) * tmp_prod) / (m_result.s.sum() + s_lb.sum() + s_ub.sum() + (m_data.m + m_data.n_lb + m_data.n_ub) * delta_s);
+            T delta_s_bar = delta_s + (T(0.5) * tmp_prod) / (m_result.z.sum() + z_lb.sum() + z_ub.sum() + T(m_data.m + m_data.n_lb + m_data.n_ub) * delta_z);
+            T delta_z_bar = delta_z + (T(0.5) * tmp_prod) / (m_result.s.sum() + s_lb.sum() + s_ub.sum() + T(m_data.m + m_data.n_lb + m_data.n_ub) * delta_s);
 
             m_result.s.array() += delta_s_bar;
             s_lb.array() += delta_s_bar;
@@ -430,7 +430,7 @@ protected:
             z_lb.array() += delta_z_bar;
             z_ub.array() += delta_z_bar;
 
-            m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / (m_data.m + m_data.n_lb + m_data.n_ub);
+            m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / T(m_data.m + m_data.n_lb + m_data.n_ub);
         }
 
         m_result.zeta = m_result.x;
@@ -592,7 +592,7 @@ protected:
                 m_result.info.sigma = (m_result.s + alpha_s * ds).dot(m_result.z + alpha_z * dz);
                 m_result.info.sigma += (s_lb + alpha_s * ds_lb.head(m_data.n_lb)).dot(z_lb + alpha_z * dz_lb.head(m_data.n_lb));
                 m_result.info.sigma += (s_ub + alpha_s * ds_ub.head(m_data.n_ub)).dot(z_ub + alpha_z * dz_ub.head(m_data.n_ub));
-                m_result.info.sigma /= (m_result.info.mu * (m_data.m + m_data.n_lb + m_data.n_ub));
+                m_result.info.sigma /= (m_result.info.mu * T(m_data.m + m_data.n_lb + m_data.n_ub));
                 m_result.info.sigma = std::max(T(0), std::min(T(1), m_result.info.sigma));
                 m_result.info.sigma = m_result.info.sigma * m_result.info.sigma * m_result.info.sigma;
 
@@ -656,7 +656,7 @@ protected:
                 s_ub += m_result.info.primal_step * ds_ub.head(m_data.n_ub);
 
                 T mu_prev = m_result.info.mu;
-                m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / (m_data.m + m_data.n_lb + m_data.n_ub);
+                m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / T(m_data.m + m_data.n_lb + m_data.n_ub);
                 T mu_rate = std::max(T(0), (mu_prev - m_result.info.mu) / mu_prev);
 
                 // ------------------ update regularization ------------------

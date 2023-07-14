@@ -170,7 +170,7 @@ public:
                         gamma += std::max(data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
                                           data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>());
                     }
-                    gamma /= n;
+                    gamma /= T(n);
                     limit_scaling(gamma);
                     gamma = std::max(gamma, data.c.template lpNorm<Eigen::Infinity>());
                     limit_scaling(gamma);

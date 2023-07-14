@@ -192,7 +192,7 @@ public:
                             }
                         }
                     }
-                    T gamma = delta_iter_cost.sum() / n;
+                    T gamma = delta_iter_cost.sum() / T(n);
                     limit_scaling(gamma);
                     gamma = std::max(gamma, data.c.template lpNorm<Eigen::Infinity>());
                     limit_scaling(gamma);
