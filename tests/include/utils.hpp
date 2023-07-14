@@ -12,6 +12,20 @@
 #include "piqp/piqp.hpp"
 #include "gtest/gtest.h"
 
+template<typename T, unsigned int Mode>
+void assert_dense_triangular_equal(piqp::Mat<T>& A, piqp::Mat<T>& B)
+{
+    ASSERT_EQ(A.rows(), B.rows());
+    ASSERT_EQ(A.cols(), B.cols());
+
+    piqp::Mat<T> diff(A.rows(), A.cols());
+    diff.setZero();
+
+    diff = A.template triangularView<Mode>();
+    diff -= B.template triangularView<Mode>();
+    ASSERT_TRUE(diff.cwiseAbs().maxCoeff() == 0);
+}
+
 template<typename T, typename I>
 void assert_sparse_matrices_equal(piqp::SparseMat<T, I>& A, piqp::SparseMat<T, I>& B)
 {

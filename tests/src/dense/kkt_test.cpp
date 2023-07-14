@@ -13,6 +13,7 @@
 #include "piqp/utils/random_utils.hpp"
 
 #include "gtest/gtest.h"
+#include "utils.hpp"
 
 using namespace piqp;
 using namespace piqp::dense;
@@ -55,7 +56,7 @@ TEST(DenseKKTTest, UpdateScalings)
     kkt2.init(rho, delta);
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
-    EXPECT_TRUE(kkt.kkt_mat.isApprox(kkt2.kkt_mat, 1e-8));
+    assert_dense_triangular_equal<T, Eigen::Lower>(kkt.kkt_mat, kkt2.kkt_mat);
 }
 
 TEST(DenseKKTTest, UpdateData)
@@ -92,7 +93,7 @@ TEST(DenseKKTTest, UpdateData)
     kkt2.init(rho, delta);
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
-    EXPECT_TRUE(kkt.kkt_mat.isApprox(kkt2.kkt_mat, 1e-8));
+    assert_dense_triangular_equal<T, Eigen::Lower>(kkt.kkt_mat, kkt2.kkt_mat);
 }
 
 TEST(DenseKKTTest, FactorizeSolve)
