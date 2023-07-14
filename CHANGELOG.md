@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Fixed PyPi upload
-- Fixed incorrect type in settings
-- Added runtime dimension checks in release mode
+- Fixed PyPi upload.
+- Fixed incorrect type in settings.
+- Added runtime dimension checks in release mode.
+- Convert infinite inequality bounds to a finite value internally (-inf -> -1e30, inf -> 1e30).
 
 ## [0.1.1] - 2023-06-30
 

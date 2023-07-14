@@ -182,7 +182,7 @@ protected:
         m_data.GT = G.transpose();
         m_data.c = c;
         m_data.b = b;
-        m_data.h = h;
+        m_data.h = h.cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
 
         m_data.x_lb_idx.resize(m_data.n);
         m_data.x_ub_idx.resize(m_data.n);
@@ -972,7 +972,7 @@ public:
         if (h.has_value())
         {
             assert_exit(h->size() == this->m_data.m, "h has wrong dimensions");
-            this->m_data.h = *h;
+            this->m_data.h = (*h).cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
         }
 
         if (x_lb.has_value()) { assert_exit(x_lb->size() == this->m_data.n, "x_lb has wrong dimensions"); }
@@ -1084,7 +1084,7 @@ public:
         if (h.has_value())
         {
             assert_exit(h->size() == this->m_data.m, "h has wrong dimensions");
-            this->m_data.h = *h;
+            this->m_data.h = (*h).cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
         }
 
         if (x_lb.has_value()) { assert_exit(x_lb->size() == this->m_data.n, "x_lb has wrong dimensions"); }
