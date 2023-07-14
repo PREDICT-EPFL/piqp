@@ -170,7 +170,7 @@ protected:
 
         assert_exit(P.rows() == m_data.n && P.cols() == m_data.n, "P must be square");
         assert_exit(A.rows() == m_data.p && A.cols() == m_data.n, "A must have correct dimensions");
-        assert_exit(G.rows() == m_data.m, G.cols() == m_data.n, "G must have correct dimensions");
+        assert_exit(G.rows() == m_data.m && G.cols() == m_data.n, "G must have correct dimensions");
         assert_exit(c.size() == m_data.n, "c must have correct dimensions");
         assert_exit(b.size() == m_data.p, "b must have correct dimensions");
         assert_exit(h.size() == m_data.m, "h must have correct dimensions");
