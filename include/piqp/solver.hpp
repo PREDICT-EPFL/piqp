@@ -110,7 +110,7 @@ public:
             printf("variable lower bounds n_lb = %zd\n", m_data.n_lb);
             printf("variable upper bounds n_ub = %zd\n", m_data.n_ub);
             printf("\n");
-            printf("iter  prim_obj       dual_obj       duality_gap   prim_inf      dual_inf      rho         delta       mu          prim_step   dual_step\n");
+            printf("iter  prim_obj       dual_obj       duality_gap   prim_inf      dual_inf      rho         delta       mu          p_step   d_step\n");
         }
 
         if (m_settings.compute_timings)
@@ -451,7 +451,7 @@ protected:
 
             if (m_settings.verbose)
             {
-                printf("%3zd   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.3e   %.3e\n",
+                printf("%3zd   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.4f   %.4f\n",
                        m_result.info.iter,
                        m_result.info.primal_obj,
                        m_result.info.dual_obj,
