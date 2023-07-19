@@ -30,7 +30,7 @@ All interfaces have the same internal solver settings. Note that the default set
 | `iterative_refinement_eps_rel`                    | `1e-12`       | Iterative refinement relative tolerance.                                   |
 | `iterative_refinement_max_iter`                   | `10`          | Maximum number of iterations for iterative refinement.                     |
 | `iterative_refinement_min_improvement_rate`       | `5.0`         | Minimum improvement rate for iterative refinement.                         |
-| `iterative_refinement_static_regularization_eps`  | `1e-5`        | Static regularization for KKT system for iterative refinement.             |
+| `iterative_refinement_static_regularization_eps`  | `1e-7`        | Static regularization for KKT system for iterative refinement.             |
 | `iterative_refinement_static_regularization_rel`  | `eps^2`       | Static regularization w.r.t. the maximum abs diagonal term of KKT system. |
 | `verbose`                                        | `false`       | Verbose printing.                                                         |
 | `compute_timings`                                | `false`       | Measure timing information internally.                                    |
