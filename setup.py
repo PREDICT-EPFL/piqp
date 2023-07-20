@@ -147,7 +147,7 @@ setup(
     author="Roland Schwan",
     author_email="roland.schwan@epfl.ch",
     license='BSD-2-Clause',
-    description="An embedded Proximal Interior Point Quadratic Programming solver",
+    description="A Proximal Interior Point Quadratic Programming solver",
     long_description=long_description,
     long_description_content_type='text/markdown',
     ext_modules=[CMakeExtension("piqp.piqp")],

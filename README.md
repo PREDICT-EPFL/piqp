@@ -2,10 +2,13 @@
 
 [![DOI](https://img.shields.io/badge/DOI-10.48550/arXiv.2304.00290-green.svg)](https://doi.org/10.48550/arXiv.2304.00290)
 [![Preprint](https://img.shields.io/badge/Preprint-arXiv-blue.svg)](https://arxiv.org/abs/2304.00290)
-[![Funding](https://img.shields.io/badge/Grant-NCCR%20Automation%20(51NF40180545)-90e3dc.svg)](https://nccr-automation.ch/)
-[![Docs](https://img.shields.io/badge/Docs-available-brightgreen.svg)](https://predict-epfl.github.io/piqp/)
+[![Funding](https://img.shields.io/badge/Grant-NCCR%20Automation%20(51NF40__180545)-90e3dc.svg)](https://nccr-automation.ch/)
 
-PIQP is an embedded Proximal Interior Point Quadratic Programming solver, which can solve dense and sparse quadratic programs of the form
+[![Docs](https://img.shields.io/badge/Docs-available-brightgreen.svg)](https://predict-epfl.github.io/piqp/)
+![License](https://img.shields.io/badge/License-BSD--2--Clause-brightgreen.svg)
+![PyPI - downloads](https://img.shields.io/pypi/dm/piqp.svg?label=PyPI%20downloads)
+
+PIQP is a Proximal Interior Point Quadratic Programming solver, which can solve dense and sparse quadratic programs of the form
 
 $$
 \begin{aligned}
@@ -23,6 +26,7 @@ Combining an infeasible interior point method with the proximal method of multip
 * PIQP is written in header only C++ 14 leveraging the [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) library for vectorized linear algebra.
 * Dense and sparse problem formulations are supported. For small dense problems, vectorized instructions and cache locality can be exploited more efficiently.
 * Interface to Python with many more to follow.
+* Allocation free problem updates and re-solves.
 * Open source under the BSD 2-Clause License.
 
 ## Interfaces

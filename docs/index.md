@@ -4,7 +4,7 @@ layout: default
 nav_order: 1
 ---
 
-PIQP is an embedded Proximal Interior Point Quadratic Programming solver, which can solve dense and sparse quadratic programs of the form
+PIQP is a Proximal Interior Point Quadratic Programming solver, which can solve dense and sparse quadratic programs of the form
 
 $$
 \begin{aligned}
@@ -28,6 +28,7 @@ ArXiv, 2023
 * PIQP is written in header only C++ 14 leveraging the [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) library for vectorized linear algebra.
 * Dense and sparse problem formulations are supported. For small dense problems, vectorized instructions and cache locality can be exploited more efficiently.
 * Interface to Python with many more to follow.
+* Allocation free problem updates and re-solves.
 * Open source under the BSD 2-Clause License.
 
 ### Interfaces
