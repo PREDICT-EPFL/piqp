@@ -53,4 +53,16 @@
 
 #define PIQP_INF 1e30
 
+#ifdef MATLAB
+#define c_print mexPrintf
+#define c_eprint mexPrintf
+#elif defined R_LANG
+#include <R_ext/Print.h>
+#define c_print Rprintf
+#define c_eprint REprintf
+#else
+#define c_print printf
+#define c_eprint(...) fprintf(stderr, __VA_ARGS__)
+#endif
+
 #endif //PIQP_FWD_HPP
