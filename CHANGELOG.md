@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2023-07-20
+
+### Changed
+
+- Changed print function for potential Matlab and R interfaces
+
 ## [0.1.2] - 2023-07-14
 
 ### Changed
@@ -29,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.1.1...HEAD
-[0.1.2]: https://github.com/PREDICT-EPFL/piqp/compare/v0.1.0...v0.1.2
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/PREDICT-EPFL/piqp/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/PREDICT-EPFL/piqp/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/PREDICT-EPFL/piqp/releases/tag/v0.1.0
