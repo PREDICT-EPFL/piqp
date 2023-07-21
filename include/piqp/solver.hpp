@@ -89,27 +89,27 @@ public:
     {
         if (m_settings.verbose)
         {
-            c_print("----------------------------------------------------------\n");
-            c_print("                           PIQP                           \n");
-            c_print("                    (c) Roland Schwan                     \n");
-            c_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2023   \n");
-            c_print("----------------------------------------------------------\n");
+            piqp_print("----------------------------------------------------------\n");
+            piqp_print("                           PIQP                           \n");
+            piqp_print("                    (c) Roland Schwan                     \n");
+            piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2023   \n");
+            piqp_print("----------------------------------------------------------\n");
             if (MatrixType == PIQP_DENSE)
             {
-                c_print("variables n = %zd\n", m_data.n);
-                c_print("equality constraints p = %zd\n", m_data.p);
-                c_print("inequality constraints m = %zd\n", m_data.m);
+                piqp_print("variables n = %zd\n", m_data.n);
+                piqp_print("equality constraints p = %zd\n", m_data.p);
+                piqp_print("inequality constraints m = %zd\n", m_data.m);
             }
             else
             {
-                c_print("variables n = %zd, nzz(P upper triangular) = %zd\n", m_data.n, m_data.non_zeros_P_utri());
-                c_print("equality constraints p = %zd, nnz(A) = %zd\n", m_data.p, m_data.non_zeros_A());
-                c_print("inequality constraints m = %zd, nnz(G) = %zd\n", m_data.m, m_data.non_zeros_G());
+                piqp_print("variables n = %zd, nzz(P upper triangular) = %zd\n", m_data.n, m_data.non_zeros_P_utri());
+                piqp_print("equality constraints p = %zd, nnz(A) = %zd\n", m_data.p, m_data.non_zeros_A());
+                piqp_print("inequality constraints m = %zd, nnz(G) = %zd\n", m_data.m, m_data.non_zeros_G());
             }
-            c_print("variable lower bounds n_lb = %zd\n", m_data.n_lb);
-            c_print("variable upper bounds n_ub = %zd\n", m_data.n_ub);
-            c_print("\n");
-            c_print("iter  prim_obj       dual_obj       duality_gap   prim_inf      dual_inf      rho         delta       mu          p_step   d_step\n");
+            piqp_print("variable lower bounds n_lb = %zd\n", m_data.n_lb);
+            piqp_print("variable upper bounds n_ub = %zd\n", m_data.n_ub);
+            piqp_print("\n");
+            piqp_print("iter  prim_obj       dual_obj       duality_gap   prim_inf      dual_inf      rho         delta       mu          p_step   d_step\n");
         }
 
         if (m_settings.compute_timings)
@@ -131,16 +131,16 @@ public:
 
         if (m_settings.verbose)
         {
-            c_print("\n");
-            c_print("status:               %s\n", status_to_string(status));
-            c_print("number of iterations: %zd\n", m_result.info.iter);
-            c_print("objective:            %.5e\n", m_result.info.primal_obj);
+            piqp_print("\n");
+            piqp_print("status:               %s\n", status_to_string(status));
+            piqp_print("number of iterations: %zd\n", m_result.info.iter);
+            piqp_print("objective:            %.5e\n", m_result.info.primal_obj);
             if (m_settings.compute_timings)
             {
-                c_print("total run time:       %.3es\n", m_result.info.run_time);
-                c_print("  setup time:         %.3es\n", m_result.info.setup_time);
-                c_print("  update time:        %.3es\n", m_result.info.update_time);
-                c_print("  solve time:         %.3es\n", m_result.info.solve_time);
+                piqp_print("total run time:       %.3es\n", m_result.info.run_time);
+                piqp_print("  setup time:         %.3es\n", m_result.info.setup_time);
+                piqp_print("  update time:        %.3es\n", m_result.info.update_time);
+                piqp_print("  solve time:         %.3es\n", m_result.info.solve_time);
             }
         }
 
@@ -167,14 +167,14 @@ protected:
         m_data.p = A.rows();
         m_data.m = G.rows();
 
-        if (P.rows() != m_data.n || P.cols() != m_data.n) { c_eprint("P must be square"); return; }
-        if (A.rows() != m_data.p || A.cols() != m_data.n) { c_eprint("A must have correct dimensions"); return; }
-        if (G.rows() != m_data.m || G.cols() != m_data.n) { c_eprint("G must have correct dimensions"); return; }
-        if (c.size() != m_data.n) { c_eprint("c must have correct dimensions"); return; }
-        if (b.size() != m_data.p) { c_eprint("b must have correct dimensions"); return; }
-        if (h.size() != m_data.m) { c_eprint("h must have correct dimensions"); return; }
-        if (x_lb.has_value() && x_lb->size() != m_data.n) { c_eprint("x_lb must have correct dimensions"); return; }
-        if (x_ub.has_value() && x_ub->size() != m_data.n) { c_eprint("x_ub must have correct dimensions"); return; }
+        if (P.rows() != m_data.n || P.cols() != m_data.n) { piqp_eprint("P must be square"); return; }
+        if (A.rows() != m_data.p || A.cols() != m_data.n) { piqp_eprint("A must have correct dimensions"); return; }
+        if (G.rows() != m_data.m || G.cols() != m_data.n) { piqp_eprint("G must have correct dimensions"); return; }
+        if (c.size() != m_data.n) { piqp_eprint("c must have correct dimensions"); return; }
+        if (b.size() != m_data.p) { piqp_eprint("b must have correct dimensions"); return; }
+        if (h.size() != m_data.m) { piqp_eprint("h must have correct dimensions"); return; }
+        if (x_lb.has_value() && x_lb->size() != m_data.n) { piqp_eprint("x_lb must have correct dimensions"); return; }
+        if (x_ub.has_value() && x_ub->size() != m_data.n) { piqp_eprint("x_ub must have correct dimensions"); return; }
 
         m_data.P_utri = P.template triangularView<Eigen::Upper>();
         m_data.AT = A.transpose();
@@ -318,7 +318,7 @@ protected:
 
         if (!m_setup_done)
         {
-            c_eprint("Solver not setup yet");
+            piqp_eprint("Solver not setup yet");
             m_result.info.status = Status::PIQP_UNSOLVED;
             return m_result.info.status;
         }
@@ -452,7 +452,7 @@ protected:
 
             if (m_settings.verbose)
             {
-                c_print("%3zd   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.4f   %.4f\n",
+                piqp_print("%3zd   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.4f   %.4f\n",
                         m_result.info.iter,
                         m_result.info.primal_obj,
                         m_result.info.dual_obj,
@@ -922,7 +922,7 @@ public:
     {
         if (!this->m_setup_done)
         {
-            c_eprint("Solver not setup yet");
+            piqp_eprint("Solver not setup yet");
             return;
         }
 
@@ -937,7 +937,7 @@ public:
 
         if (P.has_value())
         {
-            if (P->rows() != this->m_data.n || P->cols() != this->m_data.n) { c_eprint("P has wrong dimensions"); return; }
+            if (P->rows() != this->m_data.n || P->cols() != this->m_data.n) { piqp_eprint("P has wrong dimensions"); return; }
             this->m_data.P_utri = P->template triangularView<Eigen::Upper>();
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_P;
@@ -945,7 +945,7 @@ public:
 
         if (A.has_value())
         {
-            if (A->rows() != this->m_data.p || A->cols() != this->m_data.n) { c_eprint("A has wrong dimensions"); return; }
+            if (A->rows() != this->m_data.p || A->cols() != this->m_data.n) { piqp_eprint("A has wrong dimensions"); return; }
             this->m_data.AT = A->transpose();
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_A;
@@ -953,7 +953,7 @@ public:
 
         if (G.has_value())
         {
-            if (G->rows() != this->m_data.m || G->cols() != this->m_data.n) { c_eprint("G has wrong dimensions"); return; }
+            if (G->rows() != this->m_data.m || G->cols() != this->m_data.n) { piqp_eprint("G has wrong dimensions"); return; }
             this->m_data.GT = G->transpose();
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_G;
@@ -961,24 +961,24 @@ public:
 
         if (c.has_value())
         {
-            if (c->size() != this->m_data.n) { c_eprint("c has wrong dimensions"); return; }
+            if (c->size() != this->m_data.n) { piqp_eprint("c has wrong dimensions"); return; }
             this->m_data.c = *c;
         }
 
         if (b.has_value())
         {
-            if (b->size() != this->m_data.p) { c_eprint("b has wrong dimensions"); return; }
+            if (b->size() != this->m_data.p) { piqp_eprint("b has wrong dimensions"); return; }
             this->m_data.b = *b;
         }
 
         if (h.has_value())
         {
-            if (h->size() != this->m_data.m) { c_eprint("h has wrong dimensions"); return; }
+            if (h->size() != this->m_data.m) { piqp_eprint("h has wrong dimensions"); return; }
             this->m_data.h = (*h).cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
         }
 
-        if (x_lb.has_value() && x_lb->size() != this->m_data.n) { c_eprint("x_lb has wrong dimensions"); return; }
-        if (x_ub.has_value() && x_ub->size() != this->m_data.n) { c_eprint("x_ub has wrong dimensions"); return; }
+        if (x_lb.has_value() && x_lb->size() != this->m_data.n) { piqp_eprint("x_lb has wrong dimensions"); return; }
+        if (x_ub.has_value() && x_ub->size() != this->m_data.n) { piqp_eprint("x_ub has wrong dimensions"); return; }
         if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
         if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
 
@@ -1026,7 +1026,7 @@ public:
     {
         if (!this->m_setup_done)
         {
-            c_eprint("Solver not setup yet");
+            piqp_eprint("Solver not setup yet");
             return;
         }
 
@@ -1041,13 +1041,13 @@ public:
 
         if (P.has_value())
         {
-            if (P->rows() != this->m_data.n || P->cols() != this->m_data.n) { c_eprint("P has wrong dimensions"); return; }
+            if (P->rows() != this->m_data.n || P->cols() != this->m_data.n) { piqp_eprint("P has wrong dimensions"); return; }
             isize n = P->outerSize();
             for (isize j = 0; j < n; j++)
             {
                 isize P_col_nnz = P->outerIndexPtr()[j + 1] - P->outerIndexPtr()[j];
                 isize P_utri_col_nnz = this->m_data.P_utri.outerIndexPtr()[j + 1] - this->m_data.P_utri.outerIndexPtr()[j];
-                if (P_col_nnz < P_utri_col_nnz) { c_eprint("P nonzeros missmatch"); return; }
+                if (P_col_nnz < P_utri_col_nnz) { piqp_eprint("P nonzeros missmatch"); return; }
                 Eigen::Map<Vec<T>>(this->m_data.P_utri.valuePtr() + this->m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P->valuePtr() + P->outerIndexPtr()[j], P_utri_col_nnz);
             }
 
@@ -1056,8 +1056,8 @@ public:
 
         if (A.has_value())
         {
-            if (A->rows() != this->m_data.p || A->cols() != this->m_data.n) { c_eprint("A has wrong dimensions"); return; }
-            if (A->nonZeros() != this->m_data.AT.nonZeros()) { c_eprint("A nonzeros missmatch"); return; }
+            if (A->rows() != this->m_data.p || A->cols() != this->m_data.n) { piqp_eprint("A has wrong dimensions"); return; }
+            if (A->nonZeros() != this->m_data.AT.nonZeros()) { piqp_eprint("A nonzeros missmatch"); return; }
             sparse::transpose_no_allocation(*A, this->m_data.AT);
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_A;
@@ -1065,8 +1065,8 @@ public:
 
         if (G.has_value())
         {
-            if (G->rows() != this->m_data.m || G->cols() != this->m_data.n) { c_eprint("G has wrong dimensions"); return; }
-            if (G->nonZeros() != this->m_data.GT.nonZeros()) { c_eprint("G nonzeros missmatch"); return; }
+            if (G->rows() != this->m_data.m || G->cols() != this->m_data.n) { piqp_eprint("G has wrong dimensions"); return; }
+            if (G->nonZeros() != this->m_data.GT.nonZeros()) { piqp_eprint("G nonzeros missmatch"); return; }
             sparse::transpose_no_allocation(*G, this->m_data.GT);
 
             update_options |= KKTUpdateOptions::KKT_UPDATE_G;
@@ -1074,24 +1074,24 @@ public:
 
         if (c.has_value())
         {
-            if (c->size() != this->m_data.n) { c_eprint("c has wrong dimensions"); return; }
+            if (c->size() != this->m_data.n) { piqp_eprint("c has wrong dimensions"); return; }
             this->m_data.c = *c;
         }
 
         if (b.has_value())
         {
-            if (b->size() != this->m_data.p) { c_eprint("b has wrong dimensions"); return; }
+            if (b->size() != this->m_data.p) { piqp_eprint("b has wrong dimensions"); return; }
             this->m_data.b = *b;
         }
 
         if (h.has_value())
         {
-            if (h->size() != this->m_data.m) { c_eprint("h has wrong dimensions"); return; }
+            if (h->size() != this->m_data.m) { piqp_eprint("h has wrong dimensions"); return; }
             this->m_data.h = (*h).cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
         }
 
-        if (x_lb.has_value() && x_lb->size() != this->m_data.n) { c_eprint("x_lb has wrong dimensions"); return; }
-        if (x_ub.has_value() && x_ub->size() != this->m_data.n) { c_eprint("x_ub has wrong dimensions"); return; }
+        if (x_lb.has_value() && x_lb->size() != this->m_data.n) { piqp_eprint("x_lb has wrong dimensions"); return; }
+        if (x_ub.has_value() && x_ub->size() != this->m_data.n) { piqp_eprint("x_ub has wrong dimensions"); return; }
         if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
         if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
 
