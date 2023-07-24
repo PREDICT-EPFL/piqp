@@ -96,12 +96,14 @@ public:
             piqp_print("----------------------------------------------------------\n");
             if (MatrixType == PIQP_DENSE)
             {
+                piqp_print("dense backend\n");
                 piqp_print("variables n = %zd\n", m_data.n);
                 piqp_print("equality constraints p = %zd\n", m_data.p);
                 piqp_print("inequality constraints m = %zd\n", m_data.m);
             }
             else
             {
+                piqp_print("sparse backend\n");
                 piqp_print("variables n = %zd, nzz(P upper triangular) = %zd\n", m_data.n, m_data.non_zeros_P_utri());
                 piqp_print("equality constraints p = %zd, nnz(A) = %zd\n", m_data.p, m_data.non_zeros_A());
                 piqp_print("inequality constraints m = %zd, nnz(G) = %zd\n", m_data.m, m_data.non_zeros_G());
