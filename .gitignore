@@ -6,3 +6,5 @@ build
 Release
 Debug
 cmake-build-*/
+*.mex*
+*.asv

@@ -15,6 +15,7 @@ project(piqp
 #### User options ####
 option(BUILD_C_INTERFACE "Build C interface" ON)
 option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
+option(BUILD_MATLAB_INTERFACE "Build Matlab interface" OFF)
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_MAROS_MESZAROS_TEST "Build maros meszaros tests" OFF)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
@@ -55,9 +56,15 @@ if (ENABLE_SANITIZERS)
     unset(sanitizer_flags)
 endif ()
 
-# Find pybind11
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
-add_subdirectory(external/pybind11 ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
+if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
+    # Find cpu_features
+    set(BUILD_TESTING OFF)
+    add_subdirectory(external/cpu_features EXCLUDE_FROM_ALL)
+
+    # Find pybind11
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
+    add_subdirectory(external/pybind11 ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
+endif ()
 
 # Find Eigen3.3+
 if (DEFINED EIGEN3_INCLUDE_DIRS AND NOT TARGET Eigen3::Eigen)
@@ -88,6 +95,10 @@ endif()
 
 if (BUILD_PYTHON_INTERFACE)
     add_subdirectory(interfaces/python)
+endif()
+
+if (BUILD_MATLAB_INTERFACE)
+    add_subdirectory(interfaces/matlab)
 endif()
 
 if (BUILD_TESTS)
