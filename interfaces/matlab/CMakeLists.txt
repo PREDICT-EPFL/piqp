@@ -17,11 +17,13 @@ else ()
     matlab_add_mex(NAME piqp_instruction_set_mex SRC piqp_instruction_set_mex.cpp)
 endif ()
 set_target_properties(piqp_instruction_set_mex PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(piqp_instruction_set_mex PRIVATE ${compiler_flags})
 
 function(CREATE_PIQP_MATLAB_TARGET target_name COMPILE_OPTIONS)
     matlab_add_mex(NAME ${target_name} SRC piqp_mex.cpp LINK_TO piqp)
     set_target_properties(${target_name} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_options(${target_name} PRIVATE ${COMPILE_OPTIONS})
+    target_compile_options(${target_name} PRIVATE ${compiler_flags})
 endfunction()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
