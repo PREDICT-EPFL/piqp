@@ -7,15 +7,30 @@
 % LICENSE file in the root directory of this source tree.
 
 classdef piqp < handle
+    % piqp interface class for PIQP solver
+    % This class provides a complete interface to the C++ implementation
+    % of the PIQP solver.
+    %
+    % piqp Properties:
+    %   piqpMexHandle - handle to the mex function
+    %   objectHandle - pointer to the C++ structure of PIQP solver
+    %   isDense - is dense or sparse backend used
+    %
+    % piqp Methods:
+    %
+    %   TODO
 
     properties (SetAccess = private, Hidden = true)
         piqpMexHandle
-        objectHandle % Handle to underlying C instance
+        objectHandle % Handle to underlying C++ instance
+        isDense
     end
 
     methods
-        %% Constructor - Create a new solver instance
+        %%
         function this = piqp(varargin)
+            % Construct piqp solver class.
+
             % detect available instruction sets
             instructionSets = piqp_instruction_set_mex();
             % select correct mex file
@@ -26,14 +41,225 @@ classdef piqp < handle
             else
                 this.piqpMexHandle = @piqp_mex;
             end
-            % Construct PIQP solver class
+            
+            if length(varargin) >= 1
+                if strcmp(varargin{1}, 'dense')
+                    this.isDense = true;
+                else
+                    this.isDense = false;
+                end
+            else
+                this.isDense = false;
+            end
+
             this.objectHandle = this.piqpMexHandle('new', varargin{:});
         end
 
-        %% Destructor - destroy the solver instance
+        %%
         function delete(this)
-            % Destroy PIQP solver class
+            % Destroy piqp solver class.
             this.piqpMexHandle('delete', this.objectHandle);
         end
+
+        %%
+        function out = get_settings(this)
+            % GET_SETTINGS get the current solver settings structure
+            out = this.piqpMexHandle('get_settings', this.objectHandle);
+        end
+
+        %%
+        function update_settings(this, varargin)
+            % UPDATE_SETTINGS update the current solver settings structure
+
+            newSettings = validateSettings(this, varargin{:});
+
+            %write the solver settings.  C-mex does not check input
+            %data or protect against disallowed parameter modifications
+            this.piqpMexHandle('update_settings', this.objectHandle, newSettings);
+        end
+
+        %%
+        function [n,p,m] = get_dimensions(this)
+            % GET_DIMENSIONS get the number of variables and constraints
+
+            [n,p,m] = this.piqpMexHandle('get_dimensions', this.objectHandle);
+        end
+
+        %%
+        function setup(this, P, c, A, b, G, h, x_lb, x_ub, varargin)
+            % SETUP Configure solver with problem data.
+            %
+            %   setup(P,c,A,b,G,h,x_lb,x_ub,options)
+
+            % Get number of variables n
+            if ~isempty(P)
+                n = size(P, 1);
+                assert(size(P, 2) == n, 'P must be square')
+            else
+                if ~isempty(c)
+                    n = length(c);
+                else
+                    if ~isempty(A)
+                        n = size(A, 2);
+                    else
+                        if ~isempty(G)
+                            n = size(G, 2);
+                        else
+                            error('The problem does not have any variables');
+                        end
+                    end
+                end
+            end
+
+            % Get number of equality constraints p
+            if isempty(A)
+                p = 0;
+            else
+                p = size(A, 1);
+                assert(size(A, 2) == n, 'Incorrect dimension of A');
+            end
+
+            % Get number of inequality constraints m
+            if isempty(G)
+                m = 0;
+            else
+                m = size(G, 1);
+                assert(size(G, 2) == n, 'Incorrect dimension of G');
+            end
+
+            %
+            % Create dense/sparse matrices and full vectors if they are empty
+            %
+            if isempty(P)
+                if this.isDense
+                    P = zeros(n, n);
+                else
+                    P = sparse(n, n);
+                end
+            else
+                if this.isDense
+                    P = full(P);
+                else
+                    P = sparse(P);
+                end
+            end
+
+            if isempty(c)
+                c = zeros(n, 1);
+            else
+                c = full(c(:));
+            end
+
+            % Create proper equalty constraints if they are not passed
+            if (isempty(A) && ~isempty(b)) || (~isempty(A) && isempty(b))
+                error('A must be supplied together with b');
+            end
+
+            if isempty(A)
+                if this.isDense
+                    A = zeros(p, n);
+                else
+                    A = sparse(p, n);
+                end
+                b = zeros(p, 1);
+            else
+                if this.isDense
+                    A = full(A);
+                else
+                    A = sparse(A);
+                end
+                b  = full(b(:));
+            end
+
+            % Create proper inequalty constraints if they are not passed
+            if (isempty(G) && ~isempty(h)) || (~isempty(G) && isempty(h))
+                error('G must be supplied together with h');
+            end
+
+            if isempty(G)
+                if this.isDense
+                    G = zeros(m, n);
+                else
+                    G = sparse(m, n);
+                end
+                h = Inf(m, 1);
+            else
+                if this.isDense
+                    G = full(G);
+                else
+                    G = sparse(G);
+                end
+                h  = full(h(:));
+            end
+
+            if isempty(x_lb)
+                x_lb = -Inf(n, 1);
+            else
+                x_lb = full(x_lb(:));
+            end
+
+            if isempty(x_ub)
+                x_ub = Inf(n, 1);
+            else
+                x_ub = full(x_ub(:));
+            end
+
+            %
+            % Check vector dimensions
+            %
+            assert(length(c) == n, 'Incorrect dimension of c');
+            assert(length(b) == p, 'Incorrect dimension of b');
+            assert(length(h) == m, 'Incorrect dimension of h');
+            assert(length(x_lb) == n, 'Incorrect dimension of x_lb');
+            assert(length(x_ub) == n, 'Incorrect dimension of x_ub');
+
+            %make a settings structure from the remainder of the arguments.
+            settings = validateSettings(this, varargin{:});
+
+            this.piqpMexHandle('setup',this.objectHandle,n,p,m,P,c,A,b,G,h,x_lb,x_ub,settings);
+        end
+
+        %%
+        function res = solve(this, varargin)
+            % SOLVE solve the QP
+
+            res = this.piqpMexHandle('solve', this.objectHandle);
+        end
     end
+end
+
+function settings = validateSettings(this, varargin)
+
+settings = this.piqpMexHandle('get_settings', this.objectHandle);
+
+%no settings passed -> return defaults
+if isempty(varargin)
+    return;
+end
+
+%check for structure style input
+if isstruct(varargin{1})
+    newSettings = varargin{1};
+    assert(length(varargin) == 1, 'too many input arguments');
+else
+    newSettings = struct(varargin{:});
+end
+
+%get the piqp settings fields
+currentFields = fieldnames(settings);
+
+%get the requested fields in the update
+newFields = fieldnames(newSettings);
+
+%check for unknown parameters
+badFieldsIdx = find(~ismember(newFields, currentFields));
+if ~isempty(badFieldsIdx)
+    error('Unrecognized solver setting ''%s'' detected', newFields{badFieldsIdx(1)});
+end
+
+%everything checks out - merge the newSettings into the current ones
+for i = 1:length(newFields)
+    settings.(newFields{i}) = double(newSettings.(newFields{i}));
+end
+
 end

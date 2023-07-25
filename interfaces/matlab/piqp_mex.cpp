@@ -11,14 +11,85 @@
 
 #define PIQP_MEX_SIGNATURE 0x271C1A7A
 
+using Vec = Eigen::Matrix<double, Eigen::Dynamic, 1>;
+using IVec = Eigen::Matrix<int, Eigen::Dynamic, 1>;
+using Mat = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+using SparseMat = Eigen::SparseMatrix<double, Eigen::ColMajor, int>;
+
 using DenseSolver = piqp::DenseSolver<double>;
 using SparseSolver = piqp::SparseSolver<double, int>;
+
+const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
+                                      "delta_init",
+                                      "eps_abs",
+                                      "eps_rel",
+                                      "check_duality_gap",
+                                      "eps_duality_gap_abs",
+                                      "eps_duality_gap_rel",
+                                      "reg_lower_limit",
+                                      "reg_finetune_lower_limit",
+                                      "reg_finetune_primal_update_threshold",
+                                      "reg_finetune_dual_update_threshold",
+                                      "max_iter",
+                                      "max_factor_retires",
+                                      "preconditioner_scale_cost",
+                                      "preconditioner_iter",
+                                      "tau",
+                                      "iterative_refinement_always_enabled",
+                                      "iterative_refinement_eps_abs",
+                                      "iterative_refinement_eps_rel",
+                                      "iterative_refinement_max_iter",
+                                      "iterative_refinement_min_improvement_rate",
+                                      "iterative_refinement_static_regularization_eps",
+                                      "iterative_refinement_static_regularization_rel",
+                                      "verbose",
+                                      "compute_timings"};
+
+const char* PIQP_INFO_FIELDS[] = {"status",
+                                  "iter",
+                                  "rho",
+                                  "delta",
+                                  "mu",
+                                  "sigma",
+                                  "primal_step",
+                                  "dual_step",
+                                  "primal_inf",
+                                  "primal_rel_inf",
+                                  "dual_inf",
+                                  "dual_rel_inf",
+                                  "primal_obj",
+                                  "dual_obj",
+                                  "duality_gap",
+                                  "duality_gap_rel",
+                                  "factor_retires",
+                                  "reg_limit",
+                                  "no_primal_update",
+                                  "no_dual_update",
+                                  "setup_time",
+                                  "update_time",
+                                  "solve_time",
+                                  "run_time"};
+
+const char* PIQP_RESULT_FIELDS[] = {"x",
+                                    "y",
+                                    "z",
+                                    "z_lb",
+                                    "z_ub",
+                                    "s",
+                                    "s_lb",
+                                    "s_ub",
+                                    "zeta",
+                                    "lambda",
+                                    "nu",
+                                    "nu_lb",
+                                    "nu_ub",
+                                    "info"};
 
 class piqp_mex_handle
 {
 public:
-    explicit piqp_mex_handle(DenseSolver* ptr) : m_ptr(ptr), m_is_dense(true) { m_signature = PIQP_MEX_SIGNATURE; }
-    explicit piqp_mex_handle(SparseSolver* ptr) : m_ptr(ptr), m_is_dense(false) { m_signature = PIQP_MEX_SIGNATURE; }
+    explicit piqp_mex_handle(DenseSolver* ptr) : m_signature(PIQP_MEX_SIGNATURE), m_is_dense(true), m_ptr(ptr) {}
+    explicit piqp_mex_handle(SparseSolver* ptr) : m_signature(PIQP_MEX_SIGNATURE), m_is_dense(false), m_ptr(ptr) {}
     bool isValid() const { return m_signature == PIQP_MEX_SIGNATURE; }
     bool isDense() const { return m_is_dense; }
     DenseSolver* as_dense_ptr() { return static_cast<DenseSolver*>(m_ptr); }
@@ -55,6 +126,132 @@ inline void destroy_mex_handle(const mxArray* in)
 {
     delete get_mex_handle(in);
     mexUnlock();
+}
+
+inline IVec to_int_vec(mwIndex* data, int n)
+{
+    return Eigen::Map<Eigen::Matrix<mwIndex, Eigen::Dynamic, 1>>(data, n).cast<int>();
+}
+
+inline mxArray* eigen_to_mx(const Vec& vec)
+{
+    mxArray* mx_ptr = mxCreateDoubleMatrix((mwSize) vec.rows(), 1, mxREAL);
+    Eigen::Map<Vec>(mxGetPr(mx_ptr), vec.rows()) = vec;
+    return mx_ptr;
+}
+
+mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
+{
+    int n_fields  = sizeof(PIQP_SETTINGS_FIELDS) / sizeof(PIQP_SETTINGS_FIELDS[0]);
+    mxArray* mx_ptr = mxCreateStructMatrix(1, 1, n_fields, PIQP_SETTINGS_FIELDS);
+
+    mxSetField(mx_ptr, 0, "rho_init", mxCreateDoubleScalar(settings.rho_init));
+    mxSetField(mx_ptr, 0, "delta_init", mxCreateDoubleScalar(settings.delta_init));
+    mxSetField(mx_ptr, 0, "eps_abs", mxCreateDoubleScalar(settings.eps_abs));
+    mxSetField(mx_ptr, 0, "eps_rel", mxCreateDoubleScalar(settings.eps_rel));
+    mxSetField(mx_ptr, 0, "check_duality_gap", mxCreateDoubleScalar(settings.check_duality_gap));
+    mxSetField(mx_ptr, 0, "eps_duality_gap_abs", mxCreateDoubleScalar(settings.eps_duality_gap_abs));
+    mxSetField(mx_ptr, 0, "eps_duality_gap_rel", mxCreateDoubleScalar(settings.eps_duality_gap_rel));
+    mxSetField(mx_ptr, 0, "reg_lower_limit", mxCreateDoubleScalar(settings.reg_lower_limit));
+    mxSetField(mx_ptr, 0, "reg_finetune_lower_limit", mxCreateDoubleScalar(settings.reg_finetune_lower_limit));
+    mxSetField(mx_ptr, 0, "reg_finetune_primal_update_threshold", mxCreateDoubleScalar((double) settings.reg_finetune_primal_update_threshold));
+    mxSetField(mx_ptr, 0, "reg_finetune_dual_update_threshold", mxCreateDoubleScalar((double) settings.reg_finetune_dual_update_threshold));
+    mxSetField(mx_ptr, 0, "max_iter", mxCreateDoubleScalar((double) settings.max_iter));
+    mxSetField(mx_ptr, 0, "max_factor_retires", mxCreateDoubleScalar((double) settings.max_factor_retires));
+    mxSetField(mx_ptr, 0, "preconditioner_scale_cost", mxCreateDoubleScalar(settings.preconditioner_scale_cost));
+    mxSetField(mx_ptr, 0, "preconditioner_iter", mxCreateDoubleScalar((double) settings.preconditioner_iter));
+    mxSetField(mx_ptr, 0, "tau", mxCreateDoubleScalar(settings.tau));
+    mxSetField(mx_ptr, 0, "iterative_refinement_always_enabled", mxCreateDoubleScalar(settings.iterative_refinement_always_enabled));
+    mxSetField(mx_ptr, 0, "iterative_refinement_eps_abs", mxCreateDoubleScalar(settings.iterative_refinement_eps_abs));
+    mxSetField(mx_ptr, 0, "iterative_refinement_eps_rel", mxCreateDoubleScalar(settings.iterative_refinement_eps_rel));
+    mxSetField(mx_ptr, 0, "iterative_refinement_max_iter", mxCreateDoubleScalar((double) settings.iterative_refinement_max_iter));
+    mxSetField(mx_ptr, 0, "iterative_refinement_min_improvement_rate", mxCreateDoubleScalar(settings.iterative_refinement_min_improvement_rate));
+    mxSetField(mx_ptr, 0, "iterative_refinement_static_regularization_eps", mxCreateDoubleScalar(settings.iterative_refinement_static_regularization_eps));
+    mxSetField(mx_ptr, 0, "iterative_refinement_static_regularization_rel", mxCreateDoubleScalar(settings.iterative_refinement_static_regularization_rel));
+    mxSetField(mx_ptr, 0, "verbose", mxCreateDoubleScalar(settings.verbose));
+    mxSetField(mx_ptr, 0, "compute_timings", mxCreateDoubleScalar(settings.compute_timings));
+
+    return mx_ptr;
+}
+
+void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& settings)
+{
+    settings.rho_init = (double) mxGetScalar(mxGetField(mx_ptr, 0, "rho_init"));
+    settings.delta_init = (double) mxGetScalar(mxGetField(mx_ptr, 0, "delta_init"));
+    settings.eps_abs = (double) mxGetScalar(mxGetField(mx_ptr, 0, "eps_abs"));
+    settings.eps_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "eps_rel"));
+    settings.check_duality_gap = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "check_duality_gap"));
+    settings.eps_duality_gap_abs = (double) mxGetScalar(mxGetField(mx_ptr, 0, "eps_duality_gap_abs"));
+    settings.eps_duality_gap_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "eps_duality_gap_rel"));
+    settings.reg_lower_limit = (double) mxGetScalar(mxGetField(mx_ptr, 0, "reg_lower_limit"));
+    settings.reg_finetune_lower_limit = (double) mxGetScalar(mxGetField(mx_ptr, 0, "reg_finetune_lower_limit"));
+    settings.reg_finetune_primal_update_threshold = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "reg_finetune_primal_update_threshold"));
+    settings.reg_finetune_dual_update_threshold = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "reg_finetune_dual_update_threshold"));
+    settings.max_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "max_iter"));
+    settings.max_factor_retires = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "max_factor_retires"));
+    settings.preconditioner_scale_cost = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "preconditioner_scale_cost"));
+    settings.preconditioner_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "preconditioner_iter"));
+    settings.tau = (double) mxGetScalar(mxGetField(mx_ptr, 0, "tau"));
+    settings.iterative_refinement_always_enabled = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_always_enabled"));
+    settings.iterative_refinement_eps_abs = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_eps_abs"));
+    settings.iterative_refinement_eps_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_eps_rel"));
+    settings.iterative_refinement_max_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_max_iter"));
+    settings.iterative_refinement_min_improvement_rate = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_min_improvement_rate"));
+    settings.iterative_refinement_static_regularization_eps = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_static_regularization_eps"));
+    settings.iterative_refinement_static_regularization_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_static_regularization_rel"));
+    settings.verbose = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "verbose"));
+    settings.compute_timings = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "compute_timings"));
+}
+
+mxArray* result_to_mx_struct(const piqp::Result<double>& result)
+{
+    int n_info_fields  = sizeof(PIQP_INFO_FIELDS) / sizeof(PIQP_INFO_FIELDS[0]);
+    mxArray* mx_info_ptr = mxCreateStructMatrix(1, 1, n_info_fields, PIQP_INFO_FIELDS);
+
+    mxSetField(mx_info_ptr, 0, "status", mxCreateString(piqp::status_to_string(result.info.status)));
+    mxSetField(mx_info_ptr, 0, "iter", mxCreateDoubleScalar((double) result.info.iter));
+    mxSetField(mx_info_ptr, 0, "rho", mxCreateDoubleScalar(result.info.rho));
+    mxSetField(mx_info_ptr, 0, "delta", mxCreateDoubleScalar(result.info.delta));
+    mxSetField(mx_info_ptr, 0, "mu", mxCreateDoubleScalar(result.info.mu));
+    mxSetField(mx_info_ptr, 0, "sigma", mxCreateDoubleScalar(result.info.sigma));
+    mxSetField(mx_info_ptr, 0, "primal_step", mxCreateDoubleScalar(result.info.primal_step));
+    mxSetField(mx_info_ptr, 0, "dual_step", mxCreateDoubleScalar(result.info.dual_step));
+    mxSetField(mx_info_ptr, 0, "primal_inf", mxCreateDoubleScalar(result.info.primal_inf));
+    mxSetField(mx_info_ptr, 0, "primal_rel_inf", mxCreateDoubleScalar(result.info.primal_rel_inf));
+    mxSetField(mx_info_ptr, 0, "dual_inf", mxCreateDoubleScalar(result.info.dual_inf));
+    mxSetField(mx_info_ptr, 0, "dual_rel_inf", mxCreateDoubleScalar(result.info.dual_rel_inf));
+    mxSetField(mx_info_ptr, 0, "primal_obj", mxCreateDoubleScalar(result.info.primal_obj));
+    mxSetField(mx_info_ptr, 0, "dual_obj", mxCreateDoubleScalar(result.info.dual_obj));
+    mxSetField(mx_info_ptr, 0, "duality_gap", mxCreateDoubleScalar(result.info.duality_gap));
+    mxSetField(mx_info_ptr, 0, "duality_gap_rel", mxCreateDoubleScalar(result.info.duality_gap_rel));
+    mxSetField(mx_info_ptr, 0, "factor_retires", mxCreateDoubleScalar((double) result.info.factor_retires));
+    mxSetField(mx_info_ptr, 0, "reg_limit", mxCreateDoubleScalar(result.info.reg_limit));
+    mxSetField(mx_info_ptr, 0, "no_primal_update", mxCreateDoubleScalar((double) result.info.no_primal_update));
+    mxSetField(mx_info_ptr, 0, "no_dual_update", mxCreateDoubleScalar((double) result.info.no_dual_update));
+    mxSetField(mx_info_ptr, 0, "setup_time", mxCreateDoubleScalar(result.info.setup_time));
+    mxSetField(mx_info_ptr, 0, "update_time", mxCreateDoubleScalar(result.info.update_time));
+    mxSetField(mx_info_ptr, 0, "solve_time", mxCreateDoubleScalar(result.info.solve_time));
+    mxSetField(mx_info_ptr, 0, "run_time", mxCreateDoubleScalar(result.info.run_time));
+
+    int n_result_fields  = sizeof(PIQP_RESULT_FIELDS) / sizeof(PIQP_RESULT_FIELDS[0]);
+    mxArray* mx_result_ptr = mxCreateStructMatrix(1, 1, n_result_fields, PIQP_RESULT_FIELDS);
+
+    mxSetField(mx_result_ptr, 0, "x", eigen_to_mx(result.x));
+    mxSetField(mx_result_ptr, 0, "y", eigen_to_mx(result.y));
+    mxSetField(mx_result_ptr, 0, "z", eigen_to_mx(result.z));
+    mxSetField(mx_result_ptr, 0, "z_lb", eigen_to_mx(result.z_lb));
+    mxSetField(mx_result_ptr, 0, "z_ub", eigen_to_mx(result.z_ub));
+    mxSetField(mx_result_ptr, 0, "s", eigen_to_mx(result.s));
+    mxSetField(mx_result_ptr, 0, "s_lb", eigen_to_mx(result.s_lb));
+    mxSetField(mx_result_ptr, 0, "s_ub", eigen_to_mx(result.s_ub));
+    mxSetField(mx_result_ptr, 0, "zeta", eigen_to_mx(result.zeta));
+    mxSetField(mx_result_ptr, 0, "lambda", eigen_to_mx(result.lambda));
+    mxSetField(mx_result_ptr, 0, "nu", eigen_to_mx(result.nu));
+    mxSetField(mx_result_ptr, 0, "nu_lb", eigen_to_mx(result.nu_lb));
+    mxSetField(mx_result_ptr, 0, "nu_ub", eigen_to_mx(result.nu_ub));
+    mxSetField(mx_result_ptr, 0, "info", mx_info_ptr);
+
+    return mx_result_ptr;
 }
 
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
@@ -109,6 +306,101 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         if (nlhs != 0 || nrhs != 2) {
             mexWarnMsgTxt("Unexpected arguments ignored.");
         }
+        return;
+    }
+
+    // Get settings
+    if (!strcmp("get_settings", cmd)) {
+        if (mex_handle->isDense()) {
+            plhs[0] = settings_to_mx_struct(mex_handle->as_dense_ptr()->settings());
+        } else {
+            plhs[0] = settings_to_mx_struct(mex_handle->as_sparse_ptr()->settings());
+        }
+        return;
+    }
+
+    // Update settings
+    if (!strcmp("update_settings", cmd)) {
+        if (mex_handle->isDense()) {
+            copy_mx_struct_to_settings(prhs[2], mex_handle->as_dense_ptr()->settings());
+        } else {
+            copy_mx_struct_to_settings(prhs[2], mex_handle->as_sparse_ptr()->settings());
+        }
+        return;
+    }
+
+    // Get problem dimensions
+    if (!strcmp("get_dimensions", cmd)) {
+        if (mex_handle->isDense()) {
+            plhs[0] = mxCreateDoubleScalar((double) mex_handle->as_dense_ptr()->result().x.rows());
+            plhs[1] = mxCreateDoubleScalar((double) mex_handle->as_dense_ptr()->result().y.rows());
+            plhs[2] = mxCreateDoubleScalar((double) mex_handle->as_dense_ptr()->result().z.rows());
+        } else {
+            plhs[0] = mxCreateDoubleScalar((double) mex_handle->as_sparse_ptr()->result().x.rows());
+            plhs[1] = mxCreateDoubleScalar((double) mex_handle->as_sparse_ptr()->result().y.rows());
+            plhs[2] = mxCreateDoubleScalar((double) mex_handle->as_sparse_ptr()->result().z.rows());
+        }
+        return;
+    }
+
+    if (!strcmp("setup", cmd)) {
+        const int n = (int) mxGetScalar(prhs[2]);
+        const int p = (int) mxGetScalar(prhs[3]);
+        const int m = (int) mxGetScalar(prhs[4]);
+
+        const mxArray* P_ptr = prhs[5];
+        const mxArray* c_ptr = prhs[6];
+        const mxArray* A_ptr = prhs[7];
+        const mxArray* b_ptr = prhs[8];
+        const mxArray* G_ptr = prhs[9];
+        const mxArray* h_ptr = prhs[10];
+        const mxArray* x_lb_ptr = prhs[11];
+        const mxArray* x_ub_ptr = prhs[12];
+
+        Eigen::Map<Vec> c(mxGetPr(c_ptr), n);
+        Eigen::Map<Vec> b(mxGetPr(b_ptr), p);
+        Eigen::Map<Vec> h(mxGetPr(h_ptr), m);
+        Eigen::Map<Vec> x_lb(mxGetPr(x_lb_ptr), n);
+        Eigen::Map<Vec> x_ub(mxGetPr(x_ub_ptr), n);
+
+        if (mex_handle->isDense()) {
+            copy_mx_struct_to_settings(prhs[13], mex_handle->as_dense_ptr()->settings());
+
+            Eigen::Map<Mat> P(mxGetPr(P_ptr), n, n);
+            Eigen::Map<Mat> A(mxGetPr(A_ptr), p, n);
+            Eigen::Map<Mat> G(mxGetPr(G_ptr), m, n);
+
+            mex_handle->as_dense_ptr()->setup(P, c, A, b, G, h, x_lb, x_ub);
+        } else {
+            copy_mx_struct_to_settings(prhs[13], mex_handle->as_sparse_ptr()->settings());
+
+            IVec Pp = to_int_vec(mxGetJc(P_ptr), n + 1);
+            IVec Pi = to_int_vec(mxGetIr(P_ptr), Pp(n));
+            Eigen::Map<SparseMat> P(n, n, (Eigen::Index) mxGetNzmax(P_ptr), Pp.data(), Pi.data(), mxGetPr(P_ptr));
+
+            IVec Ap = to_int_vec(mxGetJc(A_ptr), n + 1);
+            IVec Ai = to_int_vec(mxGetIr(A_ptr), Ap(n));
+            Eigen::Map<SparseMat> A(p, n, (Eigen::Index) mxGetNzmax(A_ptr), Ap.data(), Ai.data(), mxGetPr(A_ptr));
+
+            IVec Gp = to_int_vec(mxGetJc(G_ptr), n + 1);
+            IVec Gi = to_int_vec(mxGetIr(G_ptr), Gp(n));
+            Eigen::Map<SparseMat> G(m, n, (Eigen::Index) mxGetNzmax(G_ptr), Gp.data(), Gi.data(), mxGetPr(G_ptr));
+
+            mex_handle->as_sparse_ptr()->setup(P, c, A, b, G, h, x_lb, x_ub);
+        }
+
+        return;
+    }
+
+    if (!strcmp("solve", cmd)) {
+        if (mex_handle->isDense()) {
+            mex_handle->as_dense_ptr()->solve();
+            plhs[0] = result_to_mx_struct(mex_handle->as_dense_ptr()->result());
+        } else {
+            mex_handle->as_sparse_ptr()->solve();
+            plhs[0] = result_to_mx_struct(mex_handle->as_sparse_ptr()->result());
+        }
+
         return;
     }
 }
