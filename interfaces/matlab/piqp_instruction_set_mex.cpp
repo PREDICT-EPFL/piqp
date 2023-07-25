@@ -27,6 +27,11 @@ const char* INFO_FIELDS[] = { "avx2", "avx512f" };
 
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 {
+    // unused
+    (void) nlhs;
+    (void) nrhs;
+    (void) prhs;
+
     int n_info = sizeof(INFO_FIELDS) / sizeof(INFO_FIELDS[0]);
     mxArray* info_struct = mxCreateStructMatrix(1, 1, n_info, INFO_FIELDS);
 #if defined(CPU_FEATURES_ARCH_X86)
