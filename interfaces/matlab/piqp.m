@@ -13,17 +13,43 @@ classdef piqp < handle
     %
     % piqp Properties:
     %   piqpMexHandle - handle to the mex function
-    %   objectHandle - pointer to the C++ structure of PIQP solver
-    %   isDense - is dense or sparse backend used
+    %   objectHandle  - pointer to the C++ structure of PIQP solver
+    %   isDense       - is dense or sparse backend used
+    %   n             - number of variables
+    %   p             - number of equality constraints
+    %   m             - number of inequalty constraints
     %
     % piqp Methods:
     %
-    %   TODO
+    %   setup             - configure solver with problem data
+    %   solve             - solve the QP
+    %   update            - modify problem data
+    %
+    %   get_settings      - get the current solver settings
+    %   update_settings   - update the current solver settings
+    %
+    %   get_dimensions    - get the number of variables, equalty and
+    %                       inequalty constraints
+    %   version           - return OSQP version
 
     properties (SetAccess = private, Hidden = true)
         piqpMexHandle
         objectHandle % Handle to underlying C++ instance
-        isDense
+    end
+
+    properties (SetAccess = private)
+        isDense = false
+        n = 0
+        p = 0
+        m = 0
+    end
+
+    methods(Static)
+        %%
+        function out = version()
+            % Return PIQP version
+            out = piqp_mex('version');
+        end
     end
 
     methods
@@ -63,13 +89,13 @@ classdef piqp < handle
 
         %%
         function out = get_settings(this)
-            % GET_SETTINGS get the current solver settings structure
+            % GET_SETTINGS get the current solver settings structure.
             out = this.piqpMexHandle('get_settings', this.objectHandle);
         end
 
         %%
         function update_settings(this, varargin)
-            % UPDATE_SETTINGS update the current solver settings structure
+            % UPDATE_SETTINGS update the current solver settings structure.
 
             newSettings = validateSettings(this, varargin{:});
 
@@ -80,7 +106,7 @@ classdef piqp < handle
 
         %%
         function [n,p,m] = get_dimensions(this)
-            % GET_DIMENSIONS get the number of variables and constraints
+            % GET_DIMENSIONS get the number of variables and constraints.
 
             [n,p,m] = this.piqpMexHandle('get_dimensions', this.objectHandle);
         end
@@ -93,17 +119,17 @@ classdef piqp < handle
 
             % Get number of variables n
             if ~isempty(P)
-                n = size(P, 1);
-                assert(size(P, 2) == n, 'P must be square')
+                this.n = size(P, 1);
+                assert(size(P, 2) == this.n, 'P must be square')
             else
                 if ~isempty(c)
-                    n = length(c);
+                    this.n = length(c);
                 else
                     if ~isempty(A)
-                        n = size(A, 2);
+                        this.n = size(A, 2);
                     else
                         if ~isempty(G)
-                            n = size(G, 2);
+                            this.n = size(G, 2);
                         else
                             error('The problem does not have any variables');
                         end
@@ -113,18 +139,18 @@ classdef piqp < handle
 
             % Get number of equality constraints p
             if isempty(A)
-                p = 0;
+                this.p = 0;
             else
-                p = size(A, 1);
-                assert(size(A, 2) == n, 'Incorrect dimension of A');
+                this.p = size(A, 1);
+                assert(size(A, 2) == this.n, 'Incorrect dimension of A');
             end
 
             % Get number of inequality constraints m
             if isempty(G)
-                m = 0;
+                this.m = 0;
             else
-                m = size(G, 1);
-                assert(size(G, 2) == n, 'Incorrect dimension of G');
+                this.m = size(G, 1);
+                assert(size(G, 2) == this.n, 'Incorrect dimension of G');
             end
 
             %
@@ -132,9 +158,9 @@ classdef piqp < handle
             %
             if isempty(P)
                 if this.isDense
-                    P = zeros(n, n);
+                    P = zeros(this.n, this.n);
                 else
-                    P = sparse(n, n);
+                    P = sparse(this.n, this.n);
                 end
             else
                 if this.isDense
@@ -145,7 +171,7 @@ classdef piqp < handle
             end
 
             if isempty(c)
-                c = zeros(n, 1);
+                c = zeros(this.n, 1);
             else
                 c = full(c(:));
             end
@@ -157,11 +183,11 @@ classdef piqp < handle
 
             if isempty(A)
                 if this.isDense
-                    A = zeros(p, n);
+                    A = zeros(this.p, this.n);
                 else
-                    A = sparse(p, n);
+                    A = sparse(this.p, this.n);
                 end
-                b = zeros(p, 1);
+                b = zeros(this.p, 1);
             else
                 if this.isDense
                     A = full(A);
@@ -178,11 +204,11 @@ classdef piqp < handle
 
             if isempty(G)
                 if this.isDense
-                    G = zeros(m, n);
+                    G = zeros(this.m, this.n);
                 else
-                    G = sparse(m, n);
+                    G = sparse(this.m, this.n);
                 end
-                h = Inf(m, 1);
+                h = Inf(this.m, 1);
             else
                 if this.isDense
                     G = full(G);
@@ -193,13 +219,13 @@ classdef piqp < handle
             end
 
             if isempty(x_lb)
-                x_lb = -Inf(n, 1);
+                x_lb = -Inf(this.n, 1);
             else
                 x_lb = full(x_lb(:));
             end
 
             if isempty(x_ub)
-                x_ub = Inf(n, 1);
+                x_ub = Inf(this.n, 1);
             else
                 x_ub = full(x_ub(:));
             end
@@ -207,23 +233,89 @@ classdef piqp < handle
             %
             % Check vector dimensions
             %
-            assert(length(c) == n, 'Incorrect dimension of c');
-            assert(length(b) == p, 'Incorrect dimension of b');
-            assert(length(h) == m, 'Incorrect dimension of h');
-            assert(length(x_lb) == n, 'Incorrect dimension of x_lb');
-            assert(length(x_ub) == n, 'Incorrect dimension of x_ub');
+            assert(length(c) == this.n, 'Incorrect dimension of c');
+            assert(length(b) == this.p, 'Incorrect dimension of b');
+            assert(length(h) == this.m, 'Incorrect dimension of h');
+            assert(length(x_lb) == this.n, 'Incorrect dimension of x_lb');
+            assert(length(x_ub) == this.n, 'Incorrect dimension of x_ub');
 
             %make a settings structure from the remainder of the arguments.
             settings = validateSettings(this, varargin{:});
 
-            this.piqpMexHandle('setup',this.objectHandle,n,p,m,P,c,A,b,G,h,x_lb,x_ub,settings);
+            this.piqpMexHandle('setup',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h,x_lb,x_ub,settings);
         end
 
         %%
         function res = solve(this, varargin)
-            % SOLVE solve the QP
+            % SOLVE solve the QP.
 
             res = this.piqpMexHandle('solve', this.objectHandle);
+        end
+
+        %%
+        function update(this, P, c, A, b, G, h, x_lb, x_ub)
+            % UPDATE update problem data.
+            %
+            %   update(P,c,A,b,G,h,x_lb,x_ub)
+            %
+            %   Sparsity pattern has to be the same as used for setup.
+            %   To not update a field pass a empty matrix.
+
+            assert(this.n ~= 0, 'Problem is not initialized.')
+
+            if ~isempty(P)
+                if this.isDense
+                    P = full(P);
+                else
+                    P = sparse(P);
+                end
+                assert(size(P, 1) == this.n && size(P, 2) == this.n, 'Incorrect dimension of P')
+            end
+
+            if ~isempty(c)
+                c = full(c(:));
+                assert(length(c) == this.n, 'Incorrect dimension of c');
+            end
+
+            if ~isempty(A)
+                if this.isDense
+                    A = full(A);
+                else
+                    A = sparse(A);
+                end
+                assert(size(A, 1) == this.p && size(A, 2) == this.n, 'Incorrect dimension of A')
+            end
+
+            if ~isempty(b)
+                b = full(b(:));
+                assert(length(b) == this.p, 'Incorrect dimension of b');
+            end
+
+            if ~isempty(G)
+                if this.isDense
+                    G = full(G);
+                else
+                    G = sparse(G);
+                end
+                assert(size(G, 1) == this.m && size(G, 2) == this.n, 'Incorrect dimension of G')
+            end
+
+            if ~isempty(h)
+                h = full(h(:));
+                assert(length(h) == this.m, 'Incorrect dimension of h');
+            end
+
+            if ~isempty(x_lb)
+                x_lb = full(x_lb(:));
+                assert(length(x_lb) == this.n, 'Incorrect dimension of x_lb');
+            end
+
+            if ~isempty(x_ub)
+                x_ub = full(x_ub(:));
+                assert(length(x_ub) == this.n, 'Incorrect dimension of x_ub');
+            end
+
+            this.piqpMexHandle('update',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h,x_lb,x_ub);
         end
     end
 end

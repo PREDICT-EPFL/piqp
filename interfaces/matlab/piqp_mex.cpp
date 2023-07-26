@@ -9,7 +9,14 @@
 #include "mex.h"
 #include "piqp/piqp.hpp"
 
+#define STRINGIFY(x) #x
+#define MACRO_STRINGIFY(x) STRINGIFY(x)
+
 #define PIQP_MEX_SIGNATURE 0x271C1A7A
+
+#ifndef PIQP_VERSION
+#define PIQP_VERSION dev
+#endif
 
 using Vec = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 using IVec = Eigen::Matrix<int, Eigen::Dynamic, 1>;
@@ -282,6 +289,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         return;
     }
 
+    if (!strcmp("version", cmd)) {
+        plhs[0] = mxCreateString(MACRO_STRINGIFY(PIQP_VERSION));
+        return;
+    }
+
     // Check for a second input
     if (nrhs < 2) {
         mexErrMsgTxt("Second input should be a class instance handle.");
@@ -402,5 +414,74 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         }
 
         return;
+    }
+
+    if (!strcmp("update", cmd)) {
+        const int n = (int) mxGetScalar(prhs[2]);
+        const int p = (int) mxGetScalar(prhs[3]);
+        const int m = (int) mxGetScalar(prhs[4]);
+
+        const mxArray* P_ptr = prhs[5];
+        const mxArray* c_ptr = prhs[6];
+        const mxArray* A_ptr = prhs[7];
+        const mxArray* b_ptr = prhs[8];
+        const mxArray* G_ptr = prhs[9];
+        const mxArray* h_ptr = prhs[10];
+        const mxArray* x_lb_ptr = prhs[11];
+        const mxArray* x_ub_ptr = prhs[12];
+
+        piqp::optional<Eigen::Map<Vec>> c;
+        piqp::optional<Eigen::Map<Vec>> b;
+        piqp::optional<Eigen::Map<Vec>> h;
+        piqp::optional<Eigen::Map<Vec>> x_lb;
+        piqp::optional<Eigen::Map<Vec>> x_ub;
+        if (!mxIsEmpty(c_ptr)) { c = Eigen::Map<Vec>(mxGetPr(c_ptr), n); }
+        if (!mxIsEmpty(b_ptr)) { b = Eigen::Map<Vec>(mxGetPr(b_ptr), p); }
+        if (!mxIsEmpty(h_ptr)) { h = Eigen::Map<Vec>(mxGetPr(h_ptr), m); }
+        if (!mxIsEmpty(x_lb_ptr)) { x_lb = Eigen::Map<Vec>(mxGetPr(x_lb_ptr), n); }
+        if (!mxIsEmpty(x_ub_ptr)) { x_ub = Eigen::Map<Vec>(mxGetPr(x_ub_ptr), n); }
+
+        if (mex_handle->isDense()) {
+            piqp::optional<Eigen::Map<Mat>> P;
+            piqp::optional<Eigen::Map<Mat>> A;
+            piqp::optional<Eigen::Map<Mat>> G;
+            if (!mxIsEmpty(P_ptr)) { P = Eigen::Map<Mat>(mxGetPr(P_ptr), n, n); }
+            if (!mxIsEmpty(A_ptr)) { A = Eigen::Map<Mat>(mxGetPr(A_ptr), p, n); }
+            if (!mxIsEmpty(G_ptr)) { G = Eigen::Map<Mat>(mxGetPr(G_ptr), m, n); }
+
+            mex_handle->as_dense_ptr()->update(P, c, A, b, G, h, x_lb, x_ub);
+        } else {
+            piqp::optional<Eigen::Map<SparseMat>> P;
+            IVec Pp;
+            IVec Pi;
+            if (!mxIsEmpty(P_ptr)) {
+                Pp = to_int_vec(mxGetJc(P_ptr), n + 1);
+                Pi = to_int_vec(mxGetIr(P_ptr), Pp(n));
+                P = Eigen::Map<SparseMat>(n, n, (Eigen::Index) mxGetNzmax(P_ptr), Pp.data(), Pi.data(), mxGetPr(P_ptr));
+            }
+
+            piqp::optional<Eigen::Map<SparseMat>> A;
+            IVec Ap;
+            IVec Ai;
+            if (!mxIsEmpty(A_ptr)) {
+                Ap = to_int_vec(mxGetJc(A_ptr), n + 1);
+                Ai = to_int_vec(mxGetIr(A_ptr), Ap(n));
+                A = Eigen::Map<SparseMat>(p, n, (Eigen::Index) mxGetNzmax(A_ptr), Ap.data(), Ai.data(), mxGetPr(A_ptr));
+            }
+
+            piqp::optional<Eigen::Map<SparseMat>> G;
+            IVec Gp;
+            IVec Gi;
+            if (!mxIsEmpty(G_ptr)) {
+                Gp = to_int_vec(mxGetJc(G_ptr), n + 1);
+                Gi = to_int_vec(mxGetIr(G_ptr), Gp(n));
+                G = Eigen::Map<SparseMat>(m, n, (Eigen::Index) mxGetNzmax(G_ptr), Gp.data(), Gi.data(), mxGetPr(G_ptr));
+            }
+
+            mex_handle->as_sparse_ptr()->update(P, c, A, b, G, h, x_lb, x_ub);
+        }
+
+        // Got here, so command not recognized
+        mexErrMsgTxt("Command not recognized.");
     }
 }
