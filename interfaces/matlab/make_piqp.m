@@ -66,11 +66,11 @@ cmake_args = [
     '-DBUILD_BENCHMARKS=OFF'];
 
 % Add specific generators for windows linux or mac
-if (ispc)
-    cmake_args = sprintf('%s %s', cmake_args, '-G "MinGW Makefiles"');
-else
-    cmake_args = sprintf('%s %s', cmake_args, '-G "Unix Makefiles"');
-end
+% if (ispc)
+%     cmake_args = sprintf('%s %s', cmake_args, '-G "MinGW Makefiles"');
+% else
+%     cmake_args = sprintf('%s %s', cmake_args, '-G "Unix Makefiles"');
+% end
 
 % Pass Matlab root to cmake
 Matlab_ROOT = strrep(matlabroot, '\', '/');
