@@ -481,7 +481,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
             mex_handle->as_sparse_ptr()->update(P, c, A, b, G, h, x_lb, x_ub);
         }
 
-        // Got here, so command not recognized
-        mexErrMsgTxt("Command not recognized.");
+        return;
     }
+
+    // Got here, so command not recognized
+    mexErrMsgTxt("Command not recognized.");
 }
