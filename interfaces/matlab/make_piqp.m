@@ -105,7 +105,7 @@ if any(strcmpi(what,'mex')) || any(strcmpi(what,'all'))
         disp(output);
     end
 
-    [status, output] = system(sprintf('%s %s', make_cmd, '--target all'));
+    [status, output] = system(make_cmd);
     if (status)
         fprintf('\n');
         disp(output);
