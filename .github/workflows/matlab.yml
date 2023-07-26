@@ -32,6 +32,9 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: Setup external build directory
+        run: mkdir -p build_external
+
       - name: Install Eigen
         working-directory: build_external
         run: bash  ../ci/install_eigen.sh
