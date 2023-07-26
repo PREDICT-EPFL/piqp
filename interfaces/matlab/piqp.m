@@ -253,15 +253,40 @@ classdef piqp < handle
         end
 
         %%
-        function update(this, P, c, A, b, G, h, x_lb, x_ub)
+        function update(this, varargin)
             % UPDATE update problem data.
-            %
-            %   update(P,c,A,b,G,h,x_lb,x_ub)
-            %
-            %   Sparsity pattern has to be the same as used for setup.
-            %   To not update a field pass a empty matrix.
 
             assert(this.n ~= 0, 'Problem is not initialized.')
+
+            allowedFields = {'P','c','A','b','G','h','x_lb', 'x_ub'};
+
+            if isempty(varargin)
+                return;
+            elseif length(varargin) == 1
+                if(~isstruct(varargin{1}))
+                    error('Single input should be a structure with new problem data');
+                else
+                    newData = varargin{1};
+                end
+            else % param / value style assumed
+                newData = struct(varargin{:});
+            end
+
+            %check for unknown fields
+            newFields = fieldnames(newData);
+            badFieldsIdx = find(~ismember(newFields,allowedFields));
+            if(~isempty(badFieldsIdx))
+                 error('Unrecognized input field ''%s'' detected',newFields{badFieldsIdx(1)});
+            end
+
+            if isfield(newData, 'P'); P = newData.P; else; P = []; end
+            if isfield(newData, 'c'); c = newData.c; else; c = []; end
+            if isfield(newData, 'A'); A = newData.A; else; A = []; end
+            if isfield(newData, 'b'); b = newData.b; else; b = []; end
+            if isfield(newData, 'G'); G = newData.G; else; G = []; end
+            if isfield(newData, 'h'); h = newData.h; else; h = []; end
+            if isfield(newData, 'x_lb'); x_lb = newData.x_lb; else; x_lb = []; end
+            if isfield(newData, 'x_ub'); x_ub = newData.x_ub; else; x_ub = []; end
 
             if ~isempty(P)
                 if this.isDense
