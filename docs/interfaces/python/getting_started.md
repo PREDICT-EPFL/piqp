@@ -35,7 +35,7 @@ x_ub = np.array([1, np.inf], dtype=np.float64)
 
 For the sparse interface $$P$$, $$A$$, and $$G$$ have to be in compressed sparse column (CSC) format.
 
-```c
+```python
 P = sparse.csc_matrix([[6, 0], [0, 4]], dtype=np.float64)
 A = sparse.csc_matrix([[1, -2]], dtype=np.float64)
 G = sparse.csc_matrix([[1, -1], [2, 0]], dtype=np.float64)
@@ -45,7 +45,7 @@ G = sparse.csc_matrix([[1, -1], [2, 0]], dtype=np.float64)
 
 You can instantiate a solver object using
 
-```c++
+```python
 // for dense problems
 solver = piqp.DenseSolver()
 // or for sparse problems
@@ -56,7 +56,7 @@ solver = piqp.SparseSolver()
 
 Settings can be directly set on the solver object:
 
-```c++
+```python
 solver.settings.verbose = True
 solver.settings.compute_timings = True
 ```
@@ -67,7 +67,7 @@ In this example we enable the verbose output and internal timings. The full set 
 
 We can now set up the problem using
 
-```c++
+```python
 solver.setup(P, c, A, b, G, h, x_lb, x_ub)
 ```
 
@@ -75,7 +75,7 @@ The data is internally copied, and the solver initializes all internal data stru
 
 Now, the problem can be solver using
 
-```c++
+```python
 status = solver.solve()
 ```
 

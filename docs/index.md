@@ -36,7 +36,8 @@ ArXiv, 2023
 PIQP support a wide range of interfaces including
 * C/C++ (with Eigen support)
 * Python
-* Matlab (soon)
+* Matlab
+* R (soon)
 * Julia (soon)
 * Rust (soon)
 
@@ -58,7 +59,7 @@ PIQP is build on the following open-source libraries:
 * [SuiteSparse - LDL](https://github.com/DrTimothyAldenDavis/SuiteSparse) (modified version): Used for solving linear systems in the sparse solver.
 * [pybind11](https://github.com/pybind/pybind11): Used for generating the python bindings.
 * [cpu_features](https://github.com/google/cpu_features): Used for run-time instruction set detection in the interface bindings.
-* [OSQP](https://github.com/osqp/osqp): The C interface is inspired by OSQP.
+* [OSQP](https://github.com/osqp/osqp): The C and Matlab interface is inspired by OSQP.
 * [Clarabel](https://github.com/oxfordcontrol/Clarabel.rs): Parts of the iterative refinement scheme are inspired by Clarabel's implementation.
 
 ### License

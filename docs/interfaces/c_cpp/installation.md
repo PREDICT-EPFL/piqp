@@ -27,7 +27,7 @@ cmake --build .
 Note that by setting `-march=native`, we allow the compiler to optimize for the full available instruction set on the machine compiling the code.
 * Install libraries and header files
 ```shell
-cmake --build . --target install
+cmake --install .
 ```
 This will install the C++ and C headers and the static and shared library for the C interface.
 
