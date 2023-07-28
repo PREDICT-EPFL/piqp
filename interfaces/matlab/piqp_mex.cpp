@@ -53,6 +53,7 @@ const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "compute_timings"};
 
 const char* PIQP_INFO_FIELDS[] = {"status",
+                                  "status_val",
                                   "iter",
                                   "rho",
                                   "delta",
@@ -216,6 +217,7 @@ mxArray* result_to_mx_struct(const piqp::Result<double>& result)
     mxArray* mx_info_ptr = mxCreateStructMatrix(1, 1, n_info_fields, PIQP_INFO_FIELDS);
 
     mxSetField(mx_info_ptr, 0, "status", mxCreateString(piqp::status_to_string(result.info.status)));
+    mxSetField(mx_info_ptr, 0, "status_val", mxCreateDoubleScalar((double) result.info.status));
     mxSetField(mx_info_ptr, 0, "iter", mxCreateDoubleScalar((double) result.info.iter));
     mxSetField(mx_info_ptr, 0, "rho", mxCreateDoubleScalar(result.info.rho));
     mxSetField(mx_info_ptr, 0, "delta", mxCreateDoubleScalar(result.info.delta));
