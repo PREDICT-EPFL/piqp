@@ -13,7 +13,7 @@ target_include_directories(piqp_c_static PUBLIC
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/piqp_c>
 )
 target_link_libraries(piqp_c_static PRIVATE piqp)
-set_target_properties(piqp_c_static PROPERTIES OUTPUT_NAME piqp)
+set_target_properties(piqp_c_static PROPERTIES OUTPUT_NAME piqpc)
 add_library(piqp::piqp_c_static ALIAS piqp_c_static)
 
 add_library(piqp_c_shared SHARED src/piqp.cpp include/piqp.h)
@@ -22,7 +22,7 @@ target_include_directories(piqp_c_shared PUBLIC
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/piqp_c>
 )
 target_link_libraries(piqp_c_shared PRIVATE piqp)
-set_target_properties(piqp_c_shared PROPERTIES OUTPUT_NAME piqp)
+set_target_properties(piqp_c_shared PROPERTIES OUTPUT_NAME piqpcstatic)
 add_library(piqp::piqp_c_shared ALIAS piqp_c_shared)
 
 install(
