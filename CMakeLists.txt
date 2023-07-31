@@ -12,6 +12,8 @@ project(piqp
     LANGUAGES C CXX
 )
 
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
 #### User options ####
 option(BUILD_C_INTERFACE "Build C interface" ON)
 option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
