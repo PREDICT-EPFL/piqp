@@ -59,6 +59,11 @@ if (ENABLE_SANITIZERS)
 endif ()
 
 if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
+    # building for conda-forge, TARGET_OS_OSX is not properly set, i.e., macOS is not correctly detected
+    if (DEFINED ENV{CONDA_TOOLCHAIN_BUILD} AND APPLE)
+        add_definitions(-DTARGET_OS_OSX=1)
+    endif ()
+
     # Find cpu_features
     include(FetchContent)
     FetchContent_Declare(
