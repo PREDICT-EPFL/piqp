@@ -60,12 +60,27 @@ endif ()
 
 if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
     # Find cpu_features
+    include(FetchContent)
+    FetchContent_Declare(
+        cpu_features
+        GIT_REPOSITORY https://github.com/google/cpu_features.git
+        GIT_TAG        936b9ab5515dead115606559502e3864958f7f6e # v0.8.0
+    )
     set(BUILD_TESTING OFF)
-    add_subdirectory(external/cpu_features EXCLUDE_FROM_ALL)
+    FetchContent_GetProperties(cpu_features)
+    if(NOT cpu_features_POPULATED)
+        FetchContent_Populate(cpu_features)
+        add_subdirectory(${cpu_features_SOURCE_DIR} ${cpu_features_BINARY_DIR} EXCLUDE_FROM_ALL)
+    endif()
 
     # Find pybind11
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
-    add_subdirectory(external/pybind11 ${CMAKE_CURRENT_BINARY_DIR}/external/pybind11)
+    include(FetchContent)
+    FetchContent_Declare(
+        pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG        8a099e44b3d5f85b20f05828d919d2332a8de841 # v2.11.1
+    )
+    FetchContent_MakeAvailable(pybind11)
 endif ()
 
 # Find Eigen3.3+

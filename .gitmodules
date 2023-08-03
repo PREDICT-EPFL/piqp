@@ -1,6 +1,0 @@
-[submodule "interfaces/python/external/pybind11"]
-	path = external/pybind11
-	url = https://github.com/pybind/pybind11.git
-[submodule "interfaces/python/external/cpu_features"]
-	path = external/cpu_features
-	url = https://github.com/google/cpu_features.git
