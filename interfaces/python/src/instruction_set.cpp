@@ -8,6 +8,11 @@
 
 #include <pybind11/pybind11.h>
 
+// building for conda-forge, TARGET_OS_OSX is not properly set, i.e., macOS is not correctly detected
+#if defined(TARGET_OS_MAC)
+#define TARGET_OS_OSX 1
+#endif
+
 #if defined(CPU_FEATURES_AVAILABLE)
 #include "cpu_features_macros.h"
 #endif
