@@ -6,8 +6,8 @@
 
 [![Docs](https://img.shields.io/badge/Docs-available-brightgreen.svg)](https://predict-epfl.github.io/piqp/)
 ![License](https://img.shields.io/badge/License-BSD--2--Clause-brightgreen.svg)
-![PyPI - downloads](https://img.shields.io/pypi/dm/piqp.svg?label=PyPI%20downloads)
-![Conda - downloads](https://img.shields.io/conda/dn/conda-forge/piqp.svg?label=Conda%20downloads)
+[![PyPI - downloads](https://img.shields.io/pypi/dm/piqp.svg?label=PyPI%20downloads)](https://pypi.org/project/piqp/)
+[![Conda - downloads](https://img.shields.io/conda/dn/conda-forge/piqp.svg?label=Conda%20downloads)](https://anaconda.org/conda-forge/piqp)
 
 PIQP is a Proximal Interior Point Quadratic Programming solver, which can solve dense and sparse quadratic programs of the form
 
