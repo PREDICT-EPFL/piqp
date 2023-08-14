@@ -14,6 +14,14 @@ PIQP can be directly installed via pip:
 pip install piqp
 ```
 
+## Installing using conda
+
+PIQP can be directly installed via anaconda/miniconda:
+
+```shell
+conda install -c conda-forge piqp
+```
+
 ## Building and Installing from Source
 
 {% root_include _common/building_from_source_deps.md %}
