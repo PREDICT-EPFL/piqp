@@ -53,7 +53,7 @@ All contributors are affiliated with the [Laboratoire d'Automatique](https://www
 
 This work was supported by the [Swiss National Science Foundation](https://www.snf.ch/) under the [NCCR Automation](https://nccr-automation.ch/) (grant agreement 51NF40_180545).
 
-PIQP is build on the following open-source libraries:
+PIQP is an adapted implementation of [work](https://link.springer.com/article/10.1007/s10589-020-00240-9) by Spyridon Pougkakiotis and Jacek Gondzio, and is built on the following open-source libraries:
 * [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page): It's the work horse under the hood, responsible for producing optimized numerical linear algebra code.
 * [ProxSuite](https://github.com/Simple-Robotics/proxsuite): The code structure (folder/namespace structure, etc.), some utility functions/helper macros, and the instruction set optimized python bindings are based on ProxSuite.
 * [SuiteSparse - LDL](https://github.com/DrTimothyAldenDavis/SuiteSparse) (modified version): Used for solving linear systems in the sparse solver.
