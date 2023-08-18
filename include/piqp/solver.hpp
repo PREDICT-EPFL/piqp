@@ -136,13 +136,13 @@ public:
             piqp_print("\n");
             piqp_print("status:               %s\n", status_to_string(status));
             piqp_print("number of iterations: %zd\n", m_result.info.iter);
-            piqp_print("objective:            %.5e\n", m_result.info.primal_obj);
+            piqp_print("objective:            %.5e\n", (double) m_result.info.primal_obj);
             if (m_settings.compute_timings)
             {
-                piqp_print("total run time:       %.3es\n", m_result.info.run_time);
-                piqp_print("  setup time:         %.3es\n", m_result.info.setup_time);
-                piqp_print("  update time:        %.3es\n", m_result.info.update_time);
-                piqp_print("  solve time:         %.3es\n", m_result.info.solve_time);
+                piqp_print("total run time:       %.3es\n", (double) m_result.info.run_time);
+                piqp_print("  setup time:         %.3es\n", (double) m_result.info.setup_time);
+                piqp_print("  update time:        %.3es\n", (double) m_result.info.update_time);
+                piqp_print("  solve time:         %.3es\n", (double) m_result.info.solve_time);
             }
         }
 
@@ -456,16 +456,16 @@ protected:
             {
                 piqp_print("%3zd   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.4f   %.4f\n",
                         m_result.info.iter,
-                        m_result.info.primal_obj,
-                        m_result.info.dual_obj,
-                        m_result.info.duality_gap,
-                        m_result.info.primal_inf,
-                        m_result.info.dual_inf,
-                        m_result.info.rho,
-                        m_result.info.delta,
-                        m_result.info.mu,
-                        m_result.info.primal_step,
-                        m_result.info.dual_step);
+                        (double) m_result.info.primal_obj,
+                        (double) m_result.info.dual_obj,
+                        (double) m_result.info.duality_gap,
+                        (double) m_result.info.primal_inf,
+                        (double) m_result.info.dual_inf,
+                        (double) m_result.info.rho,
+                        (double) m_result.info.delta,
+                        (double) m_result.info.mu,
+                        (double) m_result.info.primal_step,
+                        (double) m_result.info.dual_step);
             }
 
             if (m_result.info.primal_inf < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf &&
@@ -735,6 +735,8 @@ protected:
 
     void update_nr_residuals()
     {
+        using std::abs;
+
         // first part of dual residual and infeasibility calculation (used in cost calculation)
         rx_nr.noalias() = -m_data.P_utri * m_result.x;
         rx_nr.noalias() -= m_data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * m_result.x;
@@ -744,24 +746,24 @@ protected:
         T tmp = -m_result.x.dot(rx_nr); // x'Px
         m_result.info.primal_obj = T(0.5) * tmp;
         m_result.info.dual_obj = -T(0.5) * tmp;
-        m_result.info.duality_gap_rel = m_preconditioner.unscale_cost(std::abs(tmp));
+        m_result.info.duality_gap_rel = m_preconditioner.unscale_cost(abs(tmp));
         tmp = m_data.c.dot(m_result.x);
         m_result.info.primal_obj += tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
+        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
         tmp = m_data.b.dot(m_result.y);
         m_result.info.dual_obj -= tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
+        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
         tmp = m_data.h.dot(m_result.z);
         m_result.info.dual_obj -= tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
+        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
         tmp = m_data.x_lb_n.head(m_data.n_lb).dot(m_result.z_lb.head(m_data.n_lb));
         m_result.info.dual_obj -= tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
+        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
         tmp = m_data.x_ub.head(m_data.n_ub).dot(m_result.z_ub.head(m_data.n_ub));
         m_result.info.dual_obj -= tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(std::abs(tmp)));
+        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
 
-        m_result.info.duality_gap = std::abs(m_result.info.primal_obj - m_result.info.dual_obj);
+        m_result.info.duality_gap = abs(m_result.info.primal_obj - m_result.info.dual_obj);
 
         m_result.info.primal_obj = m_preconditioner.unscale_cost(m_result.info.primal_obj);
         m_result.info.dual_obj = m_preconditioner.unscale_cost(m_result.info.dual_obj);

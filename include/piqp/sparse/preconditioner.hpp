@@ -25,9 +25,6 @@ namespace sparse
 template<typename T, typename I>
 class RuizEquilibration
 {
-    static constexpr T min_scaling = 1e-4;
-    static constexpr T max_scaling = 1e4;
-
     isize n = 0;
     isize p = 0;
     isize m = 0;
@@ -72,6 +69,8 @@ public:
 
     inline void scale_data(Data<T, I>& data, bool reuse_prev_scaling = false, bool scale_cost = false, isize max_iter = 10, T epsilon = T(1e-3))
     {
+        using std::abs;
+
         n_lb = data.n_lb;
         n_ub = data.n_ub;
 
@@ -104,10 +103,10 @@ public:
                     for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
                     {
                         I i_row = P_utri_it.index();
-                        delta_iter(j) = std::max(delta_iter(j), std::abs(P_utri_it.value()));
+                        delta_iter(j) = std::max(delta_iter(j), abs(P_utri_it.value()));
                         if (i_row != j)
                         {
-                            delta_iter(i_row) = std::max(delta_iter(i_row), std::abs(P_utri_it.value()));
+                            delta_iter(i_row) = std::max(delta_iter(i_row), abs(P_utri_it.value()));
                         }
                     }
                 }
@@ -116,8 +115,8 @@ public:
                     for (typename SparseMat<T, I>::InnerIterator AT_it(data.AT, j); AT_it; ++AT_it)
                     {
                         I i_row = AT_it.index();
-                        delta_iter(i_row) = std::max(delta_iter(i_row), std::abs(AT_it.value()));
-                        delta_iter(n + j) = std::max(delta_iter(n + j), std::abs(AT_it.value()));
+                        delta_iter(i_row) = std::max(delta_iter(i_row), abs(AT_it.value()));
+                        delta_iter(n + j) = std::max(delta_iter(n + j), abs(AT_it.value()));
                     }
                 }
                 for (isize j = 0; j < m; j++)
@@ -125,8 +124,8 @@ public:
                     for (typename SparseMat<T, I>::InnerIterator GT_it(data.GT, j); GT_it; ++GT_it)
                     {
                         I i_row = GT_it.index();
-                        delta_iter(i_row) = std::max(delta_iter(i_row), std::abs(GT_it.value()));
-                        delta_iter(n + p + j) = std::max(delta_iter(n + p + j), std::abs(GT_it.value()));
+                        delta_iter(i_row) = std::max(delta_iter(i_row), abs(GT_it.value()));
+                        delta_iter(n + p + j) = std::max(delta_iter(n + p + j), abs(GT_it.value()));
                     }
                 }
                 for (isize j = 0; j < n_lb; j++)
@@ -185,10 +184,10 @@ public:
                         for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
                         {
                             I i_row = P_utri_it.index();
-                            delta_iter_cost(j) = std::max(delta_iter_cost(j), std::abs(P_utri_it.value()));
+                            delta_iter_cost(j) = std::max(delta_iter_cost(j), abs(P_utri_it.value()));
                             if (i_row != j)
                             {
-                                delta_iter_cost(i_row) = std::max(delta_iter_cost(i_row), std::abs(P_utri_it.value()));
+                                delta_iter_cost(i_row) = std::max(delta_iter_cost(i_row), abs(P_utri_it.value()));
                             }
                         }
                     }
@@ -455,6 +454,9 @@ protected:
     }
     inline void limit_scaling(T& d) const
     {
+        const T min_scaling = 1e-4;
+        const T max_scaling = 1e4;
+
         if (d < min_scaling)
         {
             d = T(1);
