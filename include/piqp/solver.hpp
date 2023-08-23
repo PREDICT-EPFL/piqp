@@ -479,8 +479,8 @@ protected:
             rx = rx_nr - m_result.info.rho * (m_result.x - m_result.zeta);
             ry = ry_nr - m_result.info.delta * (m_result.lambda - m_result.y);
             rz = rz_nr - m_result.info.delta * (m_result.nu - m_result.z);
-            rz_lb.head(m_data.n_lb) = rz_lb_nr.head(m_data.n_lb) - m_result.info.delta * (nu_lb - z_lb);
-            rz_ub.head(m_data.n_ub) = rz_ub_nr.head(m_data.n_ub) - m_result.info.delta * (nu_ub - z_ub);
+            rz_lb.head(m_data.n_lb) = rz_lb_nr.head(m_data.n_lb) - m_result.info.delta * (nu_lb.head(m_data.n_lb) - z_lb.head(m_data.n_lb));
+            rz_ub.head(m_data.n_ub) = rz_ub_nr.head(m_data.n_ub) - m_result.info.delta * (nu_ub.head(m_data.n_ub) - z_ub.head(m_data.n_ub));
 
             if (m_result.info.no_dual_update > std::min(isize(5), m_settings.reg_finetune_dual_update_threshold) &&
                 primal_prox_inf() > 1e12 &&
