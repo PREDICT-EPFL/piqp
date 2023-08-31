@@ -44,12 +44,14 @@ endfunction()
 if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
     set(AVX_COMPILE_OPTION "/arch:AVX")
     set(AVX2_COMPILE_OPTION "/arch:AVX2")
-    set(FMA_COMPILE_OPTION "/fp:fast,")
+    # set(FMA_COMPILE_OPTION "/fp:fast,")
+    set(FMA_COMPILE_OPTION "") # disable fma instructions since with gcc this leads to numerical issues
     set(AVX512_COMPILE_OPTION "/arch:AVX512")
 else()
     set(AVX_COMPILE_OPTION "-mavx")
     set(AVX2_COMPILE_OPTION "-mavx2")
-    set(FMA_COMPILE_OPTION "-mfma")
+    # set(FMA_COMPILE_OPTION "-mfma")
+    set(FMA_COMPILE_OPTION "") # disable fma instructions since with gcc this leads to numerical issues
     set(AVX512_COMPILE_OPTION "-mavx512f")
 endif()
 
