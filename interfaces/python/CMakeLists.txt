@@ -36,19 +36,17 @@ endfunction()
 if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
     set(AVX_COMPILE_OPTION "/arch:AVX")
     set(AVX2_COMPILE_OPTION "/arch:AVX2")
-    # set(FMA_COMPILE_OPTION "/fp:fast,")
-    set(FMA_COMPILE_OPTION "") # disable fma instructions since with gcc this leads to numerical issues
+    set(FMA_COMPILE_OPTION "/fp:fast,")
     set(AVX512_COMPILE_OPTION "/arch:AVX512")
 else()
     set(AVX_COMPILE_OPTION "-mavx")
     set(AVX2_COMPILE_OPTION "-mavx2")
-    # set(FMA_COMPILE_OPTION "-mfma")
-    set(FMA_COMPILE_OPTION "") # disable fma instructions since with gcc this leads to numerical issues
+    set(FMA_COMPILE_OPTION "-mfma")
     set(AVX512_COMPILE_OPTION "-mavx512f")
 endif()
 
 create_piqp_python_target(piqp_python "")
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-    create_piqp_python_target(piqp_python_avx2 "${AVX2_COMPILE_OPTION};${FMA_COMPILE_OPTION}")
+    create_piqp_python_target(piqp_python_avx2 "${AVX2_COMPILE_OPTION}") # disable fma instructions since with gcc this leads to numerical issues
     create_piqp_python_target(piqp_python_avx512 "${AVX512_COMPILE_OPTION};${FMA_COMPILE_OPTION}")
 endif()
