@@ -8,16 +8,26 @@
 cmake_minimum_required(VERSION 3.5)
 
 project(piqp
-    VERSION 0.2.2
+    VERSION 0.2.3
     LANGUAGES C CXX
 )
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-#### User options ####
+# Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
+#### Ordering options ####
+option(BUILD_WITH_AMD_METIS_ORDERING_SUPPORT "Build with AMD and Metis ordering support (requires SuiteSparse an Metis)" OFF)
+
+#### Interface options ####
 option(BUILD_C_INTERFACE "Build C interface" ON)
 option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
 option(BUILD_MATLAB_INTERFACE "Build Matlab interface" OFF)
+
+#### Tests/Benchmarks options ####
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_MAROS_MESZAROS_TEST "Build maros meszaros tests" OFF)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
@@ -68,8 +78,7 @@ if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE OR BUILD_MAROS_MESZAROS_TES
     include(FetchContent)
     FetchContent_Declare(
         cpu_features
-        GIT_REPOSITORY https://github.com/google/cpu_features.git
-        GIT_TAG        936b9ab5515dead115606559502e3864958f7f6e # v0.8.0
+        URL https://github.com/google/cpu_features/archive/936b9ab5515dead115606559502e3864958f7f6e.zip # v0.8.0
     )
     set(BUILD_TESTING OFF)
     FetchContent_GetProperties(cpu_features)
@@ -82,8 +91,7 @@ if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE OR BUILD_MAROS_MESZAROS_TES
     include(FetchContent)
     FetchContent_Declare(
         pybind11
-        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG        8a099e44b3d5f85b20f05828d919d2332a8de841 # v2.11.1
+        URL https://github.com/pybind/pybind11/archive/8a099e44b3d5f85b20f05828d919d2332a8de841.zip # v2.11.1
     )
     FetchContent_MakeAvailable(pybind11)
 endif ()
@@ -106,9 +114,22 @@ target_include_directories(piqp INTERFACE
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_link_libraries(piqp INTERFACE Eigen3::Eigen)
+
+if (BUILD_WITH_AMD_METIS_ORDERING_SUPPORT)
+    message(STATUS "Building with AMD/METIS support")
+
+    find_package(SuiteSparse COMPONENTS AMD REQUIRED)
+    find_package(METIS REQUIRED)
+
+    target_link_libraries(piqp INTERFACE SuiteSparse::AMD METIS::METIS)
+else ()
+    message(STATUS "Building without AMD/METIS support")
+endif ()
+
 if (DEBUG_PRINTS)
     target_compile_definitions(piqp INTERFACE PIQP_DEBUG_PRINT)
 endif ()
+
 add_library(piqp::piqp ALIAS piqp)
 
 if (BUILD_C_INTERFACE)
