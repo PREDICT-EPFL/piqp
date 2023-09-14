@@ -7,12 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.3] - 2023-09-13
+## [0.2.3] - 2023-09-14
 
 ### Changed
 
 - Allow compilation with custom scalar types like mpreal.
-- Disable fma instructions for python and matlab interface since with gcc this can lead to numerical instabilities.
+- Disable floating point contractions in sparse ldlt.
 
 ## [0.2.2] - 2023-08-04
 
