@@ -12,6 +12,14 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
+// Disable FMA instructions
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+#pragma float_control(push)
+#pragma fp_contract(off)
+#elif defined(__GNUC__) || defined(__clang__)
+#pragma STDC FP_CONTRACT OFF
+#endif
+
 namespace piqp
 {
 
@@ -205,5 +213,11 @@ struct LDLt
 } // namespace sparse
 
 } // namespace piqp
+
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+#pragma float_control(pop)
+#elif defined(__GNUC__) || defined(__clang__)
+#pragma STDC FP_CONTRACT DEFAULT
+#endif
 
 #endif //PIQP_SPARSE_LDLT_HPP
