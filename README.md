@@ -64,7 +64,6 @@ PIQP is an adapted implementation of [work](https://link.springer.com/article/10
 ## Citing our Work
 
 If you found PIQP useful in your scientific work, we encourage you to cite our accompanying paper:
-
 ```
 @misc{schwan2023,
     author = {Schwan, Roland and Jiang, Yuning and Kuhn, Daniel and Jones, Colin N.},
@@ -73,6 +72,7 @@ If you found PIQP useful in your scientific work, we encourage you to cite our a
     eprint = {arXiv:2304.00290},
 }
 ```
+The benchmarks are available in the following repo: [piqp_benchmarks](https://github.com/PREDICT-EPFL/piqp_benchmarks)
 
 ## License
 
