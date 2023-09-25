@@ -19,9 +19,6 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
     cmake_policy(SET CMP0135 NEW)
 endif()
 
-#### Ordering options ####
-option(BUILD_WITH_AMD_METIS_ORDERING_SUPPORT "Build with AMD and Metis ordering support (requires SuiteSparse an Metis)" OFF)
-
 #### Interface options ####
 option(BUILD_C_INTERFACE "Build C interface" ON)
 option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
@@ -114,17 +111,6 @@ target_include_directories(piqp INTERFACE
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_link_libraries(piqp INTERFACE Eigen3::Eigen)
-
-if (BUILD_WITH_AMD_METIS_ORDERING_SUPPORT)
-    message(STATUS "Building with AMD/METIS support")
-
-    find_package(SuiteSparse COMPONENTS AMD REQUIRED)
-    find_package(METIS REQUIRED)
-
-    target_link_libraries(piqp INTERFACE SuiteSparse::AMD METIS::METIS)
-else ()
-    message(STATUS "Building without AMD/METIS support")
-endif ()
 
 if (DEBUG_PRINTS)
     target_compile_definitions(piqp INTERFACE PIQP_DEBUG_PRINT)
