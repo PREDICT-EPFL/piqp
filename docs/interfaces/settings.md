@@ -2,7 +2,7 @@
 title: Settings
 layout: default
 parent: Interfaces
-nav_order: 3
+nav_order: 10
 ---
 
 All interfaces have the same internal solver settings. Note that the default settings have been tuned for 64bit floating point data types (i.e. `double`). If the solver is run with 32bit floating point data types (i.e. `float`) this can result in convergence issues. In this case, the tolerances have to be reduced.

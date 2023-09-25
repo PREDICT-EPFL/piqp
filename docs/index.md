@@ -37,7 +37,7 @@ PIQP support a wide range of interfaces including
 * C/C++ (with Eigen support)
 * Python
 * Matlab
-* R (soon)
+* R
 * Julia (soon)
 * Rust (soon)
 
