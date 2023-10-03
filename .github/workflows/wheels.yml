@@ -57,7 +57,7 @@ jobs:
           platforms: all
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.13.1
+        uses: pypa/cibuildwheel@v2.16.1
         env:
           CIBW_BEFORE_ALL: mkdir -p build_external && cd build_external && bash ../ci/install_eigen.sh
           CIBW_BUILD: ${{ matrix.target.build }}
