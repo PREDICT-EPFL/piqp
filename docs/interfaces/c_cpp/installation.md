@@ -25,7 +25,7 @@ cmake .. -DCMAKE_CXX_FLAGS="-march=native" -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=
 cmake --build .
 ```
 Note that by setting `-march=native`, we allow the compiler to optimize for the full available instruction set on the machine compiling the code.
-* Install libraries and header files
+* Install libraries and header files (requires CMake 3.15+)
 ```shell
 cmake --install .
 ```
