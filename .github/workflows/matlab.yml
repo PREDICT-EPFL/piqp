@@ -41,6 +41,9 @@ jobs:
 
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v1
+        with:
+          # R2023b causes licensing errors
+          release: R2023a
 
       - name: Build and package interface
         uses: matlab-actions/run-command@v1
