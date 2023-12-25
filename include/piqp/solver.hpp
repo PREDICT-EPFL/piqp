@@ -930,6 +930,9 @@ public:
             return;
         }
 
+        this->m_result.info.rho = this->m_settings.rho_init;
+        this->m_result.info.delta = this->m_settings.delta_init;
+
         if (this->m_settings.compute_timings)
         {
             this->m_timer.start();
@@ -1033,6 +1036,9 @@ public:
             piqp_eprint("Solver not setup yet");
             return;
         }
+
+        this->m_result.info.rho = this->m_settings.rho_init;
+        this->m_result.info.delta = this->m_settings.delta_init;
 
         if (this->m_settings.compute_timings)
         {
