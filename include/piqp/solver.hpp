@@ -153,10 +153,10 @@ protected:
     template<typename MatType>
     void setup_impl(const MatType& P,
                     const CVecRef<T>& c,
-                    const MatType& A,
-                    const CVecRef<T>& b,
-                    const MatType& G,
-                    const CVecRef<T>& h,
+                    const optional<MatType>& A,
+                    const optional<CVecRef<T>>& b,
+                    const optional<MatType>& G,
+                    const optional<CVecRef<T>>& h,
                     const optional<CVecRef<T>>& x_lb,
                     const optional<CVecRef<T>>& x_ub)
     {
@@ -166,24 +166,36 @@ protected:
         }
 
         m_data.n = P.rows();
-        m_data.p = A.rows();
-        m_data.m = G.rows();
+        m_data.p = A.has_value() ? A->rows() : 0;
+        m_data.m = G.has_value() ? G->rows() : 0;
 
         if (P.rows() != m_data.n || P.cols() != m_data.n) { piqp_eprint("P must be square"); return; }
-        if (A.rows() != m_data.p || A.cols() != m_data.n) { piqp_eprint("A must have correct dimensions"); return; }
-        if (G.rows() != m_data.m || G.cols() != m_data.n) { piqp_eprint("G must have correct dimensions"); return; }
+        if (A.has_value() && (A->rows() != m_data.p || A->cols() != m_data.n)) { piqp_eprint("A must have correct dimensions"); return; }
+        if (G.has_value() && (G->rows() != m_data.m || G->cols() != m_data.n)) { piqp_eprint("G must have correct dimensions"); return; }
         if (c.size() != m_data.n) { piqp_eprint("c must have correct dimensions"); return; }
-        if (b.size() != m_data.p) { piqp_eprint("b must have correct dimensions"); return; }
-        if (h.size() != m_data.m) { piqp_eprint("h must have correct dimensions"); return; }
+        if ((b.has_value() && b->size() != m_data.p) || (!b.has_value() && m_data.p > 0)) { piqp_eprint("b must have correct dimensions"); return; }
+        if ((h.has_value() && h->size() != m_data.m) || (!h.has_value() && m_data.m > 0)) { piqp_eprint("h must have correct dimensions"); return; }
         if (x_lb.has_value() && x_lb->size() != m_data.n) { piqp_eprint("x_lb must have correct dimensions"); return; }
         if (x_ub.has_value() && x_ub->size() != m_data.n) { piqp_eprint("x_ub must have correct dimensions"); return; }
 
         m_data.P_utri = P.template triangularView<Eigen::Upper>();
-        m_data.AT = A.transpose();
-        m_data.GT = G.transpose();
+        if (A.has_value()) {
+            m_data.AT = A->transpose();
+        } else {
+            m_data.AT.resize(m_data.n, 0);
+        }
+        if (G.has_value()) {
+            m_data.GT = G->transpose();
+        } else {
+            m_data.GT.resize(m_data.n, 0);
+        }
         m_data.c = c;
-        m_data.b = b;
-        m_data.h = h.cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
+        m_data.b = b.has_value() ? *b : Vec<T>::Zero(0);
+        if (h.has_value()) {
+            m_data.h = (*h).cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
+        } else {
+            m_data.h.resize(0);
+        }
 
         m_data.x_lb_idx.resize(m_data.n);
         m_data.x_ub_idx.resize(m_data.n);
@@ -904,10 +916,10 @@ class DenseSolver : public SolverBase<DenseSolver<T, Preconditioner>, T, int, Pr
 public:
     void setup(const CMatRef<T>& P,
                const CVecRef<T>& c,
-               const CMatRef<T>& A,
-               const CVecRef<T>& b,
-               const CMatRef<T>& G,
-               const CVecRef<T>& h,
+               const optional<CMatRef<T>>& A = nullopt,
+               const optional<CVecRef<T>>& b = nullopt,
+               const optional<CMatRef<T>>& G = nullopt,
+               const optional<CVecRef<T>>& h = nullopt,
                const optional<CVecRef<T>>& x_lb = nullopt,
                const optional<CVecRef<T>>& x_ub = nullopt)
     {
@@ -1011,10 +1023,10 @@ class SparseSolver : public SolverBase<SparseSolver<T, I, Mode, Preconditioner>,
 public:
     void setup(const CSparseMatRef<T, I>& P,
                const CVecRef<T>& c,
-               const CSparseMatRef<T, I>& A,
-               const CVecRef<T>& b,
-               const CSparseMatRef<T, I>& G,
-               const CVecRef<T>& h,
+               const optional<CSparseMatRef<T, I>>& A,
+               const optional<CVecRef<T>>& b,
+               const optional<CSparseMatRef<T, I>>& G,
+               const optional<CVecRef<T>>& h,
                const optional<CVecRef<T>>& x_lb = nullopt,
                const optional<CVecRef<T>>& x_ub = nullopt)
     {

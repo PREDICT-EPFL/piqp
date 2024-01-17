@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Make equality and inequality constrains optional on setup.
+
 ## [0.2.4] - 2023-12-25
 
 ### Changed
 
-- Fixed issue where regularization parameters where not correctly reset after an update.
+- Fixed issue where regularization parameters were not correctly reset after an update.
 
 ## [0.2.3] - 2023-09-14
 

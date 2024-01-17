@@ -117,10 +117,10 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              [](SparseSolver &solver,
                 const piqp::SparseMat<T, I>& P,
                 const piqp::CVecRef<T>& c,
-                const piqp::SparseMat<T, I>& A,
-                const piqp::CVecRef<T>& b,
-                const piqp::SparseMat<T, I>& G,
-                const piqp::CVecRef<T>& h,
+                const piqp::optional<piqp::SparseMat<T, I>>& A,
+                const piqp::optional<piqp::CVecRef<T>>& b,
+                const piqp::optional<piqp::SparseMat<T, I>>& G,
+                const piqp::optional<piqp::CVecRef<T>>& h,
                 const piqp::optional<piqp::CVecRef<T>>& x_lb = piqp::nullopt,
                 const piqp::optional<piqp::CVecRef<T>>& x_ub = piqp::nullopt)
              {
@@ -155,7 +155,9 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_property("settings", &DenseSolver::settings, &DenseSolver::settings)
         .def_property_readonly("result", &DenseSolver::result)
         .def("setup", &DenseSolver::setup,
-             py::arg("P"), py::arg("c"), py::arg("A"), py::arg("b"), py::arg("G"), py::arg("h"),
+             py::arg("P"), py::arg("c"),
+             py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
+             py::arg("G") = piqp::nullopt, py::arg("h") = piqp::nullopt,
              py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt)
         .def("update", &DenseSolver::update,
              py::arg("P") = piqp::nullopt, py::arg("c") = piqp::nullopt,

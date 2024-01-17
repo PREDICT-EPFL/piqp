@@ -156,10 +156,10 @@ void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, c
 
     Eigen::Map<CMat> P(data->P, data->n, data->n);
     Eigen::Map<CVec> c(data->c, data->n);
-    Eigen::Map<CMat> A(data->A, data->p, data->n);
-    Eigen::Map<CVec> b(data->b, data->p);
-    Eigen::Map<CMat> G(data->G, data->m, data->n);
-    Eigen::Map<CVec> h(data->h, data->m);
+    piqp::optional<Eigen::Map<CMat>> A = piqp_optional_mat_map(data->A, data->p, data->n);
+    piqp::optional<Eigen::Map<CVec>> b = piqp_optional_vec_map(data->b, data->p);
+    piqp::optional<Eigen::Map<CMat>> G = piqp_optional_mat_map(data->G, data->m, data->n);
+    piqp::optional<Eigen::Map<CVec>> h = piqp_optional_vec_map(data->h, data->m);
     piqp::optional<Eigen::Map<CVec>> x_lb = piqp_optional_vec_map(data->x_lb, data->n);
     piqp::optional<Eigen::Map<CVec>> x_ub = piqp_optional_vec_map(data->x_ub, data->n);
 
@@ -188,10 +188,10 @@ void piqp_setup_sparse(piqp_workspace** workspace, const piqp_data_sparse* data,
 
     Eigen::Map<CSparseMat> P(data->P->m, data->P->n, data->P->nnz, data->P->p, data->P->i, data->P->x);
     Eigen::Map<CVec> c(data->c, data->n);
-    Eigen::Map<CSparseMat> A(data->A->m, data->A->n, data->A->nnz, data->A->p, data->A->i, data->A->x);
-    Eigen::Map<CVec> b(data->b, data->p);
-    Eigen::Map<CSparseMat> G(data->G->m, data->G->n, data->G->nnz, data->G->p, data->G->i, data->G->x);
-    Eigen::Map<CVec> h(data->h, data->m);
+    piqp::optional<Eigen::Map<CSparseMat>> A = piqp_optional_sparse_mat_map(data->A);
+    piqp::optional<Eigen::Map<CVec>> b = piqp_optional_vec_map(data->b, data->p);
+    piqp::optional<Eigen::Map<CSparseMat>> G = piqp_optional_sparse_mat_map(data->G);
+    piqp::optional<Eigen::Map<CVec>> h = piqp_optional_vec_map(data->h, data->m);
     piqp::optional<Eigen::Map<CVec>> x_lb = piqp_optional_vec_map(data->x_lb, data->n);
     piqp::optional<Eigen::Map<CVec>> x_ub = piqp_optional_vec_map(data->x_ub, data->n);
 
