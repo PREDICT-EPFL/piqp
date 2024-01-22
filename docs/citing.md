@@ -6,6 +6,7 @@ nav_order: 4
 
 If you found PIQP useful in your scientific work, we encourage you to cite our accompanying paper:
 
+{% raw %}
 ```
 @INPROCEEDINGS{schwan2023piqp,
   author={Schwan, Roland and Jiang, Yuning and Kuhn, Daniel and Jones, Colin N.},
@@ -18,3 +19,4 @@ If you found PIQP useful in your scientific work, we encourage you to cite our a
   doi={10.1109/CDC49753.2023.10383915}
 }
 ```
+{% endraw %}
