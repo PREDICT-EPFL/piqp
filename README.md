@@ -1,6 +1,6 @@
 # PIQP
 
-[![DOI](https://img.shields.io/badge/DOI-10.48550/arXiv.2304.00290-green.svg)](https://doi.org/10.48550/arXiv.2304.00290)
+[![DOI](https://img.shields.io/badge/DOI-10.1109/CDC49753.2023.10383915-green.svg)](https://doi.org/10.1109/CDC49753.2023.10383915)
 [![Preprint](https://img.shields.io/badge/Preprint-arXiv-blue.svg)](https://arxiv.org/abs/2304.00290)
 [![Funding](https://img.shields.io/badge/Grant-NCCR%20Automation%20(51NF40__180545)-90e3dc.svg)](https://nccr-automation.ch/)
 
@@ -65,11 +65,15 @@ PIQP is an adapted implementation of [work](https://link.springer.com/article/10
 
 If you found PIQP useful in your scientific work, we encourage you to cite our accompanying paper:
 ```
-@misc{schwan2023,
-    author = {Schwan, Roland and Jiang, Yuning and Kuhn, Daniel and Jones, Colin N.},
-    title = {PIQP: A Proximal Interior-Point Quadratic Programming Solver},
-    year = {2023},
-    eprint = {arXiv:2304.00290},
+@INPROCEEDINGS{schwan2023piqp,
+  author={Schwan, Roland and Jiang, Yuning and Kuhn, Daniel and Jones, Colin N.},
+  booktitle={2023 62nd IEEE Conference on Decision and Control (CDC)}, 
+  title={{PIQP}: A Proximal Interior-Point Quadratic Programming Solver}, 
+  year={2023},
+  volume={},
+  number={},
+  pages={1088-1093},
+  doi={10.1109/CDC49753.2023.10383915}
 }
 ```
 The benchmarks are available in the following repo: [piqp_benchmarks](https://github.com/PREDICT-EPFL/piqp_benchmarks)
