@@ -352,12 +352,11 @@ protected:
         m_result.info.mu = 0;
         m_result.info.primal_step = 0;
         m_result.info.dual_step = 0;
+        m_result.info.rho = m_settings.rho_init;
+        m_result.info.delta = m_settings.delta_init;
 
         if (!m_kkt_init_state)
         {
-            m_result.info.rho = m_settings.rho_init;
-            m_result.info.delta = m_settings.delta_init;
-
             m_result.s.setConstant(1);
             s_lb.head(m_data.n_lb).setConstant(1);
             s_ub.head(m_data.n_ub).setConstant(1);
@@ -367,6 +366,11 @@ protected:
             m_kkt.update_scalings(m_result.info.rho, m_result.info.delta,
                                   m_result.s, m_result.s_lb, m_result.s_ub,
                                   m_result.z, m_result.z_lb, m_result.z_ub);
+        }
+        else
+        {
+            // after solve is called once, the scalings are not in initial state anymore
+            m_kkt_init_state = false;
         }
 
         while (!m_kkt.regularize_and_factorize(m_enable_iterative_refinement))
@@ -942,9 +946,6 @@ public:
             return;
         }
 
-        this->m_result.info.rho = this->m_settings.rho_init;
-        this->m_result.info.delta = this->m_settings.delta_init;
-
         if (this->m_settings.compute_timings)
         {
             this->m_timer.start();
@@ -1048,9 +1049,6 @@ public:
             piqp_eprint("Solver not setup yet");
             return;
         }
-
-        this->m_result.info.rho = this->m_settings.rho_init;
-        this->m_result.info.delta = this->m_settings.delta_init;
 
         if (this->m_settings.compute_timings)
         {
