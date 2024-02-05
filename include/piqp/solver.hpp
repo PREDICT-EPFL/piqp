@@ -685,7 +685,7 @@ protected:
                 else
                 {
                     m_result.info.no_primal_update++;
-                    m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * m_result.info.rho);
+                    m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - T(0.666) * mu_rate) * m_result.info.rho);
                 }
 
                 if (primal_inf_nr() < 0.95 * m_result.info.primal_inf || (m_result.info.delta == m_settings.reg_finetune_lower_limit && primal_prox_inf() < 1e2))
@@ -699,7 +699,7 @@ protected:
                 else
                 {
                     m_result.info.no_dual_update++;
-                    m_result.info.delta = std::max(m_result.info.reg_limit, (T(1) - 0.666 * mu_rate) * m_result.info.delta);
+                    m_result.info.delta = std::max(m_result.info.reg_limit, (T(1) - T(0.666) * mu_rate) * m_result.info.delta);
                 }
             }
             else
@@ -720,23 +720,23 @@ protected:
                 if (dual_inf_nr() < 0.95 * m_result.info.dual_inf)
                 {
                     m_result.zeta = m_result.x;
-                    m_result.info.rho = std::max(m_result.info.reg_limit, 0.1 * m_result.info.rho);
+                    m_result.info.rho = std::max(m_result.info.reg_limit, T(0.1) * m_result.info.rho);
                 }
                 else
                 {
                     m_result.info.no_primal_update++;
-                    m_result.info.rho = std::max(m_result.info.reg_limit, 0.5 * m_result.info.rho);
+                    m_result.info.rho = std::max(m_result.info.reg_limit, T(0.5) * m_result.info.rho);
                 }
 
                 if (primal_inf_nr() < 0.95 * m_result.info.primal_inf)
                 {
                     m_result.lambda = m_result.y;
-                    m_result.info.delta = std::max(m_result.info.reg_limit, 0.1 * m_result.info.delta);
+                    m_result.info.delta = std::max(m_result.info.reg_limit, T(0.1) * m_result.info.delta);
                 }
                 else
                 {
                     m_result.info.no_dual_update++;
-                    m_result.info.delta = std::max(m_result.info.reg_limit, 0.5 * m_result.info.delta);
+                    m_result.info.delta = std::max(m_result.info.reg_limit, T(0.5) * m_result.info.delta);
                 }
             }
         }
