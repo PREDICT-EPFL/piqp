@@ -1,6 +1,6 @@
 // This file is part of PIQP.
 //
-// Copyright (c) 2023 EPFL
+// Copyright (c) 2024 EPFL
 // Copyright (c) 2022 INRIA
 //
 // This source code is licensed under the BSD 2-Clause License found in the
@@ -12,6 +12,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
+#include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
 #include "piqp/sparse/model.hpp"
 
@@ -93,5 +94,9 @@ struct Data
 } // namespace sparse
 
 } // namespace piqp
+
+#ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
+#include "piqp/sparse/data.tpp"
+#endif
 
 #endif //PIQP_SPARSE_DATA_HPP

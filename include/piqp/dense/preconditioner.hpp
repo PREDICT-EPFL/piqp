@@ -1,6 +1,6 @@
 // This file is part of PIQP.
 //
-// Copyright (c) 2023 EPFL
+// Copyright (c) 2024 EPFL
 // Copyright (c) 2022 INRIA
 //
 // This source code is licensed under the BSD 2-Clause License found in the
@@ -12,6 +12,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
+#include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
 #include "piqp/dense/data.hpp"
 
@@ -543,5 +544,9 @@ public:
 } // namespace dense
 
 } // namespace piqp
+
+#ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
+#include "piqp/dense/preconditioner.tpp"
+#endif
 
 #endif //PIQP_DENSE_PRECONDITIONER_HPP

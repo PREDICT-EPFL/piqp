@@ -1,6 +1,6 @@
 // This file is part of PIQP.
 //
-// Copyright (c) 2023 EPFL
+// Copyright (c) 2024 EPFL
 // Copyright (c) 2022 INRIA
 //
 // This source code is licensed under the BSD 2-Clause License found in the
@@ -10,6 +10,7 @@
 #define PIQP_SETTINGS_HPP
 
 #include <limits>
+#include "piqp/typedefs.hpp"
 
 namespace piqp
 {

@@ -1,6 +1,6 @@
 # This file is part of PIQP.
 #
-# Copyright (c) 2023 EPFL
+# Copyright (c) 2024 EPFL
 #
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
@@ -20,6 +20,8 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 endif()
 
 #### Interface options ####
+option(BUILD_WITH_TEMPLATE_INSTANTIATION "Build a shared library with common templates instantiated" ON)
+option(BUILD_WITH_STD_OPTIONAL "Build using std::optional" OFF)
 option(BUILD_C_INTERFACE "Build C interface" ON)
 option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
 option(BUILD_MATLAB_INTERFACE "Build Matlab interface" OFF)
@@ -33,7 +35,11 @@ option(BUILD_BENCHMARKS "Build benchmarks" ON)
 option(ENABLE_SANITIZERS "Build with sanitizers enabled" OFF)
 option(DEBUG_PRINTS "Print additional debug information" OFF)
 
-set(CMAKE_CXX_STANDARD 14)
+if (BUILD_WITH_STD_OPTIONAL)
+    set(CMAKE_CXX_STANDARD 17)
+else ()
+    set(CMAKE_CXX_STANDARD 14)
+endif ()
 
 # Set build type to RELEASE by default
 if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
@@ -105,18 +111,62 @@ message(STATUS "Using Eigen3 from: ${EIGEN3_INCLUDE_DIRS}")
 
 include(GNUInstallDirs)
 
-add_library(piqp INTERFACE)
-target_include_directories(piqp INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
-    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_link_libraries(piqp INTERFACE Eigen3::Eigen)
+macro(create_piqp_library library_name library_type)
+
+    if ("${library_type}" STREQUAL "INTERFACE")
+        add_library(${library_name} ${library_type})
+        target_include_directories(${library_name} INTERFACE
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
+            $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
+        )
+        target_link_libraries(${library_name} INTERFACE Eigen3::Eigen)
+    else ()
+        add_library(${library_name} ${library_type} ${TEMPLATE_SOURCES})
+        target_include_directories(${library_name} PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
+            $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
+        )
+        target_link_libraries(${library_name} PUBLIC Eigen3::Eigen)
+    endif ()
+endmacro()
+
+if (BUILD_WITH_TEMPLATE_INSTANTIATION)
+    message(STATUS "Building with template instantiation")
+
+    file(GLOB_RECURSE TEMPLATE_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+
+    create_piqp_library(piqp SHARED)
+    set_target_properties(piqp PROPERTIES OUTPUT_NAME piqp)
+    target_compile_definitions(piqp PUBLIC PIQP_WITH_TEMPLATE_INSTANTIATION)
+
+    create_piqp_library(piqp_static STATIC)
+    set_target_properties(piqp_static PROPERTIES OUTPUT_NAME piqpstatic)
+    target_compile_definitions(piqp_static PUBLIC PIQP_WITH_TEMPLATE_INSTANTIATION)
+
+    create_piqp_library(piqp_interface INTERFACE)
+else ()
+    message(STATUS "Building without template instantiation")
+
+    create_piqp_library(piqp INTERFACE)
+    create_piqp_library(piqp_static INTERFACE)
+    create_piqp_library(piqp_interface INTERFACE)
+endif ()
+
+if (BUILD_WITH_STD_OPTIONAL)
+    target_compile_definitions(piqp INTERFACE PIQP_STD_OPTIONAL)
+    target_compile_definitions(piqp_static INTERFACE PIQP_STD_OPTIONAL)
+    target_compile_definitions(piqp_interface INTERFACE PIQP_STD_OPTIONAL)
+endif ()
 
 if (DEBUG_PRINTS)
     target_compile_definitions(piqp INTERFACE PIQP_DEBUG_PRINT)
+    target_compile_definitions(piqp_static INTERFACE PIQP_DEBUG_PRINT)
+    target_compile_definitions(piqp_interface INTERFACE PIQP_DEBUG_PRINT)
 endif ()
 
 add_library(piqp::piqp ALIAS piqp)
+add_library(piqp::piqp_static ALIAS piqp_static)
+add_library(piqp::piqp_interface ALIAS piqp_interface)
 
 if (BUILD_C_INTERFACE)
     add_subdirectory(interfaces/c)
@@ -144,7 +194,7 @@ install(
 )
 
 install(
-    TARGETS piqp
+    TARGETS piqp piqp_static piqp_interface
     EXPORT piqpTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

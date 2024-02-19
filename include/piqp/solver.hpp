@@ -1,6 +1,6 @@
 // This file is part of PIQP.
 //
-// Copyright (c) 2023 EPFL
+// Copyright (c) 2024 EPFL
 // Copyright (c) 2022 INRIA
 //
 // This source code is licensed under the BSD 2-Clause License found in the
@@ -13,6 +13,8 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
+#include "piqp/fwd.hpp"
+#include "piqp/common.hpp"
 #include "piqp/timer.hpp"
 #include "piqp/results.hpp"
 #include "piqp/settings.hpp"
@@ -1132,5 +1134,9 @@ public:
 };
 
 } // namespace piqp
+
+#ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
+#include "piqp/solver.tpp"
+#endif
 
 #endif //PIQP_SOLVER_HPP

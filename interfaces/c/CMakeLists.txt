@@ -1,6 +1,6 @@
 # This file is part of PIQP.
 #
-# Copyright (c) 2023 EPFL
+# Copyright (c) 2024 EPFL
 #
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
@@ -12,7 +12,7 @@ target_include_directories(piqp_c_static PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/piqp_c>
 )
-target_link_libraries(piqp_c_static PRIVATE piqp)
+target_link_libraries(piqp_c_static PRIVATE piqp_static)
 set_target_properties(piqp_c_static PROPERTIES OUTPUT_NAME piqpc)
 add_library(piqp::piqp_c_static ALIAS piqp_c_static)
 
@@ -31,14 +31,7 @@ install(
 )
 
 install(
-    TARGETS piqp_c_static
-    EXPORT piqpTargets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-
-install(
-    TARGETS piqp_c_shared
+    TARGETS piqp_c_static piqp_c_shared
     EXPORT piqpTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

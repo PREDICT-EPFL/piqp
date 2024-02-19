@@ -1,6 +1,6 @@
 // This file is part of PIQP.
 //
-// Copyright (c) 2023 EPFL
+// Copyright (c) 2024 EPFL
 // Copyright (c) 2005-2022 by Timothy A. Davis.
 //
 // This source code is licensed under the BSD 2-Clause License found in the
@@ -9,8 +9,8 @@
 #ifndef PIQP_SPARSE_LDLT_HPP
 #define PIQP_SPARSE_LDLT_HPP
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
+#include "piqp/fwd.hpp"
+#include "piqp/typedefs.hpp"
 
 // Disable FMA instructions
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
@@ -218,6 +218,10 @@ struct LDLt
 #pragma float_control(pop)
 #elif defined(__GNUC__) || defined(__clang__)
 #pragma STDC FP_CONTRACT DEFAULT
+#endif
+
+#ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
+#include "piqp/sparse/ldlt.tpp"
 #endif
 
 #endif //PIQP_SPARSE_LDLT_HPP

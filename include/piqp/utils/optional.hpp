@@ -1,6 +1,6 @@
 // This file is part of PIQP.
 //
-// Copyright (c) 2023 EPFL
+// Copyright (c) 2024 EPFL
 // Copyright (c) 2022 INRIA
 //
 // This source code is licensed under the BSD 2-Clause License found in the
@@ -11,7 +11,7 @@
 
 #include "piqp/fwd.hpp"
 
-#ifdef PIQP_WITH_CPP_17
+#ifdef PIQP_STD_OPTIONAL
 #include <optional>
 #else
 #include "piqp/utils/tl_optional.hpp"
@@ -20,7 +20,7 @@
 namespace piqp
 {
 
-#ifdef PIQP_WITH_CPP_17
+#ifdef PIQP_STD_OPTIONAL
 template<class T>
 using optional = std::optional<T>;
 using in_place_t = std::in_place_t;

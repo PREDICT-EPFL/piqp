@@ -1,6 +1,6 @@
 // This file is part of PIQP.
 //
-// Copyright (c) 2023 EPFL
+// Copyright (c) 2024 EPFL
 // Copyright (c) 2022 INRIA
 //
 // This source code is licensed under the BSD 2-Clause License found in the
@@ -487,5 +487,9 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
 } // namespace sparse
 
 } // namespace piqp
+
+#ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
+#include "piqp/sparse/kkt.tpp"
+#endif
 
 #endif //PIQP_SPARSE_KKT_HPP

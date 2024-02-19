@@ -8,7 +8,7 @@
 // Copyright (C) 2009 Benoit Jacob <jacob.benoit.1@gmail.com>
 // Copyright (C) 2011 Timothy E. Holy <tim.holy@gmail.com >
 // Copyright (C) 2011 Timothy E. Holy <tim.holy@gmail.com >
-// Copyright (C) 2023 EPFL
+// Copyright (C) 2024 EPFL
 //
 // This Source Code Form is subject to the terms of the Mozilla
 // Public License v. 2.0. If a copy of the MPL was not distributed
@@ -477,11 +477,26 @@ template<typename MatrixType, int UpLo_>
 MatrixType LDLTNoPivot<MatrixType,UpLo_>::reconstructedMatrix() const
 {
     eigen_assert(m_isInitialized && "LDLTNoPivot is not initialized.");
-    return matrixL() * vectorD().real().asDiagonal() * matrixU();
+    const Eigen::Index size = m_matrix.rows();
+    MatrixType res(size,size);
+
+    res.setIdentity();
+
+    res = matrixU() * res;
+    // D(L^)
+    res = vectorD().real().asDiagonal() * res;
+    // L(DL^)
+    res = matrixL() * res;
+
+    return res;
 }
 
 } // namespace dense
 
 } // namespace piqp
+
+#ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
+#include "piqp/dense/ldlt_no_pivot.tpp"
+#endif
 
 #endif //PIQP_LDLT_NO_PIVOT_HPP
