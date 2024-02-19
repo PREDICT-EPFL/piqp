@@ -96,7 +96,7 @@ public:
             piqp_print("----------------------------------------------------------\n");
             piqp_print("                           PIQP                           \n");
             piqp_print("                    (c) Roland Schwan                     \n");
-            piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2023   \n");
+            piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2024   \n");
             piqp_print("----------------------------------------------------------\n");
             if (MatrixType == PIQP_DENSE)
             {
