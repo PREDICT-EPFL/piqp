@@ -35,6 +35,8 @@ option(BUILD_BENCHMARKS "Build benchmarks" ON)
 option(ENABLE_SANITIZERS "Build with sanitizers enabled" OFF)
 option(DEBUG_PRINTS "Print additional debug information" OFF)
 
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
 if (BUILD_WITH_STD_OPTIONAL)
     set(CMAKE_CXX_STANDARD 17)
 else ()
