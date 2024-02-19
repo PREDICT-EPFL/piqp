@@ -83,6 +83,8 @@ protected:
 public:
     SolverBase() : m_kkt(m_data, m_settings) {};
 
+    ~SolverBase() {};
+
     Settings<T>& settings() { return m_settings; }
 
     const Result<T>& result() const { return m_result; }

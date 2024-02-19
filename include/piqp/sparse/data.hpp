@@ -49,7 +49,7 @@ struct Data
     Vec<T> x_lb_n; // stores negative finite lower bounds in the first n_lb fields
     Vec<T> x_ub;   // stores finite upper bounds in the first n_ub fields
 
-    Data() = default;
+    Data() {};
 
     explicit Data(Model<T, I> model)
         : n(model.P.rows()), p(model.A.rows()), m(model.G.rows()),
@@ -85,6 +85,8 @@ struct Data
             }
         }
     }
+
+    ~Data() {};
 
     Eigen::Index non_zeros_P_utri() { return P_utri.nonZeros(); }
     Eigen::Index non_zeros_A() { return AT.nonZeros(); }
