@@ -41,6 +41,7 @@ class SolverBase
 protected:
     using DataType = typename std::conditional<MatrixType == PIQP_DENSE, dense::Data<T>, sparse::Data<T, I>>::type;
     using KKTType = typename std::conditional<MatrixType == PIQP_DENSE, dense::KKT<T>, sparse::KKT<T, I, Mode>>::type;
+    using CMatRefType = typename std::conditional<MatrixType == PIQP_DENSE, CMatRef<T>, CSparseMatRef<T, I>>::type;
 
     Timer<T> m_timer;
     Result<T> m_result;
@@ -154,12 +155,11 @@ public:
     }
 
 protected:
-    template<typename MatType>
-    void setup_impl(const MatType& P,
+    void setup_impl(const CMatRefType& P,
                     const CVecRef<T>& c,
-                    const optional<MatType>& A,
+                    const optional<CMatRefType>& A,
                     const optional<CVecRef<T>>& b,
-                    const optional<MatType>& G,
+                    const optional<CMatRefType>& G,
                     const optional<CVecRef<T>>& h,
                     const optional<CVecRef<T>>& x_lb,
                     const optional<CVecRef<T>>& x_ub)
