@@ -64,7 +64,7 @@ message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")
 # Set sanitizer flags
 if (ENABLE_SANITIZERS)
     if (${CMAKE_CXX_COMPILER_ID} IN_LIST gcc_like_cxx)
-        list(APPEND sanitizer_flags -fsanitize=address -fno-omit-frame-pointer)
+        list(APPEND sanitizer_flags -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer)
     elseif ((${CMAKE_CXX_COMPILER_ID} IN_LIST msvc_like))
         list(APPEND sanitizer_flags /fsanitize=address)
     endif ()
