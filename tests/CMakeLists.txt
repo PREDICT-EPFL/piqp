@@ -68,11 +68,9 @@ target_link_libraries(preconditioner_test PRIVATE pipq-test)
 if (BUILD_MAROS_MESZAROS_TEST)
     add_executable(dense_maros_meszaros_tests src/dense/maros_meszaros_tests.cpp)
     target_link_libraries(dense_maros_meszaros_tests PRIVATE pipq-test pybind11::embed)
-    target_compile_features(dense_maros_meszaros_tests PRIVATE cxx_std_17)
 
     add_executable(sparse_maros_meszaros_tests src/sparse/maros_meszaros_tests.cpp)
     target_link_libraries(sparse_maros_meszaros_tests PRIVATE pipq-test pybind11::embed)
-    target_compile_features(sparse_maros_meszaros_tests PRIVATE cxx_std_17)
 endif()
 
 include(GoogleTest)

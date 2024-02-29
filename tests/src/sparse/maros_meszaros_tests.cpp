@@ -7,7 +7,6 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <iostream>
-#include <filesystem>
 
 #include <pybind11/embed.h>
 #include <pybind11/eigen.h>
@@ -16,13 +15,13 @@
 #include <Eigen/Sparse>
 
 #include "piqp/piqp.hpp"
+#include "piqp/utils/filesystem.hpp"
 
 #include "gtest/gtest.h"
 
 using T = double;
 using I = int;
 
-namespace fs = std::filesystem;
 namespace py = pybind11;
 using namespace py::literals;
 
@@ -122,7 +121,7 @@ TEST_P(SparseMarosMeszarosTest, CanSolveProblemKKTFull)
 std::vector<std::string> get_maros_meszaros_problems()
 {
     std::vector<std::string> problem_names;
-    for (const auto & entry : fs::directory_iterator("maros_meszaros_data"))
+    for (const auto & entry : piqp::fs::directory_iterator("maros_meszaros_data"))
     {
         std::string file_name = entry.path().filename().string();
         if (file_name == "README.md" || file_name == "LICENSE") continue;
