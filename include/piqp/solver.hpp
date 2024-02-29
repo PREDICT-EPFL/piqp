@@ -1028,10 +1028,10 @@ class SparseSolver : public SolverBase<SparseSolver<T, I, Mode, Preconditioner>,
 public:
     void setup(const CSparseMatRef<T, I>& P,
                const CVecRef<T>& c,
-               const optional<CSparseMatRef<T, I>>& A,
-               const optional<CVecRef<T>>& b,
-               const optional<CSparseMatRef<T, I>>& G,
-               const optional<CVecRef<T>>& h,
+               const optional<CSparseMatRef<T, I>>& A = nullopt,
+               const optional<CVecRef<T>>& b = nullopt,
+               const optional<CSparseMatRef<T, I>>& G = nullopt,
+               const optional<CVecRef<T>>& h = nullopt,
                const optional<CVecRef<T>>& x_lb = nullopt,
                const optional<CVecRef<T>>& x_ub = nullopt)
     {
