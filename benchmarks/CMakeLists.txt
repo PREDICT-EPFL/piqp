@@ -25,10 +25,16 @@ if(NOT benchmark_POPULATED)
     add_subdirectory(${benchmark_SOURCE_DIR} ${benchmark_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
+# copy data
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 add_library(pipq-benchmark INTERFACE)
 target_compile_options(pipq-benchmark INTERFACE ${compiler_flags})
 target_link_options(pipq-benchmark INTERFACE ${compiler_flags})
 target_link_libraries(pipq-benchmark INTERFACE piqp benchmark::benchmark)
+
+add_executable(chain_mass_sqp_benchmark src/chain_mass_sqp_benchmark.cpp)
+target_link_libraries(chain_mass_sqp_benchmark PRIVATE pipq-benchmark pybind11::embed)
 
 add_executable(dense_cholesky_factorization_benchmark src/dense_cholesky_factorization_benchmark.cpp)
 target_link_libraries(dense_cholesky_factorization_benchmark PRIVATE pipq-benchmark)

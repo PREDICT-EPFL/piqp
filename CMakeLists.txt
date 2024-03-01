@@ -30,7 +30,7 @@ option(BUILD_MATLAB_INTERFACE "Build Matlab interface" OFF)
 #### Tests/Benchmarks options ####
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_MAROS_MESZAROS_TEST "Build maros meszaros tests" OFF)
-option(BUILD_BENCHMARKS "Build benchmarks" ON)
+option(BUILD_BENCHMARKS "Build benchmarks" OFF)
 
 #### Developer options ####
 option(ENABLE_SANITIZERS "Build with sanitizers enabled" OFF)
