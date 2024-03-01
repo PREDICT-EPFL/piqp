@@ -11,9 +11,6 @@
 #include <pybind11/embed.h>
 #include <pybind11/eigen.h>
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
-
 #include "piqp/piqp.hpp"
 #include "piqp/utils/filesystem.hpp"
 
@@ -98,7 +95,7 @@ piqp::sparse::Model<T, I> get_problem_data(const std::string& file_name)
     auto x_lb = locals["xl"].cast<piqp::Vec<T>>();
     auto x_ub = locals["xu"].cast<piqp::Vec<T>>();
 
-    return piqp::sparse::Model<T, I>(P, A, G, c, b, h, x_lb, x_ub);
+    return piqp::sparse::Model<T, I>(P, c, A, b, G, h, x_lb, x_ub);
 }
 
 class SparseMarosMeszarosTest : public testing::TestWithParam<std::string> {};

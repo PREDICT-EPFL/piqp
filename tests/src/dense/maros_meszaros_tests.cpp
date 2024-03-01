@@ -7,20 +7,17 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <iostream>
-#include <filesystem>
 
 #include <pybind11/embed.h>
 #include <pybind11/eigen.h>
 
-#include <Eigen/Dense>
-
 #include "piqp/piqp.hpp"
+#include "piqp/utils/filesystem.hpp"
 
 #include "gtest/gtest.h"
 
 using T = double;
 
-namespace fs = std::filesystem;
 namespace py = pybind11;
 using namespace py::literals;
 
@@ -96,7 +93,7 @@ piqp::dense::Model<T> get_problem_data(const std::string& file_name)
     auto x_lb = locals["xl"].cast<piqp::Vec<T>>();
     auto x_ub = locals["xu"].cast<piqp::Vec<T>>();
 
-    return piqp::dense::Model<T>(P, A, G, c, b, h, x_lb, x_ub);
+    return piqp::dense::Model<T>(P, c, A, b, G, h, x_lb, x_ub);
 }
 
 class DenseMarosMeszarosTest : public testing::TestWithParam<std::string> {};
@@ -119,7 +116,7 @@ TEST_P(DenseMarosMeszarosTest, CanSolveProblemKKTFull)
 std::vector<std::string> get_maros_meszaros_problems()
 {
     std::vector<std::string> problem_names;
-    for (const auto & entry : fs::directory_iterator("maros_meszaros_data"))
+    for (const auto & entry : piqp::fs::directory_iterator("maros_meszaros_data"))
     {
         std::string file_name = entry.path().filename().string();
         if (file_name == "README.md" || file_name == "LICENSE") continue;

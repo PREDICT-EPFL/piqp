@@ -166,7 +166,7 @@ dense::Model<T> dense_strongly_convex_qp(isize dim, isize n_eq, isize n_ineq,
         }
     }
 
-    return dense::Model<T>(P, A, G, c, b, h, x_lb, x_ub);
+    return dense::Model<T>(P, c, A, b, G, h, x_lb, x_ub);
 }
 
 template<typename T, typename I>
@@ -222,7 +222,7 @@ sparse::Model<T, I> sparse_strongly_convex_qp(isize dim, isize n_eq, isize n_ine
         }
     }
 
-    return sparse::Model<T, I>(P, A, G, c, b, h, x_lb, x_ub);
+    return sparse::Model<T, I>(P, c, A, b, G, h, x_lb, x_ub);
 }
 
 } // namespace rand

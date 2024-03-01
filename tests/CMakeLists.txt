@@ -62,6 +62,9 @@ target_link_libraries(sparse_utils_test PRIVATE pipq-test)
 add_executable(sparse_solver_test src/sparse/solver_test.cpp)
 target_link_libraries(sparse_solver_test PRIVATE pipq-test)
 
+add_executable(io_utils_test src/io_utils_test.cpp)
+target_link_libraries(io_utils_test PRIVATE pipq-test pybind11::embed)
+
 add_executable(preconditioner_test src/preconditioner_test.cpp)
 target_link_libraries(preconditioner_test PRIVATE pipq-test)
 
@@ -82,6 +85,7 @@ gtest_discover_tests(sparse_ldlt_test)
 gtest_discover_tests(sparse_utils_test)
 gtest_discover_tests(sparse_solver_test)
 gtest_discover_tests(preconditioner_test)
+gtest_discover_tests(io_utils_test)
 if (BUILD_MAROS_MESZAROS_TEST)
     gtest_discover_tests(dense_maros_meszaros_tests)
     gtest_discover_tests(sparse_maros_meszaros_tests)
