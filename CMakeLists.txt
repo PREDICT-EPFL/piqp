@@ -74,7 +74,7 @@ if (ENABLE_SANITIZERS)
     unset(sanitizer_flags)
 endif ()
 
-if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE OR BUILD_MAROS_MESZAROS_TEST OR BUILD_BENCHMARKS)
+if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
     # building for conda-forge, TARGET_OS_OSX is not properly set, i.e., macOS is not correctly detected
     if (DEFINED ENV{CONDA_TOOLCHAIN_BUILD} AND APPLE)
         add_definitions(-DTARGET_OS_OSX=1)
@@ -92,15 +92,15 @@ if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE OR BUILD_MAROS_MESZAROS_TES
         FetchContent_Populate(cpu_features)
         add_subdirectory(${cpu_features_SOURCE_DIR} ${cpu_features_BINARY_DIR} EXCLUDE_FROM_ALL)
     endif()
-
-    # Find pybind11
-    include(FetchContent)
-    FetchContent_Declare(
-        pybind11
-        URL https://github.com/pybind/pybind11/archive/8a099e44b3d5f85b20f05828d919d2332a8de841.zip # v2.11.1
-    )
-    FetchContent_MakeAvailable(pybind11)
 endif ()
+
+# Find pybind11
+include(FetchContent)
+FetchContent_Declare(
+    pybind11
+    URL https://github.com/pybind/pybind11/archive/8a099e44b3d5f85b20f05828d919d2332a8de841.zip # v2.11.1
+)
+FetchContent_MakeAvailable(pybind11)
 
 # Find Eigen3.3+
 if (DEFINED EIGEN3_INCLUDE_DIRS AND NOT TARGET Eigen3::Eigen)
