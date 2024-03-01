@@ -74,7 +74,7 @@ if (ENABLE_SANITIZERS)
     unset(sanitizer_flags)
 endif ()
 
-if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE OR BUILD_MAROS_MESZAROS_TEST)
+if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE OR BUILD_MAROS_MESZAROS_TEST OR BUILD_BENCHMARKS)
     # building for conda-forge, TARGET_OS_OSX is not properly set, i.e., macOS is not correctly detected
     if (DEFINED ENV{CONDA_TOOLCHAIN_BUILD} AND APPLE)
         add_definitions(-DTARGET_OS_OSX=1)
