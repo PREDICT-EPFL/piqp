@@ -61,3 +61,5 @@ jobs:
       - name: Test piqp
         working-directory: build
         run: ctest --test-dir tests --verbose
+        env:
+          PYTHONMALLOC: malloc
