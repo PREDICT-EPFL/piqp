@@ -134,8 +134,14 @@ dense::Model<T> dense_strongly_convex_qp(isize dim, isize n_eq, isize n_ineq,
     }
 
     Vec<T> c = vector_rand<T>(dim);
-    Vec<T> b = A * x_sol;
-    Vec<T> h = G * x_sol + delta;
+    Vec<T> b(n_eq);
+    if (n_eq > 0) {
+        b = A * x_sol;
+    }
+    Vec<T> h(n_ineq);
+    if (n_ineq > 0) {
+        h = G * x_sol + delta;
+    }
 
     Vec<T> x_lb = Vec<T>::Constant(dim, -std::numeric_limits<T>::infinity());
     Vec<T> x_ub = Vec<T>::Constant(dim, std::numeric_limits<T>::infinity());

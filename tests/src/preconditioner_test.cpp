@@ -154,8 +154,8 @@ TEST(RuizEquilibration, DenseSameIneqScaling)
         h(data_box.n_lb + i) = data_box.x_ub(i);
     }
 
-    dense::Model<T> qp_model_ineq(qp_model_box.P, qp_model_box.A, G,
-                                  qp_model_box.c, qp_model_box.b, h,
+    dense::Model<T> qp_model_ineq(qp_model_box.P, qp_model_box.c,
+                                  qp_model_box.A, qp_model_box.b, G, h,
                                   Vec<T>::Constant(dim, -std::numeric_limits<T>::infinity()),
                                   Vec<T>::Constant(dim, std::numeric_limits<T>::infinity()));
     dense::Data<T> data_ineq(qp_model_ineq);
