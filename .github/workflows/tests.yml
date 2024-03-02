@@ -59,5 +59,11 @@ jobs:
         run: cmake --build . -- -j2
 
       - name: Test piqp
+        if: runner.os == 'Windows'
         working-directory: build
-        run: ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=suppressions=tests/lsan/suppressions.txt ctest --test-dir tests --verbose
+        run: ctest --test-dir tests --verbose
+
+      - name: Test piqp
+        if: runner.os != 'Windows'
+        working-directory: build
+        run: ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=suppressions=lsan/suppressions.txt ctest --test-dir tests --verbose
