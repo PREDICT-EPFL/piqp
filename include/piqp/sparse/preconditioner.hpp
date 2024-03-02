@@ -91,7 +91,7 @@ public:
             Vec<T>& delta_iter_lb = delta_lb_inv; // we use the memory of delta_lb_inv as temporary storage
             Vec<T>& delta_iter_ub = delta_ub_inv; // we use the memory of delta_ub_inv as temporary storage
             delta_iter.setZero();
-            for (isize i = 0; i < max_iter && std::max({
+            for (isize i = 0; i < max_iter && (std::max)({
                     (1 - delta_iter.array()).matrix().template lpNorm<Eigen::Infinity>(),
                     (1 - delta_iter_lb.head(n_lb).array()).matrix().template lpNorm<Eigen::Infinity>(),
                     (1 - delta_iter_ub.head(n_ub).array()).matrix().template lpNorm<Eigen::Infinity>()

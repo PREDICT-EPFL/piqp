@@ -93,7 +93,7 @@ public:
             delta_iter.setZero();
             delta_iter_lb.setZero();
             delta_iter_ub.setZero();
-            for (isize i = 0; i < max_iter && std::max({
+            for (isize i = 0; i < max_iter && (std::max)({
                     (1 - delta_iter.array()).matrix().template lpNorm<Eigen::Infinity>(),
                     (1 - delta_iter_lb.head(n_lb).array()).matrix().template lpNorm<Eigen::Infinity>(),
                     (1 - delta_iter_ub.head(n_ub).array()).matrix().template lpNorm<Eigen::Infinity>()
@@ -105,10 +105,10 @@ public:
                 // [ G 0  0  ]
                 for (isize k = 0; k < n; k++)
                 {
-                    delta_iter(k) = std::max({data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
-                                              data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>(),
-                                              p > 0 ? data.AT.row(k).template lpNorm<Eigen::Infinity>() : T(0),
-                                              m > 0 ? data.GT.row(k).template lpNorm<Eigen::Infinity>() : T(0)});
+                    delta_iter(k) = (std::max)({data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
+                                                data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>(),
+                                                p > 0 ? data.AT.row(k).template lpNorm<Eigen::Infinity>() : T(0),
+                                                m > 0 ? data.GT.row(k).template lpNorm<Eigen::Infinity>() : T(0)});
                 }
                 for (isize k = 0; k < p; k++)
                 {
