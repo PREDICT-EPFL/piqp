@@ -51,14 +51,14 @@ struct Model
         isize p = A.has_value() ? A->rows() : 0;
         isize m = G.has_value() ? G->rows() : 0;
 
-        if (P.rows() != n || P.cols() != n) { piqp_eprint("P must be square"); }
-        if (A.has_value() && (A->rows() != p || A->cols() != n)) { piqp_eprint("A must have correct dimensions"); }
-        if (G.has_value() && (G->rows() != m || G->cols() != n)) { piqp_eprint("G must have correct dimensions"); }
-        if (c.size() != n) { piqp_eprint("c must have correct dimensions"); }
-        if ((b.has_value() && b->size() != p) || (!b.has_value() && p > 0)) { piqp_eprint("b must have correct dimensions"); }
-        if ((h.has_value() && h->size() != m) || (!h.has_value() && m > 0)) { piqp_eprint("h must have correct dimensions"); }
-        if (x_lb.has_value() && x_lb->size() != n) { piqp_eprint("x_lb must have correct dimensions"); }
-        if (x_ub.has_value() && x_ub->size() != n) { piqp_eprint("x_ub must have correct dimensions"); }
+        if (P.rows() != n || P.cols() != n) { piqp_eprint("P must be square\n"); }
+        if (A.has_value() && (A->rows() != p || A->cols() != n)) { piqp_eprint("A must have correct dimensions\n"); }
+        if (G.has_value() && (G->rows() != m || G->cols() != n)) { piqp_eprint("G must have correct dimensions\n"); }
+        if (c.size() != n) { piqp_eprint("c must have correct dimensions\n"); }
+        if ((b.has_value() && b->size() != p) || (!b.has_value() && p > 0)) { piqp_eprint("b must have correct dimensions\n"); }
+        if ((h.has_value() && h->size() != m) || (!h.has_value() && m > 0)) { piqp_eprint("h must have correct dimensions\n"); }
+        if (x_lb.has_value() && x_lb->size() != n) { piqp_eprint("x_lb must have correct dimensions\n"); }
+        if (x_ub.has_value() && x_ub->size() != n) { piqp_eprint("x_ub must have correct dimensions\n"); }
 
         this->A = A.value_or(Mat<T>(p, n));
         this->G = G.value_or(Mat<T>(m, n));
