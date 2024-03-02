@@ -29,6 +29,8 @@ endif()
 
 enable_testing()
 
+# lsan suppression list
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/lsan DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 # copy maros meszaros data
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/maros_meszaros_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
