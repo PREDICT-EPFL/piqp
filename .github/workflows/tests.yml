@@ -41,6 +41,9 @@ jobs:
         env:
           EIGEN_VERSION: ${{ matrix.eigen }}
 
+      - name: Install python dependencies
+        run: pip3 install numpy scipy
+
       - name: Configure piqp
         working-directory: build
         run: cmake .. -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DENABLE_SANITIZERS=$ENABLE_SANITIZERS
