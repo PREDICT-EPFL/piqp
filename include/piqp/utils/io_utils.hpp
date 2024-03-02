@@ -18,7 +18,15 @@
 namespace piqp
 {
 
-bool init_interpreter = false;
+static bool py_interpreter_initialized = false;
+static void cleanup_py_interpreter()
+{
+    namespace py = pybind11;
+    if (py_interpreter_initialized) {
+        py::finalize_interpreter();
+        py_interpreter_initialized = false;
+    }
+}
 
 template<typename T>
 void save_dense_model(const dense::Model<T>& model, const std::string& path)
@@ -26,9 +34,10 @@ void save_dense_model(const dense::Model<T>& model, const std::string& path)
     namespace py = pybind11;
     using namespace pybind11::literals;
 
-    if (!init_interpreter) {
+    if (!py_interpreter_initialized) {
         py::initialize_interpreter();
-        init_interpreter = true;
+        py_interpreter_initialized = true;
+        std::atexit(cleanup_py_interpreter);
     }
 
     py::str py_path = path;
@@ -53,9 +62,10 @@ void save_sparse_model(const sparse::Model<T, I>& model, const std::string& path
     namespace py = pybind11;
     using namespace pybind11::literals;
 
-    if (!init_interpreter) {
+    if (!py_interpreter_initialized) {
         py::initialize_interpreter();
-        init_interpreter = true;
+        py_interpreter_initialized = true;
+        std::atexit(cleanup_py_interpreter);
     }
 
     py::str py_path = path;
@@ -80,9 +90,10 @@ dense::Model<T> load_dense_model(const std::string& path)
     namespace py = pybind11;
     using namespace pybind11::literals;
 
-    if (!init_interpreter) {
+    if (!py_interpreter_initialized) {
         py::initialize_interpreter();
-        init_interpreter = true;
+        py_interpreter_initialized = true;
+        std::atexit(cleanup_py_interpreter);
     }
 
     py::object spio = py::module_::import("scipy.io");
@@ -107,9 +118,10 @@ sparse::Model<T, I> load_sparse_model(const std::string& path)
     namespace py = pybind11;
     using namespace pybind11::literals;
 
-    if (!init_interpreter) {
+    if (!py_interpreter_initialized) {
         py::initialize_interpreter();
-        init_interpreter = true;
+        py_interpreter_initialized = true;
+        std::atexit(cleanup_py_interpreter);
     }
 
     py::object spio = py::module_::import("scipy.io");
