@@ -29,6 +29,7 @@ option(BUILD_MATLAB_INTERFACE "Build Matlab interface" OFF)
 
 #### Tests/Benchmarks options ####
 option(BUILD_TESTS "Build tests" ON)
+option(BUILD_EXAMPLES "Build examples" ON)
 option(BUILD_MAROS_MESZAROS_TEST "Build maros meszaros tests" OFF)
 option(BUILD_BENCHMARKS "Build benchmarks" OFF)
 
@@ -198,6 +199,10 @@ endif ()
 
 if (BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
+endif()
+
+if (BUILD_EXAMPLES)
+    add_subdirectory(examples)
 endif()
 
 install(

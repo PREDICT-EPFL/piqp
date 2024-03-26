@@ -11,7 +11,7 @@ project(piqp_examples)
 
 set(CMAKE_CXX_STANDARD 14)
 
-find_package(piqp REQUIRED)
+# find_package(piqp REQUIRED)
 
 add_subdirectory(c)
 add_subdirectory(cpp)
