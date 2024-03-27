@@ -13,7 +13,11 @@ function install_piqp
     if ispc
         platform = 'windows';
     elseif ismac
-        platform = 'mac';
+        if strcmp(mexext, 'mexmaci64')
+            platform = 'maci';
+        else
+            platform = 'maca';
+        end
     elseif isunix
         platform = 'linux';
     end
