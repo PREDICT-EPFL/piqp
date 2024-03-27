@@ -63,6 +63,7 @@ cmake_args = [
     '-DBUILD_C_INTERFACE=OFF ' ...
     '-DBUILD_MATLAB_INTERFACE=ON ' ...
     '-DBUILD_TESTS=OFF ' ...
+    '-DBUILD_EXAMPLES=OFF ' ...
     '-DBUILD_BENCHMARKS=OFF'];
 
 % Add specific generators for windows linux or mac
@@ -138,7 +139,7 @@ if any(strcmpi(what,'package')) || any(strcmpi(what,'all'))
     
     % Setup directory and copy files
     pkg_name = sprintf('piqp-matlab-%s64', platform);
-    if exist(pkg_name, 'dir')
+    if exist(fullfile(piqp_matlab_dir, pkg_name), 'dir')
         rmdir(pkg_name, 's');
     end
     mkdir(pkg_name);

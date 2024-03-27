@@ -13,5 +13,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 # find_package(piqp REQUIRED)
 
-add_subdirectory(c)
+if (BUILD_C_INTERFACE)
+    add_subdirectory(c)
+endif()
 add_subdirectory(cpp)
