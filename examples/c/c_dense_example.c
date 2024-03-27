@@ -53,5 +53,9 @@ int main()
     printf("status = %d\n", status);
     printf("x = %f %f\n", work->result->x[0], work->result->x[1]);
 
+    piqp_cleanup(work);
+    free(settings);
+    free(data);
+
     return 0;
 }
