@@ -9,134 +9,83 @@
 #define PIQP_UTILS_IO_UTILS_HPP
 
 #include <iostream>
-#include <pybind11/embed.h>
-#include <pybind11/eigen.h>
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
 
+#include "piqp/utils/eigen_matio.hpp"
 #include "piqp/dense/model.hpp"
 #include "piqp/sparse/model.hpp"
 
 namespace piqp
 {
 
-static bool py_interpreter_initialized = false;
-static void cleanup_py_interpreter()
-{
-    namespace py = pybind11;
-    if (py_interpreter_initialized) {
-        py::finalize_interpreter();
-        py_interpreter_initialized = false;
-    }
-}
-
 template<typename T>
 void save_dense_model(const dense::Model<T>& model, const std::string& path)
 {
-    namespace py = pybind11;
-    using namespace pybind11::literals;
-
-    if (!py_interpreter_initialized) {
-        py::initialize_interpreter();
-        py_interpreter_initialized = true;
-        std::atexit(cleanup_py_interpreter);
-    }
-
-    py::str py_path = path;
-    pybind11::dict data(
-        "P"_a = model.P,
-        "A"_a = model.A,
-        "G"_a = model.G,
-        "c"_a = model.c,
-        "b"_a = model.b,
-        "h"_a = model.h,
-        "x_lb"_a = model.x_lb,
-        "x_ub"_a = model.x_ub
-    );
-
-    py::object spio = py::module_::import("scipy.io");
-    spio.attr("savemat")(py_path, data);
+    Eigen::MatioFile file(path.c_str());
+    file.write_mat("P", model.P);
+    file.write_mat("c", model.c);
+    file.write_mat("A", model.A);
+    file.write_mat("b", model.b);
+    file.write_mat("G", model.G);
+    file.write_mat("h", model.h);
+    file.write_mat("x_lb", model.x_lb);
+    file.write_mat("x_ub", model.x_ub);
+    file.close();
 }
 
 template<typename T, typename I>
 void save_sparse_model(const sparse::Model<T, I>& model, const std::string& path)
 {
-    namespace py = pybind11;
-    using namespace pybind11::literals;
-
-    if (!py_interpreter_initialized) {
-        py::initialize_interpreter();
-        py_interpreter_initialized = true;
-        std::atexit(cleanup_py_interpreter);
-    }
-
-    py::str py_path = path;
-    pybind11::dict data(
-        "P"_a = model.P,
-        "A"_a = model.A,
-        "G"_a = model.G,
-        "c"_a = model.c,
-        "b"_a = model.b,
-        "h"_a = model.h,
-        "x_lb"_a = model.x_lb,
-        "x_ub"_a = model.x_ub
-    );
-
-    py::object spio = py::module_::import("scipy.io");
-    spio.attr("savemat")(py_path, data);
+    Eigen::MatioFile file(path.c_str());
+    file.write_mat("P", model.P);
+    file.write_mat("c", model.c);
+    file.write_mat("A", model.A);
+    file.write_mat("b", model.b);
+    file.write_mat("G", model.G);
+    file.write_mat("h", model.h);
+    file.write_mat("x_lb", model.x_lb);
+    file.write_mat("x_ub", model.x_ub);
+    file.close();
 }
 
 template<typename T>
 dense::Model<T> load_dense_model(const std::string& path)
 {
-    namespace py = pybind11;
-    using namespace pybind11::literals;
+    Mat<T> P, A, G;
+    Vec<T> c, b, h, x_lb, x_ub;
+    Eigen::MatioFile file(path.c_str());
+    file.read_mat("P", P);
+    file.read_mat("c", c);
+    file.read_mat("A", A);
+    file.read_mat("b", b);
+    file.read_mat("G", G);
+    file.read_mat("h", h);
+    file.read_mat("x_lb", x_lb);
+    file.read_mat("x_ub", x_ub);
+    file.close();
 
-    if (!py_interpreter_initialized) {
-        py::initialize_interpreter();
-        py_interpreter_initialized = true;
-        std::atexit(cleanup_py_interpreter);
-    }
-
-    py::object spio = py::module_::import("scipy.io");
-
-    py::str py_path = path;
-    pybind11::dict data = spio.attr("loadmat")(py_path);
-
-    dense::Model<T> model(
-        data["P"].cast<Mat<T>>(), data["c"].attr("T").attr("flatten")().cast<Vec<T>>(),
-        data["A"].cast<Mat<T>>(), data["b"].attr("T").attr("flatten")().cast<Vec<T>>(),
-        data["G"].cast<Mat<T>>(), data["h"].attr("T").attr("flatten")().cast<Vec<T>>(),
-        data["x_lb"].attr("T").attr("flatten")().cast<Vec<T>>(),
-        data["x_ub"].attr("T").attr("flatten")().cast<Vec<T>>()
-    );
-
+    dense::Model<T> model(P, c, A, b, G, h, x_lb, x_ub);
     return model;
 }
 
 template<typename T, typename I>
 sparse::Model<T, I> load_sparse_model(const std::string& path)
 {
-    namespace py = pybind11;
-    using namespace pybind11::literals;
+    SparseMat<T, I> P, A, G;
+    Vec<T> c, b, h, x_lb, x_ub;
+    Eigen::MatioFile file(path.c_str());
+    file.read_mat("P", P);
+    file.read_mat("c", c);
+    file.read_mat("A", A);
+    file.read_mat("b", b);
+    file.read_mat("G", G);
+    file.read_mat("h", h);
+    file.read_mat("x_lb", x_lb);
+    file.read_mat("x_ub", x_ub);
+    file.close();
 
-    if (!py_interpreter_initialized) {
-        py::initialize_interpreter();
-        py_interpreter_initialized = true;
-        std::atexit(cleanup_py_interpreter);
-    }
-
-    py::object spio = py::module_::import("scipy.io");
-
-    py::str py_path = path;
-    pybind11::dict data = spio.attr("loadmat")(py_path);
-
-    sparse::Model<T, I> model(
-        data["P"].cast<SparseMat<T, I>>(), data["c"].attr("T").attr("flatten")().cast<Vec<T>>(),
-        data["A"].cast<SparseMat<T, I>>(), data["b"].attr("T").attr("flatten")().cast<Vec<T>>(),
-        data["G"].cast<SparseMat<T, I>>(), data["h"].attr("T").attr("flatten")().cast<Vec<T>>(),
-        data["x_lb"].attr("T").attr("flatten")().cast<Vec<T>>(),
-        data["x_ub"].attr("T").attr("flatten")().cast<Vec<T>>()
-    );
-
+    sparse::Model<T, I> model(P, c, A, b, G, h, x_lb, x_ub);
     return model;
 }
 

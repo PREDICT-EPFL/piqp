@@ -95,13 +95,11 @@ if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
     endif()
 endif ()
 
-# Find pybind11
-include(FetchContent)
-FetchContent_Declare(
-    pybind11
-    URL https://github.com/pybind/pybind11/archive/8a099e44b3d5f85b20f05828d919d2332a8de841.zip # v2.11.1
-)
-FetchContent_MakeAvailable(pybind11)
+if (BUILD_TESTS OR BUILD_BENCHMARKS)
+    # Find Matio
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(matio REQUIRED IMPORTED_TARGET matio)
+endif ()
 
 # Find Eigen3.3+
 if (DEFINED EIGEN3_INCLUDE_DIRS AND NOT TARGET Eigen3::Eigen)

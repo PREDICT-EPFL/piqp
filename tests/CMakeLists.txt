@@ -65,7 +65,7 @@ add_executable(sparse_solver_test src/sparse/solver_test.cpp)
 target_link_libraries(sparse_solver_test PRIVATE pipq-test)
 
 add_executable(io_utils_test src/io_utils_test.cpp)
-target_link_libraries(io_utils_test PRIVATE pipq-test pybind11::embed)
+target_link_libraries(io_utils_test PRIVATE pipq-test PkgConfig::matio)
 
 add_executable(preconditioner_test src/preconditioner_test.cpp)
 target_link_libraries(preconditioner_test PRIVATE pipq-test)

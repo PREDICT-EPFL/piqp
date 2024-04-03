@@ -8,6 +8,19 @@
 
 cmake_minimum_required(VERSION 3.5)
 
+# Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
+# Find pybind11
+include(FetchContent)
+FetchContent_Declare(
+    pybind11
+    URL https://github.com/pybind/pybind11/archive/8a099e44b3d5f85b20f05828d919d2332a8de841.zip # v2.11.1
+)
+FetchContent_MakeAvailable(pybind11)
+
 # detect arm64 cross compilation on macOS
 if(DEFINED ENV{_PYTHON_HOST_PLATFORM})
     if($ENV{_PYTHON_HOST_PLATFORM} MATCHES "arm64")

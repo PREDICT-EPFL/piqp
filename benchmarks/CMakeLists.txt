@@ -15,8 +15,8 @@ endif()
 # Google Benchmark
 include(FetchContent)
 FetchContent_Declare(
-        benchmark
-        URL https://github.com/google/benchmark/archive/84c71faa8126e4eedc2bb520352615cb4484d6ad.zip
+    benchmark
+    URL https://github.com/google/benchmark/archive/84c71faa8126e4eedc2bb520352615cb4484d6ad.zip
 )
 option(BENCHMARK_ENABLE_TESTING "Enable testing of the benchmark library." OFF)
 FetchContent_GetProperties(benchmark)
@@ -34,7 +34,7 @@ target_link_options(pipq-benchmark INTERFACE ${compiler_flags})
 target_link_libraries(pipq-benchmark INTERFACE piqp benchmark::benchmark)
 
 add_executable(chain_mass_sqp_benchmark src/chain_mass_sqp_benchmark.cpp)
-target_link_libraries(chain_mass_sqp_benchmark PRIVATE pipq-benchmark pybind11::embed)
+target_link_libraries(chain_mass_sqp_benchmark PRIVATE pipq-benchmark PkgConfig::matio)
 
 add_executable(dense_cholesky_factorization_benchmark src/dense_cholesky_factorization_benchmark.cpp)
 target_link_libraries(dense_cholesky_factorization_benchmark PRIVATE pipq-benchmark)
