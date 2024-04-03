@@ -97,8 +97,7 @@ endif ()
 
 if (BUILD_TESTS OR BUILD_BENCHMARKS)
     # Find Matio
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(matio REQUIRED IMPORTED_TARGET matio)
+    find_package(Matio REQUIRED)
 endif ()
 
 # Find Eigen3.3+

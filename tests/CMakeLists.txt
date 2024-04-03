@@ -63,17 +63,17 @@ add_executable(sparse_solver_test src/sparse/solver_test.cpp)
 target_link_libraries(sparse_solver_test PRIVATE pipq-test)
 
 add_executable(io_utils_test src/io_utils_test.cpp)
-target_link_libraries(io_utils_test PRIVATE pipq-test PkgConfig::matio)
+target_link_libraries(io_utils_test PRIVATE pipq-test Matio::Matio)
 
 add_executable(preconditioner_test src/preconditioner_test.cpp)
 target_link_libraries(preconditioner_test PRIVATE pipq-test)
 
 if (BUILD_MAROS_MESZAROS_TEST)
     add_executable(dense_maros_meszaros_tests src/dense/maros_meszaros_tests.cpp)
-    target_link_libraries(dense_maros_meszaros_tests PRIVATE pipq-test PkgConfig::matio)
+    target_link_libraries(dense_maros_meszaros_tests PRIVATE pipq-test Matio::Matio)
 
     add_executable(sparse_maros_meszaros_tests src/sparse/maros_meszaros_tests.cpp)
-    target_link_libraries(sparse_maros_meszaros_tests PRIVATE pipq-test PkgConfig::matio)
+    target_link_libraries(sparse_maros_meszaros_tests PRIVATE pipq-test Matio::Matio)
 endif()
 
 include(GoogleTest)

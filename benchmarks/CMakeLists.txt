@@ -34,7 +34,7 @@ target_link_options(pipq-benchmark INTERFACE ${compiler_flags})
 target_link_libraries(pipq-benchmark INTERFACE piqp benchmark::benchmark)
 
 add_executable(chain_mass_sqp_benchmark src/chain_mass_sqp_benchmark.cpp)
-target_link_libraries(chain_mass_sqp_benchmark PRIVATE pipq-benchmark PkgConfig::matio)
+target_link_libraries(chain_mass_sqp_benchmark PRIVATE pipq-benchmark Matio::Matio)
 
 add_executable(dense_cholesky_factorization_benchmark src/dense_cholesky_factorization_benchmark.cpp)
 target_link_libraries(dense_cholesky_factorization_benchmark PRIVATE pipq-benchmark)
