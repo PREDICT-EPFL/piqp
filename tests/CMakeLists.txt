@@ -29,8 +29,6 @@ endif()
 
 enable_testing()
 
-# lsan suppression list
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/lsan DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 # copy maros meszaros data
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/maros_meszaros_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -72,10 +70,10 @@ target_link_libraries(preconditioner_test PRIVATE pipq-test)
 
 if (BUILD_MAROS_MESZAROS_TEST)
     add_executable(dense_maros_meszaros_tests src/dense/maros_meszaros_tests.cpp)
-    target_link_libraries(dense_maros_meszaros_tests PRIVATE pipq-test pybind11::embed)
+    target_link_libraries(dense_maros_meszaros_tests PRIVATE pipq-test PkgConfig::matio)
 
     add_executable(sparse_maros_meszaros_tests src/sparse/maros_meszaros_tests.cpp)
-    target_link_libraries(sparse_maros_meszaros_tests PRIVATE pipq-test pybind11::embed)
+    target_link_libraries(sparse_maros_meszaros_tests PRIVATE pipq-test PkgConfig::matio)
 endif()
 
 include(GoogleTest)
