@@ -40,7 +40,7 @@ endif()
 function(CREATE_PIQP_PYTHON_TARGET target_name COMPILE_OPTIONS)
     pybind11_add_module(${target_name} src/piqp_python.cpp)
     target_compile_options(${target_name} PRIVATE ${COMPILE_OPTIONS})
-    target_link_libraries(${target_name} PRIVATE piqp_interface)
+    target_link_libraries(${target_name} PRIVATE piqp_header_only)
     target_compile_definitions(${target_name} PRIVATE PYTHON_MODULE_NAME=${target_name})
     # PIQP_VERSION_INFO is defined by setup.py and passed into the C++ code as a define (VERSION_INFO) here.
     target_compile_definitions(${target_name} PRIVATE VERSION_INFO=${PIQP_VERSION_INFO})

@@ -139,44 +139,52 @@ if (BUILD_WITH_TEMPLATE_INSTANTIATION)
     create_piqp_library(piqp SHARED)
     set_target_properties(piqp PROPERTIES OUTPUT_NAME piqp)
     target_compile_definitions(piqp PUBLIC PIQP_WITH_TEMPLATE_INSTANTIATION)
+    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
+        # Ensure ABI compatibility up to AVX512
+        target_compile_definitions(piqp PUBLIC EIGEN_MAX_ALIGN_BYTES=64)
+    endif ()
     target_compile_options(piqp PRIVATE ${compiler_flags})
     target_link_options(piqp PRIVATE ${compiler_flags})
 
     create_piqp_library(piqp_static STATIC)
     set_target_properties(piqp_static PROPERTIES OUTPUT_NAME piqpstatic)
     target_compile_definitions(piqp_static PUBLIC PIQP_WITH_TEMPLATE_INSTANTIATION)
+    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
+        # Ensure ABI compatibility up to AVX512
+        target_compile_definitions(piqp_static PUBLIC EIGEN_MAX_ALIGN_BYTES=64)
+    endif ()
     target_compile_options(piqp_static PRIVATE ${compiler_flags})
     target_link_options(piqp_static PRIVATE ${compiler_flags})
 
-    create_piqp_library(piqp_interface INTERFACE)
+    create_piqp_library(piqp_header_only INTERFACE)
 else ()
     message(STATUS "Building without template instantiation")
 
     create_piqp_library(piqp INTERFACE)
     create_piqp_library(piqp_static INTERFACE)
-    create_piqp_library(piqp_interface INTERFACE)
+    create_piqp_library(piqp_header_only INTERFACE)
 endif ()
 
 if (BUILD_WITH_STD_OPTIONAL)
     target_compile_definitions(piqp INTERFACE PIQP_STD_OPTIONAL)
     target_compile_definitions(piqp_static INTERFACE PIQP_STD_OPTIONAL)
-    target_compile_definitions(piqp_interface INTERFACE PIQP_STD_OPTIONAL)
+    target_compile_definitions(piqp_header_only INTERFACE PIQP_STD_OPTIONAL)
 endif ()
 if (BUILD_WITH_STD_FILESYSTEM)
     target_compile_definitions(piqp INTERFACE PIQP_STD_FILESYSTEM)
     target_compile_definitions(piqp_static INTERFACE PIQP_STD_FILESYSTEM)
-    target_compile_definitions(piqp_interface INTERFACE PIQP_STD_FILESYSTEM)
+    target_compile_definitions(piqp_header_only INTERFACE PIQP_STD_FILESYSTEM)
 endif ()
 
 if (DEBUG_PRINTS)
     target_compile_definitions(piqp INTERFACE PIQP_DEBUG_PRINT)
     target_compile_definitions(piqp_static INTERFACE PIQP_DEBUG_PRINT)
-    target_compile_definitions(piqp_interface INTERFACE PIQP_DEBUG_PRINT)
+    target_compile_definitions(piqp_header_only INTERFACE PIQP_DEBUG_PRINT)
 endif ()
 
 add_library(piqp::piqp ALIAS piqp)
 add_library(piqp::piqp_static ALIAS piqp_static)
-add_library(piqp::piqp_interface ALIAS piqp_interface)
+add_library(piqp::piqp_header_only ALIAS piqp_header_only)
 
 if (BUILD_C_INTERFACE)
     add_subdirectory(interfaces/c)
@@ -208,7 +216,7 @@ install(
 )
 
 install(
-    TARGETS piqp piqp_static piqp_interface
+    TARGETS piqp piqp_static piqp_header_only
     EXPORT piqpTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

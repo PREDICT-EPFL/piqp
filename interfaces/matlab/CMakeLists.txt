@@ -27,7 +27,7 @@ set_target_properties(piqp_instruction_set_mex PROPERTIES
 target_compile_options(piqp_instruction_set_mex PRIVATE ${compiler_flags})
 
 function(CREATE_PIQP_MATLAB_TARGET target_name COMPILE_OPTIONS)
-    matlab_add_mex(NAME ${target_name} SRC piqp_mex.cpp LINK_TO piqp_interface)
+    matlab_add_mex(NAME ${target_name} SRC piqp_mex.cpp LINK_TO piqp_header_only)
     set_target_properties(${target_name} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
