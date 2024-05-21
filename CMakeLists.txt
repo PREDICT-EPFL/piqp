@@ -26,6 +26,7 @@ option(BUILD_WITH_STD_FILESYSTEM "Build using std::filesystem" OFF)
 option(BUILD_C_INTERFACE "Build C interface" ON)
 option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
 option(BUILD_MATLAB_INTERFACE "Build Matlab interface" OFF)
+option(BUILD_OCTAVE_INTERFACE "Build Octave interface" OFF)
 
 #### Tests/Benchmarks options ####
 option(BUILD_TESTS "Build tests" ON)
@@ -75,7 +76,7 @@ if (ENABLE_SANITIZERS)
     unset(sanitizer_flags)
 endif ()
 
-if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
+if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE OR BUILD_OCTAVE_INTERFACE)
     # building for conda-forge, TARGET_OS_OSX is not properly set, i.e., macOS is not correctly detected
     if (DEFINED ENV{CONDA_TOOLCHAIN_BUILD} AND APPLE)
         add_definitions(-DTARGET_OS_OSX=1)
@@ -196,6 +197,10 @@ endif()
 
 if (BUILD_MATLAB_INTERFACE)
     add_subdirectory(interfaces/matlab)
+endif()
+
+if (BUILD_OCTAVE_INTERFACE)
+    add_subdirectory(interfaces/octave)
 endif()
 
 if (BUILD_TESTS)
