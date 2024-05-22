@@ -7,12 +7,14 @@
 
 #  cmake -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_OCTAVE_INTERFACE=ON .
 
-cmake_minimum_required(VERSION 3.5)
+#cmake_minimum_required(VERSION 3.5)
 
 find_package(Octave)  # Calls FindOctave
 
-function(CREATE_PIQP_OCTAVE_TARGET target_name COMPILE_OPTIONS)
-    octave_add_oct(${target_name} SOURCES piqp_oct.cpp LINK_LIBRARIES piqp_header_only)
+function(CREATE_PIQP_OCTAVE_TARGET target_base COMPILE_OPTIONS)
+    set(target_name "${target_base}_oct")
+    octave_add_oct(${target_base} SOURCES piqp_oct.cpp LINK_LIBRARIES piqp_header_only)
+    message(STATUS "t1 ${target_name} ${COMPILE_OPTIONS}")
     set_target_properties(${target_name} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
@@ -38,8 +40,10 @@ else()
     set(AVX512_COMPILE_OPTION "-mavx512f")
 endif()
 
-create_piqp_octave_target(piqp_oct "")
+# Creates targe piqp_oct
+create_piqp_octave_target(piqp "")
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-    create_piqp_octave_target(piqp_avx2_oct "${AVX2_COMPILE_OPTION};${FMA_COMPILE_OPTION}")
-    create_piqp_octave_target(piqp_avx512_oct "${AVX512_COMPILE_OPTION};${FMA_COMPILE_OPTION}")
+    # Creates targe piqp_avx2_oct and piqp_avx512_oct
+    create_piqp_octave_target(piqp_avx2  "${AVX2_COMPILE_OPTION};${FMA_COMPILE_OPTION}")
+    create_piqp_octave_target(piqp_avx512  "${AVX512_COMPILE_OPTION};${FMA_COMPILE_OPTION}")
 endif()

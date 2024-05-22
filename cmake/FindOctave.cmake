@@ -153,7 +153,8 @@ endif ()
 function(octave_add_oct2)
 endfunction()
 
-macro (octave_add_oct FUNCTIONNAME)
+macro (octave_add_oct TARGETBASE)
+  set(target_name "${TARGETBASE}_oct")
   set (_CMD SOURCES)
   set (_SOURCES)
   set (_LINK_LIBRARIES)
@@ -176,9 +177,10 @@ macro (octave_add_oct FUNCTIONNAME)
       endif ()
     endif ()
   endforeach ()
-  add_custom_command(OUTPUT ${FUNCTIONNAME}.oct
-                     COMMAND mkoctfile ${FUNCTIONNAME}.cpp
-                     DEPENDS ${FUNCTIONNAME}.cpp
+  message(STATUS "t2 ${TARGETBASE}
+  add_custom_command(OUTPUT "${TARGETBASE}.oct"
+                     COMMAND mkoctfile ${SOURCES}.cpp
+                     DEPENDS "${SOURCES}.cpp"
                      VERBATIM)
   #add_library (${FUNCTIONNAME} SHARED ${_SOURCES})
   #target_link_libraries (${FUNCTIONNAME} ${OCTAVE_LIBRARIES} ${_LINK_LIBRARIES})
