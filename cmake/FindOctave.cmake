@@ -150,11 +150,10 @@ if (OCTAVE_INCLUDE_DIR)
   set (OCTAVE_INCLUDE_DIRS ${OCTAVE_INCLUDE_DIR} ${OCTAVE_INCLUDE_DIR}/octave)
 endif ()
 
-function(octave_add_oct)
-   message(WARNING "[OCTAVE] fooooooo matlab_add_mex requires that at least C or CXX are enabled languages")
+function(octave_add_oct2)
 endfunction()
 
-macro (octave_add_oct2 FUNCTIONNAME)
+macro (octave_add_oct FUNCTIONNAME)
   set (_CMD SOURCES)
   set (_SOURCES)
   set (_LINK_LIBRARIES)
@@ -177,12 +176,16 @@ macro (octave_add_oct2 FUNCTIONNAME)
       endif ()
     endif ()
   endforeach ()
-  add_library (${FUNCTIONNAME} SHARED ${_SOURCES})
-  target_link_libraries (${FUNCTIONNAME} ${OCTAVE_LIBRARIES} ${_LINK_LIBRARIES})
-  set_target_properties (${FUNCTIONNAME} PROPERTIES
-    PREFIX ""
-    SUFFIX  ".${_OCT_EXTENSION}"
-)
+  add_custom_command(OUTPUT ${FUNCTIONNAME}.oct
+                     COMMAND mkoctfile ${FUNCTIONNAME}.cpp
+                     DEPENDS ${FUNCTIONNAME}.cpp
+                     VERBATIM)
+  #add_library (${FUNCTIONNAME} SHARED ${_SOURCES})
+  #target_link_libraries (${FUNCTIONNAME} ${OCTAVE_LIBRARIES} ${_LINK_LIBRARIES})
+  #set_target_properties (${FUNCTIONNAME} PROPERTIES
+  #  PREFIX ""
+  #  SUFFIX  ".${_OCT_EXTENSION}"
+  # )
 endmacro ()
 
 

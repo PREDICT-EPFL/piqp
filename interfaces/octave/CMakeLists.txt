@@ -9,6 +9,8 @@
 
 cmake_minimum_required(VERSION 3.5)
 
+find_package(Octave)  # Calls FindOctave
+
 function(CREATE_PIQP_OCTAVE_TARGET target_name COMPILE_OPTIONS)
     octave_add_oct(${target_name} SOURCES piqp_oct.cpp LINK_LIBRARIES piqp_header_only)
     set_target_properties(${target_name} PROPERTIES
