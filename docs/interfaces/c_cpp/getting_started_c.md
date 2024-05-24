@@ -79,6 +79,9 @@ data->G = piqp_csc_matrix(data->m, data->n, G_nnz, G_p, G_i, G_x);
 
 `piqp_csc_matrix(...)` is a helper function allocating a `piqp_csc` struct and filling its fields accordingly.
 
+{: .note }
+Every member in `data`, except `P` and `c`, is optional and may be `NULL`.
+
 ## Settings
 
 To set custom settings, a `piqp_settings` struct has to be instantiated and the default settings have to be set:
@@ -131,3 +134,25 @@ The result of the optimization can be obtained from the `work->result` struct. M
 
 {: .warning }
 Timing information like `work->result->info.run_time` is only measured if `settings->compute_timings` is set to `1`.
+
+## Efficient Problem Updates
+
+Instead of creating a new solver object everytime it's possible to update the problem directly using
+
+```c
+// dense interface
+piqp_update_dense(&work, P, c, A, b, G, h, x_lb, x_ub);
+// or sparse interface
+piqp_update_sparse(&work, P, c, A, b, G, h, x_lb, x_ub);
+```
+
+with a subsequent call to
+
+```c
+piqp_status status = piqp_solve(work);
+```
+
+This allows the solver to internally reuse memory and factorizations speeding up subsequent solves. Similar to the `piqp_setup_*` functions, all parameters are optional and `NULL` may be passed instead.
+
+{: .warning }
+Note the dimension and sparsity pattern of the problem are not allowed to change when calling the `piqp_update_*` functions.

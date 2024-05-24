@@ -83,3 +83,22 @@ The result of the optimization are directly returned. More specifically, the mos
 
 {: .warning }
 Timing information like `result.info.run_time` is only measured if `compute_timings` is set to `true`.
+
+## Efficient Problem Updates
+
+Instead of creating a new solver object everytime it's possible to update the problem directly using
+
+```matlab
+solver.update('P', P_new, 'A', A_new, 'b', b_new, ...);
+```
+
+with a subsequent call to
+
+```matlab
+result = solver.solve()
+```
+
+This allows the solver to internally reuse memory and factorizations speeding up subsequent solves.
+
+{: .warning }
+Note the dimension and sparsity pattern of the problem are not allowed to change when calling the `update` function.
