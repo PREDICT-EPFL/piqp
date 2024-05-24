@@ -13,19 +13,19 @@ find_package(Octave)  # Calls FindOctave
 
 function(CREATE_PIQP_OCTAVE_TARGET target_base COMPILE_OPTIONS)
     set(target_name "${target_base}_oct")
-    octave_add_oct(${target_base} SOURCES piqp_oct.cpp LINK_LIBRARIES piqp_header_only)
-    message(STATUS "t1 ${target_name} ${COMPILE_OPTIONS}")
-    set_target_properties(${target_name} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
-        LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-    target_compile_options(${target_name} PRIVATE ${COMPILE_OPTIONS})
-    target_compile_options(${target_name} PRIVATE ${compiler_flags})
-    target_compile_definitions(${target_name} PRIVATE PIQP_VERSION=${CMAKE_PROJECT_VERSION})
+    message(STATUS "t1 ${target_name} ${COMPILE_OPTIONS} ${compiler_flags}")
+    octave_add_oct(${target_base} SOURCES piqp_oct.cpp COMPILE_OPTIONS ${COMPILE_OPTIONS} COMPILER_FLAGS ${COMPILER_FLAGS})
+    #set_target_properties(${target_name} PROPERTIES
+    #    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    #    LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
+    #    LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}
+    #    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    #    RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
+    #    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}
+    #)
+    #target_compile_options(${target_name} PRIVATE ${COMPILE_OPTIONS})
+    #target_compile_options(${target_name} PRIVATE ${compiler_flags})
+    #target_compile_definitions(${target_name} PRIVATE PIQP_VERSION=${CMAKE_PROJECT_VERSION})
 endfunction()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)

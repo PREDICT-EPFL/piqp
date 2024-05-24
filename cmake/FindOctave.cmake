@@ -150,20 +150,25 @@ if (OCTAVE_INCLUDE_DIR)
   set (OCTAVE_INCLUDE_DIRS ${OCTAVE_INCLUDE_DIR} ${OCTAVE_INCLUDE_DIR}/octave)
 endif ()
 
-function(octave_add_oct2)
+function(octave_add_oct)
+        fuck
 endfunction()
 
-macro (octave_add_oct TARGETBASE)
+macro (octave_add_oct2 TARGETBASE)
   set(target_name "${TARGETBASE}_oct")
   set (_CMD SOURCES)
   set (_SOURCES)
   set (_LINK_LIBRARIES)
   set (_EXTENSION)
   set (_OCT_EXTENSION oct)
+  set (_COMPILE_OPTIONS)
+  set (_COMPILER_FLAGS)
   foreach (_ARG ${ARGN})
     if (${_ARG} MATCHES SOURCES)
       set (_CMD SOURCES)
     elseif (${_ARG} MATCHES LINK_LIBRARIES)
+      set (_CMD LINK_LIBRARIES)
+    elseif (${_ARG} MATCHES COMPILE_OPTIONS)
       set (_CMD LINK_LIBRARIES)
     elseif (${_ARG} MATCHES EXTENSION)
       set (_CMD EXTENSION)
@@ -177,11 +182,8 @@ macro (octave_add_oct TARGETBASE)
       endif ()
     endif ()
   endforeach ()
-  message(STATUS "t2 ${TARGETBASE}
-  add_custom_command(OUTPUT "${TARGETBASE}.oct"
-                     COMMAND mkoctfile ${SOURCES}.cpp
-                     DEPENDS "${SOURCES}.cpp"
-                     VERBATIM)
+  # message(STATUS "t2 ${TARGETBASE}")
+  add_custom_command(OUTPUT "${TARGETBASE}.oct" COMMAND mkoctfile ARGS ${SOURCES}.cpp DEPENDS "${SOURCES}.cpp" VERBATIM)
   #add_library (${FUNCTIONNAME} SHARED ${_SOURCES})
   #target_link_libraries (${FUNCTIONNAME} ${OCTAVE_LIBRARIES} ${_LINK_LIBRARIES})
   #set_target_properties (${FUNCTIONNAME} PROPERTIES
