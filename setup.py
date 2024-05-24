@@ -56,6 +56,7 @@ class CMakeBuild(build_ext):
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}{os.sep}",
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
+            f"-DBUILD_WITH_TEMPLATE_INSTANTIATION=OFF",
             f"-DBUILD_PYTHON_INTERFACE=ON",
             f"-DBUILD_C_INTERFACE=OFF",
             f"-DBUILD_TESTS=OFF",
@@ -143,7 +144,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name="piqp",
-    version="0.3.0",
+    version="0.3.1",
     url='https://github.com/PREDICT-EPFL/piqp',
     author="Roland Schwan",
     author_email="roland.schwan@epfl.ch",

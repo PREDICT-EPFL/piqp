@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2024-05-25
+
+### Changed
+
+- Added python stub files for better python IDE support.
+
 ## [0.3.0] - 2024-05-24
 
 ### Changed
@@ -78,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.2...v0.2.3
