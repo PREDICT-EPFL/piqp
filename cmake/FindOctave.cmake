@@ -151,7 +151,21 @@ if (OCTAVE_INCLUDE_DIR)
 endif ()
 
 function(octave_add_oct)
-        fuck
+  set(TARGET_BASE ${ARGV0})
+  set(SOURCE ${ARGV1})
+  set(COMPILE_OPTIONS ${ARGV2})
+  set(COMPILER_FLAGS ${ARGV3})
+  message(STATUS "add custom rule: ${TARGET_BASE}.oct with source=${SOURCE}")
+  #add_custom_command(OUTPUT ${TARGET_BASE}.oct
+  #                   COMMAND mkoctfile ${SOURCE} -o ${TARGET_BASE}.oct
+  #                   DEPENDS ${SOURCE} VERBATIM)
+  # -lpiqpcstatic -L${CMAKE_CURRENT_SOURCE_DIR}/../c
+  add_custom_target(${TARGET_BASE}.oct
+                     COMMAND mkoctfile -v -o ${TARGET_BASE}.oct -I${CMAKE_CURRENT_SOURCE_DIR}/../c/include ${SOURCE}
+                     VERBATIM)
+  #message(STATUS "foo=$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/")
+
+  add_dependencies(${TARGET_BASE}.oct piqp::piqp_c_shared)
 endfunction()
 
 macro (octave_add_oct2 TARGETBASE)
