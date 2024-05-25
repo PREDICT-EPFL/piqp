@@ -160,8 +160,9 @@ function(octave_add_oct)
   #                   COMMAND mkoctfile ${SOURCE} -o ${TARGET_BASE}.oct
   #                   DEPENDS ${SOURCE} VERBATIM)
   # -lpiqpcstatic -L${CMAKE_CURRENT_SOURCE_DIR}/../c
+  # -I${CMAKE_CURRENT_SOURCE_DIR}/../c/include 
   add_custom_target(${TARGET_BASE}.oct
-                     COMMAND mkoctfile -v -o ${TARGET_BASE}.oct -I${CMAKE_CURRENT_SOURCE_DIR}/../c/include ${SOURCE}
+                     COMMAND mkoctfile -v -o ${TARGET_BASE}.oct -I${CMAKE_CURRENT_SOURCE_DIR}/../../include/piqp -I${CMAKE_CURRENT_SOURCE_DIR}/../../include -I/usr/include/eigen3 ${SOURCE}
                      VERBATIM)
   #message(STATUS "foo=$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
