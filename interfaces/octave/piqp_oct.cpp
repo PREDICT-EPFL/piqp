@@ -12,6 +12,14 @@
 
 //static_assert(sizeof(piqp_float) == 8);
 
+ColumnVector eigen3VecToCol(const Eigen::Matrix<double, Eigen::Dynamic, 1>& vec) {
+  int n = vec.size();
+  double* vraw = new double[n];
+  memcpy(vraw, vec.data(), sizeof(double)*n);
+  ColumnVector x(Array<double>(vraw, dim_vector(n,1)));
+  return x;
+}
+
 DEFUN_DLD (piqp_dense, args, nargout,
            "piqp_dense(Q, c, A, b, G, h, x_lb, x_ub)")
 {
@@ -64,11 +72,11 @@ DEFUN_DLD (piqp_dense, args, nargout,
   std::cout << "status = " << status << std::endl;
   std::cout << "x = " << solver.result().x.transpose() << std::endl;
 
-  double* xraw = new double[n];
-  memcpy(xraw, solver.result().x.data(), sizeof(double)*n);
-  ColumnVector x(Array<double>(xraw, dim_vector(n,1)));
+  //double* xraw = new double[n];
+  //memcpy(xraw, solver.result().x.data(), sizeof(double)*n);
+  //ColumnVector x(Array<double>(xraw, dim_vector(n,1)));
 
   int numiter = solver.result().info.iter;
   double obj = solver.result().info.primal_obj;
-  return ovl(status, x, numiter, obj);
+  return ovl(status, eigen3VecToCol(solver.result().x), numiter, obj);
 }
