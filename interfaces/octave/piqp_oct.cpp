@@ -78,5 +78,49 @@ DEFUN_DLD (piqp_dense, args, nargout,
 
   int numiter = solver.result().info.iter;
   double obj = solver.result().info.primal_obj;
-  return ovl(status, eigen3VecToCol(solver.result().x), numiter, obj);
+  octave_scalar_map info;
+#define iset(a) info.assign(#a, solver.result().info.a);
+  iset(status);
+  iset(iter);
+  iset(rho);
+  iset(delta);
+  iset(mu);
+  iset(sigma);
+  iset(primal_step);
+  iset(dual_step);
+  iset(primal_inf);
+  iset(primal_rel_inf);
+  iset(dual_inf);
+  iset(dual_rel_inf);
+  iset(primal_obj);
+  iset(dual_obj);
+  iset(duality_gap);
+  iset(duality_gap_rel);
+  iset(factor_retires);
+  iset(reg_limit);
+  iset(no_primal_update);
+  iset(no_dual_update);
+  iset(setup_time);
+  iset(update_time);
+  iset(solve_time);
+  iset(run_time);
+#undef iset
+  octave_scalar_map res;
+  res.assign("info", info);
+#define rset(a) res.assign(#a, eigen3VecToCol(solver.result().a));
+  rset(x);
+  rset(y);
+  rset(z);
+  rset(z_lb);
+  rset(z_ub);
+  rset(s);
+  rset(s_lb);
+  rset(s_ub);
+  rset(zeta);
+  rset(lambda);
+  rset(nu);
+  rset(nu_lb);
+  rset(nu_ub);
+#undef rset
+  return ovl(res);
 }
