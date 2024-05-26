@@ -1,4 +1,6 @@
+#include <limits>
 #include <octave/oct.h>
+#include "ovl.h" // for octave value list
 #include "piqp.hpp"
 
 // cmake -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_OCTAVE_INTERFACE=ON .
@@ -6,12 +8,12 @@
 //
 // LD_PRELOAD=/home/redstone/tmp/piqp/interfaces/c/libpiqpc.so octave
 // autoload("piqp_dense", "/home/redstone/tmp/piqp/interfaces/octave/piqp.oct")
-// piqp_dense
+// [status, x, numiter, obj] = piqp_dense([1 0 ; 0 1], [-4 ; -6], [], [], [], [], [-Inf ; -Inf], [Inf; Inf])
 
 //static_assert(sizeof(piqp_float) == 8);
 
 DEFUN_DLD (piqp_dense, args, nargout,
-           "piqp_dense(Q, c, A, b, G, h)")
+           "piqp_dense(Q, c, A, b, G, h, x_lb, x_ub)")
 {
   octave_stdout << "piqp_dense has "
                 << args.length () << " input arguments and "
@@ -21,7 +23,7 @@ DEFUN_DLD (piqp_dense, args, nargout,
   for (int i = 0; i < nargout; i++)
     retval(i) = octave_value (Matrix ());
 
-  if (args.length() != 6) {
+  if (args.length() != 8) {
     error("piqp_dense: Incorrect # of args#");
     return retval;
   }
@@ -31,23 +33,42 @@ DEFUN_DLD (piqp_dense, args, nargout,
   int nineq = args(5).vector_value().numel();
 
   Eigen::MatrixXd Q = Eigen::Map<Eigen::MatrixXd>(args(0).matrix_value().fortran_vec(), n, n);
+  printf("happy Q(0,1)=%g  Q(1,0)=%g vs %g %d %d \n", Q(0,1), Q(1,0), std::numeric_limits<double>::infinity(),
+         octave::math::isinf(Q(0,1)), octave::math::isinf(std::numeric_limits<double>::infinity()));
+  
   Eigen::VectorXd c = Eigen::Map<Eigen::VectorXd>(args(1).vector_value().fortran_vec(), n, 1);
+  if (0) {
+    double* craw = new double[n];
+    memcpy(craw, c.data(), sizeof(double)*n);
+    ColumnVector cc(Array<double>(craw, dim_vector(n,1)));
+    printf("c has %g %g\n", cc(0), cc(1));
+    return retval;
+  }
+
   Eigen::MatrixXd A = Eigen::Map<Eigen::MatrixXd>(args(2).matrix_value().fortran_vec(), neq, n);
   Eigen::VectorXd b = Eigen::Map<Eigen::VectorXd>(args(3).vector_value().fortran_vec(), neq, 1);
   Eigen::MatrixXd G = Eigen::Map<Eigen::MatrixXd>(args(4).matrix_value().fortran_vec(), nineq, n);
   Eigen::VectorXd h = Eigen::Map<Eigen::VectorXd>(args(5).vector_value().fortran_vec(), nineq, 1);
-
-  printf("happy Q(0,1)=%g  Q(1,0)=%g vs %g\n", Q(0,1), Q(1,0), std::numeric_limits<double>::infinity());
-  
+  Eigen::VectorXd x_lb = Eigen::Map<Eigen::VectorXd>(args(6).vector_value().fortran_vec(), n, 1);
+  Eigen::VectorXd x_ub = Eigen::Map<Eigen::VectorXd>(args(7).vector_value().fortran_vec(), n, 1);
   //ColumnVector x0  (args(0).vector_value ());
   //Matrix        Q  (args(1).matrix_value ());
-  //ColumnVector  c  (args(2).vector_value ());
 
-  //  int n = x0.numel();
-  // For Matrix, data() goes by columns.
-  //printf("Qa is #%ld  and %g %g %g\n", Q.numel(), Q.data()[0], Q.data()[1], Q.data()[2]);
-  //printf("Q is #%ld  and %g %g %g\n", Q.numel(), Q.fortran_vec()[0], Q.fortran_vec()[1], Q.fortran_vec()[2]);
-  return retval;
-
+  piqp::DenseSolver<double> solver;
+  solver.settings().verbose = true;
+  solver.settings().compute_timings = false;
+  solver.setup(Q, c, A, b, G, h, x_lb, x_ub);
   
+  piqp::Status status = solver.solve();
+  
+  std::cout << "status = " << status << std::endl;
+  std::cout << "x = " << solver.result().x.transpose() << std::endl;
+
+  double* xraw = new double[n];
+  memcpy(xraw, solver.result().x.data(), sizeof(double)*n);
+  ColumnVector x(Array<double>(xraw, dim_vector(n,1)));
+
+  int numiter = solver.result().info.iter;
+  double obj = solver.result().info.primal_obj;
+  return ovl(status, x, numiter, obj);
 }
