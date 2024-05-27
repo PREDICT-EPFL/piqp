@@ -4,11 +4,13 @@
 #include "piqp.hpp"
 
 // cmake -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_OCTAVE_INTERFACE=ON .
-// make piqp.oct
+// make piqp_oct.oct
 //
 // LD_PRELOAD=/home/redstone/tmp/piqp/interfaces/c/libpiqpc.so octave
-// autoload("piqp_dense", "/home/redstone/tmp/piqp/interfaces/octave/piqp.oct")
-// [res] = piqp_dense([1 0 ; 0 1], [-4 ; -6], [], [], [], [], [-Inf ; -Inf], [Inf; Inf], struct("verbose", true))
+// autoload("__piqp__", "/home/redstone/tmp/piqp/interfaces/octave/piqp_oct.oct")
+// addpath("/home/redstone/tmp/piqp/interfaces/octave");
+
+// [res] = __piqp__([1 0 ; 0 1], [-4 ; -6], [], [], [], [], [-Inf ; -Inf], [Inf; Inf], struct("verbose", true))
 
 //static_assert(sizeof(piqp_float) == 8);
 
@@ -20,12 +22,12 @@ ColumnVector eigen3VecToCol(const Eigen::Matrix<double, Eigen::Dynamic, 1>& vec)
   return x;
 }
 
-DEFUN_DLD (piqp_dense, args, nargout,
-           "piqp_dense(Q, c, A, b, G, h, x_lb, x_ub, opts)")
+DEFUN_DLD (__piqp__, args, nargout,
+           "rez = __piqp__(Q, c, A, b, G, h, x_lb, x_ub, opts)\nOnly supports dense matrices")
 {
-  octave_stdout << "piqp_dense has "
-                << args.length () << " input arguments and "
-                << nargout << " output arguments.\n";
+  //octave_stdout << "piqp has "
+  //              << args.length () << " input arguments and "
+  //              << nargout << " output arguments.\n";
   // Return empty matrices for any outputs
   octave_value_list retval (nargout);
   for (int i = 0; i < nargout; i++)
@@ -33,7 +35,10 @@ DEFUN_DLD (piqp_dense, args, nargout,
 
   if (args.length() < 8) {
     error("piqp_dense: Incorrect # of args#");
-    return retval;
+    //octave_value_list retval (0);
+    //return retval;
+    //retval(i) = octave_value (Matrix ());
+    return ovl();
   }
  
   int n = args(1).vector_value().numel();
@@ -41,8 +46,8 @@ DEFUN_DLD (piqp_dense, args, nargout,
   int nineq = args(5).vector_value().numel();
 
   Eigen::MatrixXd Q = Eigen::Map<Eigen::MatrixXd>(args(0).matrix_value().fortran_vec(), n, n);
-  printf("happy Q(0,1)=%g  Q(1,0)=%g vs %g %d %d \n", Q(0,1), Q(1,0), std::numeric_limits<double>::infinity(),
-         octave::math::isinf(Q(0,1)), octave::math::isinf(std::numeric_limits<double>::infinity()));
+  //printf("happy Q(0,1)=%g  Q(1,0)=%g vs %g %d %d \n", Q(0,1), Q(1,0), std::numeric_limits<double>::infinity(),
+  //       octave::math::isinf(Q(0,1)), octave::math::isinf(std::numeric_limits<double>::infinity()));
   
   Eigen::VectorXd c = Eigen::Map<Eigen::VectorXd>(args(1).vector_value().fortran_vec(), n, 1);
   if (0) {
@@ -117,9 +122,11 @@ DEFUN_DLD (piqp_dense, args, nargout,
   double obj = solver.result().info.primal_obj;
   octave_scalar_map info;
 #define iset(a) info.assign(#a, solver.result().info.a);
-  iset(status);
-  iset(iter);
+  //info.assign("testfield", 3.3);
+  // Seems like if first element assigned to map is numeric, it's prints better for some reason. Or maybe it's the Status enum that confused things.
   iset(rho);
+  info.assign("status", static_cast<int>(solver.result().info.status));
+  iset(iter);
   iset(delta);
   iset(mu);
   iset(sigma);

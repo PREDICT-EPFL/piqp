@@ -155,18 +155,19 @@ function(octave_add_oct)
   set(SOURCE ${ARGV1})
   set(COMPILE_OPTIONS ${ARGV2})
   set(COMPILER_FLAGS ${ARGV3})
-  message(STATUS "add custom rule: ${TARGET_BASE}.oct with source=${SOURCE}")
+  message(STATUS "add custom rule: ${TARGET_BASE}_oct.oct with source=${SOURCE}")
   #add_custom_command(OUTPUT ${TARGET_BASE}.oct
   #                   COMMAND mkoctfile ${SOURCE} -o ${TARGET_BASE}.oct
   #                   DEPENDS ${SOURCE} VERBATIM)
   # -lpiqpcstatic -L${CMAKE_CURRENT_SOURCE_DIR}/../c
   # -I${CMAKE_CURRENT_SOURCE_DIR}/../c/include 
-  add_custom_target(${TARGET_BASE}.oct
-                     COMMAND mkoctfile -v -o ${TARGET_BASE}.oct -I${CMAKE_CURRENT_SOURCE_DIR}/../../include/piqp -I${CMAKE_CURRENT_SOURCE_DIR}/../../include -I/usr/include/eigen3 ${SOURCE}
+  # Octave gets confused if there is a piqp.m and piqp.oct file in same directory, so call it piqp_oct.oct...
+  add_custom_target(${TARGET_BASE}_oct.oct
+                     COMMAND mkoctfile -v -o ${TARGET_BASE}_oct.oct -I${CMAKE_CURRENT_SOURCE_DIR}/../../include/piqp -I${CMAKE_CURRENT_SOURCE_DIR}/../../include -I/usr/include/eigen3 ${SOURCE}
                      VERBATIM)
   #message(STATUS "foo=$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
-  add_dependencies(${TARGET_BASE}.oct piqp::piqp_c_shared)
+  add_dependencies(${TARGET_BASE}_oct.oct piqp::piqp_c_shared)
 endfunction()
 
 macro (octave_add_oct2 TARGETBASE)
