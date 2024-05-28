@@ -91,7 +91,7 @@ function [x, obj, INFO, lambda] = piqp (Q, c, A, b, lb, ub, rl, rA, ru, opts)
   %%opts = struct("verbose", true);
   %%opts.max_iter = 500;
   
-  if true
+  if false
     Q
     c
     A
