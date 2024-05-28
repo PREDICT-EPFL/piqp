@@ -12,8 +12,6 @@
 
 // [res] = __piqp__([1 0 ; 0 1], [-4 ; -6], [], [], [], [], [-Inf ; -Inf], [Inf; Inf], struct("verbose", true))
 
-//static_assert(sizeof(piqp_float) == 8);
-
 ColumnVector eigen3VecToCol(const Eigen::Matrix<double, Eigen::Dynamic, 1>& vec) {
   int n = vec.size();
   double* vraw = new double[n];
@@ -25,19 +23,8 @@ ColumnVector eigen3VecToCol(const Eigen::Matrix<double, Eigen::Dynamic, 1>& vec)
 DEFUN_DLD (__piqp__, args, nargout,
            "rez = __piqp__(Q, c, A, b, G, h, x_lb, x_ub, opts)\nOnly supports dense matrices")
 {
-  //octave_stdout << "piqp has "
-  //              << args.length () << " input arguments and "
-  //              << nargout << " output arguments.\n";
-  // Return empty matrices for any outputs
-  octave_value_list retval (nargout);
-  for (int i = 0; i < nargout; i++)
-    retval(i) = octave_value (Matrix ());
-
   if (args.length() < 8) {
     error("piqp_dense: Incorrect # of args#");
-    //octave_value_list retval (0);
-    //return retval;
-    //retval(i) = octave_value (Matrix ());
     return ovl();
   }
  
@@ -46,18 +33,7 @@ DEFUN_DLD (__piqp__, args, nargout,
   int nineq = args(5).vector_value().numel();
 
   Eigen::MatrixXd Q = Eigen::Map<Eigen::MatrixXd>(args(0).matrix_value().fortran_vec(), n, n);
-  //printf("happy Q(0,1)=%g  Q(1,0)=%g vs %g %d %d \n", Q(0,1), Q(1,0), std::numeric_limits<double>::infinity(),
-  //       octave::math::isinf(Q(0,1)), octave::math::isinf(std::numeric_limits<double>::infinity()));
-  
   Eigen::VectorXd c = Eigen::Map<Eigen::VectorXd>(args(1).vector_value().fortran_vec(), n, 1);
-  if (0) {
-    double* craw = new double[n];
-    memcpy(craw, c.data(), sizeof(double)*n);
-    ColumnVector cc(Array<double>(craw, dim_vector(n,1)));
-    printf("c has %g %g\n", cc(0), cc(1));
-    return retval;
-  }
-
   Eigen::MatrixXd A = Eigen::Map<Eigen::MatrixXd>(args(2).matrix_value().fortran_vec(), neq, n);
   Eigen::VectorXd b = Eigen::Map<Eigen::VectorXd>(args(3).vector_value().fortran_vec(), neq, 1);
   Eigen::MatrixXd G = Eigen::Map<Eigen::MatrixXd>(args(4).matrix_value().fortran_vec(), nineq, n);
@@ -70,10 +46,13 @@ DEFUN_DLD (__piqp__, args, nargout,
   if (args.length() == 9) {
     const octave_scalar_map& opts = args(8).scalar_map_value();
 #define DFIELD(a) { if (opts.contains(#a)) {                            \
-        solver.settings().a = opts.getfield(#a).double_value(); } }
+      printf("  opts has d %s=%g\n", #a, opts.getfield(#a).double_value()); \
+      solver.settings().a = opts.getfield(#a).double_value(); } }
 #define BFIELD(a) { if (opts.contains(#a)) {                            \
+        printf("  opts has b %s=%d\n", #a, opts.getfield(#a).bool_value()); \
         solver.settings().a = opts.getfield(#a).bool_value(); } }
 #define IFIELD(a) { if (opts.contains(#a)) {                            \
+        printf("  opts has i %s=%d\n", #a, opts.getfield(#a).int_value()); \
         solver.settings().a = opts.getfield(#a).int_value(); } }
     DFIELD(rho_init);
     DFIELD(delta_init);
@@ -108,21 +87,10 @@ DEFUN_DLD (__piqp__, args, nargout,
   }
 
   solver.setup(Q, c, A, b, G, h, x_lb, x_ub);
-  
   piqp::Status status = solver.solve();
   
-  //std::cout << "status = " << status << std::endl;
-  //std::cout << "x = " << solver.result().x.transpose() << std::endl;
-
-  //double* xraw = new double[n];
-  //memcpy(xraw, solver.result().x.data(), sizeof(double)*n);
-  //ColumnVector x(Array<double>(xraw, dim_vector(n,1)));
-
-  int numiter = solver.result().info.iter;
-  double obj = solver.result().info.primal_obj;
   octave_scalar_map info;
 #define iset(a) info.assign(#a, solver.result().info.a);
-  //info.assign("testfield", 3.3);
   // Seems like if first element assigned to map is numeric, it's prints better for some reason. Or maybe it's the Status enum that confused things.
   iset(rho);
   info.assign("status", static_cast<int>(solver.result().info.status));
