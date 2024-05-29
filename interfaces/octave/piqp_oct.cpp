@@ -4,10 +4,10 @@
 #include "piqp.hpp"
 
 // cmake -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_OCTAVE_INTERFACE=ON .
-// make piqp_oct.oct
+// make piqp_plain.oct
 //
 // LD_PRELOAD=/home/redstone/tmp/piqp/interfaces/c/libpiqpc.so octave
-// autoload("__piqp__", "/home/redstone/tmp/piqp/interfaces/octave/piqp_oct.oct")
+// autoload("__piqp__", "/home/redstone/tmp/piqp/interfaces/octave/piqp_plain.oct")
 // addpath("/home/redstone/tmp/piqp/interfaces/octave");
 
 // [res] = __piqp__([1 0 ; 0 1], [-4 ; -6], [], [], [], [], [-Inf ; -Inf], [Inf; Inf], struct("verbose", true))
@@ -32,6 +32,7 @@ DEFUN_DLD (__piqp__, args, nargout,
   int neq = args(3).vector_value().numel();
   int nineq = args(5).vector_value().numel();
 
+  // Convert octave matrix and vectors to Eigen versions of the same
   Eigen::MatrixXd Q = Eigen::Map<Eigen::MatrixXd>(args(0).matrix_value().fortran_vec(), n, n);
   Eigen::VectorXd c = Eigen::Map<Eigen::VectorXd>(args(1).vector_value().fortran_vec(), n, 1);
   Eigen::MatrixXd A = Eigen::Map<Eigen::MatrixXd>(args(2).matrix_value().fortran_vec(), neq, n);

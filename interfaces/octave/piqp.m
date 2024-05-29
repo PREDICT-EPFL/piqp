@@ -7,7 +7,6 @@ function [x, obj, INFO, lambda] = piqp (Q, c, A, b, lb, ub, rl, rA, ru, opts)
   if nargin != 10
     error("Wrong # args to piqp");
   endif
-  
   n = size(Q, 1);
   neq = size(A, 1);
   nineq = size(rA, 1);
@@ -106,6 +105,46 @@ function [x, obj, INFO, lambda] = piqp (Q, c, A, b, lb, ub, rl, rA, ru, opts)
   obj = rez.info.primal_obj;
   if rez.info.status == 1
     INFO.info = 0
+    %% Success. Make sure constraints are respected
+    ttol = 1e-9;
+    fullX = rez.x;
+    jassert(!isempty(fullX));
+    idxs = find(fullX < (lb - ttol));
+    isbad = false;
+    if !isempty(idxs)
+      printf("LB violation:\n");
+      lb(idxs)
+      (x - lb)(idxs)
+      isbad = true;
+    endif
+    idxs = find(fullX > (ub + ttol));
+    if !isempty(idxs)
+      printf("UB violation:\n");
+      ub(idxs)
+      (ub - x)(idxs)
+      isbad = true;
+    endif
+    if ~isempty(A)
+      dev = abs(A * fullX - b);
+      idxs = find(dev > ttol);
+      if !isempty(idxs)
+        printf("Ax=b violation:\n");
+        b(idxs)
+        dev(idxs)
+        isbad = true;
+      endif
+    endif
+    if ~isempty(rA)
+      dev = abs(rA * fullX - ru);
+      idxs = find(dev > ttol);
+      if !isempty(idxs)
+        printf("Ax=b violation:\n");
+        ru(idxs)
+        dev(idxs)
+        isbad = true;
+      endif
+    endif
+    jassert(!isbad);
   else
     INFO.info = rez.info.status;
   endif
