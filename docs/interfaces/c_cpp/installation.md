@@ -22,14 +22,17 @@ cd piqp
 mkdir build
 cd build
 cmake .. -DCMAKE_CXX_FLAGS="-march=native" -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF
-cmake --build .
+cmake --build . --config Release
 ```
 Note that by setting `-march=native`, we allow the compiler to optimize for the full available instruction set on the machine compiling the code.
 * Install libraries and header files (requires CMake 3.15+)
 ```shell
-cmake --install .
+cmake --install . --config Release
 ```
-This will install the C++ and C headers and the static and shared library for the C interface.
+This will install the C++ and C headers and shared libraries.
+
+{: .note }
+If you want to build static libraries instead, you can pass `-DBUILD_SHARED_LIBS=OFF` when configuring cmake.
 
 ## Using PIQP in CMake Projects
 
@@ -42,11 +45,12 @@ find_package(piqp REQUIRED)
 # PIQP requires at least C++14
 set(CMAKE_CXX_STANDARD 14)
 
-# Link the PIQP C++ header-only library
+# Link the PIQP C++ library with precompiled template instantiations
 target_link_libraries(yourTarget PRIVATE piqp::piqp)
 
-# Link the PIQP C shared library
-target_link_libraries(yourTarget PRIVATE piqp::piqp_c_shared)
-# or link the PIQP C static library
-target_link_libraries(yourTarget PRIVATE piqp::piqp_c_static)
+# Link the PIQP C++ header-only library
+target_link_libraries(yourTarget PRIVATE piqp::piqp_header_only)
+
+# Link the PIQP C library
+target_link_libraries(yourTarget PRIVATE piqp::piqp_c)
 ```

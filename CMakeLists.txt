@@ -5,7 +5,7 @@
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 
 project(piqp
     VERSION 0.3.1
@@ -183,6 +183,15 @@ endif ()
 
 add_library(piqp::piqp ALIAS piqp)
 add_library(piqp::piqp_header_only ALIAS piqp_header_only)
+
+macro(fix_test_dll target)
+    if (WIN32)
+        add_custom_command(
+            TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${target}> $<TARGET_FILE_DIR:${target}>
+        )
+    endif ()
+endmacro()
 
 if (BUILD_C_INTERFACE)
     add_subdirectory(interfaces/c)

@@ -63,15 +63,20 @@ jobs:
         shell: bash -l {0}
         if: runner.os == 'Windows'
         working-directory: build
-        run: cmake --build .
+        run: cmake --build . --config $CMAKE_BUILD_TYPE
 
       - name: Build piqp
         shell: bash -l {0}
         if: runner.os != 'Windows'
         working-directory: build
-        run: cmake --build . -- -j2
+        run: cmake --build . --config $CMAKE_BUILD_TYPE -- -j2
 
       - name: Test piqp
         shell: bash -l {0}
         working-directory: build
-        run: ctest --test-dir tests --verbose
+        run: ctest -C $CMAKE_BUILD_TYPE --test-dir tests --verbose
+
+      - name: Test piqp c interface
+        shell: bash -l {0}
+        working-directory: build
+        run: ctest -C $CMAKE_BUILD_TYPE --test-dir interfaces/c/tests --verbose

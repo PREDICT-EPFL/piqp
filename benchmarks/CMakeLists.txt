@@ -5,7 +5,7 @@
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 
 # Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
