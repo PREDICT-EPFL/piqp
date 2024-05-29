@@ -101,11 +101,14 @@ if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
         cpu_features
         URL https://github.com/google/cpu_features/archive/refs/tags/v0.9.0.zip
     )
+    set(BUILD_SHARED_LIBS_COPY ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
     FetchContent_GetProperties(cpu_features)
     if(NOT cpu_features_POPULATED)
         FetchContent_Populate(cpu_features)
         add_subdirectory(${cpu_features_SOURCE_DIR} ${cpu_features_BINARY_DIR} EXCLUDE_FROM_ALL)
     endif()
+    set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_COPY})
 endif ()
 
 if (BUILD_TESTS OR BUILD_BENCHMARKS)
