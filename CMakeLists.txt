@@ -21,6 +21,7 @@ endif()
 
 #### Interface options ####
 option(BUILD_WITH_TEMPLATE_INSTANTIATION "Build a shared library with common templates instantiated" ON)
+option(BUILD_SHARED_LIBS "Build library as shared." ON)
 option(BUILD_WITH_STD_OPTIONAL "Build using std::optional" OFF)
 option(BUILD_WITH_STD_FILESYSTEM "Build using std::filesystem" OFF)
 option(BUILD_C_INTERFACE "Build C interface" ON)
@@ -109,19 +110,19 @@ else ()
 endif ()
 message(STATUS "Using Eigen3 from: ${EIGEN3_INCLUDE_DIRS}")
 
-include(GNUInstallDirs)
+macro(create_piqp_library library_name)
+    set(options INTERFACE)
+    cmake_parse_arguments(CREATE_PIQP_LIBRARY "${options}" "" "" ${ARGN})
 
-macro(create_piqp_library library_name library_type)
-
-    if ("${library_type}" STREQUAL "INTERFACE")
-        add_library(${library_name} ${library_type})
+    if (CREATE_PIQP_LIBRARY_INTERFACE)
+        add_library(${library_name} INTERFACE)
         target_include_directories(${library_name} INTERFACE
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
             $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
         )
         target_link_libraries(${library_name} INTERFACE Eigen3::Eigen)
     else ()
-        add_library(${library_name} ${library_type} ${TEMPLATE_SOURCES})
+        add_library(${library_name} ${TEMPLATE_SOURCES})
         target_include_directories(${library_name} PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
             $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
@@ -135,7 +136,7 @@ if (BUILD_WITH_TEMPLATE_INSTANTIATION)
 
     file(GLOB_RECURSE TEMPLATE_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
-    create_piqp_library(piqp SHARED)
+    create_piqp_library(piqp)
     set_target_properties(piqp PROPERTIES OUTPUT_NAME piqp)
     target_compile_definitions(piqp PUBLIC PIQP_WITH_TEMPLATE_INSTANTIATION)
     if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
@@ -145,44 +146,29 @@ if (BUILD_WITH_TEMPLATE_INSTANTIATION)
     target_compile_options(piqp PRIVATE ${compiler_flags})
     target_link_options(piqp PRIVATE ${compiler_flags})
 
-    create_piqp_library(piqp_static STATIC)
-    set_target_properties(piqp_static PROPERTIES OUTPUT_NAME piqpstatic)
-    target_compile_definitions(piqp_static PUBLIC PIQP_WITH_TEMPLATE_INSTANTIATION)
-    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-        # Ensure ABI compatibility up to AVX512
-        target_compile_definitions(piqp_static PUBLIC EIGEN_MAX_ALIGN_BYTES=64)
-    endif ()
-    target_compile_options(piqp_static PRIVATE ${compiler_flags})
-    target_link_options(piqp_static PRIVATE ${compiler_flags})
-
     create_piqp_library(piqp_header_only INTERFACE)
 else ()
     message(STATUS "Building without template instantiation")
 
     create_piqp_library(piqp INTERFACE)
-    create_piqp_library(piqp_static INTERFACE)
     create_piqp_library(piqp_header_only INTERFACE)
 endif ()
 
 if (BUILD_WITH_STD_OPTIONAL)
     target_compile_definitions(piqp INTERFACE PIQP_STD_OPTIONAL)
-    target_compile_definitions(piqp_static INTERFACE PIQP_STD_OPTIONAL)
     target_compile_definitions(piqp_header_only INTERFACE PIQP_STD_OPTIONAL)
 endif ()
 if (BUILD_WITH_STD_FILESYSTEM)
     target_compile_definitions(piqp INTERFACE PIQP_STD_FILESYSTEM)
-    target_compile_definitions(piqp_static INTERFACE PIQP_STD_FILESYSTEM)
     target_compile_definitions(piqp_header_only INTERFACE PIQP_STD_FILESYSTEM)
 endif ()
 
 if (DEBUG_PRINTS)
     target_compile_definitions(piqp INTERFACE PIQP_DEBUG_PRINT)
-    target_compile_definitions(piqp_static INTERFACE PIQP_DEBUG_PRINT)
     target_compile_definitions(piqp_header_only INTERFACE PIQP_DEBUG_PRINT)
 endif ()
 
 add_library(piqp::piqp ALIAS piqp)
-add_library(piqp::piqp_static ALIAS piqp_static)
 add_library(piqp::piqp_header_only ALIAS piqp_header_only)
 
 if (BUILD_C_INTERFACE)
