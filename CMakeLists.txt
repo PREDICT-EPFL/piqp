@@ -85,9 +85,8 @@ if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
     include(FetchContent)
     FetchContent_Declare(
         cpu_features
-        URL https://github.com/google/cpu_features/archive/936b9ab5515dead115606559502e3864958f7f6e.zip # v0.8.0
+        URL https://github.com/google/cpu_features/archive/refs/tags/v0.9.0.zip
     )
-    set(BUILD_TESTING OFF)
     FetchContent_GetProperties(cpu_features)
     if(NOT cpu_features_POPULATED)
         FetchContent_Populate(cpu_features)

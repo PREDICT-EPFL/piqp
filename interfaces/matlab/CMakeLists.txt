@@ -11,7 +11,7 @@ find_package(Matlab)
 
 # only link cpu_features on x86/amd64
 if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-    matlab_add_mex(NAME piqp_instruction_set_mex SRC piqp_instruction_set_mex.cpp LINK_TO CpuFeature::cpu_features)
+    matlab_add_mex(NAME piqp_instruction_set_mex SRC piqp_instruction_set_mex.cpp LINK_TO cpu_features)
     target_compile_definitions(piqp_instruction_set_mex PRIVATE CPU_FEATURES_AVAILABLE=1)
 else ()
     matlab_add_mex(NAME piqp_instruction_set_mex SRC piqp_instruction_set_mex.cpp)
