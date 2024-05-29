@@ -29,14 +29,27 @@ option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
 option(BUILD_MATLAB_INTERFACE "Build Matlab interface" OFF)
 
 #### Tests/Benchmarks options ####
-option(BUILD_TESTS "Build tests" ON)
-option(BUILD_EXAMPLES "Build examples" ON)
+# Don't build tests and examples if included as subdirectory
+if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    option(BUILD_TESTS "Build tests" OFF)
+    option(BUILD_EXAMPLES "Build examples" OFF)
+else()
+    option(BUILD_TESTS "Build tests" ON)
+    option(BUILD_EXAMPLES "Build examples" ON)
+endif()
 option(BUILD_MAROS_MESZAROS_TEST "Build maros meszaros tests" OFF)
 option(BUILD_BENCHMARKS "Build benchmarks" OFF)
 
 #### Developer options ####
 option(ENABLE_SANITIZERS "Build with sanitizers enabled" OFF)
 option(DEBUG_PRINTS "Print additional debug information" OFF)
+
+#### Install options ####
+if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    option(ENABLE_INSTALL "Enable install targets" OFF)
+else()
+    option(ENABLE_INSTALL "Enable install targets" ON)
+endif()
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
@@ -195,44 +208,49 @@ if (BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
-install(
-    DIRECTORY include/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
+if (ENABLE_INSTALL)
+    include(GNUInstallDirs)
 
-install(
-    TARGETS piqp piqp_static piqp_header_only
-    EXPORT piqpTargets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
+    install(
+        DIRECTORY include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
 
-# https://cmake.org/cmake/help/latest/guide/importing-exporting/index.html
-install(
-    EXPORT piqpTargets
-    FILE piqpTargets.cmake
-    NAMESPACE piqp::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
-)
+    install(
+        TARGETS piqp piqp_header_only
+        EXPORT piqpTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
 
-include(CMakePackageConfigHelpers)
-configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/piqpConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
-)
+    # https://cmake.org/cmake/help/latest/guide/importing-exporting/index.html
+    install(
+        EXPORT piqpTargets
+        FILE piqpTargets.cmake
+        NAMESPACE piqp::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
+    )
 
-write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake
-    VERSION ${PROJECT_VERSION} COMPATIBILITY ExactVersion
-)
+    include(CMakePackageConfigHelpers)
+    configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/piqpConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
+    )
 
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
-)
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake
+        VERSION ${PROJECT_VERSION} COMPATIBILITY ExactVersion
+    )
 
-export(EXPORT piqpTargets
-    FILE ${CMAKE_CURRENT_BINARY_DIR}/piqpTargets.cmake
-    NAMESPACE piqp::
-)
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
+    )
+
+    export(EXPORT piqpTargets
+        FILE ${CMAKE_CURRENT_BINARY_DIR}/piqpTargets.cmake
+        NAMESPACE piqp::
+    )
+
+endif ()
