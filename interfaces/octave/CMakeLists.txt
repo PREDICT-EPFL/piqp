@@ -7,33 +7,12 @@
 
 #  cmake -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_OCTAVE_INTERFACE=ON .
 
-function(CREATE_PIQP_OCTAVE_TARGET target_base COMPILE_OPTIONS)
-  set(TARGET_NAME "${target_base}.oct")
-  # NOT setting VERBATIM here.  It does not appear possible to get correct quoting around
-  # COMPILE_OPTIONS if VERBATIM is set.  Either you get no quotes, or escaped quotes.
-  add_custom_target(${TARGET_NAME}
-                     COMMAND ${CMAKE_COMMAND} -E env CPPFLAGS="${COMPILE_OPTIONS}" -- mkoctfile -v -o ${TARGET_NAME} -I${CMAKE_CURRENT_SOURCE_DIR}/../../include/piqp -I${CMAKE_CURRENT_SOURCE_DIR}/../../include -I/usr/include/eigen3 piqp_oct.cpp
-                     )
-  add_dependencies(${TARGET_NAME} piqp::piqp_c_shared)
-endfunction()
-
-if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
-    set(AVX_COMPILE_OPTION "/arch:AVX")
-    set(AVX2_COMPILE_OPTION "/arch:AVX2")
-    set(FMA_COMPILE_OPTION "/fp:fast")
-    set(AVX512_COMPILE_OPTION "/arch:AVX512")
-else()
-    set(AVX_COMPILE_OPTION "-mavx")
-    set(AVX2_COMPILE_OPTION "-mavx2")
-    set(FMA_COMPILE_OPTION "-mfma;-ffp-contract=on")
-    set(AVX512_COMPILE_OPTION "-mavx512f")
-endif()
-
-# Creates targe piqp_oct
 # Note: Octave gets confused if there is a piqp.m and piqp.oct file in same directory. That's why
 # we use the piqp_plain.oct output
-create_piqp_octave_target(piqp_plain "")
-if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-    create_piqp_octave_target(piqp_avx2  "${AVX2_COMPILE_OPTION};${FMA_COMPILE_OPTION}")
-    create_piqp_octave_target(piqp_avx512  "${AVX512_COMPILE_OPTION};${FMA_COMPILE_OPTION}")
-endif()
+set(TARGET_NAME piqp_plain.oct)
+
+add_custom_target(${TARGET_NAME}
+      COMMAND mkoctfile -v -o ${TARGET_NAME} -I${CMAKE_CURRENT_SOURCE_DIR}/../../include/piqp -I${CMAKE_CURRENT_SOURCE_DIR}/../../include -I/usr/include/eigen3 piqp_oct.cpp
+      VERBATIM )
+
+add_dependencies(${TARGET_NAME} piqp::piqp_c_shared)

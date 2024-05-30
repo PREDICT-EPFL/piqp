@@ -1,5 +1,7 @@
 %% foo
+%% opts are struct with fields listed in piqp distribution, piqp/include/piqp/settings.hpp. E.g., struct("verbose", true)
 function [x, obj, INFO, lambda] = piqp (Q, c, A, b, lb, ub, rl, rA, ru, opts)
+  save "/tmp/foo4a.dat" Q c A b rl rA ru lb ub
   x=[];
   obj=NaN;
   INFO.info = NaN;
@@ -87,26 +89,17 @@ function [x, obj, INFO, lambda] = piqp (Q, c, A, b, lb, ub, rl, rA, ru, opts)
   rA = rA(idxs,:);
   ru = ru(idxs);
   jasserteq(size(rA,1), size(ru, 1));
-  %%opts = struct("verbose", true);
-  %%opts.max_iter = 500;
   
-  if false
-    Q
-    c
-    A
-    b
-    rA
-    ru
-    lb
-    ub
-  endif
+
+
+  save "/tmp/foo4b.dat" Q c A b rA ru lb ub
   rez = __piqp__(Q, c, A, b, rA, ru, lb, ub, opts);
   x = rez.x(1:n);
   obj = rez.info.primal_obj;
   if rez.info.status == 1
     INFO.info = 0
     %% Success. Make sure constraints are respected
-    ttol = 1e-9;
+    ttol = 1e-10;
     fullX = rez.x;
     jassert(!isempty(fullX));
     idxs = find(fullX < (lb - ttol));
@@ -125,26 +118,32 @@ function [x, obj, INFO, lambda] = piqp (Q, c, A, b, lb, ub, rl, rA, ru, opts)
       isbad = true;
     endif
     if ~isempty(A)
-      dev = abs(A * fullX - b);
+      dev = abs((A * fullX) - b);
       idxs = find(dev > ttol);
       if !isempty(idxs)
         printf("Ax=b violation:\n");
+        fullX(idxs)
+        (A*fullX)(idxs)
         b(idxs)
         dev(idxs)
         isbad = true;
       endif
     endif
     if ~isempty(rA)
-      dev = abs(rA * fullX - ru);
+      dev = (rA * fullX) - ru;
       idxs = find(dev > ttol);
       if !isempty(idxs)
-        printf("Ax=b violation:\n");
+        printf("rAx <= ru violation:\n");
+        fullX(idxs)
+        (rA*fullX)(idxs)
         ru(idxs)
         dev(idxs)
         isbad = true;
       endif
     endif
-    jassert(!isbad);
+    if isbad
+      jassert(false);
+    endif
   else
     INFO.info = rez.info.status;
   endif
