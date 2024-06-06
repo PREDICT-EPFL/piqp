@@ -1,17 +1,68 @@
-%% foo
-%% opts are struct with fields listed in piqp distribution, piqp/include/piqp/settings.hpp. E.g., struct("verbose", true)
-function [x, obj, INFO, lambda] = piqp (Q, c, A, b, lb, ub, rl, rA, ru, opts)
-  save "/tmp/foo4a.dat" Q c A b rl rA ru lb ub
-  x=[];
-  obj=NaN;
-  INFO.info = NaN;
-  lambda = NaN;
-  if nargin != 10
+% Copyright (c) 2024 Joshua Redstone
+%
+% This file is part of PIQP.
+%
+% This source code is licensed under the BSD 2-Clause License found in the
+% LICENSE file in the root directory of this source tree.
+
+## -*- texinfo -*-
+## @deftypefn {} {[@var{x}, @var{obj}, @var{info}] =} piqp (@var{x0}, @var{Q}, @var{c}, @var{A}, @var{b}, @var{lb}, @var{ub}, @var{G}, @var{h})
+## @deftypefnx {} {[@var{x}, @var{obj}, @var{info}] =} piqp (@dots{}, @var{options})
+## Solve a quadratic program (QP) using the dense PIQP solver.
+##
+## Solve the quadratic program defined by
+## @tex
+## $$
+##  \min_x {1 \over 2} x^T Q x + x^T c \\
+##  \text {s.t.} \quad  Ax=b, \quad lb \leq x \leq ub, \quad  Gx \leq h
+## $$
+## @end tex
+## @ifnottex
+##
+## @example
+## @group
+## min 0.5 x'*Q*x + x'*c
+##  x
+##
+## s.t.  Ax=b, lb <= x <= ub,  Gx <= h
+## @end group
+## @end example
+##
+## @end ifnottex
+## @noindent
+##
+## Any bound (@var{A}, @var{b}, @var{lb}, @var{ub}, @var{G}, @var{h},
+## may be set to the empty matrix (@code{[]}) if not present.  The
+## constraints @var{A} and @var{G} are matrices with each row representing
+## a single constraint.  The other bounds are scalars or vectors depending on
+## the number of constraints.
+##
+## @var{options} is a structure specifying additional parameters as defined in
+## https://github.com/PREDICT-EPFL/piqp/blob/main/include/piqp/settings.hpp
+## For example:   struct("verbose", true)
+##
+## On return, @var{result} is the raw result structure
+## returned by __piqp__. The Result structure is defined in
+## https://github.com/PREDICT-EPFL/piqp/blob/main/include/piqp/results.hpp
+## For example, @code{result.x} is the location of the minimum
+## and @code{result.info.primal_obj} is the value of the objective at the minimum
+## and @code{resutl.info.status} is the status of the result, with 1 meaning success.
+##
+## @seealso{qp}
+## @end deftypefn
+##
+function [result] = piqp (Q, c, A, b, lb, ub, G, h, opts)
+  result = Nan;
+  if nargin ==8
+    opts = struct();
+  elseif nargin == 9
+    %% opts is specified
+  else
     error("Wrong # args to piqp");
   endif
   n = size(Q, 1);
   neq = size(A, 1);
-  nineq = size(rA, 1);
+  nineq = size(G, 1);
   if !issquare(Q)
     error("Q must be square");
   endif
@@ -22,7 +73,7 @@ function [x, obj, INFO, lambda] = piqp (Q, c, A, b, lb, ub, rl, rA, ru, opts)
     A = zeros(0,n);
   endif
   if size(A,2) != n
-    error("A of wrong # columns");
+    error("A of wrong # of columns");
   endif
   if isempty(b)
     b = zeros(0,1);
@@ -42,110 +93,18 @@ function [x, obj, INFO, lambda] = piqp (Q, c, A, b, lb, ub, rl, rA, ru, opts)
   if !all(size(ub) == [n 1])
     error("ub of wrong dimensions");
   endif
-  if isempty(rl)
-    rl = zeros(0,1);
+  if isempty(G)
+    G = zeros(0,n);
   endif
-  if !all(size(rl) == [nineq 1])
-    error("rl of wrong dimensions");
+  if size(G,2) != n
+    error("G of wrong # columns");
   endif
-  if isempty(rA)
-    rA = zeros(0,n);
+  if isempty(h)
+    h = zeros(0,1);
   endif
-  if size(rA,2) != n
-    error("rA of wrong # columns");
+  if !all(size(h) == [nineq 1])
+    error("h of wrong dimensions");
   endif
-  if isempty(ru)
-    ru = zeros(0,1);
-  endif
-  if !all(size(ru) == [nineq 1])
-    error("ru of wrong dimensions");
-  endif
-  
-  %% For rA*x >= rl, is equivalent to rA*x + s = rl and s <= 0
-  %% so add constraints:
-  %% rA*x + s = rl
-  %% s <= 0
-  %% First add slack variables:
-  idxs = find(isfinite(rl));
-  nidxs = numel(idxs);
-  if nidxs > 0
-    [nqr, nqc] = size(Q);
-    Q = [ Q zeros(nqr, nidxs) ; zeros(nidxs, nqc + nidxs) ];
-    c = [ c ; zeros(nidxs, 1) ];
-    A = [ A zeros(size(A, 1), nidxs) ];
-    %% b is fine
-    lb = [ lb ; -Inf*ones(nidxs, 1) ];
-    ub = [ ub ; zeros(nidxs, 1) ];  %% adding s <= 0 in one go
-    preRA = rA;
-    rA = [ rA zeros(size(rA,1), nidxs) ];
-    %% ru is fine
 
-    %% Now add constraints
-    %% rA*x + s = rl
-    A = [ A ; preRA(idxs,:) eye(nidxs) ];
-    b = [ b ; rl(idxs) ];
-  endif
-  idxs = find(isfinite(ru));
-  rA = rA(idxs,:);
-  ru = ru(idxs);
-  jasserteq(size(rA,1), size(ru, 1));
-  
-
-
-  save "/tmp/foo4b.dat" Q c A b rA ru lb ub
-  rez = __piqp__(Q, c, A, b, rA, ru, lb, ub, opts);
-  x = rez.x(1:n);
-  obj = rez.info.primal_obj;
-  if rez.info.status == 1
-    INFO.info = 0
-    %% Success. Make sure constraints are respected
-    ttol = 1e-10;
-    fullX = rez.x;
-    jassert(!isempty(fullX));
-    idxs = find(fullX < (lb - ttol));
-    isbad = false;
-    if !isempty(idxs)
-      printf("LB violation:\n");
-      lb(idxs)
-      (x - lb)(idxs)
-      isbad = true;
-    endif
-    idxs = find(fullX > (ub + ttol));
-    if !isempty(idxs)
-      printf("UB violation:\n");
-      ub(idxs)
-      (ub - x)(idxs)
-      isbad = true;
-    endif
-    if ~isempty(A)
-      dev = abs((A * fullX) - b);
-      idxs = find(dev > ttol);
-      if !isempty(idxs)
-        printf("Ax=b violation:\n");
-        fullX(idxs)
-        (A*fullX)(idxs)
-        b(idxs)
-        dev(idxs)
-        isbad = true;
-      endif
-    endif
-    if ~isempty(rA)
-      dev = (rA * fullX) - ru;
-      idxs = find(dev > ttol);
-      if !isempty(idxs)
-        printf("rAx <= ru violation:\n");
-        fullX(idxs)
-        (rA*fullX)(idxs)
-        ru(idxs)
-        dev(idxs)
-        isbad = true;
-      endif
-    endif
-    if isbad
-      jassert(false);
-    endif
-  else
-    INFO.info = rez.info.status;
-  endif
-  INFO.rez = rez;
+  result = __piqp__(Q, c, A, b, G, h, lb, ub, opts);
 endfunction

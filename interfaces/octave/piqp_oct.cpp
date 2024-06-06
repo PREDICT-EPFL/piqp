@@ -1,16 +1,14 @@
+// This file is part of PIQP.
+//
+// Copyright (c) 2024 Joshua Redstone
+//
+// This source code is licensed under the BSD 2-Clause License found in the
+// LICENSE file in the root directory of this source tree.
+
 #include <limits>
 #include <octave/oct.h>
 #include "ovl.h" // for octave value list
 #include "piqp.hpp"
-
-// cmake -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_OCTAVE_INTERFACE=ON .
-// make piqp_plain.oct
-//
-// LD_PRELOAD=/home/redstone/tmp/piqp/interfaces/c/libpiqpc.so octave
-// autoload("__piqp__", "/home/redstone/tmp/piqp/interfaces/octave/piqp_plain.oct")
-// addpath("/home/redstone/tmp/piqp/interfaces/octave");
-
-// [res] = __piqp__([1 0 ; 0 1], [-4 ; -6], [], [], [], [], [-Inf ; -Inf], [Inf; Inf], struct("verbose", true))
 
 ColumnVector eigen3VecToCol(const Eigen::Matrix<double, Eigen::Dynamic, 1>& vec) {
   int n = vec.size();
@@ -21,7 +19,7 @@ ColumnVector eigen3VecToCol(const Eigen::Matrix<double, Eigen::Dynamic, 1>& vec)
 }
 
 DEFUN_DLD (__piqp__, args, nargout,
-           "rez = __piqp__(Q, c, A, b, G, h, x_lb, x_ub, opts)\nOnly supports dense matrices")
+           "rez = __piqp__(Q, c, A, b, G, h, x_lb, x_ub, opts)\nOnly supports dense matrices at present")
 {
   if (args.length() < 8) {
     error("piqp_dense: Incorrect # of args#");
@@ -47,13 +45,10 @@ DEFUN_DLD (__piqp__, args, nargout,
   if (args.length() == 9) {
     const octave_scalar_map& opts = args(8).scalar_map_value();
 #define DFIELD(a) { if (opts.contains(#a)) {                            \
-      printf("  opts has d %s=%g\n", #a, opts.getfield(#a).double_value()); \
-      solver.settings().a = opts.getfield(#a).double_value(); } }
+        solver.settings().a = opts.getfield(#a).double_value(); } }
 #define BFIELD(a) { if (opts.contains(#a)) {                            \
-        printf("  opts has b %s=%d\n", #a, opts.getfield(#a).bool_value()); \
         solver.settings().a = opts.getfield(#a).bool_value(); } }
 #define IFIELD(a) { if (opts.contains(#a)) {                            \
-        printf("  opts has i %s=%d\n", #a, opts.getfield(#a).int_value()); \
         solver.settings().a = opts.getfield(#a).int_value(); } }
     DFIELD(rho_init);
     DFIELD(delta_init);
@@ -92,7 +87,8 @@ DEFUN_DLD (__piqp__, args, nargout,
   
   octave_scalar_map info;
 #define iset(a) info.assign(#a, solver.result().info.a);
-  // Seems like if first element assigned to map is numeric, it's prints better for some reason. Or maybe it's the Status enum that confused things.
+  // Seems like if first element assigned to map is numeric, it's prints better for some reason.
+  // Or maybe it's the info.status Status enum that confused things.
   iset(rho);
   info.assign("status", static_cast<int>(solver.result().info.status));
   iset(iter);
