@@ -13,8 +13,8 @@ follow the instructions to [install Eigen and prerequistes](../../_common/buildi
 
 Then, from the piqp root directory do
 ```
-$ cmake -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_OCTAVE_INTERFACE=ON .
-$ make piqp_plain.oct
+$ cmake -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF  -DBUILD_SHARED_LIBS=ON -DBUILD_OCTAVE_INTERFACE=ON .
+$ make
 ```
 
 Then you can start Octave with

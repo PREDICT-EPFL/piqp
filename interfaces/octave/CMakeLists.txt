@@ -10,8 +10,9 @@
 set(TARGET_NAME piqp_plain.oct)
 
 # mkoctfile is a utility program included with Octave
+# TODO - piqp_plain_oct will be rebuilt every time. Add proper cmake smarts so it is only rebuilt when necessary
 add_custom_target(${TARGET_NAME}
       COMMAND mkoctfile -v -o ${TARGET_NAME} -I${CMAKE_CURRENT_SOURCE_DIR}/../../include/piqp -I${CMAKE_CURRENT_SOURCE_DIR}/../../include -I/usr/include/eigen3 piqp_oct.cpp
       VERBATIM )
 
-add_dependencies(${TARGET_NAME} piqp::piqp_c_shared)
+add_dependencies(${TARGET_NAME} piqp::piqp)
