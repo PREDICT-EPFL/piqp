@@ -5,7 +5,7 @@
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 
 # Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
@@ -32,10 +32,12 @@ add_library(pipq-c-interface-test INTERFACE)
 target_include_directories(pipq-c-interface-test INTERFACE include)
 target_compile_options(pipq-c-interface-test INTERFACE ${compiler_flags})
 target_link_options(pipq-c-interface-test INTERFACE ${compiler_flags})
-target_link_libraries(pipq-c-interface-test INTERFACE piqp_c_static gtest_main gtest)
+target_link_libraries(pipq-c-interface-test INTERFACE piqp_c gtest_main gtest)
 
 add_executable(c_interface_test src/c_interface_test.cpp)
 target_link_libraries(c_interface_test PRIVATE pipq-c-interface-test)
+
+fix_test_dll(c_interface_test)
 
 include(GoogleTest)
 gtest_discover_tests(c_interface_test)

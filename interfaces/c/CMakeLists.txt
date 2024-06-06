@@ -5,25 +5,16 @@
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 
-add_library(piqp_c_static STATIC src/piqp.cpp include/piqp.h)
-target_include_directories(piqp_c_static PUBLIC
+add_library(piqp_c src/piqp.cpp include/piqp.h)
+target_include_directories(piqp_c PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/piqp_c>
 )
-target_link_libraries(piqp_c_static PRIVATE piqp_static)
-set_target_properties(piqp_c_static PROPERTIES OUTPUT_NAME piqpcstatic)
-add_library(piqp::piqp_c_static ALIAS piqp_c_static)
-
-add_library(piqp_c_shared SHARED src/piqp.cpp include/piqp.h)
-target_include_directories(piqp_c_shared PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
-    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/piqp_c>
-)
-target_link_libraries(piqp_c_shared PRIVATE piqp)
-set_target_properties(piqp_c_shared PROPERTIES OUTPUT_NAME piqpc)
-add_library(piqp::piqp_c_shared ALIAS piqp_c_shared)
+target_link_libraries(piqp_c PRIVATE piqp_header_only)
+set_target_properties(piqp_c PROPERTIES OUTPUT_NAME piqpc)
+add_library(piqp::piqp_c ALIAS piqp_c)
 
 install(
     DIRECTORY include/
@@ -31,7 +22,7 @@ install(
 )
 
 install(
-    TARGETS piqp_c_static piqp_c_shared
+    TARGETS piqp_c
     EXPORT piqpTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

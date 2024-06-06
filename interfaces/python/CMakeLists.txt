@@ -6,7 +6,7 @@
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 
 # Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
@@ -17,7 +17,7 @@ endif()
 include(FetchContent)
 FetchContent_Declare(
     pybind11
-    URL https://github.com/pybind/pybind11/archive/8a099e44b3d5f85b20f05828d919d2332a8de841.zip # v2.11.1
+    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.12.0.zip
 )
 FetchContent_MakeAvailable(pybind11)
 
@@ -34,7 +34,7 @@ pybind11_add_module(instruction_set src/instruction_set.cpp)
 # only link cpu_features on x86/amd64
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
     target_compile_definitions(instruction_set PRIVATE CPU_FEATURES_AVAILABLE=1)
-    target_link_libraries(instruction_set PRIVATE CpuFeature::cpu_features)
+    target_link_libraries(instruction_set PRIVATE cpu_features)
 endif()
 
 function(CREATE_PIQP_PYTHON_TARGET target_name COMPILE_OPTIONS)

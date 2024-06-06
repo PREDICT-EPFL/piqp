@@ -6,7 +6,7 @@
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 
 # Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
@@ -74,6 +74,20 @@ if (BUILD_MAROS_MESZAROS_TEST)
 
     add_executable(sparse_maros_meszaros_tests src/sparse/maros_meszaros_tests.cpp)
     target_link_libraries(sparse_maros_meszaros_tests PRIVATE pipq-test Matio::Matio)
+endif()
+
+fix_test_dll(dense_ldlt_test)
+fix_test_dll(dense_kkt_test)
+fix_test_dll(dense_solver_test)
+fix_test_dll(sparse_kkt_test)
+fix_test_dll(sparse_ldlt_test)
+fix_test_dll(sparse_utils_test)
+fix_test_dll(sparse_solver_test)
+fix_test_dll(preconditioner_test)
+fix_test_dll(io_utils_test)
+if (BUILD_MAROS_MESZAROS_TEST)
+    fix_test_dll(dense_maros_meszaros_tests)
+    fix_test_dll(sparse_maros_meszaros_tests)
 endif()
 
 include(GoogleTest)

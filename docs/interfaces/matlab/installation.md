@@ -15,9 +15,6 @@ websave('install_piqp.m','https://raw.githubusercontent.com/PREDICT-EPFL/piqp/ma
 install_piqp
 ```
 
-{: .warning }
-Matlab on Apple Silicon (Matlab R2023b) is currently not supported for precompiled packages, i.e., it has to be built from Source.
-
 ## Building and Installing from Source
 
 {% root_include _common/building_from_source_deps.md %}

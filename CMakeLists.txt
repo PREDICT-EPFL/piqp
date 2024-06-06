@@ -5,10 +5,10 @@
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 
 project(piqp
-    VERSION 0.2.4
+    VERSION 0.3.1
     LANGUAGES C CXX
 )
 
@@ -21,6 +21,7 @@ endif()
 
 #### Interface options ####
 option(BUILD_WITH_TEMPLATE_INSTANTIATION "Build a shared library with common templates instantiated" ON)
+option(BUILD_SHARED_LIBS "Build library as shared." ON)
 option(BUILD_WITH_STD_OPTIONAL "Build using std::optional" OFF)
 option(BUILD_WITH_STD_FILESYSTEM "Build using std::filesystem" OFF)
 option(BUILD_C_INTERFACE "Build C interface" ON)
@@ -29,14 +30,27 @@ option(BUILD_MATLAB_INTERFACE "Build Matlab interface" OFF)
 option(BUILD_OCTAVE_INTERFACE "Build Octave interface" OFF)
 
 #### Tests/Benchmarks options ####
-option(BUILD_TESTS "Build tests" ON)
-option(BUILD_EXAMPLES "Build examples" ON)
+# Don't build tests and examples if included as subdirectory
+if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    option(BUILD_TESTS "Build tests" OFF)
+    option(BUILD_EXAMPLES "Build examples" OFF)
+else()
+    option(BUILD_TESTS "Build tests" ON)
+    option(BUILD_EXAMPLES "Build examples" ON)
+endif()
 option(BUILD_MAROS_MESZAROS_TEST "Build maros meszaros tests" OFF)
 option(BUILD_BENCHMARKS "Build benchmarks" OFF)
 
 #### Developer options ####
 option(ENABLE_SANITIZERS "Build with sanitizers enabled" OFF)
 option(DEBUG_PRINTS "Print additional debug information" OFF)
+
+#### Install options ####
+if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    option(ENABLE_INSTALL "Enable install targets" OFF)
+else()
+    option(ENABLE_INSTALL "Enable install targets" ON)
+endif()
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
@@ -86,14 +100,16 @@ if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE OR BUILD_OCTAVE_INTERFACE)
     include(FetchContent)
     FetchContent_Declare(
         cpu_features
-        URL https://github.com/google/cpu_features/archive/936b9ab5515dead115606559502e3864958f7f6e.zip # v0.8.0
+        URL https://github.com/google/cpu_features/archive/refs/tags/v0.9.0.zip
     )
-    set(BUILD_TESTING OFF)
+    set(BUILD_SHARED_LIBS_COPY ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
     FetchContent_GetProperties(cpu_features)
     if(NOT cpu_features_POPULATED)
         FetchContent_Populate(cpu_features)
         add_subdirectory(${cpu_features_SOURCE_DIR} ${cpu_features_BINARY_DIR} EXCLUDE_FROM_ALL)
     endif()
+    set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_COPY})
 endif ()
 
 if (BUILD_TESTS OR BUILD_BENCHMARKS)
@@ -111,19 +127,19 @@ else ()
 endif ()
 message(STATUS "Using Eigen3 from: ${EIGEN3_INCLUDE_DIRS}")
 
-include(GNUInstallDirs)
+macro(create_piqp_library library_name)
+    set(options INTERFACE)
+    cmake_parse_arguments(CREATE_PIQP_LIBRARY "${options}" "" "" ${ARGN})
 
-macro(create_piqp_library library_name library_type)
-
-    if ("${library_type}" STREQUAL "INTERFACE")
-        add_library(${library_name} ${library_type})
+    if (CREATE_PIQP_LIBRARY_INTERFACE)
+        add_library(${library_name} INTERFACE)
         target_include_directories(${library_name} INTERFACE
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
             $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
         )
         target_link_libraries(${library_name} INTERFACE Eigen3::Eigen)
     else ()
-        add_library(${library_name} ${library_type} ${TEMPLATE_SOURCES})
+        add_library(${library_name} ${TEMPLATE_SOURCES})
         target_include_directories(${library_name} PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
             $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
@@ -137,7 +153,7 @@ if (BUILD_WITH_TEMPLATE_INSTANTIATION)
 
     file(GLOB_RECURSE TEMPLATE_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
-    create_piqp_library(piqp SHARED)
+    create_piqp_library(piqp)
     set_target_properties(piqp PROPERTIES OUTPUT_NAME piqp)
     target_compile_definitions(piqp PUBLIC PIQP_WITH_TEMPLATE_INSTANTIATION)
     if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
@@ -147,45 +163,40 @@ if (BUILD_WITH_TEMPLATE_INSTANTIATION)
     target_compile_options(piqp PRIVATE ${compiler_flags})
     target_link_options(piqp PRIVATE ${compiler_flags})
 
-    create_piqp_library(piqp_static STATIC)
-    set_target_properties(piqp_static PROPERTIES OUTPUT_NAME piqpstatic)
-    target_compile_definitions(piqp_static PUBLIC PIQP_WITH_TEMPLATE_INSTANTIATION)
-    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-        # Ensure ABI compatibility up to AVX512
-        target_compile_definitions(piqp_static PUBLIC EIGEN_MAX_ALIGN_BYTES=64)
-    endif ()
-    target_compile_options(piqp_static PRIVATE ${compiler_flags})
-    target_link_options(piqp_static PRIVATE ${compiler_flags})
-
     create_piqp_library(piqp_header_only INTERFACE)
 else ()
     message(STATUS "Building without template instantiation")
 
     create_piqp_library(piqp INTERFACE)
-    create_piqp_library(piqp_static INTERFACE)
     create_piqp_library(piqp_header_only INTERFACE)
 endif ()
 
 if (BUILD_WITH_STD_OPTIONAL)
     target_compile_definitions(piqp INTERFACE PIQP_STD_OPTIONAL)
-    target_compile_definitions(piqp_static INTERFACE PIQP_STD_OPTIONAL)
     target_compile_definitions(piqp_header_only INTERFACE PIQP_STD_OPTIONAL)
 endif ()
 if (BUILD_WITH_STD_FILESYSTEM)
     target_compile_definitions(piqp INTERFACE PIQP_STD_FILESYSTEM)
-    target_compile_definitions(piqp_static INTERFACE PIQP_STD_FILESYSTEM)
     target_compile_definitions(piqp_header_only INTERFACE PIQP_STD_FILESYSTEM)
 endif ()
 
 if (DEBUG_PRINTS)
     target_compile_definitions(piqp INTERFACE PIQP_DEBUG_PRINT)
-    target_compile_definitions(piqp_static INTERFACE PIQP_DEBUG_PRINT)
     target_compile_definitions(piqp_header_only INTERFACE PIQP_DEBUG_PRINT)
 endif ()
 
 add_library(piqp::piqp ALIAS piqp)
-add_library(piqp::piqp_static ALIAS piqp_static)
 add_library(piqp::piqp_header_only ALIAS piqp_header_only)
+
+macro(fix_test_dll target)
+    if (WIN32)
+        add_custom_command(
+            TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${target}> $<TARGET_FILE_DIR:${target}>
+            COMMAND_EXPAND_LISTS
+        )
+    endif ()
+endmacro()
 
 if (BUILD_C_INTERFACE)
     add_subdirectory(interfaces/c)
@@ -215,44 +226,49 @@ if (BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
-install(
-    DIRECTORY include/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
+if (ENABLE_INSTALL)
+    include(GNUInstallDirs)
 
-install(
-    TARGETS piqp piqp_static piqp_header_only
-    EXPORT piqpTargets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
+    install(
+        DIRECTORY include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
 
-# https://cmake.org/cmake/help/latest/guide/importing-exporting/index.html
-install(
-    EXPORT piqpTargets
-    FILE piqpTargets.cmake
-    NAMESPACE piqp::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
-)
+    install(
+        TARGETS piqp piqp_header_only
+        EXPORT piqpTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
 
-include(CMakePackageConfigHelpers)
-configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/piqpConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
-)
+    # https://cmake.org/cmake/help/latest/guide/importing-exporting/index.html
+    install(
+        EXPORT piqpTargets
+        FILE piqpTargets.cmake
+        NAMESPACE piqp::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
+    )
 
-write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake
-    VERSION ${PROJECT_VERSION} COMPATIBILITY ExactVersion
-)
+    include(CMakePackageConfigHelpers)
+    configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/piqpConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
+    )
 
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
-)
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake
+        VERSION ${PROJECT_VERSION} COMPATIBILITY ExactVersion
+    )
 
-export(EXPORT piqpTargets
-    FILE ${CMAKE_CURRENT_BINARY_DIR}/piqpTargets.cmake
-    NAMESPACE piqp::
-)
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/piqpConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/piqpConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/piqp
+    )
+
+    export(EXPORT piqpTargets
+        FILE ${CMAKE_CURRENT_BINARY_DIR}/piqpTargets.cmake
+        NAMESPACE piqp::
+    )
+
+endif ()

@@ -89,6 +89,10 @@ TEST(CInterfaceTest, SimpleDenseQPWithUpdate)
     ASSERT_NEAR(work->result->z_lb[1], 0, 1e-6);
     ASSERT_NEAR(work->result->z_ub[0], 0, 1e-6);
     ASSERT_NEAR(work->result->z_ub[1], 0, 1e-6);
+
+    piqp_cleanup(work);
+    if (settings) free(settings);
+    if (data) free(data);
 }
 
 /*

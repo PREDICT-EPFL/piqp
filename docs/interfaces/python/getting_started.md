@@ -71,6 +71,9 @@ We can now set up the problem using
 solver.setup(P, c, A, b, G, h, x_lb, x_ub)
 ```
 
+{: .note }
+Every variable except `P` and `c` are optional and `None` may be passed.
+
 The data is internally copied, and the solver initializes all internal data structures.
 
 Now, the problem can be solver using
@@ -96,3 +99,22 @@ The result of the optimization can be obtained from the `solver.result` object. 
 
 {: .warning }
 Timing information like `solver.result.info.run_time` is only measured if `solver.settings.compute_timings` is set to `true`.
+
+## Efficient Problem Updates
+
+Instead of creating a new solver object everytime it's possible to update the problem directly using
+
+```python
+solver.update(P, c, A, b, G, h, x_lb, x_ub)
+```
+
+with a subsequent call to
+
+```python
+status = solver.solve()
+```
+
+This allows the solver to internally reuse memory and factorizations speeding up subsequent solves. Similar to the `setup` function, all parameters are optional and `None` may be passed instead.
+
+{: .warning }
+Note the dimension and sparsity pattern of the problem are not allowed to change when calling the `update` function.

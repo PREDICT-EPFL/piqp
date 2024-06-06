@@ -7,9 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2024-05-25
+
+### Changed
+
+- Added python stub files for better python IDE support.
+
+## [0.3.0] - 2024-05-24
+
 ### Changed
 
 - Make equality and inequality constrains optional on setup.
+- Pre-compile common template instantiations in C++ interface to speed up compilation times.
+- Add utilities to save and load problem data.
+- Various bug fixes.
+- Various doc improvements.
 
 ## [0.2.4] - 2023-12-25
 
@@ -72,7 +84,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.4...HEAD
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.1...v0.2.2
