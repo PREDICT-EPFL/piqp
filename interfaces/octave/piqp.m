@@ -52,7 +52,7 @@
 ## @end deftypefn
 ##
 function [result] = piqp (Q, c, A, b, lb, ub, G, h, opts)
-  result = Nan;
+  result = NaN;
   if nargin ==8
     opts = struct();
   elseif nargin == 9
