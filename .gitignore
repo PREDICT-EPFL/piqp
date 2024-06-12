@@ -7,5 +7,6 @@ Release
 Debug
 cmake-build-*/
 *.mex*
+*.oct
 *.asv
 *.pdb

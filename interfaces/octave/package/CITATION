@@ -1,0 +1,17 @@
+To cite PIQP in publications please use:
+
+    R. Schwan, Y. Jiang, D. Kuhn and C. N. Jones, "PIQP: A Proximal Interior-Point Quadratic Programming Solver,"
+    2023 62nd IEEE Conference on Decision and Control (CDC), Singapore, Singapore, 2023, pp. 1088-1093
+
+A BibTex entry for LaTex users:
+
+@INPROCEEDINGS{schwan2023piqp,
+  author={Schwan, Roland and Jiang, Yuning and Kuhn, Daniel and Jones, Colin N.},
+  booktitle={2023 62nd IEEE Conference on Decision and Control (CDC)},
+  title={{PIQP}: A Proximal Interior-Point Quadratic Programming Solver},
+  year={2023},
+  volume={},
+  number={},
+  pages={1088-1093},
+  doi={10.1109/CDC49753.2023.10383915}
+}
