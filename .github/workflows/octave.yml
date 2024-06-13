@@ -10,7 +10,7 @@ on:
 
 jobs:
   build_test_release:
-    name: Build, test and release Matlab interface
+    name: package, install and release Octave interface
 
     strategy:
       fail-fast: false
@@ -29,7 +29,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt update
-          sudo apt install --no-install-recommends octave
+          sudo apt install --no-install-recommends octave liboctave-dev
 
       - name: Install Octave (macOS)
         if: runner.os == 'macOS'
@@ -52,12 +52,13 @@ jobs:
         run: octave --eval "pkg load piqp; piqp('sparse')"
 
       - name: Upload artifact
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v3
         with:
           path: ./interfaces/octave/piqp-octave.tar.gz
 
       - name: Upload tarballs
-        if: github.event_name == 'release' && github.event.action == 'published'
+        if: runner.os == 'Linux' && github.event_name == 'release' && github.event.action == 'published'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

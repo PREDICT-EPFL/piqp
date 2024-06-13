@@ -69,7 +69,7 @@ cmake_args = [
     '-DBUILD_EXAMPLES=OFF ' ...
     '-DBUILD_BENCHMARKS=OFF'];
 
-if isenv('PIQP_EIGEN3_INCLUDE_DIRS')
+if getenv('PIQP_EIGEN3_INCLUDE_DIRS')
     cmake_args = sprintf('%s -DEIGEN3_INCLUDE_DIRS=%s', cmake_args, getenv('PIQP_EIGEN3_INCLUDE_DIRS'));
 end
 
