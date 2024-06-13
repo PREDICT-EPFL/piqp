@@ -200,7 +200,7 @@ DEFUN_DLD(PIQP_TARGET, args, nargout, "")
         if (args.length() < 2) {
             backend = "sparse";
             warning("The sparse backend is automatically used. To get rid of this warning or use another backend, "
-                    "provide the backend explicitly using pipq('dense') or piqp('sparse').");
+                    "provide the backend explicitly using piqp('dense') or piqp('sparse').");
         } else if (!args(1).is_string()) {
             error("Second input should be string less than 10 characters long.");
         } else {

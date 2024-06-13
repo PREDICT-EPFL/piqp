@@ -13,7 +13,7 @@ current_dir = pwd;
 piqp_dir = fullfile(piqp_octave_dir, '../..');
 tmp_dir = tempdir;
 
-fprintf('Packaging PIQP...');
+fprintf('Packaging PIQP...\n');
 
 % Setup directory and copy files
 pkg_name = 'piqp-octave';
@@ -31,7 +31,7 @@ mkdir(fullfile(pkg_dir, 'src'));
 copyfile(piqp_dir, fullfile(pkg_dir, 'src/piqp'));
 rmdir(fullfile(pkg_dir, 'src/piqp/.git'), 's');
 
-fprintf('Downloading Eigen3...');
+fprintf('Downloading Eigen3...\n');
 system('wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz');
 untar('eigen-3.4.0.tar.gz', fullfile(pkg_dir, 'src'));
 delete('eigen-3.4.0.tar.gz');

@@ -45,7 +45,7 @@ jobs:
 
       - name: Install pkg
         working-directory: interfaces/octave
-        run: octave --eval "pkg install pipq-octave.tar.gz"
+        run: octave --eval "pkg install piqp-octave.tar.gz"
 
       - name: Load pkg
         working-directory: interfaces/octave
