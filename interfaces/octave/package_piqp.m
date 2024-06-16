@@ -30,6 +30,8 @@ copyfile(fullfile(piqp_octave_dir, 'piqp.m'), fullfile(pkg_dir, 'inst/piqp.m'));
 mkdir(fullfile(pkg_dir, 'src'));
 copyfile(piqp_dir, fullfile(pkg_dir, 'src/piqp'));
 rmdir(fullfile(pkg_dir, 'src/piqp/.git'), 's');
+rmdir(fullfile(pkg_dir, 'src/piqp/benchmarks'), 's');
+rmdir(fullfile(pkg_dir, 'src/piqp/tests'), 's');
 
 fprintf('Downloading Eigen3...\n');
 system('wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz');
