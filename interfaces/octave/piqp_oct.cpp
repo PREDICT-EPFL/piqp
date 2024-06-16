@@ -300,18 +300,28 @@ DEFUN_DLD(PIQP_TARGET, args, nargout, "")
         const octave_value& x_lb_ref = args(11);
         const octave_value& x_ub_ref = args(12);
 
-        Eigen::Map<const Vec> c(c_ref.vector_value().data(), n);
-        Eigen::Map<const Vec> b(b_ref.vector_value().data(), p);
-        Eigen::Map<const Vec> h(h_ref.vector_value().data(), m);
-        Eigen::Map<const Vec> x_lb(x_lb_ref.vector_value().data(), n);
-        Eigen::Map<const Vec> x_ub(x_ub_ref.vector_value().data(), n);
+        double c_value = c_ref.is_scalar_type() ? c_ref.double_value() : 0;
+        double b_value = b_ref.is_scalar_type() ? b_ref.double_value() : 0;
+        double h_value = h_ref.is_scalar_type() ? h_ref.double_value() : 0;
+        double x_lb_value = x_lb_ref.is_scalar_type() ? x_lb_ref.double_value() : 0;
+        double x_ub_value = x_ub_ref.is_scalar_type() ? x_ub_ref.double_value() : 0;
+
+        Eigen::Map<const Vec> c(c_ref.is_scalar_type() ? &c_value : c_ref.vector_value().data(), n);
+        Eigen::Map<const Vec> b(b_ref.is_scalar_type() ? &b_value : b_ref.vector_value().data(), p);
+        Eigen::Map<const Vec> h(h_ref.is_scalar_type() ? &h_value : h_ref.vector_value().data(), m);
+        Eigen::Map<const Vec> x_lb(x_lb_ref.is_scalar_type() ? &x_lb_value : x_lb_ref.vector_value().data(), n);
+        Eigen::Map<const Vec> x_ub(x_ub_ref.is_scalar_type() ? &x_ub_value : x_ub_ref.vector_value().data(), n);
 
         if (oct_handle->isDense()) {
             copy_ov_struct_to_settings(args(13).scalar_map_value(), oct_handle->as_dense_ptr()->settings());
 
-            Eigen::Map<const Mat> P(P_ref.matrix_value().data(), n, n);
-            Eigen::Map<const Mat> A(A_ref.matrix_value().data(), p, n);
-            Eigen::Map<const Mat> G(G_ref.matrix_value().data(), m, n);
+            double P_value = P_ref.is_scalar_type() ? P_ref.double_value() : 0;
+            double A_value = A_ref.is_scalar_type() ? A_ref.double_value() : 0;
+            double G_value = G_ref.is_scalar_type() ? G_ref.double_value() : 0;
+
+            Eigen::Map<const Mat> P(P_ref.is_scalar_type() ? &P_value : P_ref.matrix_value().data(), n, n);
+            Eigen::Map<const Mat> A(A_ref.is_scalar_type() ? &A_value : A_ref.matrix_value().data(), p, n);
+            Eigen::Map<const Mat> G(G_ref.is_scalar_type() ? &G_value : G_ref.matrix_value().data(), m, n);
 
             oct_handle->as_dense_ptr()->setup(P, c, A, b, G, h, x_lb, x_ub);
         } else {
@@ -367,19 +377,30 @@ DEFUN_DLD(PIQP_TARGET, args, nargout, "")
         piqp::optional<Eigen::Map<const Vec>> x_lb;
         piqp::optional<Eigen::Map<const Vec>> x_ub;
 
-        if (!c_ref.isempty()) { c.emplace(c_ref.vector_value().data(), n); }
-        if (!b_ref.isempty()) { b.emplace(b_ref.vector_value().data(), p); }
-        if (!h_ref.isempty()) { h.emplace(h_ref.vector_value().data(), m); }
-        if (!x_lb_ref.isempty()) { x_lb.emplace(x_lb_ref.vector_value().data(), n); }
-        if (!x_ub_ref.isempty()) { x_ub.emplace(x_ub_ref.vector_value().data(), n); }
+        double c_value = c_ref.is_scalar_type() ? c_ref.double_value() : 0;
+        double b_value = b_ref.is_scalar_type() ? b_ref.double_value() : 0;
+        double h_value = h_ref.is_scalar_type() ? h_ref.double_value() : 0;
+        double x_lb_value = x_lb_ref.is_scalar_type() ? x_lb_ref.double_value() : 0;
+        double x_ub_value = x_ub_ref.is_scalar_type() ? x_ub_ref.double_value() : 0;
+
+        if (!c_ref.isempty()) { c.emplace(c_ref.is_scalar_type() ? &c_value : c_ref.vector_value().data(), n); }
+        if (!b_ref.isempty()) { b.emplace(b_ref.is_scalar_type() ? &b_value : b_ref.vector_value().data(), p); }
+        if (!h_ref.isempty()) { h.emplace(h_ref.is_scalar_type() ? &h_value : h_ref.vector_value().data(), m); }
+        if (!x_lb_ref.isempty()) { x_lb.emplace(x_lb_ref.is_scalar_type() ? &x_lb_value : x_lb_ref.vector_value().data(), n); }
+        if (!x_ub_ref.isempty()) { x_ub.emplace(x_ub_ref.is_scalar_type() ? &x_ub_value : x_ub_ref.vector_value().data(), n); }
 
         if (oct_handle->isDense()) {
             piqp::optional<Eigen::Map<const Mat>> P;
             piqp::optional<Eigen::Map<const Mat>> A;
             piqp::optional<Eigen::Map<const Mat>> G;
-            if (!P_ref.isempty()) { P.emplace(P_ref.matrix_value().data(), n, n); }
-            if (!A_ref.isempty()) { A.emplace(A_ref.matrix_value().data(), p, n); }
-            if (!G_ref.isempty()) { G.emplace(G_ref.matrix_value().data(), m, n); }
+
+            double P_value = P_ref.is_scalar_type() ? P_ref.double_value() : 0;
+            double A_value = A_ref.is_scalar_type() ? A_ref.double_value() : 0;
+            double G_value = G_ref.is_scalar_type() ? G_ref.double_value() : 0;
+
+            if (!P_ref.isempty()) { P.emplace(P_ref.is_scalar_type() ? &P_value : P_ref.matrix_value().data(), n, n); }
+            if (!A_ref.isempty()) { A.emplace(A_ref.is_scalar_type() ? &A_value : A_ref.matrix_value().data(), p, n); }
+            if (!G_ref.isempty()) { G.emplace(G_ref.is_scalar_type() ? &G_value : G_ref.matrix_value().data(), m, n); }
 
             oct_handle->as_dense_ptr()->update(P, c, A, b, G, h, x_lb, x_ub);
         } else {
