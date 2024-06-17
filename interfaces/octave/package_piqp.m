@@ -26,6 +26,7 @@ end
 copyfile(fullfile(piqp_octave_dir, 'package'), pkg_dir);
 mkdir(fullfile(pkg_dir, 'inst'))
 copyfile(fullfile(piqp_octave_dir, 'piqp.m'), fullfile(pkg_dir, 'inst/piqp.m'));
+copyfile(fullfile(piqp_octave_dir, 'make_piqp.m'), fullfile(pkg_dir, 'make_piqp.m'));
 
 mkdir(fullfile(pkg_dir, 'src'));
 copyfile(piqp_dir, fullfile(pkg_dir, 'src/piqp'));

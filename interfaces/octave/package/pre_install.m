@@ -6,11 +6,6 @@
 % LICENSE file in the root directory of this source tree.
 
 function pre_install (in)
-    octave_interface_dir = fullfile(pwd, 'src/piqp/interfaces/octave');
-    addpath(octave_interface_dir);
-
     make_piqp();
-    copyfile(fullfile(octave_interface_dir, 'piqp_oct.oct'), fullfile(pwd, 'inst/piqp_oct.oct'));
-
-    rmpath(octave_interface_dir)
+    movefile('piqp_oct.oct', 'inst/piqp_oct.oct');
 endfunction

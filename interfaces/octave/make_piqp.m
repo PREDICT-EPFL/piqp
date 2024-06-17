@@ -55,13 +55,10 @@ end
 if any(strcmpi(what,'oct')) || any(strcmpi(what,'all'))
    fprintf('Compiling PIQP Octave interface...\n');
 
-    % Change directory back to octave interface
-    cd(piqp_octave_dir);
-
     mkoctfile('-O3', '-DNDEBUG', '-march=native', '-std=gnu++14', ...
              ['-I', fullfile(piqp_dir, 'include')], ...
              ['-I', eigen_include_dir], ...
-             '-o', 'piqp_oct.oct', 'piqp_oct.cpp');
+             '-o', 'piqp_oct.oct', fullfile(piqp_dir, 'interfaces/octave/piqp_oct.cpp'));
 
     fprintf('[done]\n');
 
@@ -70,9 +67,6 @@ end
 %% clean
 if any(strcmpi(what,'clean'))
     fprintf('Cleaning build related files...\n');
-
-    % Change directory back to octave interface
-    cd(piqp_octave_dir);
 
     % Delete oct file
     octfiles = dir('*.oct');
