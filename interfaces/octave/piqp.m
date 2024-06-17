@@ -12,7 +12,6 @@ classdef piqp < handle
     % of the PIQP solver.
     %
     % piqp Properties:
-    %   piqpOctHandle - handle to the oct function
     %   objectHandle  - pointer to the C++ structure of PIQP solver
     %   isDense       - is dense or sparse backend used
     %   n             - number of variables
@@ -33,7 +32,6 @@ classdef piqp < handle
     %   version           - return PIQP version
 
     properties (SetAccess = private, Hidden = true)
-        piqpOctHandle
         objectHandle % Handle to underlying C++ instance
     end
 
@@ -56,17 +54,6 @@ classdef piqp < handle
         %%
         function this = piqp(varargin)
             % Construct piqp solver class.
-
-            % detect available instruction sets
-            instructionSets = piqp_instruction_set_oct();
-            % select correct oct file
-            if instructionSets.avx512f
-                this.piqpOctHandle = @piqp_avx512_oct;
-            elseif instructionSets.avx2
-                this.piqpOctHandle = @piqp_avx2_oct;
-            else
-                this.piqpOctHandle = @piqp_oct;
-            end
             
             if length(varargin) >= 1
                 if strcmp(varargin{1}, 'dense')
@@ -78,19 +65,19 @@ classdef piqp < handle
                 this.isDense = false;
             end
 
-            this.objectHandle = this.piqpOctHandle('new', varargin{:});
+            this.objectHandle = piqp_oct('new', varargin{:});
         end
 
         %%
         function delete(this)
             % Destroy piqp solver class.
-            this.piqpOctHandle('delete', this.objectHandle);
+            piqp_oct('delete', this.objectHandle);
         end
 
         %%
         function out = get_settings(this)
             % GET_SETTINGS get the current solver settings structure.
-            out = this.piqpOctHandle('get_settings', this.objectHandle);
+            out = piqp_oct('get_settings', this.objectHandle);
         end
 
         %%
@@ -101,14 +88,14 @@ classdef piqp < handle
 
             %write the solver settings.  C-oct does not check input
             %data or protect against disallowed parameter modifications
-            this.piqpOctHandle('update_settings', this.objectHandle, newSettings);
+            piqp_oct('update_settings', this.objectHandle, newSettings);
         end
 
         %%
         function [n,p,m] = get_dimensions(this)
             % GET_DIMENSIONS get the number of variables and constraints.
 
-            [n,p,m] = this.piqpOctHandle('get_dimensions', this.objectHandle);
+            [n,p,m] = piqp_oct('get_dimensions', this.objectHandle);
         end
 
         %%
@@ -242,14 +229,14 @@ classdef piqp < handle
             %make a settings structure from the remainder of the arguments.
             settings = validateSettings(this, varargin{:});
 
-            this.piqpOctHandle('setup',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h,x_lb,x_ub,settings);
+            piqp_oct('setup',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h,x_lb,x_ub,settings);
         end
 
         %%
         function res = solve(this, varargin)
             % SOLVE solve the QP.
 
-            res = this.piqpOctHandle('solve', this.objectHandle);
+            res = piqp_oct('solve', this.objectHandle);
         end
 
         %%
@@ -340,14 +327,14 @@ classdef piqp < handle
                 assert(length(x_ub) == this.n, 'Incorrect dimension of x_ub');
             end
 
-            this.piqpOctHandle('update',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h,x_lb,x_ub);
+            piqp_oct('update',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h,x_lb,x_ub);
         end
     end
 end
 
 function settings = validateSettings(this, varargin)
 
-settings = this.piqpOctHandle('get_settings', this.objectHandle);
+settings = piqp_oct('get_settings', this.objectHandle);
 
 %no settings passed -> return defaults
 if isempty(varargin)

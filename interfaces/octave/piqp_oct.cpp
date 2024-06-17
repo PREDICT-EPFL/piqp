@@ -15,7 +15,7 @@
 #define PIQP_MEX_SIGNATURE 0x271C1A7A
 
 #ifndef PIQP_VERSION
-#define PIQP_VERSION dev
+#define PIQP_VERSION 0.3.1
 #endif
 
 using Vec = Eigen::Matrix<double, Eigen::Dynamic, 1>;
@@ -189,7 +189,7 @@ octave_value result_to_ov_struct(const piqp::Result<double>& result)
     return octave_value(ov_result_struct);
 }
 
-DEFUN_DLD(PIQP_TARGET, args, nargout, "")
+DEFUN_DLD(piqp_oct, args, nargout, "")
 {
     if (args.length() < 1 || !args(0).is_string()) {
         error("First input should be a command string.");

@@ -34,9 +34,16 @@ rmdir(fullfile(pkg_dir, 'src/piqp/benchmarks'), 's');
 rmdir(fullfile(pkg_dir, 'src/piqp/tests'), 's');
 
 fprintf('Downloading Eigen3...\n');
-system('wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz');
-untar('eigen-3.4.0.tar.gz', fullfile(pkg_dir, 'src'));
-delete('eigen-3.4.0.tar.gz');
+tar_path = fullfile(tmp_dir, 'eigen-3.4.0.tar.gz');
+data = urlread('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz');
+if exist(tar_path, 'file')
+    delete(tar_path)
+end
+tar_file = fopen(tar_path, 'w');
+fwrite(tar_file, data);
+fclose(tar_file);
+untar(tar_path, fullfile(pkg_dir, 'src'));
+delete(tar_path);
 movefile(fullfile(pkg_dir, 'src/eigen-3.4.0'), fullfile(pkg_dir, 'src/eigen'));
 
 % Create tarball

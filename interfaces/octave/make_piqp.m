@@ -39,89 +39,37 @@ end
 if mislocked('piqp_oct')
     munlock('piqp_oct');
 end
-if mislocked('piqp_avx2_oct')
-    munlock('piqp_avx2_oct');
-end
-if mislocked('piqp_avx512_oct')
-    munlock('piqp_avx512_oct');
-end
 
 %% Setup directories
 current_dir = pwd;
 [piqp_octave_dir,~,~] = fileparts(which('make_piqp.m'));
 if exist(fullfile(piqp_octave_dir, 'src'))
     piqp_dir = fullfile(piqp_octave_dir, 'src/piqp');
+    eigen_include_dir = fullfile(piqp_octave_dir, 'src/eigen');
 else
     piqp_dir = fullfile(piqp_octave_dir, '../..');
-end
-piqp_build_dir = fullfile(piqp_dir, 'build');
-
-%% Compile commands
-
-% Get make and oct commands
-make_cmd = 'cmake --build .';
-
-% Add arguments to cmake and oct compiler
-cmake_args = [
-    '-DBUILD_C_INTERFACE=OFF ' ...
-    '-DBUILD_OCTAVE_INTERFACE=ON ' ...
-    '-DBUILD_TESTS=OFF ' ...
-    '-DBUILD_EXAMPLES=OFF ' ...
-    '-DBUILD_BENCHMARKS=OFF'];
-
-if getenv('PIQP_EIGEN3_INCLUDE_DIRS')
-    cmake_args = sprintf('%s -DEIGEN3_INCLUDE_DIRS=%s', cmake_args, getenv('PIQP_EIGEN3_INCLUDE_DIRS'));
+    eigen_include_dir = '/usr/local/include/eigen3';
 end
 
 %% piqp_oct
 if any(strcmpi(what,'oct')) || any(strcmpi(what,'all'))
-   fprintf('Compiling PIQP Octave interface...');
-
-    % Create build directory and go inside
-    if exist(piqp_build_dir, 'dir')
-        rmdir(piqp_build_dir, 's');
-    end
-    mkdir(piqp_build_dir);
-    cd(piqp_build_dir);
-
-    % Extend path for CMake mac (via Homebrew)
-    PATH = getenv('PATH');
-    if (ismac && isempty(strfind(PATH, '/usr/local/bin')))
-        setenv('PATH', [PATH ':/usr/local/bin']);
-    end
-
-    % Compile static library with CMake
-    [status, output] = system(sprintf('%s %s ..', 'cmake', cmake_args));
-    if(status)
-        fprintf('\n');
-        disp(output);
-        error('Error configuring CMake environment');
-    elseif(verbose)
-        fprintf('\n');
-        disp(output);
-    end
-
-    [status, output] = system(make_cmd);
-    if (status)
-        fprintf('\n');
-        disp(output);
-        error('Error compiling PIQP Interface');
-    elseif(verbose)
-        fprintf('\n');
-        disp(output);
-    end
-
+   fprintf('Compiling PIQP Octave interface...\n');
 
     % Change directory back to octave interface
     cd(piqp_octave_dir);
 
-    fprintf('\t\t\t\t\t\t[done]\n');
+    mkoctfile('-O3', '-DNDEBUG', '-march=native', '-std=gnu++14', ...
+             ['-I', fullfile(piqp_dir, 'include')], ...
+             ['-I', eigen_include_dir], ...
+             '-o', 'piqp_oct.oct', 'piqp_oct.cpp');
+
+    fprintf('[done]\n');
 
 end
 
 %% clean
 if any(strcmpi(what,'clean'))
-    fprintf('Cleaning build related files...');
+    fprintf('Cleaning build related files...\n');
 
     % Change directory back to octave interface
     cd(piqp_octave_dir);
@@ -132,12 +80,7 @@ if any(strcmpi(what,'clean'))
         delete(octfiles(i).name);
     end
 
-    % Delete PIQP build directory
-    if exist(piqp_build_dir, 'dir')
-        rmdir(piqp_build_dir, 's');
-    end
-
-    fprintf('\t\t\t[done]\n');
+    fprintf('[done]\n');
 end
 
 %% Go back to the original directory
