@@ -28,9 +28,9 @@ conda install -c conda-forge piqp
 
 ### Building and Installing PIQP
 
-* Clone PIQP from Github recursively
+* Clone PIQP from Github
 ```shell
-git clone https://github.com/PREDICT-EPFL/piqp.git --recurse-submodules
+git clone https://github.com/PREDICT-EPFL/piqp.git
 ```
 * Building and installing PIQP
 ```shell

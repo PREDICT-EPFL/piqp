@@ -1,7 +1,7 @@
 ---
-title: Installation 
+title: Installation (Matlab)
 layout: default
-parent: Matlab
+parent: Matlab / Octave
 grand_parent: Interfaces
 nav_order: 1
 ---
@@ -21,9 +21,9 @@ install_piqp
 
 ### Building and Installing PIQP
 
-* Clone PIQP from Github recursively
+* Clone PIQP from Github
 ```shell
-git clone https://github.com/PREDICT-EPFL/piqp.git --recurse-submodules
+git clone https://github.com/PREDICT-EPFL/piqp.git
 ```
 * Build the interface in Matlab by executing the following commands
 ```matlab

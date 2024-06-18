@@ -1,9 +1,9 @@
 ---
 title: Getting Started
 layout: default
-parent: Matlab
+parent: Matlab / Octave
 grand_parent: Interfaces
-nav_order: 2
+nav_order: 3
 ---
 
 {% root_include _common/problem_formulation.md %}
