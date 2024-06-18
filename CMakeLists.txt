@@ -27,6 +27,7 @@ option(BUILD_WITH_STD_FILESYSTEM "Build using std::filesystem" OFF)
 option(BUILD_C_INTERFACE "Build C interface" ON)
 option(BUILD_PYTHON_INTERFACE "Build Python interface" OFF)
 option(BUILD_MATLAB_INTERFACE "Build Matlab interface" OFF)
+option(BUILD_OCTAVE_INTERFACE "Build Octave interface" OFF)
 
 #### Tests/Benchmarks options ####
 # Don't build tests and examples if included as subdirectory
@@ -207,6 +208,10 @@ endif()
 
 if (BUILD_MATLAB_INTERFACE)
     add_subdirectory(interfaces/matlab)
+endif()
+
+if (BUILD_OCTAVE_INTERFACE)
+    add_subdirectory(interfaces/octave)
 endif()
 
 if (BUILD_TESTS)

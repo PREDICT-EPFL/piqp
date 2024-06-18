@@ -12,9 +12,9 @@ nav_order: 1
 
 ### Building and Installing PIQP
 
-* Clone PIQP from Github recursively
+* Clone PIQP from Github
 ```shell
-git clone https://github.com/PREDICT-EPFL/piqp.git --recurse-submodules
+git clone https://github.com/PREDICT-EPFL/piqp.git
 ```
 * Build PIQP in a `build` folder
 ```shell

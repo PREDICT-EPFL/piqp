@@ -1,0 +1,10 @@
+name: piqp
+version: 0.3.1
+date: 2024-05-25
+author: Roland Schwan <roland.schwan@epfl.ch>
+maintainer: Roland Schwan <roland.schwan@epfl.ch>
+title: PIQP - An Proximal Interior Point Quadratic Programming solver
+categories: package
+description: PIQP is a Proximal Interior Point Quadratic Programming solver, which can solve dense and sparse quadratic programs.
+license: BSD-2-Clause
+depends: octave (>= 6.0.0)
