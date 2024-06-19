@@ -520,6 +520,29 @@ protected:
 
             m_result.info.iter++;
 
+            // avoid getting to close to boundary which can result in a division by zero
+            bool boundary_shifted = false;
+            T epsilon = std::numeric_limits<T>::epsilon();
+            if (m_data.m > 0 && m_result.z.minCoeff() < epsilon)
+            {
+                m_result.z.array() += epsilon;
+                boundary_shifted = true;
+            }
+            if (m_data.n_lb > 0 && z_lb.minCoeff() < epsilon)
+            {
+                z_lb.array() += epsilon;
+                boundary_shifted = true;
+            }
+            if (m_data.n_ub > 0 && z_ub.minCoeff() < epsilon)
+            {
+                z_ub.array() += epsilon;
+                boundary_shifted = true;
+            }
+            if (boundary_shifted)
+            {
+                m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / T(m_data.m + m_data.n_lb + m_data.n_ub);
+            }
+
             // avoid possibility of converging to a local minimum -> decrease the minimum regularization value
             if ((m_result.info.no_primal_update > m_settings.reg_finetune_primal_update_threshold &&
                  m_result.info.rho == m_result.info.reg_limit &&
