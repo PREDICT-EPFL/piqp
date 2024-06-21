@@ -35,7 +35,7 @@ Combining an infeasible interior point method with the proximal method of multip
 PIQP support a wide range of interfaces including
 * C/C++ (with Eigen support)
 * Python
-* Matlab
+* Matlab/Octave
 * R
 * Julia (soon)
 * Rust (soon)

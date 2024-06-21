@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2024-06-21
+
+### Changed
+
+- Instead of building both shared and static libraries, it can now be selected by setting `BUILD_SHARED_LIBS`.
+- Better support for CMake subdirectory installs.
+- Added Octave interface (thanks to @redstone99)
+- Added boundary control, i.e., dual inequality variables can't become zero anymore avoiding potential NaNs in the solution.
+
 ## [0.3.1] - 2024-05-25
 
 ### Changed
@@ -84,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.3.1...HEAD
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/PREDICT-EPFL/piqp/compare/v0.2.3...v0.2.4
