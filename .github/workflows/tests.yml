@@ -73,8 +73,15 @@ jobs:
 
       - name: Install piqp
         shell: bash -l {0}
+        if: runner.os == 'Windows'
         working-directory: build
         run: cmake --install . --config $CMAKE_BUILD_TYPE
+
+      - name: Install piqp
+        shell: bash -l {0}
+        if: runner.os != 'Windows'
+        working-directory: build
+        run: sudo cmake --install . --config $CMAKE_BUILD_TYPE
 
       - name: Test piqp
         shell: bash -l {0}
