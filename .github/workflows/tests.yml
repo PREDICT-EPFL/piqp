@@ -71,6 +71,11 @@ jobs:
         working-directory: build
         run: cmake --build . --config $CMAKE_BUILD_TYPE -- -j2
 
+      - name: Install piqp
+        shell: bash -l {0}
+        working-directory: build
+        run: cmake --install . --config $CMAKE_BUILD_TYPE
+
       - name: Test piqp
         shell: bash -l {0}
         working-directory: build

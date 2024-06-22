@@ -127,6 +127,8 @@ else ()
 endif ()
 message(STATUS "Using Eigen3 from: ${EIGEN3_INCLUDE_DIRS}")
 
+include(GNUInstallDirs)
+
 macro(create_piqp_library library_name)
     set(options INTERFACE)
     cmake_parse_arguments(CREATE_PIQP_LIBRARY "${options}" "" "" ${ARGN})
@@ -227,8 +229,6 @@ if (BUILD_EXAMPLES)
 endif()
 
 if (ENABLE_INSTALL)
-    include(GNUInstallDirs)
-
     install(
         DIRECTORY include/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
