@@ -38,7 +38,7 @@ fprintf('Downloading Eigen3...\n');
 tar_path = fullfile(tmp_dir, 'eigen-3.4.0.tar.gz');
 data = urlread('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz');
 if exist(tar_path, 'file')
-    delete(tar_path)
+    delete(tar_path);
 end
 tar_file = fopen(tar_path, 'w');
 fwrite(tar_file, data);
@@ -47,11 +47,14 @@ untar(tar_path, fullfile(pkg_dir, 'src'));
 delete(tar_path);
 movefile(fullfile(pkg_dir, 'src/eigen-3.4.0'), fullfile(pkg_dir, 'src/eigen'));
 
-% Create tarball
 cd(tmp_dir);
-pkg_tar = sprintf('%s.tar.gz', pkg_name)
+pkg_tar = sprintf('%s.tar', pkg_name);
+pkg_tar_gz = sprintf('%s.tar.gz', pkg_name);
+fprintf('Creating %s\n', pkg_tar_gz);
 tar(pkg_tar, pkg_name);
+gzip(pkg_tar);
 rmdir(pkg_dir, 's');
-movefile(pkg_tar, fullfile(piqp_octave_dir, pkg_tar));
+delete(pkg_tar);
+movefile(pkg_tar_gz, fullfile(piqp_octave_dir, pkg_tar_gz));
 
 cd(current_dir);
