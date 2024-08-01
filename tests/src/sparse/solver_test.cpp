@@ -345,3 +345,43 @@ TYPED_TEST(SparseSolverTest, StronglyConvexNoConstraints)
 
     ASSERT_EQ(status, Status::PIQP_SOLVED);
 }
+
+TYPED_TEST(SparseSolverTest, InfinityBounds)
+{
+    SparseMat<T, I> P(4, 4);
+    P.insert(0, 0) = 1;
+    P.insert(1, 1) = 1;
+    P.insert(2, 2) = 1;
+    P.insert(3, 3) = 1;
+    P.makeCompressed();
+    Vec<T> c(4); c << 1, 1, 1, 1;
+
+    SparseMat<T, I> G(6, 4);
+    G.insert(0, 0) = 1;
+    G.insert(1, 0) = 1;
+    G.insert(1, 2) = -1;
+    G.insert(2, 0) = -1;
+    G.insert(2, 2) = -1;
+    G.insert(3, 0) = -1;
+    G.insert(4, 0) = -1;
+    G.insert(4, 2) = 1;
+    G.insert(5, 0) = 1;
+    G.insert(5, 2) = 1;
+    G.makeCompressed();
+    T inf = std::numeric_limits<T>::infinity();
+    Vec<T> h(6); h << 1, 1, 1, 1, inf, inf;
+
+    SparseSolver<T, I, TypeParam::Mode> solver;
+    solver.settings().verbose = true;
+    solver.setup(P, c, piqp::nullopt, piqp::nullopt, G, h);
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    Status status = solver.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    ASSERT_NEAR(solver.result().x(0), -0.5, 1e-6);
+    ASSERT_NEAR(solver.result().x(1), -1.0, 1e-6);
+    ASSERT_NEAR(solver.result().x(2), -0.5, 1e-6);
+    ASSERT_NEAR(solver.result().x(3), -1.0, 1e-6);
+}

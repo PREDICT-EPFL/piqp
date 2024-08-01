@@ -88,6 +88,12 @@ struct Data
 
     ~Data() {};
 
+    void set_G_row_zero(Eigen::Index row)
+    {
+        Eigen::Index row_nnz = GT.outerIndexPtr()[row + 1] - GT.outerIndexPtr()[row];
+        Eigen::Map<Vec<T>>(GT.valuePtr() + GT.outerIndexPtr()[row], row_nnz).setZero();
+    }
+
     Eigen::Index non_zeros_P_utri() { return P_utri.nonZeros(); }
     Eigen::Index non_zeros_A() { return AT.nonZeros(); }
     Eigen::Index non_zeros_G() { return GT.nonZeros(); }

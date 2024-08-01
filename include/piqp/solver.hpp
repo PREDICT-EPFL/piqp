@@ -196,7 +196,8 @@ protected:
         m_data.c = c;
         m_data.b = b.has_value() ? *b : Vec<T>::Zero(0);
         if (h.has_value()) {
-            m_data.h = (*h).cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
+            m_data.h = *h;
+            disable_inf_constraints();
         } else {
             m_data.h.resize(0);
         }
@@ -231,6 +232,25 @@ protected:
             T setup_time = m_timer.stop();
             m_result.info.setup_time = setup_time;
             m_result.info.run_time += setup_time;
+        }
+    }
+
+    void disable_inf_constraints()
+    {
+        if (m_data.m > 0 && (m_data.h.maxCoeff() > PIQP_INF || m_data.h.minCoeff() < -PIQP_INF))
+        {
+            piqp_eprint("h contains values which are close to +/- infinity.\n");
+            piqp_eprint("PIQP is setting the corresponding rows in G to zero (sparsity preserving).\n");
+            piqp_eprint("Consider removing the corresponding constraints for faster solves.\n");
+
+            for (int i = 0; i < m_data.h.rows(); i++)
+            {
+                if (m_data.h(i) > PIQP_INF || m_data.h(i) < -PIQP_INF)
+                {
+                    m_data.set_G_row_zero(i);
+                    m_data.h(i) = T(1);
+                }
+            }
         }
     }
 
@@ -1021,7 +1041,8 @@ public:
         if (h.has_value())
         {
             if (h->size() != this->m_data.m) { piqp_eprint("h has wrong dimensions\n"); return; }
-            this->m_data.h = (*h).cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
+            this->m_data.h = *h;
+            this->disable_inf_constraints();
         }
 
         if (x_lb.has_value() && x_lb->size() != this->m_data.n) { piqp_eprint("x_lb has wrong dimensions\n"); return; }
@@ -1134,7 +1155,8 @@ public:
         if (h.has_value())
         {
             if (h->size() != this->m_data.m) { piqp_eprint("h has wrong dimensions\n"); return; }
-            this->m_data.h = (*h).cwiseMin(PIQP_INF).cwiseMax(-PIQP_INF);
+            this->m_data.h = *h;
+            this->disable_inf_constraints();
         }
 
         if (x_lb.has_value() && x_lb->size() != this->m_data.n) { piqp_eprint("x_lb has wrong dimensions\n"); return; }

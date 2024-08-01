@@ -14,7 +14,7 @@ $$
 with primal decision variables $$x \in \mathbb{R}^n$$, matrices $$P\in \mathbb{S}_+^n$$, $$A \in \mathbb{R}^{p \times n}$$,  $$G \in \mathbb{R}^{m \times n}$$, and vectors $$c \in \mathbb{R}^n$$, $$b \in \mathbb{R}^p$$, $$h \in \mathbb{R}^m$$, $$x_{lb} \in \mathbb{R}^n$$, and $$x_{ub} \in \mathbb{R}^n$$.
 
 {: .note }
-PIQP can handle infinite box constraints well, i.e. when elements of $$x_{lb}$$ or $$x_{ub}$$ are $$-\infty$$ or $$\infty$$, respectively. On the contrary, infinite values in the general inequalities $$Gx \leq h = \pm \infty$$ can cause problems, i.e., they are converted internally to `-1e30` and `1e30`, respectively.
+PIQP can handle infinite box constraints well, i.e. when elements of $$x_{lb}$$ or $$x_{ub}$$ are $$-\infty$$ or $$\infty$$, respectively. On the contrary, infinite values in the general inequalities $$Gx \leq h = \pm \infty$$ can cause problems. PIQP internally disables them by setting the corresponding rows in $$G$$ to zero (sparsity structure is preserved). For best performance, consider removing the corresponding constraints from the problem formulation directly.
 
 ### Example QP
 

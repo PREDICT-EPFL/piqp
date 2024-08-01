@@ -300,3 +300,35 @@ TEST(DenseSolverTest, StronglyConvexNoConstraints)
 
     ASSERT_EQ(status, Status::PIQP_SOLVED);
 }
+
+TEST(DenseSolverTest, InfinityBounds)
+{
+    Mat<T> P(4, 4); P << 1, 0, 0, 0,
+                         0, 1, 0, 0,
+                         0, 0, 1, 0,
+                         0, 0, 0, 1;
+    Vec<T> c(4); c << 1, 1, 1, 1;
+
+    Mat<T> G(6, 4); G << 1,  0, 0,  0,
+                         1,  0, -1, 0,
+                         -1, 0, -1, 0,
+                         -1, 0, 0,  0,
+                         -1, 0, 1,  0,
+                         1,  0, 1,  0;
+    T inf = std::numeric_limits<T>::infinity();
+    Vec<T> h(6); h << 1, 1, 1, 1, inf, inf;
+
+    DenseSolver<T> solver;
+    solver.settings().verbose = true;
+    solver.setup(P, c, piqp::nullopt, piqp::nullopt, G, h);
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    Status status = solver.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    ASSERT_NEAR(solver.result().x(0), -0.5, 1e-6);
+    ASSERT_NEAR(solver.result().x(1), -1.0, 1e-6);
+    ASSERT_NEAR(solver.result().x(2), -0.5, 1e-6);
+    ASSERT_NEAR(solver.result().x(3), -1.0, 1e-6);
+}
