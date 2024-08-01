@@ -5,7 +5,7 @@ import json
 platforms = ['linux', 'macos', 'windows']
 runners = {
     'linux': 'ubuntu-22.04',
-    'macos': 'macos-11',
+    'macos': 'macos-12',
     'windows': 'windows-2022',
 }
 
