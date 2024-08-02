@@ -168,4 +168,4 @@ PIQP_NUMERICS: piqp.Status  # value = <Status.PIQP_NUMERICS: -8>
 PIQP_PRIMAL_INFEASIBLE: piqp.Status  # value = <Status.PIQP_PRIMAL_INFEASIBLE: -2>
 PIQP_SOLVED: piqp.Status  # value = <Status.PIQP_SOLVED: 1>
 PIQP_UNSOLVED: piqp.Status  # value = <Status.PIQP_UNSOLVED: -9>
-__version__: str = '0.4.1'
+__version__: str = '0.4.2'
