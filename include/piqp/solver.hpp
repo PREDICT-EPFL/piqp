@@ -409,6 +409,10 @@ protected:
                 m_result.info.rho *= 100;
                 m_result.info.factor_retires++;
                 m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.eps_abs);
+
+                m_kkt.update_scalings(m_result.info.rho, m_result.info.delta,
+                                      m_result.s, m_result.s_lb, m_result.s_ub,
+                                      m_result.z, m_result.z_lb, m_result.z_ub);
             }
             else
             {
