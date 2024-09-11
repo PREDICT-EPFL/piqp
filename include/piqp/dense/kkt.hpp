@@ -38,7 +38,7 @@ struct KKT
 
     Mat<T> kkt_mat;
     Vec<T> kkt_diag; // unregularized diagonal of KKT matrix
-    LDLTNoPivot<Mat<T>, Eigen::Lower> ldlt;
+    Eigen::LLT<Mat<T>, Eigen::Lower> llt;
 
     Mat<T> AT_A;
     Mat<T> W_delta_inv_G; // temporary matrix
@@ -79,7 +79,7 @@ struct KKT
 
         kkt_mat.resize(data.n, data.n);
         kkt_diag.resize(data.n);
-        ldlt = LDLTNoPivot<Mat<T>>(data.n);
+        llt = Eigen::LLT<Mat<T>, Eigen::Lower>(data.n);
 
         if (data.p > 0)
         {
@@ -220,14 +220,14 @@ struct KKT
             this->regularize_kkt(reg);
         }
 
-        ldlt.compute(kkt_mat);
+        llt.compute(kkt_mat);
 
         if (iterative_refinement)
         {
             this->unregularize_kkt();
         }
 
-        return ldlt.info() == Eigen::Success;
+        return llt.info() == Eigen::Success;
     }
 
     void regularize_kkt(T reg)
@@ -387,12 +387,12 @@ struct KKT
         Vec<T> x_copy = x;
 #endif
 
-        ldlt.solveInPlace(x);
+        llt.solveInPlace(x);
 
 #ifdef PIQP_DEBUG_PRINT
         Vec<T> rhs_x = kkt_mat.template triangularView<Eigen::Lower>() * x;
         rhs_x += kkt_mat.transpose().template triangularView<Eigen::StrictlyUpper>() * x;
-        std::cout << "ldlt_error: " << (x_copy - rhs_x).template lpNorm<Eigen::Infinity>() << std::endl;
+        std::cout << "llt_error: " << (x_copy - rhs_x).template lpNorm<Eigen::Infinity>() << std::endl;
 #endif
     }
 };
