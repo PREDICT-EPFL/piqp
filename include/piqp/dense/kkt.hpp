@@ -50,8 +50,6 @@ struct KKT
 
     KKT(const Data<T>& data, const Settings<T>& settings) : data(data), settings(settings) {}
 
-    ~KKT() {};
-
     void init(const T& rho, const T& delta)
     {
         // init workspace

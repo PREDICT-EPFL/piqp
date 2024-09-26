@@ -163,8 +163,6 @@ public:
         compute(matrix.derived());
     }
 
-    ~LDLTNoPivot() {};
-
     /** \returns a view of the upper triangular matrix U */
     inline typename Traits::MatrixU matrixU() const
     {

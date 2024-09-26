@@ -58,8 +58,6 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
 
     KKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings) {}
 
-    ~KKT() {};
-
     inline isize kkt_size()
     {
         isize n_kkt;

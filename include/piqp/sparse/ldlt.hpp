@@ -46,10 +46,6 @@ struct LDLt
         Vec<T> y;
     } work;
 
-    LDLt() {};
-
-    ~LDLt() {};
-
     void factorize_symbolic_upper_triangular(const SparseMat<T, I>& A)
     {
         // reimplementation of LDL_symbolic in

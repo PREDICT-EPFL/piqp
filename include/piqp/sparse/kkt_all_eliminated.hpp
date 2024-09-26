@@ -31,10 +31,6 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
     Vec<I> AT_A_to_Ki;   // mapping from AT_A row indices to KKT matrix
     Vec<I> GT_G_to_Ki;   // mapping from GT_G row indices to KKT matrix
 
-    KKTImpl() {};
-
-    ~KKTImpl() {};
-
     void init_workspace()
     {
         auto& data = static_cast<Derived*>(this)->data;
