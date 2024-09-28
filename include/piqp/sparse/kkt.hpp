@@ -338,8 +338,8 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
             T rhs_norm = rhs_perm.template lpNorm<Eigen::Infinity>();
 
             err_corr_perm = rhs_perm;
-            err_corr_perm -= PKPt.template triangularView<Eigen::Upper>() * sol_perm;
-            err_corr_perm -= PKPt.transpose().template triangularView<Eigen::StrictlyLower>() * sol_perm;
+            err_corr_perm.noalias() -= PKPt.template triangularView<Eigen::Upper>() * sol_perm;
+            err_corr_perm.noalias() -= PKPt.transpose().template triangularView<Eigen::StrictlyLower>() * sol_perm;
             T error_norm = err_corr_perm.template lpNorm<Eigen::Infinity>();
 
             for (isize i = 0; i < settings.iterative_refinement_max_iter; i++)
@@ -355,8 +355,8 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
                 ref_sol_perm = sol_perm + err_corr_perm;
 
                 err_corr_perm = rhs_perm;
-                err_corr_perm -= PKPt.template triangularView<Eigen::Upper>() * ref_sol_perm;
-                err_corr_perm -= PKPt.transpose().template triangularView<Eigen::StrictlyLower>() * ref_sol_perm;
+                err_corr_perm.noalias() -= PKPt.template triangularView<Eigen::Upper>() * ref_sol_perm;
+                err_corr_perm.noalias() -= PKPt.transpose().template triangularView<Eigen::StrictlyLower>() * ref_sol_perm;
                 error_norm = err_corr_perm.template lpNorm<Eigen::Infinity>();
 
                 T improvement_rate = prev_error_norm / error_norm;
