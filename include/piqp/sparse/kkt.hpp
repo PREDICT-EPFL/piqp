@@ -14,6 +14,7 @@
 #include "piqp/sparse/ldlt.hpp"
 #include "piqp/sparse/ordering.hpp"
 #include "piqp/sparse/utils.hpp"
+#include "piqp/kkt_system.hpp"
 #include "piqp/kkt_fwd.hpp"
 #include "piqp/sparse/kkt_full.hpp"
 #include "piqp/sparse/kkt_eq_eliminated.hpp"
@@ -27,8 +28,11 @@ namespace sparse
 {
 
 template<typename T, typename I, int Mode = KKTMode::KKT_FULL, typename Ordering = AMDOrdering<I>>
-struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
+class KKT : public KKTSystem<T>, public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
 {
+protected:
+    friend class KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>;
+
     const Data<T, I>& data;
     const Settings<T>& settings;
 
@@ -42,6 +46,7 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
     Vec<T> m_z_lb_inv;
     Vec<T> m_z_ub_inv;
 
+    bool use_iterative_refinement;
     Ordering ordering;
     SparseMat<T, I> PKPt; // permuted KKT matrix, upper triangular only
     Vec<I> PKi;           // mapping of row indices of KKT matrix to permuted KKT matrix
@@ -56,31 +61,8 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
     Vec<T> err_corr_perm; // temporary variable to calculate error in iterative refinement and correction term
     Vec<T> ref_sol_perm;  // refined solution
 
-    KKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings) {}
-
-    inline isize kkt_size()
-    {
-        isize n_kkt;
-        if (Mode == KKTMode::KKT_FULL)
-        {
-            n_kkt = data.n + data.p + data.m;
-        }
-        else if (Mode == KKTMode::KKT_EQ_ELIMINATED)
-        {
-            n_kkt = data.n + data.m;
-        }
-        else if (Mode == KKTMode::KKT_INEQ_ELIMINATED)
-        {
-            n_kkt = data.n + data.p;
-        }
-        else
-        {
-            n_kkt = data.n;
-        }
-        return n_kkt;
-    }
-
-    void init(const T& rho, const T& delta)
+public:
+    KKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings), use_iterative_refinement(false)
     {
         isize n_kkt = kkt_size();
 
@@ -98,8 +80,6 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         err_corr_perm.resize(n_kkt);
         ref_sol_perm.resize(n_kkt);
 
-        m_rho = rho;
-        m_delta = delta;
         m_s.setConstant(1);
         m_s_lb.head(data.n_lb).setConstant(1);
         m_s_ub.head(data.n_ub).setConstant(1);
@@ -113,14 +93,19 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
 
         ordering.init(KKT);
         PKi = permute_sparse_symmetric_matrix(KKT, PKPt, ordering);
-        this->update_kkt_box_scalings();
 
         ldlt.factorize_symbolic_upper_triangular(PKPt);
     }
 
-    void update_scalings(const T& rho, const T& delta,
-                         const CVecRef<T>& s, const CVecRef<T>& s_lb, const CVecRef<T>& s_ub,
-                         const CVecRef<T>& z, const CVecRef<T>& z_lb, const CVecRef<T>& z_ub)
+    void update_data(int options)
+    {
+        this->update_data_impl(options);
+    }
+
+    bool update_scalings_and_factor(bool iterative_refinement,
+                                    const T& rho, const T& delta,
+                                    const CVecRef<T>& s, const CVecRef<T>& s_lb, const CVecRef<T>& s_ub,
+                                    const CVecRef<T>& z, const CVecRef<T>& z_lb, const CVecRef<T>& z_ub)
     {
         m_rho = rho;
         m_delta = delta;
@@ -135,24 +120,9 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         this->update_kkt_equality_scalings();
         this->update_kkt_inequality_scaling();
         this->update_kkt_box_scalings();
-    }
 
-    void update_kkt_box_scalings()
-    {
-        // we assume that PKPt is upper triangular and diagonal is set
-        // hence we can directly address the diagonal from the outer index pointer
-        for (isize i = 0; i < data.n_lb; i++)
-        {
-            isize col = data.x_lb_idx(i);
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] +=
-                data.x_lb_scaling(i) * data.x_lb_scaling(i) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
-        }
-        for (isize i = 0; i < data.n_ub; i++)
-        {
-            isize col = data.x_ub_idx(i);
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] +=
-                data.x_ub_scaling(i) * data.x_ub_scaling(i) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
-        }
+        use_iterative_refinement = iterative_refinement;
+        return regularize_and_factorize();
     }
 
     void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,
@@ -205,90 +175,12 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         rhs_s_ub.head(data.n_ub).array() += m_z_ub_inv.head(data.n_ub).array().cwiseInverse() * delta_s_ub.head(data.n_ub).array();
     }
 
-    bool regularize_and_factorize(bool iterative_refinement)
-    {
-        if (iterative_refinement)
-        {
-            T static_kkt_diag_max = 0;
-            for (isize col = 0; col < data.n; col++)
-            {
-                isize col_nnz = data.P_utri.outerIndexPtr()[col + 1] - data.P_utri.outerIndexPtr()[col];
-                isize last_col_idx = data.P_utri.outerIndexPtr()[col + 1] - 1;
-                if (col_nnz > 0 && data.P_utri.innerIndexPtr()[last_col_idx] == col)
-                {
-                    static_kkt_diag_max = std::max(static_kkt_diag_max, data.P_utri.valuePtr()[last_col_idx]);
-                }
-            }
-
-            T max_diag = static_kkt_diag_max;
-            for (isize i = 0; i < data.m; i++)
-            {
-                max_diag = std::max(max_diag, m_z_inv(i) * m_s(i));
-            }
-            for (isize i = 0; i < data.n_lb; i++)
-            {
-                max_diag = std::max(max_diag, m_z_lb_inv(i) * m_s_lb(i));
-            }
-            for (isize i = 0; i < data.n_ub; i++)
-            {
-                max_diag = std::max(max_diag, m_z_ub_inv(i) * m_s_ub(i));
-            }
-
-            T reg = settings.iterative_refinement_static_regularization_eps + settings.iterative_refinement_static_regularization_rel * max_diag;
-            this->regularize_kkt(reg);
-        }
-
-        isize n = ldlt.factorize_numeric_upper_triangular(PKPt);
-
-        if (iterative_refinement)
-        {
-            this->unregularize_kkt();
-        }
-
-        return n == PKPt.cols();
-    }
-
-    void regularize_kkt(T reg)
-    {
-        isize n_kkt = kkt_size();
-
-        // save unregularized diagonal
-        for (isize col = 0; col < n_kkt; col++)
-        {
-            kkt_diag(col) = PKPt.valuePtr()[PKPt.outerIndexPtr()[col + 1] - 1];
-        }
-
-        // regularize diagonal
-        T rho_reg = std::max(T(0), reg - m_rho);
-        for (isize col = 0; col < data.n; col++)
-        {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += rho_reg;
-        }
-
-        T delta_reg = std::max(T(0), reg - m_delta);
-        for (isize col = data.n; col < n_kkt; col++)
-        {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] -= delta_reg;
-        }
-    }
-
-    void unregularize_kkt()
-    {
-        // restore unregularized diagonal
-        isize n_kkt = kkt_size();
-        for (isize col = 0; col < n_kkt; col++)
-        {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[col + 1] - 1] = kkt_diag(col);
-        }
-    }
-
     void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y,
                const CVecRef<T>& rhs_z, const CVecRef<T>& rhs_z_lb, const CVecRef<T>& rhs_z_ub,
                const CVecRef<T>& rhs_s, const CVecRef<T>& rhs_s_lb, const CVecRef<T>& rhs_s_ub,
                VecRef<T> delta_x, VecRef<T> delta_y,
                VecRef<T> delta_z, VecRef<T> delta_z_lb, VecRef<T> delta_z_ub,
-               VecRef<T> delta_s, VecRef<T> delta_s_lb, VecRef<T> delta_s_ub,
-               bool iterative_refinement)
+               VecRef<T> delta_s, VecRef<T> delta_s_lb, VecRef<T> delta_s_ub)
     {
         T delta_inv = T(1) / m_delta;
 
@@ -333,7 +225,7 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         sol_perm = rhs_perm;
         solve_ldlt_in_place(sol_perm);
 
-        if (iterative_refinement && settings.iterative_refinement_max_iter > 0)
+        if (use_iterative_refinement && settings.iterative_refinement_max_iter > 0)
         {
             T rhs_norm = rhs_perm.template lpNorm<Eigen::Infinity>();
 
@@ -429,10 +321,10 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
         delta_s.array() = m_s.array() * m_z_inv.array() * (rhs_s.array() / m_s.array() - delta_z.array());
 
         delta_s_lb.head(data.n_lb).array() = m_s_lb.head(data.n_lb).array() * m_z_lb_inv.head(data.n_lb).array()
-            * (rhs_s_lb.head(data.n_lb).array() / m_s_lb.head(data.n_lb).array() - delta_z_lb.head(data.n_lb).array());
+                                             * (rhs_s_lb.head(data.n_lb).array() / m_s_lb.head(data.n_lb).array() - delta_z_lb.head(data.n_lb).array());
 
         delta_s_ub.head(data.n_ub).array() = m_s_ub.head(data.n_ub).array() * m_z_ub_inv.head(data.n_ub).array()
-            * (rhs_s_ub.head(data.n_ub).array() / m_s_ub.head(data.n_ub).array() - delta_z_ub.head(data.n_ub).array());
+                                             * (rhs_s_ub.head(data.n_ub).array() / m_s_ub.head(data.n_ub).array() - delta_z_ub.head(data.n_ub).array());
 
 #ifdef PIQP_DEBUG_PRINT
         Vec<T> err_x = delta_x;
@@ -466,6 +358,129 @@ struct KKT : public KKTImpl<KKT<T, I, Mode, Ordering>, T, I, Mode>
                   << err_s_lb.head(data.n_lb).template lpNorm<Eigen::Infinity>() << " "
                   << err_s_ub.head(data.n_ub).template lpNorm<Eigen::Infinity>() << std::endl;
 #endif
+    }
+
+    SparseMat<T, I>& internal_kkt_mat()
+    {
+        return PKPt;
+    }
+
+protected:
+    inline isize kkt_size()
+    {
+        isize n_kkt;
+        if (Mode == KKTMode::KKT_FULL)
+        {
+            n_kkt = data.n + data.p + data.m;
+        }
+        else if (Mode == KKTMode::KKT_EQ_ELIMINATED)
+        {
+            n_kkt = data.n + data.m;
+        }
+        else if (Mode == KKTMode::KKT_INEQ_ELIMINATED)
+        {
+            n_kkt = data.n + data.p;
+        }
+        else
+        {
+            n_kkt = data.n;
+        }
+        return n_kkt;
+    }
+
+    void update_kkt_box_scalings()
+    {
+        // we assume that PKPt is upper triangular and diagonal is set
+        // hence we can directly address the diagonal from the outer index pointer
+        for (isize i = 0; i < data.n_lb; i++)
+        {
+            isize col = data.x_lb_idx(i);
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] +=
+                data.x_lb_scaling(i) * data.x_lb_scaling(i) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
+        }
+        for (isize i = 0; i < data.n_ub; i++)
+        {
+            isize col = data.x_ub_idx(i);
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] +=
+                data.x_ub_scaling(i) * data.x_ub_scaling(i) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
+        }
+    }
+
+    bool regularize_and_factorize()
+    {
+        if (use_iterative_refinement)
+        {
+            T static_kkt_diag_max = 0;
+            for (isize col = 0; col < data.n; col++)
+            {
+                isize col_nnz = data.P_utri.outerIndexPtr()[col + 1] - data.P_utri.outerIndexPtr()[col];
+                isize last_col_idx = data.P_utri.outerIndexPtr()[col + 1] - 1;
+                if (col_nnz > 0 && data.P_utri.innerIndexPtr()[last_col_idx] == col)
+                {
+                    static_kkt_diag_max = std::max(static_kkt_diag_max, data.P_utri.valuePtr()[last_col_idx]);
+                }
+            }
+
+            T max_diag = static_kkt_diag_max;
+            for (isize i = 0; i < data.m; i++)
+            {
+                max_diag = std::max(max_diag, m_z_inv(i) * m_s(i));
+            }
+            for (isize i = 0; i < data.n_lb; i++)
+            {
+                max_diag = std::max(max_diag, m_z_lb_inv(i) * m_s_lb(i));
+            }
+            for (isize i = 0; i < data.n_ub; i++)
+            {
+                max_diag = std::max(max_diag, m_z_ub_inv(i) * m_s_ub(i));
+            }
+
+            T reg = settings.iterative_refinement_static_regularization_eps + settings.iterative_refinement_static_regularization_rel * max_diag;
+            this->regularize_kkt(reg);
+        }
+
+        isize n = ldlt.factorize_numeric_upper_triangular(PKPt);
+
+        if (use_iterative_refinement)
+        {
+            this->unregularize_kkt();
+        }
+
+        return n == PKPt.cols();
+    }
+
+    void regularize_kkt(T reg)
+    {
+        isize n_kkt = kkt_size();
+
+        // save unregularized diagonal
+        for (isize col = 0; col < n_kkt; col++)
+        {
+            kkt_diag(col) = PKPt.valuePtr()[PKPt.outerIndexPtr()[col + 1] - 1];
+        }
+
+        // regularize diagonal
+        T rho_reg = std::max(T(0), reg - m_rho);
+        for (isize col = 0; col < data.n; col++)
+        {
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += rho_reg;
+        }
+
+        T delta_reg = std::max(T(0), reg - m_delta);
+        for (isize col = data.n; col < n_kkt; col++)
+        {
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] -= delta_reg;
+        }
+    }
+
+    void unregularize_kkt()
+    {
+        // restore unregularized diagonal
+        isize n_kkt = kkt_size();
+        for (isize col = 0; col < n_kkt; col++)
+        {
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[col + 1] - 1] = kkt_diag(col);
+        }
     }
 
     void solve_ldlt_in_place(VecRef<T> x)

@@ -18,6 +18,7 @@
 #include "piqp/timer.hpp"
 #include "piqp/results.hpp"
 #include "piqp/settings.hpp"
+#include "piqp/kkt_system.hpp"
 #include "piqp/dense/data.hpp"
 #include "piqp/dense/preconditioner.hpp"
 #include "piqp/dense/kkt.hpp"
@@ -40,7 +41,6 @@ class SolverBase
 {
 protected:
     using DataType = typename std::conditional<MatrixType == PIQP_DENSE, dense::Data<T>, sparse::Data<T, I>>::type;
-    using KKTType = typename std::conditional<MatrixType == PIQP_DENSE, dense::KKT<T>, sparse::KKT<T, I, Mode>>::type;
     using CMatRefType = typename std::conditional<MatrixType == PIQP_DENSE, CMatRef<T>, CSparseMatRef<T, I>>::type;
 
     Timer<T> m_timer;
@@ -48,9 +48,8 @@ protected:
     Settings<T> m_settings;
     DataType m_data;
     Preconditioner m_preconditioner;
-    KKTType m_kkt;
+    std::unique_ptr<KKTSystem<T>> m_kkt;
 
-    bool m_kkt_init_state = false;
     bool m_setup_done = false;
     bool m_enable_iterative_refinement = false;
 
@@ -82,7 +81,14 @@ protected:
     Vec<T> ds_ub;
 
 public:
-    SolverBase() : m_kkt(m_data, m_settings) {};
+    SolverBase()
+    {
+        if (MatrixType == PIQP_DENSE) {
+            m_settings.kkt_solver = KKTSolver::dense_cholesky;
+        } else {
+            m_settings.kkt_solver = KKTSolver::sparse_ldlt;
+        }
+    };
 
     Settings<T>& settings() { return m_settings; }
 
@@ -218,12 +224,9 @@ protected:
                                     m_settings.preconditioner_scale_cost,
                                     m_settings.preconditioner_iter);
 
-        m_kkt.init(m_result.info.rho, m_result.info.delta);
-        m_kkt_init_state = true;
+        if (!init_kkt()) return;
 
         m_setup_done = true;
-
-        m_enable_iterative_refinement = m_settings.iterative_refinement_always_enabled;
 
         if (m_settings.compute_timings)
         {
@@ -231,6 +234,36 @@ protected:
             m_result.info.setup_time = setup_time;
             m_result.info.run_time += setup_time;
         }
+    }
+
+    template<int MatrixTypeT = MatrixType>
+    typename std::enable_if<MatrixTypeT == PIQP_DENSE, bool>::type
+    init_kkt()
+    {
+        switch (m_settings.kkt_solver) {
+            case KKTSolver::dense_cholesky:
+                m_kkt = std::make_unique<dense::KKT<T>>(m_data, m_settings);
+                break;
+            default:
+                piqp_eprint("kkt solver not supported\n");
+                return false;
+        }
+        return true;
+    }
+
+    template<int MatrixTypeT = MatrixType>
+    typename std::enable_if<MatrixTypeT == PIQP_SPARSE, bool>::type
+    init_kkt()
+    {
+        switch (m_settings.kkt_solver) {
+            case KKTSolver::sparse_ldlt:
+                m_kkt = std::make_unique<sparse::KKT<T, I, Mode>>(m_data, m_settings);
+                break;
+            default:
+                piqp_eprint("kkt solver not supported\n");
+                return false;
+        }
+        return true;
     }
 
     void disable_inf_constraints()
@@ -377,25 +410,19 @@ protected:
         m_result.info.rho = m_settings.rho_init;
         m_result.info.delta = m_settings.delta_init;
 
-        if (!m_kkt_init_state)
-        {
-            m_result.s.setConstant(1);
-            s_lb.head(m_data.n_lb).setConstant(1);
-            s_ub.head(m_data.n_ub).setConstant(1);
-            m_result.z.setConstant(1);
-            z_lb.head(m_data.n_lb).setConstant(1);
-            z_ub.head(m_data.n_ub).setConstant(1);
-            m_kkt.update_scalings(m_result.info.rho, m_result.info.delta,
-                                  m_result.s, m_result.s_lb, m_result.s_ub,
-                                  m_result.z, m_result.z_lb, m_result.z_ub);
-        }
-        else
-        {
-            // after solve is called once, the scalings are not in initial state anymore
-            m_kkt_init_state = false;
-        }
+        m_result.s.setConstant(1);
+        s_lb.head(m_data.n_lb).setConstant(1);
+        s_ub.head(m_data.n_ub).setConstant(1);
+        m_result.z.setConstant(1);
+        z_lb.head(m_data.n_lb).setConstant(1);
+        z_ub.head(m_data.n_ub).setConstant(1);
 
-        while (!m_kkt.regularize_and_factorize(m_enable_iterative_refinement))
+        m_enable_iterative_refinement = m_settings.iterative_refinement_always_enabled;
+
+        while (!m_kkt->update_scalings_and_factor(m_enable_iterative_refinement,
+                                                  m_result.info.rho, m_result.info.delta,
+                                                  m_result.s, m_result.s_lb, m_result.s_ub,
+                                                  m_result.z, m_result.z_lb, m_result.z_ub))
         {
             if (!m_enable_iterative_refinement)
             {
@@ -407,10 +434,6 @@ protected:
                 m_result.info.rho *= 100;
                 m_result.info.factor_retires++;
                 m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.eps_abs);
-
-                m_kkt.update_scalings(m_result.info.rho, m_result.info.delta,
-                                      m_result.s, m_result.s_lb, m_result.s_ub,
-                                      m_result.z, m_result.z_lb, m_result.z_ub);
             }
             else
             {
@@ -429,13 +452,12 @@ protected:
         rs.setZero();
         rs_lb.setZero();
         rs_ub.setZero();
-        m_kkt.solve(rx, m_data.b,
-                    m_data.h, m_data.x_lb_n, m_data.x_ub,
-                    rs, rs_lb, rs_ub,
-                    m_result.x, m_result.y,
-                    m_result.z, m_result.z_lb, m_result.z_ub,
-                    m_result.s, m_result.s_lb, m_result.s_ub,
-                    m_enable_iterative_refinement);
+        m_kkt->solve(rx, m_data.b,
+                     m_data.h, m_data.x_lb_n, m_data.x_ub,
+                     rs, rs_lb, rs_ub,
+                     m_result.x, m_result.y,
+                     m_result.z, m_result.z_lb, m_result.z_ub,
+                     m_result.s, m_result.s_lb, m_result.s_ub);
 
         if (m_data.m + m_data.n_lb + m_data.n_ub > 0)
         {
@@ -578,11 +600,10 @@ protected:
                 m_result.info.no_dual_update = 0;
             }
 
-            m_kkt.update_scalings(m_result.info.rho, m_result.info.delta,
-                                  m_result.s, m_result.s_lb, m_result.s_ub,
-                                  m_result.z, m_result.z_lb, m_result.z_ub);
-
-            if (!m_kkt.regularize_and_factorize(m_enable_iterative_refinement))
+            if (!m_kkt->update_scalings_and_factor(m_enable_iterative_refinement,
+                                                   m_result.info.rho, m_result.info.delta,
+                                                   m_result.s, m_result.s_lb, m_result.s_ub,
+                                                   m_result.z, m_result.z_lb, m_result.z_ub))
             {
                 if (!m_enable_iterative_refinement)
                 {
@@ -613,9 +634,8 @@ protected:
                 rs_lb.head(m_data.n_lb).array() = -s_lb.array() * z_lb.array();
                 rs_ub.head(m_data.n_ub).array() = -s_ub.array() * z_ub.array();
 
-                m_kkt.solve(rx, ry, rz, rz_lb, rz_ub, rs, rs_lb, rs_ub,
-                            dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub,
-                            m_enable_iterative_refinement);
+                m_kkt->solve(rx, ry, rz, rz_lb, rz_ub, rs, rs_lb, rs_ub,
+                             dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub);
 
                 // step in the non-negative orthant
                 T alpha_s = T(1);
@@ -669,9 +689,8 @@ protected:
                 rs_lb.head(m_data.n_lb).array() += -ds_lb.head(m_data.n_lb).array() * dz_lb.head(m_data.n_lb).array() + m_result.info.sigma * m_result.info.mu;
                 rs_ub.head(m_data.n_ub).array() += -ds_ub.head(m_data.n_ub).array() * dz_ub.head(m_data.n_ub).array() + m_result.info.sigma * m_result.info.mu;
 
-                m_kkt.solve(rx, ry, rz, rz_lb, rz_ub, rs, rs_lb, rs_ub,
-                            dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub,
-                            m_enable_iterative_refinement);
+                m_kkt->solve(rx, ry, rz, rz_lb, rz_ub, rs, rs_lb, rs_ub,
+                             dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub);
 
                 // step in the non-negative orthant
                 alpha_s = T(1);
@@ -758,9 +777,8 @@ protected:
             else
             {
                 // since there are no inequalities we can take full steps
-                m_kkt.solve(rx, ry, rz, rz_lb, rz_ub, rs, rs_lb, rs_ub,
-                            dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub,
-                            m_enable_iterative_refinement);
+                m_kkt->solve(rx, ry, rz, rz_lb, rz_ub, rs, rs_lb, rs_ub,
+                             dx, dy, dz, dz_lb, dz_ub, ds, ds_lb, ds_ub);
 
                 m_result.info.primal_step = T(1);
                 m_result.info.dual_step = T(1);
@@ -1057,7 +1075,7 @@ public:
                                           this->m_settings.preconditioner_scale_cost,
                                           this->m_settings.preconditioner_iter);
 
-        this->m_kkt.update_data(update_options);
+        this->m_kkt->update_data(update_options);
 
         if (this->m_settings.compute_timings)
         {
@@ -1171,7 +1189,7 @@ public:
                                           this->m_settings.preconditioner_scale_cost,
                                           this->m_settings.preconditioner_iter);
 
-        this->m_kkt.update_data(update_options);
+        this->m_kkt->update_data(update_options);
 
         if (this->m_settings.compute_timings)
         {

@@ -19,8 +19,9 @@ namespace sparse
 {
 
 template<typename Derived, typename T, typename I>
-struct KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
+class KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
 {
+protected:
     SparseMat<T, I> A;
     SparseMat<T, I> AT_A;
     Vec<T> tmp_scatter; // temporary storage for scatter operation
@@ -221,7 +222,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
         }
     }
 
-    void update_data(int options)
+    void update_data_impl(int options)
     {
         auto& data = static_cast<Derived*>(this)->data;
 
@@ -229,14 +230,6 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_EQ_ELIMINATED>
         {
             transpose_no_allocation<T, I>(data.AT, A);
             update_AT_A();
-        }
-
-        if (options != KKTUpdateOptions::KKT_UPDATE_NONE)
-        {
-            update_kkt_cost_scalings();
-            update_kkt_equality_scalings();
-            update_kkt_inequality_scaling();
-            static_cast<Derived*>(this)->update_kkt_box_scalings();
         }
     }
 
