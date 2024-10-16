@@ -21,6 +21,7 @@ endif()
 
 #### Interface options ####
 option(BUILD_WITH_TEMPLATE_INSTANTIATION "Build a shared library with common templates instantiated" ON)
+option(BUILD_WITH_BLASFEO "Build with blasfeo which is required for some kkt solvers" ON)
 option(BUILD_SHARED_LIBS "Build library as shared." ON)
 option(BUILD_WITH_STD_OPTIONAL "Build using std::optional" OFF)
 option(BUILD_WITH_STD_FILESYSTEM "Build using std::filesystem" OFF)
@@ -171,6 +172,17 @@ else ()
 
     create_piqp_library(piqp INTERFACE)
     create_piqp_library(piqp_header_only INTERFACE)
+endif ()
+
+if (BUILD_WITH_BLASFEO)
+    # Find Blasfeo
+    find_package(blasfeo REQUIRED)
+
+    target_compile_definitions(piqp PUBLIC PIQP_HAS_BLASFEO)
+    target_link_libraries(piqp PUBLIC blasfeo)
+
+    target_compile_definitions(piqp_header_only INTERFACE PIQP_HAS_BLASFEO)
+    target_link_libraries(piqp_header_only INTERFACE blasfeo)
 endif ()
 
 if (BUILD_WITH_STD_OPTIONAL)

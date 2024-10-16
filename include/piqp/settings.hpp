@@ -18,7 +18,8 @@ namespace piqp
 enum class KKTSolver
 {
     dense_cholesky,
-    sparse_ldlt
+    sparse_ldlt,
+    blocksparse_stagewise
 };
 
 template<typename T>

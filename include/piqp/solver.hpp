@@ -25,6 +25,9 @@
 #include "piqp/sparse/data.hpp"
 #include "piqp/sparse/preconditioner.hpp"
 #include "piqp/sparse/kkt.hpp"
+#ifdef PIQP_HAS_BLASFEO
+#include "piqp/sparse/blocksparse_stage_kkt.hpp"
+#endif
 #include "piqp/utils/optional.hpp"
 
 namespace piqp
@@ -259,6 +262,11 @@ protected:
             case KKTSolver::sparse_ldlt:
                 m_kkt = std::make_unique<sparse::KKT<T, I, Mode>>(m_data, m_settings);
                 break;
+#ifdef PIQP_HAS_BLASFEO
+            case KKTSolver::blocksparse_stagewise:
+                m_kkt = std::make_unique<sparse::BlocksparseStageKKT<T, I>>(m_data, m_settings);
+                break;
+#endif
             default:
                 piqp_eprint("kkt solver not supported\n");
                 return false;
