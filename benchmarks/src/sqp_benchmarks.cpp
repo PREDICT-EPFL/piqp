@@ -69,7 +69,7 @@ static void BM_ROBOT_ARM_SQP_KKT_ALL_ELIMINATED(benchmark::State& state)
     }
 }
 
-BENCHMARK(BM_CHAIN_MASS_SQP_KKT_FULL)->Unit(benchmark::kMicrosecond);
+//BENCHMARK(BM_CHAIN_MASS_SQP_KKT_FULL)->Unit(benchmark::kMicrosecond);
 //BENCHMARK(BM_CHAIN_MASS_SQP_KKT_ALL_ELIMINATED)->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_ROBOT_ARM_SQP_KKT_FULL)->Unit(benchmark::kMicrosecond);
 //BENCHMARK(BM_ROBOT_ARM_SQP_KKT_ALL_ELIMINATED)->Unit(benchmark::kMicrosecond);

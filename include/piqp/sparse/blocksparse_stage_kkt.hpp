@@ -5,12 +5,18 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_BLOCKSPARSE_STAGE_KKT_HPP
-#define PIQP_BLOCKSPARSE_STAGE_KKT_HPP
+#ifndef PIQP_SPARSE_BLOCKSPARSE_STAGE_KKT_HPP
+#define PIQP_SPARSE_BLOCKSPARSE_STAGE_KKT_HPP
 
+#include <iostream>
+#include <cstring>
 #include "blasfeo.h"
 
+#include "piqp/fwd.hpp"
+#include "piqp/typedefs.hpp"
 #include "piqp/kkt_system.hpp"
+#include "piqp/settings.hpp"
+#include "piqp/sparse/data.hpp"
 
 namespace piqp
 {
@@ -30,21 +36,69 @@ protected:
         I width;
     };
 
+    class BlasfeoMat
+    {
+    protected:
+        blasfeo_dmat mat{}; // note that {} initializes all values to zero here
+
+    public:
+        BlasfeoMat() = default;
+
+        BlasfeoMat(int m, int n)
+        {
+            resize(m, n);
+        }
+
+        ~BlasfeoMat()
+        {
+            if (mat.mem) {
+                blasfeo_free_dmat(&mat);
+            }
+        }
+
+        int rows() { return mat.m; }
+
+        int cols() { return mat.n; }
+
+        void resize(int m, int n)
+        {
+            if (mat.mem) {
+                blasfeo_free_dmat(&mat);
+            }
+
+            blasfeo_allocate_dmat(m, n, &mat);
+            // zero out matrix
+            std::memset(mat.mem, 0, static_cast<std::size_t>(mat.memsize));
+        }
+
+        blasfeo_dmat* ref() { return &mat; }
+    };
+
+    // stores all the data of an arrow KKT structure
+    struct BlockKKT
+    {
+        std::vector<std::unique_ptr<BlasfeoMat>> D; // lower triangular diagonal
+        std::vector<std::unique_ptr<BlasfeoMat>> B; // off diagonal
+        std::vector<std::unique_ptr<BlasfeoMat>> E; // arrow block
+    };
+
     const Data<T, I>& data;
     const Settings<T>& settings;
 
     std::vector<BlockInfo> block_info;
-    I arrow_width = 0;
+
+    BlockKKT P;
 
 public:
     BlocksparseStageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
     {
         extract_arrow_structure();
+        P = utri_to_kkt(data.P_utri);
     }
 
     void update_data(int options)
     {
-
+        assert(false && "not implemented yet");
     }
 
     bool update_scalings_and_factor(bool iterative_refinement,
@@ -115,7 +169,7 @@ protected:
         I current_diag_block_start = 0;
         I current_diag_block_size = 0;
         I current_off_diag_block_size = 0;
-        arrow_width = 0;
+        I arrow_width = 0;
 
         // flop count corresponding to tri-diagonal factorization
         usize flops_tridiag = 0;
@@ -201,6 +255,10 @@ protected:
             }
         }
 
+        // last block corresponds to corner block of arrow
+        block_info.push_back({current_diag_block_start, arrow_width});
+        assert(block_info.size() >= 2);
+
 //        // calculate current arrow flop count from normalized counts
 //        usize flops_arrow = static_cast<usize>(arrow_width) * flops_arrow_normalized_no_syrk
 //                            + static_cast<usize>(arrow_width) * static_cast<usize>(arrow_width) * flops_arrow_normalized_syrk;
@@ -209,11 +267,89 @@ protected:
 //
 //        std::cout << "flops_tridiag: " <<  flops_tridiag << "  flops_arrow: " << flops_arrow << std::endl;
     }
+
+    BlockKKT utri_to_kkt(const SparseMat<T, I>& A_utri)
+    {
+        std::size_t N = block_info.size();
+        I arrow_width = block_info.back().width;
+
+        BlockKKT A_kkt;
+        A_kkt.D.resize(N);
+        A_kkt.B.resize(N - 2);
+        A_kkt.E.resize(N - 1);
+
+        std::size_t block_index = 0;
+        I block_start = block_info[block_index].start;
+        I block_width = block_info[block_index].width;
+        I last_block_width = 0;
+
+        // Iterating over a csc symmetric upper triangular matrix corresponds
+        // to iterating over the rows of the corresponding transpose (lower triangular)
+        Eigen::Index n = A_utri.outerSize();
+        for (Eigen::Index i = 0; i < n; i++)
+        {
+            if (i >= block_start + block_width)
+            {
+                last_block_width = block_width;
+                block_index++;
+                block_start = block_info[block_index].start;
+                block_width = block_info[block_index].width;
+            }
+
+            std::size_t current_arrow_block_index = 0;
+            I current_arrow_block_start = block_info[current_arrow_block_index].start;
+            I current_arrow_block_width = block_info[current_arrow_block_index].width;
+
+            for (typename SparseMat<T, I>::InnerIterator A_ltri_row_it(A_utri, i); A_ltri_row_it; ++A_ltri_row_it)
+            {
+                I j = A_ltri_row_it.index();
+                T v = A_ltri_row_it.value();
+                assert(j <= i && "P is not upper triangular");
+
+                // check if on diagonal
+                if (j + block_width > i)
+                {
+                    if (!A_kkt.D[block_index]) {
+                        A_kkt.D[block_index] = std::make_unique<BlasfeoMat>(block_width, block_width);
+                    }
+                    BLASFEO_DMATEL(A_kkt.D[block_index]->ref(), i - block_start, j - block_start) = v;
+                }
+                // check if on arrow
+                else if (i + arrow_width > n)
+                {
+                    while (current_arrow_block_start < j) {
+                        current_arrow_block_index++;
+                        current_arrow_block_start = block_info[current_arrow_block_index].start;
+                        current_arrow_block_width = block_info[current_arrow_block_index].width;
+                    }
+
+                    if (!A_kkt.E[current_arrow_block_index]) {
+                        A_kkt.E[current_arrow_block_index] = std::make_unique<BlasfeoMat>(arrow_width, current_arrow_block_width);
+                    }
+                    BLASFEO_DMATEL(A_kkt.E[current_arrow_block_index]->ref(), i - block_start, j - current_arrow_block_start) = v;
+                }
+                // we have to be on off diagonal
+                else
+                {
+                    assert(j + block_width + last_block_width > i && "indexes in no valid block");
+                    if (!A_kkt.B[block_index - 1]) {
+                        A_kkt.B[block_index - 1] = std::make_unique<BlasfeoMat>(block_width, last_block_width);
+                    }
+                    BLASFEO_DMATEL(A_kkt.B[block_index - 1]->ref(), i - block_start, j + last_block_width - block_start) = v;
+                }
+            }
+        }
+
+        return A_kkt;
+    }
 };
 
 } // namespace sparse
 
 } // namespace piqp
 
+#ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
+#include "piqp/sparse/blocksparse_stage_kkt.tpp"
+#endif
 
-#endif //PIQP_BLOCKSPARSE_STAGE_KKT_HPP
+#endif //PIQP_SPARSE_BLOCKSPARSE_STAGE_KKT_HPP
