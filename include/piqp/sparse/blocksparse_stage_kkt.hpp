@@ -82,18 +82,33 @@ protected:
         std::vector<std::unique_ptr<BlasfeoMat>> E; // arrow block
     };
 
+    struct BlockMat
+    {
+        // Row permutation from original matrix to block matrix.
+        // For example, if the original matrix b = A * x, then
+        // b_perm = A_block * x, where b_perm[i] = b[perm[i]].
+        Vec<I> perm;
+        std::vector<std::unique_ptr<BlasfeoMat>> D; // A_{x,1}
+        std::vector<std::unique_ptr<BlasfeoMat>> B; // A_{x,2}
+        std::vector<std::unique_ptr<BlasfeoMat>> E; // A_{x,N+1}
+    };
+
     const Data<T, I>& data;
     const Settings<T>& settings;
 
     std::vector<BlockInfo> block_info;
 
     BlockKKT P;
+    BlockMat A;
+    BlockMat G;
 
 public:
     BlocksparseStageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
     {
         extract_arrow_structure();
         P = utri_to_kkt(data.P_utri);
+        A = transpose_to_block_mat(data.AT);
+        G = transpose_to_block_mat(data.GT);
     }
 
     void update_data(int options)
@@ -341,6 +356,107 @@ protected:
         }
 
         return A_kkt;
+    }
+
+    BlockMat transpose_to_block_mat(const SparseMat<T, I>& AT)
+    {
+        std::size_t N = block_info.size();
+        I arrow_width = block_info.back().width;
+
+        BlockMat A_block;
+        A_block.perm.resize(AT.cols());
+        A_block.D.resize(N - 2);
+        A_block.B.resize(N - 2);
+        A_block.E.resize(N - 2);
+
+        // keep track on the current fill status of each block
+        Vec<I> block_fill(block_info.size());
+        block_fill.setZero();
+
+        // Iterating over a csc transposed matrix corresponds
+        // to iterating over the rows of the non-transposed matrix.
+
+        // First pass is to determine the number of rows per block
+        Eigen::Index rows = AT.outerSize(); // rows here corresponds to the non-transposed matrix
+        Eigen::Index cols = AT.innerSize();
+        for (Eigen::Index i = 0; i < rows; i++)
+        {
+            typename SparseMat<T, I>::InnerIterator A_row_it(AT, i);
+            if (A_row_it)
+            {
+                I j = A_row_it.index();
+                std::size_t block_index = 0;
+                // find the corresponding block
+                while (block_info[block_index].start + block_info[block_index].width < j) { block_index++; }
+                block_fill(Eigen::Index(block_index))++;
+            }
+        }
+
+        Vec<I> block_fill_acc(block_info.size() + 1);
+        block_fill_acc[0] = 0;
+        for (Eigen::Index i = 0; i < Eigen::Index(block_info.size()); i++) {
+            block_fill_acc[i + 1] = block_fill_acc[i] + block_fill[i];
+        }
+
+        // keep track on where we are in block
+        Vec<I> block_fill_counter(block_info.size());
+        block_fill_counter.setZero();
+
+        // In the second pass, we allocate and fill the block matrix
+        for (Eigen::Index i = 0; i < rows; i++)
+        {
+            typename SparseMat<T, I>::InnerIterator A_row_it(AT, i);
+
+            std::size_t block_index = 0;
+            I block_i = 0;
+            if (A_row_it)
+            {
+                I j = A_row_it.index();
+                // find the corresponding block
+                while (block_info[block_index].start + block_info[block_index].width < j) { block_index++; }
+                block_i = block_fill_counter(Eigen::Index(block_index))++;
+                A_block.perm[i] = block_fill_acc[Eigen::Index(block_index)] + block_i;
+            }
+
+            I block_start = block_info[block_index].start;
+            I block_width = block_info[block_index].width;
+
+            for (; A_row_it; ++A_row_it)
+            {
+                I j = A_row_it.index();
+                T v = A_row_it.value();
+
+                // arrow
+                if (j + arrow_width >= cols)
+                {
+                    if (!A_block.E[block_index]) {
+                        A_block.E[block_index] = std::make_unique<BlasfeoMat>(block_fill[Eigen::Index(block_index)], arrow_width);
+                    }
+                    BLASFEO_DMATEL(A_block.E[block_index]->ref(), block_i, j + arrow_width - cols) = v;
+                }
+                // first block
+                else if (j < block_start + block_width)
+                {
+                    if (!A_block.D[block_index]) {
+                        A_block.D[block_index] = std::make_unique<BlasfeoMat>(block_fill[Eigen::Index(block_index)], block_width);
+                    }
+                    BLASFEO_DMATEL(A_block.D[block_index]->ref(), block_i, j - block_start) = v;
+                }
+                // second block
+                else
+                {
+                    I next_block_width = block_info[block_index + 1].width;
+                    assert(j < block_start + block_width + next_block_width && "indexes in no valid block");
+
+                    if (!A_block.B[block_index]) {
+                        A_block.B[block_index] = std::make_unique<BlasfeoMat>(block_fill[Eigen::Index(block_index)], next_block_width);
+                    }
+                    BLASFEO_DMATEL(A_block.B[block_index]->ref(), block_i, j - block_start - block_width) = v;
+                }
+            }
+        }
+
+        return A_block;
     }
 };
 
