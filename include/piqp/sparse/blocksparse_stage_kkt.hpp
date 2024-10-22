@@ -226,6 +226,8 @@ protected:
     BlockMat A;
     BlockMat G;
     BlockMat G_scaled;
+    BlockKKT AtA;
+    BlockKKT GtG;
 
 public:
     BlocksparseStageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
@@ -235,6 +237,8 @@ public:
         A = transpose_to_block_mat(data.AT);
         G = transpose_to_block_mat(data.GT);
         G_scaled = G;
+        block_syrk_lt(A, A, AtA);
+        block_syrk_lt(G, G_scaled, GtG);
     }
 
     void update_data(int options)
@@ -302,9 +306,9 @@ protected:
         SparseMat<T, I> identity;
         identity.resize(data.n, data.n);
         identity.setIdentity();
-        SparseMat<T, I> AtA = (data.AT * data.AT.transpose()).template triangularView<Eigen::Lower>();
-        SparseMat<T, I> GtG = (data.GT * data.GT.transpose()).template triangularView<Eigen::Lower>();
-        SparseMat<T, I> C = P_ltri + identity + AtA + GtG;
+        SparseMat<T, I> AtA_sp = (data.AT * data.AT.transpose()).template triangularView<Eigen::Lower>();
+        SparseMat<T, I> GtG_sp = (data.GT * data.GT.transpose()).template triangularView<Eigen::Lower>();
+        SparseMat<T, I> C = P_ltri + identity + AtA_sp + GtG_sp;
 
         I prev_diag_block_size = 0;
         I current_diag_block_start = 0;
@@ -589,6 +593,138 @@ protected:
         }
 
         return A_block;
+    }
+
+    void block_syrk_lt(BlockMat& sA, BlockMat& sB, BlockKKT& sD)
+    {
+        std::size_t N = block_info.size();
+        I arrow_width = block_info.back().width;
+
+        sD.D.resize(N);
+        sD.B.resize(N - 2);
+        sD.E.resize(N - 1);
+
+        // ----- DIAGONAL -----
+
+        // D.D_1 = 0
+        if (sD.D[0]) {
+            sD.D[0]->setZero();
+        }
+        for (std::size_t i = 0; i < N - 2; i++)
+        {
+            // D.D_{i+1} = 0
+            if (sD.D[i+1]) {
+                sD.D[i+1]->setZero();
+            }
+
+            if (sA.D[i] && sB.D[i]) {
+                int m = sA.D[i]->cols();
+                int k = sA.D[i]->rows();
+                assert(sB.D[i]->cols() == m && sB.D[i]->rows() == k && "size mismatch");
+                if (!sD.D[i]) {
+                    sD.D[i] = std::make_unique<BlasfeoMat>(m, m);
+                    sD.D[i]->setZero();
+                }
+                // D.D_i += lower triangular of A_{i,i}^T * B_{i,i}
+                blasfeo_dsyrk_lt(m, k, 1.0, sA.D[i]->ref(), 0, 0, sB.D[i]->ref(), 0, 0, 1.0, sD.D[i]->ref(), 0, 0, sD.D[i]->ref(), 0, 0);
+            }
+
+            if (sA.B[i] && sB.B[i]) {
+                int m = sA.B[i]->cols();
+                int k = sA.B[i]->rows();
+                assert(sB.B[i]->cols() == m && sB.B[i]->rows() == k && "size mismatch");
+                if (!sD.D[i+1]) {
+                    sD.D[i+1] = std::make_unique<BlasfeoMat>(m, m);
+                    sD.D[i+1]->setZero();
+                }
+                // D.D_{i+1} += lower triangular of A_{i,i}^T * B_{i,i}
+                blasfeo_dsyrk_lt(m, k, 1.0, sA.B[i]->ref(), 0, 0, sB.B[i]->ref(), 0, 0, 1.0, sD.D[i+1]->ref(), 0, 0, sD.D[i+1]->ref(), 0, 0);
+            }
+        }
+
+        if (arrow_width > 0)
+        {
+            // D.D_N = 0
+            if (sD.D[N-1]) {
+                sD.D[N-1]->setZero();
+            }
+
+            for (std::size_t i = 0; i < N - 2; i++)
+            {
+                if (sA.E[i] && sB.E[i]) {
+                    int m = sA.E[i]->cols();
+                    int k = sA.E[i]->rows();
+                    assert(sB.E[i]->cols() == m && sB.E[i]->rows() == k && "size mismatch");
+                    if (!sD.D[N-1]) {
+                        sD.D[N-1] = std::make_unique<BlasfeoMat>(m, m);
+                        sD.D[N-1]->setZero();
+                    }
+                    // D.D_N += lower triangular of A_{i,N}^T * B_{i,N}
+                    blasfeo_dsyrk_lt(m, k, 1.0, sA.E[i]->ref(), 0, 0, sB.E[i]->ref(), 0, 0, 1.0, sD.D[N-1]->ref(), 0, 0, sD.D[N-1]->ref(), 0, 0);
+                }
+            }
+        }
+
+        // ----- OFF-DIAGONAL -----
+
+        for (std::size_t i = 0; i < N - 2; i++)
+        {
+            if (sA.B[i] && sB.D[i]) {
+                int m = sA.B[i]->cols();
+                int n = sB.D[i]->cols();
+                int k = sA.B[i]->rows();
+                assert(sB.D[i]->rows() == k && "size mismatch");
+                if (!sD.B[i]) {
+                    sD.B[i] = std::make_unique<BlasfeoMat>(m, n);
+                    sD.B[i]->setZero();
+                }
+                // D.B_i = A_{i,i+1}^T * B_{i,i}
+                blasfeo_dgemm_tn(m, n, k, 1.0, sA.B[i]->ref(), 0, 0, sB.D[i]->ref(), 0, 0, 0.0, sD.B[i]->ref(), 0, 0, sD.B[i]->ref(), 0, 0);
+            }
+        }
+
+        // ----- ARROW -----
+
+        if (arrow_width > 0)
+        {
+            // D.E_1 = 0
+            if (sD.E[0]) {
+                sD.E[0]->setZero();
+            }
+            for (std::size_t i = 0; i < N - 2; i++)
+            {
+                // D.E_{i+1} = 0
+                if (sD.E[i+1]) {
+                    sD.E[i+1]->setZero();
+                }
+
+                if (sA.E[i] && sB.D[i]) {
+                    int m = sA.E[i]->cols();
+                    int n = sB.D[i]->cols();
+                    int k = sA.E[i]->rows();
+                    assert(sB.D[i]->rows() == k && "size mismatch");
+                    if (!sD.E[i]) {
+                        sD.E[i] = std::make_unique<BlasfeoMat>(m, n);
+                        sD.E[i]->setZero();
+                    }
+                    // D.E_i += A_{i,N}^T * B_{i,i}
+                    blasfeo_dgemm_tn(m, n, k, 1.0, sA.E[i]->ref(), 0, 0, sB.D[i]->ref(), 0, 0, 1.0, sD.E[i]->ref(), 0, 0, sD.E[i]->ref(), 0, 0);
+                }
+
+                if (sA.E[i] && sB.B[i]) {
+                    int m = sA.E[i]->cols();
+                    int n = sB.B[i]->cols();
+                    int k = sA.E[i]->rows();
+                    assert(sB.B[i]->rows() == k && "size mismatch");
+                    if (!sD.E[i+1]) {
+                        sD.E[i+1] = std::make_unique<BlasfeoMat>(m, n);
+                        sD.E[i+1]->setZero();
+                    }
+                    // D.E_{i+1} += A_{i,N}^T * B_{i,i+1}
+                    blasfeo_dgemm_tn(m, n, k, 1.0, sA.E[i]->ref(), 0, 0, sB.B[i]->ref(), 0, 0, 1.0, sD.E[i+1]->ref(), 0, 0, sD.E[i+1]->ref(), 0, 0);
+                }
+            }
+        }
     }
 };
 
