@@ -49,6 +49,49 @@ protected:
             resize(m, n);
         }
 
+        BlasfeoMat(BlasfeoMat&& other) noexcept
+        {
+            this->mat = other.mat;
+            other.mat.mem = nullptr;
+            other.mat.m = 0;
+            other.mat.n = 0;
+        }
+
+        BlasfeoMat(const BlasfeoMat& other)
+        {
+            if (other.mat.mem) {
+                this->resize(other.rows(), other.cols());
+                // B <= A
+                blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
+            }
+        }
+
+        BlasfeoMat& operator=(BlasfeoMat&& other) noexcept
+        {
+            this->mat = other.mat;
+            other.mat.mem = nullptr;
+            other.mat.m = 0;
+            other.mat.n = 0;
+            return *this;
+        }
+
+        BlasfeoMat& operator=(const BlasfeoMat& other)
+        {
+            if (other.mat.mem) {
+                this->resize(other.rows(), other.cols());
+                // B <= A
+                blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
+            } else {
+                if (mat.mem) {
+                    blasfeo_free_dmat(&mat);
+                    mat.mem = nullptr;
+                }
+                mat.m = 0;
+                mat.n = 0;
+            }
+            return *this;
+        }
+
         ~BlasfeoMat()
         {
             if (mat.mem) {
@@ -56,17 +99,24 @@ protected:
             }
         }
 
-        int rows() { return mat.m; }
+        int rows() const { return mat.m; }
 
-        int cols() { return mat.n; }
+        int cols() const { return mat.n; }
 
         void resize(int m, int n)
         {
+            // reuse memory
+            if (this->rows() == m && this->cols() == n) return;
+
             if (mat.mem) {
                 blasfeo_free_dmat(&mat);
             }
 
             blasfeo_allocate_dmat(m, n, &mat);
+        }
+
+        void setZero()
+        {
             // zero out matrix
             std::memset(mat.mem, 0, static_cast<std::size_t>(mat.memsize));
         }
@@ -91,6 +141,80 @@ protected:
         std::vector<std::unique_ptr<BlasfeoMat>> D; // A_{x,1}
         std::vector<std::unique_ptr<BlasfeoMat>> B; // A_{x,2}
         std::vector<std::unique_ptr<BlasfeoMat>> E; // A_{x,N+1}
+
+        BlockMat() = default;
+
+        BlockMat(BlockMat&&) = default;
+
+        BlockMat(const BlockMat& other)
+        {
+            perm = other.perm;
+
+            D.resize(other.D.size());
+            B.resize(other.B.size());
+            E.resize(other.E.size());
+
+            for (std::size_t i = 0; i < other.D.size(); i++) {
+                if (other.D[i]) {
+                    D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
+                }
+            }
+
+            for (std::size_t i = 0; i < other.B.size(); i++) {
+                if (other.B[i]) {
+                    B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
+                }
+            }
+
+            for (std::size_t i = 0; i < other.E.size(); i++) {
+                if (other.E[i]) {
+                    E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
+                }
+            }
+        }
+
+        BlockMat& operator=(BlockMat&&) = default;
+
+        BlockMat& operator=(const BlockMat& other)
+        {
+            perm = other.perm;
+
+            D.resize(other.D.size());
+            B.resize(other.B.size());
+            E.resize(other.E.size());
+
+            for (std::size_t i = 0; i < other.D.size(); i++) {
+                if (other.D[i] && !D[i]) {
+                    D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
+                } else if (other.D[i] && D[i]) {
+                    *D[i] = *other.D[i];
+                } else {
+                    D[i] = nullptr;
+                }
+            }
+
+            for (std::size_t i = 0; i < other.D.size(); i++) {
+                if (other.B[i] && !B[i]) {
+                    B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
+                } else if (other.B[i] && B[i]) {
+                    *B[i] = *other.B[i];
+                } else {
+                    B[i] = nullptr;
+                }
+            }
+
+            for (std::size_t i = 0; i < other.D.size(); i++) {
+                if (other.E[i] && !E[i]) {
+                    E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
+                } else if (other.E[i] && E[i]) {
+                    *E[i] = *other.E[i];
+                } else {
+                    E[i] = nullptr;
+                }
+            }
+
+            return *this;
+        }
     };
 
     const Data<T, I>& data;
@@ -101,6 +225,7 @@ protected:
     BlockKKT P;
     BlockMat A;
     BlockMat G;
+    BlockMat G_scaled;
 
 public:
     BlocksparseStageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
@@ -109,6 +234,7 @@ public:
         P = utri_to_kkt(data.P_utri);
         A = transpose_to_block_mat(data.AT);
         G = transpose_to_block_mat(data.GT);
+        G_scaled = G;
     }
 
     void update_data(int options)
@@ -326,6 +452,7 @@ protected:
                 {
                     if (!A_kkt.D[block_index]) {
                         A_kkt.D[block_index] = std::make_unique<BlasfeoMat>(block_width, block_width);
+                        A_kkt.D[block_index]->setZero();
                     }
                     BLASFEO_DMATEL(A_kkt.D[block_index]->ref(), i - block_start, j - block_start) = v;
                 }
@@ -340,6 +467,7 @@ protected:
 
                     if (!A_kkt.E[current_arrow_block_index]) {
                         A_kkt.E[current_arrow_block_index] = std::make_unique<BlasfeoMat>(arrow_width, current_arrow_block_width);
+                        A_kkt.E[current_arrow_block_index]->setZero();
                     }
                     BLASFEO_DMATEL(A_kkt.E[current_arrow_block_index]->ref(), i - block_start, j - current_arrow_block_start) = v;
                 }
@@ -349,6 +477,7 @@ protected:
                     assert(j + block_width + last_block_width > i && "indexes in no valid block");
                     if (!A_kkt.B[block_index - 1]) {
                         A_kkt.B[block_index - 1] = std::make_unique<BlasfeoMat>(block_width, last_block_width);
+                        A_kkt.B[block_index - 1]->setZero();
                     }
                     BLASFEO_DMATEL(A_kkt.B[block_index - 1]->ref(), i - block_start, j + last_block_width - block_start) = v;
                 }
@@ -431,6 +560,7 @@ protected:
                 {
                     if (!A_block.E[block_index]) {
                         A_block.E[block_index] = std::make_unique<BlasfeoMat>(block_fill[Eigen::Index(block_index)], arrow_width);
+                        A_block.E[block_index]->setZero();
                     }
                     BLASFEO_DMATEL(A_block.E[block_index]->ref(), block_i, j + arrow_width - cols) = v;
                 }
@@ -439,6 +569,7 @@ protected:
                 {
                     if (!A_block.D[block_index]) {
                         A_block.D[block_index] = std::make_unique<BlasfeoMat>(block_fill[Eigen::Index(block_index)], block_width);
+                        A_block.D[block_index]->setZero();
                     }
                     BLASFEO_DMATEL(A_block.D[block_index]->ref(), block_i, j - block_start) = v;
                 }
@@ -450,6 +581,7 @@ protected:
 
                     if (!A_block.B[block_index]) {
                         A_block.B[block_index] = std::make_unique<BlasfeoMat>(block_fill[Eigen::Index(block_index)], next_block_width);
+                        A_block.B[block_index]->setZero();
                     }
                     BLASFEO_DMATEL(A_block.B[block_index]->ref(), block_i, j - block_start - block_width) = v;
                 }
