@@ -220,6 +220,9 @@ protected:
     const Data<T, I>& data;
     const Settings<T>& settings;
 
+    T m_rho;
+    T m_delta;
+
     std::vector<BlockInfo> block_info;
 
     BlockKKT P;
@@ -228,10 +231,14 @@ protected:
     BlockMat G_scaled;
     BlockKKT AtA;
     BlockKKT GtG;
+    BlockKKT kkt_mat;
 
 public:
     BlocksparseStageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
     {
+        m_rho = T(1);
+        m_delta = T(1);
+
         extract_arrow_structure();
         P = utri_to_kkt(data.P_utri);
         A = transpose_to_block_mat(data.AT);
@@ -239,6 +246,7 @@ public:
         G_scaled = G;
         block_syrk_lt(A, A, AtA);
         block_syrk_lt(G, G_scaled, GtG);
+        populate_kkt_mat();
     }
 
     void update_data(int options)
@@ -722,6 +730,139 @@ protected:
                     }
                     // D.E_{i+1} += A_{i,N}^T * B_{i,i+1}
                     blasfeo_dgemm_tn(m, n, k, 1.0, sA.E[i]->ref(), 0, 0, sB.B[i]->ref(), 0, 0, 1.0, sD.E[i+1]->ref(), 0, 0, sD.E[i+1]->ref(), 0, 0);
+                }
+            }
+        }
+    }
+
+    void populate_kkt_mat()
+    {
+        std::size_t N = block_info.size();
+        I arrow_width = block_info.back().width;
+        T delta_inv = 1.0 / m_delta;
+
+        kkt_mat.D.resize(N);
+        kkt_mat.B.resize(N - 2);
+        kkt_mat.E.resize(N - 1);
+
+        // ----- DIAGONAL -----
+
+        for (std::size_t i = 0; i < N; i++)
+        {
+            I m = block_info[i].width;
+
+            if (!kkt_mat.D[i]) {
+                kkt_mat.D[i] = std::make_unique<BlasfeoMat>(m, m);
+            }
+            kkt_mat.D[i]->setZero();
+
+            // diag(D_i) += rho
+            blasfeo_ddiare(m, m_rho, kkt_mat.D[i]->ref(), 0, 0);
+
+            if (P.D[i]) {
+                assert(P.D[i]->rows() == m && P.D[i]->cols() == m && "size mismatch");
+                // D_i += P.D_i
+                blasfeo_dgead(m, m, 1.0, P.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+            }
+
+            if (AtA.D[i]) {
+                assert(AtA.D[i]->rows() == m && AtA.D[i]->cols() == m && "size mismatch");
+                // D_i += delta^{-1} * AtA.D_i
+                blasfeo_dgead(m, m, delta_inv, AtA.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+            }
+
+            if (GtG.D[i]) {
+                assert(GtG.D[i]->rows() == m && GtG.D[i]->cols() == m && "size mismatch");
+                // D_i += GtG.D_i
+                blasfeo_dgead(m, m, 1.0, GtG.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+            }
+        }
+
+        // ----- OFF-DIAGONAL -----
+
+        for (std::size_t i = 0; i < N - 2; i++)
+        {
+            int m = block_info[i + 1].width;
+            int n = block_info[i].width;
+
+            // B_i = 0
+            if (kkt_mat.B[i]) {
+                kkt_mat.B[i]->setZero();
+            }
+
+            if (P.B[i]) {
+                assert(P.B[i]->rows() == m && P.B[i]->cols() == n && "size mismatch");
+                if (!kkt_mat.B[i]) {
+                    kkt_mat.B[i] = std::make_unique<BlasfeoMat>(m, n);
+                    kkt_mat.B[i]->setZero();
+                }
+                // B_i += P.B_i
+                blasfeo_dgead(m, n, 1.0, P.D[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+            }
+
+            if (AtA.B[i]) {
+                assert(AtA.B[i]->rows() == m && AtA.B[i]->cols() == n && "size mismatch");
+                if (!kkt_mat.B[i]) {
+                    kkt_mat.B[i] = std::make_unique<BlasfeoMat>(m, n);
+                    kkt_mat.B[i]->setZero();
+                }
+                // B_i += delta^{-1} * AtA.B_i
+                blasfeo_dgead(m, n, delta_inv, AtA.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+            }
+
+            if (GtG.B[i]) {
+                assert(GtG.B[i]->rows() == m && GtG.B[i]->cols() == n && "size mismatch");
+                if (!kkt_mat.B[i]) {
+                    kkt_mat.B[i] = std::make_unique<BlasfeoMat>(m, n);
+                    kkt_mat.B[i]->setZero();
+                }
+                // B_i += GtG.B_i
+                blasfeo_dgead(m, n, 1.0, GtG.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+            }
+        }
+
+        // ----- ARROW -----
+
+        if (arrow_width > 0)
+        {
+            for (std::size_t i = 0; i < N - 1; i++)
+            {
+                int m = arrow_width;
+                int n = block_info[i].width;
+
+                // E_i = 0
+                if (kkt_mat.E[i]) {
+                    kkt_mat.E[i]->setZero();
+                }
+
+                if (P.E[i]) {
+                    assert(P.E[i]->rows() == m && P.E[i]->cols() == n && "size mismatch");
+                    if (!kkt_mat.E[i]) {
+                        kkt_mat.E[i] = std::make_unique<BlasfeoMat>(m, n);
+                        kkt_mat.E[i]->setZero();
+                    }
+                    // E_i += P.E_i
+                    blasfeo_dgead(m, n, 1.0, P.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                }
+
+                if (AtA.E[i]) {
+                    assert(AtA.E[i]->rows() == m && AtA.E[i]->cols() == n && "size mismatch");
+                    if (!kkt_mat.E[i]) {
+                        kkt_mat.E[i] = std::make_unique<BlasfeoMat>(m, n);
+                        kkt_mat.E[i]->setZero();
+                    }
+                    // E_i += delta^{-1} * AtA.E_i
+                    blasfeo_dgead(m, n, delta_inv, AtA.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                }
+
+                if (GtG.E[i]) {
+                    assert(GtG.E[i]->rows() == m && GtG.E[i]->cols() == n && "size mismatch");
+                    if (!kkt_mat.E[i]) {
+                        kkt_mat.E[i] = std::make_unique<BlasfeoMat>(m, n);
+                        kkt_mat.E[i]->setZero();
+                    }
+                    // E_i += GtG.E_i
+                    blasfeo_dgead(m, n, 1.0, GtG.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
                 }
             }
         }
