@@ -466,11 +466,17 @@ public:
         }
 
         init_kkt_mat();
-        // We can reuse the structure from the kkt matrix.
-        // The only difference might be that some arrow blocks
-        // might not be null, but we can deal with this
-        // dynamically during the factorization
+
+        // We can mostly reuse the structure from the kkt matrix.
+        // Only the arrow can have more allocated blocks because
+        // of the factorization if the previous factors exist.
         kkt_factor = kkt_mat;
+        for (std::size_t i = 1; i < N - 1; i++)
+        {
+            if (!kkt_factor.E[i] && kkt_factor.E[i - 1] && kkt_factor.B[i - 1]) {
+                kkt_factor.E[i] = std::make_unique<BlasfeoMat>(kkt_factor.E[i - 1]->rows(), kkt_factor.B[i - 1]->rows());
+            }
+        }
     }
 
     void update_data(int options)
@@ -483,6 +489,8 @@ public:
                                     const CVecRef<T>& s, const CVecRef<T>& s_lb, const CVecRef<T>& s_ub,
                                     const CVecRef<T>& z, const CVecRef<T>& z_lb, const CVecRef<T>& z_ub)
     {
+        assert(!iterative_refinement && "iterative refinement not implemented yet");
+
         m_rho = rho;
         m_delta = delta;
         m_s = s;
@@ -508,8 +516,9 @@ public:
         block_gemm_nd(GT, G_scaling, GT_scaled);
         block_syrk_ln_calc(GT, GT_scaled, GtG);
         populate_kkt_mat();
+        factor_kkt();
 
-        return false;
+        return true;
     }
 
     void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,
@@ -1216,6 +1225,111 @@ protected:
                 blasfeo_dgemm_nd(m, n, 1.0, sA.E[i]->ref(), 0, 0, sB[i].ref(), 0, 0.0, sD.E[i]->ref(), 0, 0, sD.E[i]->ref(), 0, 0);
             }
         }
+    }
+
+    void factor_kkt()
+    {
+        std::size_t N = block_info.size();
+        I arrow_width = block_info.back().width;
+
+        int m = kkt_mat.D[0]->rows();
+        int n, k;
+        // L_1 = chol(D_1)
+        blasfeo_dpotrf_l(m, kkt_mat.D[0]->ref(), 0, 0, kkt_factor.D[0]->ref(), 0, 0);
+
+        if (kkt_mat.B[0]) {
+            m = kkt_mat.B[0]->rows();
+            n = kkt_mat.B[0]->cols();
+            assert(kkt_factor.D[0]->rows() == n && kkt_factor.D[0]->cols() == n && "size mismatch");
+            assert(kkt_factor.B[0]->rows() == m && kkt_factor.B[0]->cols() == n && "size mismatch");
+            // C_1 = B_1 * L_1^{-T}
+            blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[0]->ref(), 0, 0, kkt_mat.B[0]->ref(), 0, 0, kkt_factor.B[0]->ref(), 0, 0);
+        }
+
+        if (arrow_width > 0)
+        {
+            if (kkt_mat.E[0]) {
+                m = kkt_mat.E[0]->rows();
+                n = kkt_mat.E[0]->cols();
+                assert(kkt_factor.D[0]->rows() == n && kkt_factor.D[0]->cols() == n && "size mismatch");
+                assert(kkt_factor.E[0]->rows() == m && kkt_factor.E[0]->cols() == n && "size mismatch");
+                // F_1 = E_1 * L_1^{-T}
+                blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[0]->ref(), 0, 0, kkt_mat.E[0]->ref(), 0, 0, kkt_factor.E[0]->ref(), 0, 0);
+                // L_N = D_N - F_1 * F_1^T
+                blasfeo_dsyrk_ln(arrow_width, n, -1.0, kkt_factor.E[0]->ref(), 0, 0, kkt_factor.E[0]->ref(), 0, 0, 1.0, kkt_mat.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
+            } else {
+                // L_N = D_N
+                blasfeo_dgecp(arrow_width, arrow_width, kkt_mat.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
+            }
+        }
+
+        for (std::size_t i = 1; i < N - 1; i++)
+        {
+            m = kkt_factor.B[i-1]->rows();
+            k = kkt_factor.B[i-1]->cols();
+            assert(kkt_mat.D[i]->rows() == m && kkt_mat.D[i]->cols() == m && "size mismatch");
+            assert(kkt_factor.D[i]->rows() == m && kkt_factor.D[i]->cols() == m && "size mismatch");
+            // L_i = chol(D_i - C_{i-1} * C_{i-1}^T)
+            blasfeo_dsyrk_ln(m, k, -1.0, kkt_factor.B[i-1]->ref(), 0, 0, kkt_factor.B[i-1]->ref(), 0, 0, 1.0, kkt_mat.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
+            blasfeo_dpotrf_l(m, kkt_factor.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
+
+            if (i < N - 2 && kkt_mat.B[i]) {
+                m = kkt_mat.B[i]->rows();
+                n = kkt_mat.B[i]->cols();
+                assert(kkt_factor.D[i]->rows() == n && kkt_factor.D[i]->cols() == n && "size mismatch");
+                assert(kkt_factor.B[i]->rows() == m && kkt_factor.B[i]->cols() == n && "size mismatch");
+                // C_i = B_i * L_i^{-T}
+                blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0, kkt_factor.B[i]->ref(), 0, 0);
+            }
+
+            if (arrow_width > 0)
+            {
+                if (kkt_mat.E[i] && kkt_factor.E[i-1] && kkt_factor.B[i-1])
+                {
+                    m = kkt_factor.E[i-1]->rows();
+                    n = kkt_factor.B[i-1]->rows();
+                    k = kkt_factor.E[i-1]->cols();
+                    assert(kkt_factor.B[i-1]->cols() == k && "size mismatch");
+                    assert(kkt_mat.E[i]->rows() == m && kkt_mat.E[i]->cols() == n && "size mismatch");
+                    assert(kkt_factor.D[i]->rows() == n && kkt_factor.D[i]->cols() == n && "size mismatch");
+                    // F_i = (E_i - F_{i-1} * C_{i-1}^T) * L_i^{-T}
+                    blasfeo_dgemm_nt(m, n, k, -1.0, kkt_factor.E[i-1]->ref(), 0, 0, kkt_factor.B[i-1]->ref(), 0, 0, 1.0, kkt_mat.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
+                    blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
+                }
+                else if (kkt_mat.E[i])
+                {
+                    m = kkt_mat.E[i]->rows();
+                    n = kkt_mat.E[i]->cols();
+                    assert(kkt_factor.D[i]->rows() == n && kkt_factor.D[i]->cols() == n && "size mismatch");
+                    // F_i = E_i * L_i^{-T}
+                    blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
+                }
+                else if (kkt_factor.E[i-1] && kkt_factor.B[i-1])
+                {
+                    m = kkt_factor.E[i-1]->rows();
+                    n = kkt_factor.B[i-1]->rows();
+                    k = kkt_factor.E[i-1]->cols();
+                    assert(kkt_factor.B[i-1]->cols() == k && "size mismatch");
+                    assert(kkt_factor.D[i]->rows() == n && kkt_factor.D[i]->cols() == n && "size mismatch");
+                    // F_i = -(F_{i-1} * C_{i-1}^T) * L_i^{-T}
+                    blasfeo_dgemm_nt(m, n, k, -1.0, kkt_factor.E[i-1]->ref(), 0, 0, kkt_factor.B[i-1]->ref(), 0, 0, 0.0, kkt_factor.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
+                    blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
+                }
+
+                if (kkt_factor.E[i]) {
+                    m = kkt_factor.E[i]->rows();
+                    k = kkt_factor.E[i]->cols();
+                    assert(m == arrow_width && "size mismatch");
+                    assert(kkt_mat.D[N - 1]->rows() == m && kkt_mat.D[N - 1]->cols() == m && "size mismatch");
+                    // L_N -= F_i * F_i^T
+                    blasfeo_dsyrk_ln(m, k, -1.0, kkt_factor.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0, 1.0, kkt_factor.D[N - 1]->ref(), 0, 0, kkt_factor.D[N - 1]->ref(), 0, 0);
+                }
+            }
+        }
+
+        // L_N = chol(D_N - sum F_i * F_i^T)
+        // note that inner is also computed and stored in L_N
+        blasfeo_dpotrf_l(arrow_width, kkt_factor.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
     }
 };
 
