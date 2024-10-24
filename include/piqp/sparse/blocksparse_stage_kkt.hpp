@@ -226,6 +226,76 @@ protected:
         std::vector<std::unique_ptr<BlasfeoMat>> D; // lower triangular diagonal
         std::vector<std::unique_ptr<BlasfeoMat>> B; // off diagonal
         std::vector<std::unique_ptr<BlasfeoMat>> E; // arrow block
+
+        BlockKKT() = default;
+
+        BlockKKT(BlockKKT&&) = default;
+
+        BlockKKT(const BlockKKT& other)
+        {
+            D.resize(other.D.size());
+            B.resize(other.B.size());
+            E.resize(other.E.size());
+
+            for (std::size_t i = 0; i < other.D.size(); i++) {
+                if (other.D[i]) {
+                    D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
+                }
+            }
+
+            for (std::size_t i = 0; i < other.B.size(); i++) {
+                if (other.B[i]) {
+                    B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
+                }
+            }
+
+            for (std::size_t i = 0; i < other.E.size(); i++) {
+                if (other.E[i]) {
+                    E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
+                }
+            }
+        }
+
+        BlockKKT& operator=(BlockKKT&&) = default;
+
+        BlockKKT& operator=(const BlockKKT& other)
+        {
+            D.resize(other.D.size());
+            B.resize(other.B.size());
+            E.resize(other.E.size());
+
+            for (std::size_t i = 0; i < other.D.size(); i++) {
+                if (other.D[i] && !D[i]) {
+                    D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
+                } else if (other.D[i] && D[i]) {
+                    *D[i] = *other.D[i];
+                } else {
+                    D[i] = nullptr;
+                }
+            }
+
+            for (std::size_t i = 0; i < other.B.size(); i++) {
+                if (other.B[i] && !B[i]) {
+                    B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
+                } else if (other.B[i] && B[i]) {
+                    *B[i] = *other.B[i];
+                } else {
+                    B[i] = nullptr;
+                }
+            }
+
+            for (std::size_t i = 0; i < other.E.size(); i++) {
+                if (other.E[i] && !E[i]) {
+                    E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
+                } else if (other.E[i] && E[i]) {
+                    *E[i] = *other.E[i];
+                } else {
+                    E[i] = nullptr;
+                }
+            }
+
+            return *this;
+        }
     };
 
     struct BlockMat
@@ -292,7 +362,7 @@ protected:
                 }
             }
 
-            for (std::size_t i = 0; i < other.D.size(); i++) {
+            for (std::size_t i = 0; i < other.B.size(); i++) {
                 if (other.B[i] && !B[i]) {
                     B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
                 } else if (other.B[i] && B[i]) {
@@ -302,7 +372,7 @@ protected:
                 }
             }
 
-            for (std::size_t i = 0; i < other.D.size(); i++) {
+            for (std::size_t i = 0; i < other.E.size(); i++) {
                 if (other.E[i] && !E[i]) {
                     E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
                 } else if (other.E[i] && E[i]) {
@@ -334,12 +404,14 @@ protected:
     BlockKKT P;
     BlockMat A;
     BlockMat G;
+    std::vector<BlasfeoVec> G_scaling;
     BlockMat G_scaled;
+
     BlockKKT AtA;
     BlockKKT GtG;
-    BlockKKT kkt_mat;
 
-    std::vector<BlasfeoVec> G_scaling;
+    BlockKKT kkt_mat;
+    BlockKKT kkt_factor;
 
 public:
     BlocksparseStageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
@@ -380,6 +452,11 @@ public:
         }
 
         init_kkt_mat();
+        // We can reuse the structure from the kkt matrix.
+        // The only difference might be that some arrow blocks
+        // might not be null, but we can deal with this
+        // dynamically during the factorization
+        kkt_factor = kkt_mat;
     }
 
     void update_data(int options)
