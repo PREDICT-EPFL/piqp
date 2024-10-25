@@ -1259,7 +1259,7 @@ protected:
                 blasfeo_dsyrk_ln(arrow_width, n, -1.0, kkt_factor.E[0]->ref(), 0, 0, kkt_factor.E[0]->ref(), 0, 0, 1.0, kkt_mat.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
             } else {
                 // L_N = D_N
-                blasfeo_dgecp(arrow_width, arrow_width, kkt_mat.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
+                blasfeo_dtrcp_l(arrow_width, kkt_mat.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
             }
         }
 
