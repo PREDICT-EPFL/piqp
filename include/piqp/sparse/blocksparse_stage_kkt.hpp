@@ -595,8 +595,10 @@ public:
         // P_diag <= diag(P)
         for (std::size_t i = 0; i < N; i++)
         {
-            assert(P_diag.x[i].rows() == P.D[i]->rows() && "size mismatch");
-            blasfeo_ddiaex(P_diag.x[i].rows(), 1.0, P.D[i]->ref(), 0, 0, P_diag.x[i].ref(), 0);
+            if (P.D[i]) {
+                assert(P_diag.x[i].rows() == P.D[i]->rows() && "size mismatch");
+                blasfeo_ddiaex(P_diag.x[i].rows(), 1.0, P.D[i]->ref(), 0, 0, P_diag.x[i].ref(), 0);
+            }
         }
 
         AT = transpose_to_block_mat(data.AT, true);
@@ -1813,7 +1815,7 @@ protected:
     //     [                          ...                          A_{N-2,N-1}]
     //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}  ]
     void block_t_gemv_nt(double alpha_n, double alpha_t, BlockMat& sA, BlockVec& x_n, BlockVec& x_t,
-                       double beta_n, double beta_t, BlockVec& y_n, BlockVec& y_t, BlockVec& z_n, BlockVec& z_t)
+                         double beta_n, double beta_t, BlockVec& y_n, BlockVec& y_t, BlockVec& z_n, BlockVec& z_t)
     {
         // z_n = beta_n * y_n
         block_veccpsc(beta_n, y_n, z_n);
