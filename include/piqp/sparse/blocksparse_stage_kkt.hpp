@@ -928,7 +928,7 @@ protected:
             if (i >= n - arrow_width) break;
 
             if (i - current_diag_block_start + 1 >= current_diag_block_size) {
-                std::cout << "B " << current_diag_block_start << " " << current_diag_block_size << " " << current_off_diag_block_size << " " << arrow_width << std::endl;
+//                std::cout << "B " << current_diag_block_start << " " << current_diag_block_size << " " << current_off_diag_block_size << " " << arrow_width << std::endl;
                 block_info.push_back({current_diag_block_start, current_diag_block_size});
 
                 // L_i = chol(D_i - C_{i-1} * C_{i-1}^T
