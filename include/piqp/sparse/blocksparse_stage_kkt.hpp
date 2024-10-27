@@ -544,6 +544,8 @@ protected:
     Vec<T> m_z_lb_inv;
     Vec<T> m_z_ub_inv;
 
+    Vec<T> tmp_x;
+
     std::vector<BlockInfo> block_info;
 
     BlockKKT P;
@@ -579,6 +581,8 @@ public:
         m_z_inv.resize(data.m);
         m_z_lb_inv.resize(data.n);
         m_z_ub_inv.resize(data.n);
+
+        tmp_x.resize(data.n);
 
         // prepare kkt factorization
         extract_arrow_structure();
@@ -1266,6 +1270,9 @@ protected:
     template<bool allocate>
     void construct_kkt_mat()
     {
+        Vec<T>& diag = tmp_x;
+        BlockVec& diag_block = tmp1_x_block;
+
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
         T delta_inv = 1.0 / m_delta;
@@ -1273,6 +1280,23 @@ protected:
         kkt_mat.D.resize(N);
         kkt_mat.B.resize(N - 2);
         kkt_mat.E.resize(N - 1);
+
+        if (!allocate)
+        {
+            diag.setConstant(m_rho);
+
+            for (isize i = 0; i < data.n_lb; i++)
+            {
+                diag(data.x_lb_idx(i)) += data.x_lb_scaling(i) * data.x_lb_scaling(i) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
+            }
+
+            for (isize i = 0; i < data.n_ub; i++)
+            {
+                diag(data.x_ub_idx(i)) += data.x_ub_scaling(i) * data.x_ub_scaling(i) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
+            }
+
+            diag_block.assign(diag);
+        }
 
         // ----- DIAGONAL -----
 
@@ -1285,10 +1309,8 @@ protected:
                     kkt_mat.D[i] = std::make_unique<BlasfeoMat>(m, m);
                 }
             } else {
-                kkt_mat.D[i]->setZero();
-
-                // diag(D_i) += rho
-                blasfeo_ddiare(m, m_rho, kkt_mat.D[i]->ref(), 0, 0);
+                // diag(D_i) = diag
+                blasfeo_ddiain(m, 1.0, diag_block.x[i].ref(), 0, kkt_mat.D[i]->ref(), 0, 0);
 
                 if (P.D[i]) {
                     assert(P.D[i]->rows() == m && P.D[i]->cols() == m && "size mismatch");
