@@ -545,6 +545,7 @@ protected:
     Vec<T> m_z_ub_inv;
 
     Vec<T> tmp_x;
+    Vec<T> tmp_z;
 
     std::vector<BlockInfo> block_info;
 
@@ -583,6 +584,7 @@ public:
         m_z_ub_inv.resize(data.n);
 
         tmp_x.resize(data.n);
+        tmp_z.resize(data.m);
 
         // prepare kkt factorization
         extract_arrow_structure();
@@ -684,7 +686,7 @@ public:
         BlockVec& block_rhs_y = tmp2_y_block;
         BlockVec& block_rhs_z = tmp2_z_block;
 
-        block_delta_x = delta_x;
+        block_delta_x.assign(delta_x);
         block_delta_y.assign(delta_y, AT.perm_inv);
         block_delta_z.assign(delta_z, GT.perm_inv);
 
@@ -749,7 +751,77 @@ public:
                VecRef<T> delta_z, VecRef<T> delta_z_lb, VecRef<T> delta_z_ub,
                VecRef<T> delta_s, VecRef<T> delta_s_lb, VecRef<T> delta_s_ub)
     {
+        Vec<T>& rhs = tmp_x;
+        Vec<T>& rhs_z_bar = tmp_z;
+        BlockVec& block_rhs = tmp1_x_block;
+        BlockVec& block_rhs_y = tmp1_y_block;
+        BlockVec& block_rhs_z_bar = tmp1_z_block;
 
+        T delta_inv = T(1) / m_delta;
+
+        rhs_z_bar.array() = rhs_z.array() - m_z_inv.array() * rhs_s.array();
+        rhs_z_bar.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
+
+        rhs = rhs_x;
+
+        for (isize i = 0; i < data.n_lb; i++) {
+            rhs(data.x_lb_idx(i)) -= data.x_lb_scaling(i) * (rhs_z_lb(i) - m_z_lb_inv(i) * rhs_s_lb(i))
+                                     / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
+        }
+        for (isize i = 0; i < data.n_ub; i++) {
+            rhs(data.x_ub_idx(i)) += data.x_ub_scaling(i) * (rhs_z_ub(i) - m_z_ub_inv(i) * rhs_s_ub(i))
+                                     / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
+        }
+
+        block_rhs.assign(rhs);
+        block_rhs_y.assign(rhs_y, AT.perm_inv);
+        block_rhs_z_bar.assign(rhs_z_bar, GT.perm_inv);
+
+        // block_rhs += GT * block_rhs_z_bar
+        block_t_gemv_n(1.0, GT, block_rhs_z_bar, 1.0, block_rhs, block_rhs);
+        // block_rhs += delta_inv * AT * block_rhs_y
+        block_t_gemv_n(delta_inv, AT, block_rhs_y, 1.0, block_rhs, block_rhs);
+
+        solve_llt_in_place(block_rhs);
+
+        BlockVec& block_delta_x = block_rhs;
+        BlockVec& block_delta_y = tmp1_y_block;
+        BlockVec& block_delta_z = tmp1_z_block;
+
+        // block_delta_y = delta_inv * A * block_delta_x
+        block_t_gemv_t(delta_inv, AT, block_delta_x, 0.0, block_delta_y, block_delta_y);
+        // block_delta_z = G * block_delta_x
+        block_t_gemv_t(1.0, GT, block_delta_x, 0.0, block_delta_z, block_delta_z);
+
+        block_delta_x.load(delta_x);
+        block_delta_y.load(delta_y, AT.perm_inv);
+        block_delta_z.load(delta_z, GT.perm_inv);
+
+        delta_y.noalias() -= delta_inv * rhs_y;
+
+        delta_z.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
+        delta_z.noalias() -= rhs_z_bar;
+
+        for (isize i = 0; i < data.n_lb; i++) {
+            delta_z_lb(i) =
+                    (-data.x_lb_scaling(i) * delta_x(data.x_lb_idx(i)) - rhs_z_lb(i) + m_z_lb_inv(i) * rhs_s_lb(i))
+                    / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
+        }
+        for (isize i = 0; i < data.n_ub; i++) {
+            delta_z_ub(i) =
+                    (data.x_ub_scaling(i) * delta_x(data.x_ub_idx(i)) - rhs_z_ub(i) + m_z_ub_inv(i) * rhs_s_ub(i))
+                    / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
+        }
+
+        delta_s.array() = m_z_inv.array() * (rhs_s.array() - m_s.array() * delta_z.array());
+
+        delta_s_lb.head(data.n_lb).array() = m_z_lb_inv.head(data.n_lb).array()
+                                             * (rhs_s_lb.head(data.n_lb).array() -
+                                                m_s_lb.head(data.n_lb).array() * delta_z_lb.head(data.n_lb).array());
+
+        delta_s_ub.head(data.n_ub).array() = m_z_ub_inv.head(data.n_ub).array()
+                                             * (rhs_s_ub.head(data.n_ub).array() -
+                                                m_s_ub.head(data.n_ub).array() * delta_z_ub.head(data.n_ub).array());
     }
 
 protected:
@@ -1636,6 +1708,100 @@ protected:
         }
     }
 
+    // z = beta * y + alpha * A * x
+    // here it's assumed that the sparsity of the block matrix
+    // is transposed without the blocks individually transposed
+    // A = [A_{1,1}                                                           ]
+    //     [A_{1,2} A_{2,2}                                                   ]
+    //     [        A_{2,3} A_{3,3}                                           ]
+    //     [                A_{3,4} A_{4,4}                        A_{N-2,N-2}]
+    //     [                          ...                          A_{N-2,N-1}]
+    //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}  ]
+    void block_t_gemv_n(double alpha, BlockMat& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
+    {
+        // z = beta * y
+        block_veccpsc(beta, y, z);
+
+        std::size_t N = block_info.size();
+        I arrow_width = block_info.back().width;
+        for (std::size_t i = 0; i < N - 2; i++)
+        {
+            if (sA.D[i]) {
+                int m = sA.D[i]->rows();
+                int n = sA.D[i]->cols();
+                assert(x.x[i].rows() == n && "size mismatch");
+                assert(z.x[i].rows() == m && "size mismatch");
+                // z_i += alpha * D_i * x_i
+                blasfeo_dgemv_n(m, n, alpha, sA.D[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
+            }
+
+            if (sA.B[i]) {
+                int m = sA.B[i]->rows();
+                int n = sA.B[i]->cols();
+                assert(x.x[i].rows() == n && "size mismatch");
+                assert(z.x[i+1].rows() == m && "size mismatch");
+                // z_{i+1} += alpha * B_i * x_i
+                blasfeo_dgemv_n(m, n, alpha, sA.B[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[i+1].ref(), 0, z.x[i+1].ref(), 0);
+            }
+
+            if (arrow_width > 0 && sA.E[i]) {
+                int m = sA.E[i]->rows();
+                int n = sA.E[i]->cols();
+                assert(x.x[i].rows() == n && "size mismatch");
+                assert(z.x[N-1].rows() == m && "size mismatch");
+                // z_{N-1} += alpha * E_i * x_i
+                blasfeo_dgemv_n(m, n, alpha, sA.E[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[N-1].ref(), 0, z.x[N-1].ref(), 0);
+            }
+        }
+    }
+
+    // z = beta * y + alpha * A^T * x
+    // here it's assumed that the sparsity of the block matrix
+    // is transposed without the blocks individually transposed
+    // A = [A_{1,1}                                                           ]
+    //     [A_{1,2} A_{2,2}                                                   ]
+    //     [        A_{2,3} A_{3,3}                                           ]
+    //     [                A_{3,4} A_{4,4}                        A_{N-2,N-2}]
+    //     [                          ...                          A_{N-2,N-1}]
+    //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}  ]
+    void block_t_gemv_t(double alpha, BlockMat& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
+    {
+        // z = beta * y
+        block_veccpsc(beta, y, z);
+
+        std::size_t N = block_info.size();
+        I arrow_width = block_info.back().width;
+        for (std::size_t i = 0; i < N - 2; i++)
+        {
+            if (sA.D[i]) {
+                int m = sA.D[i]->rows();
+                int n = sA.D[i]->cols();
+                assert(x.x[i].rows() == m && "size mismatch");
+                assert(z.x[i].rows() == n && "size mismatch");
+                // z_i += alpha * D_i^T * x_i
+                blasfeo_dgemv_t(m, n, alpha, sA.D[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
+            }
+
+            if (sA.B[i]) {
+                int m = sA.B[i]->rows();
+                int n = sA.B[i]->cols();
+                assert(x.x[i+1].rows() == m && "size mismatch");
+                assert(z.x[i].rows() == n && "size mismatch");
+                // z_i += alpha * B_i^T * x_{i+1}
+                blasfeo_dgemv_t(m, n, alpha, sA.B[i]->ref(), 0, 0, x.x[i+1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
+            }
+
+            if (arrow_width > 0 && sA.E[i]) {
+                int m = sA.E[i]->rows();
+                int n = sA.E[i]->cols();
+                assert(x.x[N-1].rows() == m && "size mismatch");
+                assert(z.x[i].rows() == n && "size mismatch");
+                // z_i += alpha * E_i^T * x_{N-1}
+                blasfeo_dgemv_t(m, n, alpha, sA.E[i]->ref(), 0, 0, x.x[N-1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
+            }
+        }
+    }
+
     // z_n = beta_n * y_n + alpha_n * A * x_n
     // z_t = beta_t * y_t + alpha_t * A^T * x_t
     // here it's assumed that the sparsity of the block matrix
@@ -1649,7 +1815,9 @@ protected:
     void block_t_gemv_nt(double alpha_n, double alpha_t, BlockMat& sA, BlockVec& x_n, BlockVec& x_t,
                        double beta_n, double beta_t, BlockVec& y_n, BlockVec& y_t, BlockVec& z_n, BlockVec& z_t)
     {
+        // z_n = beta_n * y_n
         block_veccpsc(beta_n, y_n, z_n);
+        // z_t = beta_t * y_t
         block_veccpsc(beta_t, y_t, z_t);
 
         std::size_t N = block_info.size();
@@ -1691,6 +1859,104 @@ protected:
                 // z_t_i += alpha_t * E_i^T * x_t_{N-1}
                 blasfeo_dgemv_nt(m, n, alpha_n, alpha_t, sA.E[i]->ref(), 0, 0, x_n.x[i].ref(), 0, x_t.x[N-1].ref(), 0, 1.0, 1.0, z_n.x[N-1].ref(), 0, z_t.x[i].ref(), 0, z_n.x[N-1].ref(), 0, z_t.x[i].ref(), 0);
             }
+        }
+    }
+
+    // solves A * x = b inplace
+    void solve_llt_in_place(BlockVec& b_and_x)
+    {
+        // ----- FORWARD SUBSTITUTION -----
+
+        std::size_t N = block_info.size();
+        I arrow_width = block_info.back().width;
+
+        int m = kkt_factor.D[0]->rows();
+        int n;
+        assert(b_and_x.x[0].rows() == m && "size mismatch");
+        // y_1 = L_1^{-1} * b_1
+        blasfeo_dtrsv_lnn(m, kkt_factor.D[0]->ref(), 0, 0, b_and_x.x[0].ref(), 0, b_and_x.x[0].ref(), 0);
+
+        for (std::size_t i = 1; i < N - 1; i++)
+        {
+            if (kkt_factor.B[i-1]) {
+                m = kkt_factor.D[i]->rows();
+                n = kkt_factor.B[i-1]->cols();
+                assert(kkt_factor.B[i-1]->rows() == m && "size mismatch");
+                assert(b_and_x.x[i-1].rows() == n && "size mismatch");
+                assert(b_and_x.x[i].rows() == m && "size mismatch");
+                // y_i = L_i^{-1} * (b_i - C_{i-1} * y_{i-1})
+                blasfeo_dgemv_n(m, n, -1.0, kkt_factor.B[i-1]->ref(), 0, 0, b_and_x.x[i-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+                blasfeo_dtrsv_lnn(m, kkt_factor.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+            }
+        }
+
+        if (arrow_width > 0)
+        {
+            for (std::size_t i = 0; i < N - 1; i++)
+            {
+                if (kkt_factor.E[i]) {
+                    m = kkt_factor.E[i]->rows();
+                    n = kkt_factor.E[i]->cols();
+                    assert(b_and_x.x[i].rows() == n && "size mismatch");
+                    assert(b_and_x.x[N-1].rows() == m && "size mismatch");
+                    // y_N -= F_i * y_i
+                    blasfeo_dgemv_n(m, n, -1.0, kkt_factor.E[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, 1.0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+                }
+            }
+            m = kkt_factor.D[N-1]->rows();
+            assert(b_and_x.x[N-1].rows() == m && "size mismatch");
+            // y_N = L_N^{-1} * y_N
+            blasfeo_dtrsv_lnn(m, kkt_factor.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+        }
+
+        // ----- BACK SUBSTITUTION -----
+
+        if (arrow_width > 0)
+        {
+            m = kkt_factor.D[N-1]->rows();
+            assert(b_and_x.x[N-1].rows() == m && "size mismatch");
+            // x_N = L_N^{-T} * y_N
+            blasfeo_dtrsv_ltn(m, kkt_factor.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+
+            if (kkt_factor.E[N-2]) {
+                m = kkt_factor.E[N-2]->rows();
+                n = kkt_factor.E[N-2]->cols();
+                assert(b_and_x.x[N-1].rows() == m && "size mismatch");
+                assert(b_and_x.x[N-2].rows() == n && "size mismatch");
+                // x_{N-1} = y_{N-1} - F_{N-1}^T * x_N
+                blasfeo_dgemv_t(m, n, -1.0, kkt_factor.E[N-2]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
+            }
+        }
+
+        m = kkt_factor.D[N-2]->rows();
+        assert(b_and_x.x[N-2].rows() == m && "size mismatch");
+        // x_{N-1} = L_{N-1}^{-T} * x_{N-1}
+        blasfeo_dtrsv_ltn(m, kkt_factor.D[N-2]->ref(), 0, 0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
+
+        for (std::size_t i = N - 2; i--;)
+        {
+            if (kkt_factor.B[i]) {
+                m = kkt_factor.B[i]->rows();
+                n = kkt_factor.B[i]->cols();
+                assert(b_and_x.x[i+1].rows() == m && "size mismatch");
+                assert(b_and_x.x[i].rows() == n && "size mismatch");
+                // x_i = y_i - C_i^T * x_{i+1}
+                blasfeo_dgemv_t(m, n, -1.0, kkt_factor.B[i]->ref(), 0, 0, b_and_x.x[i+1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+            }
+
+            if (kkt_factor.E[i]) {
+                m = kkt_factor.E[i]->rows();
+                n = kkt_factor.E[i]->cols();
+                assert(b_and_x.x[N-1].rows() == m && "size mismatch");
+                assert(b_and_x.x[i].rows() == n && "size mismatch");
+                // x_i -= F_i^T * x_N
+                blasfeo_dgemv_t(m, n, -1.0, kkt_factor.E[i]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+            }
+
+            m = kkt_factor.D[i]->rows();
+            assert(b_and_x.x[i].rows() == m && "size mismatch");
+            // x_i = L_i^{-T} * x_i
+            blasfeo_dtrsv_ltn(m, kkt_factor.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
         }
     }
 };
