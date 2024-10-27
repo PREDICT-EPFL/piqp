@@ -29,8 +29,8 @@ endif()
 
 enable_testing()
 
-# copy maros meszaros data
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/maros_meszaros_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# copy data
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(pipq-test INTERFACE)
 target_include_directories(pipq-test INTERFACE include)
