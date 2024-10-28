@@ -669,6 +669,7 @@ public:
                                     const CVecRef<T>& s, const CVecRef<T>& s_lb, const CVecRef<T>& s_ub,
                                     const CVecRef<T>& z, const CVecRef<T>& z_lb, const CVecRef<T>& z_ub)
     {
+        (void) iterative_refinement;
         assert(!iterative_refinement && "iterative refinement not implemented yet");
 
         m_rho = rho;
