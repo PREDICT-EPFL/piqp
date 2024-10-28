@@ -15,6 +15,7 @@
 #include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
 #include "piqp/kkt_system.hpp"
+#include "piqp/kkt_fwd.hpp"
 #include "piqp/settings.hpp"
 #include "piqp/sparse/data.hpp"
 
@@ -334,6 +335,7 @@ protected:
         Vec<I> perm;
         Vec<I> perm_inv;
         Vec<I> block_row_sizes; // the row size of each block
+        Vec<I> tmp; // temporary matrix for internal calculations
         std::vector<std::unique_ptr<BlasfeoMat>> D; // A_{i,i}
         std::vector<std::unique_ptr<BlasfeoMat>> B; // A_{i,i+1}
         std::vector<std::unique_ptr<BlasfeoMat>> E; // A_{i,N}
@@ -590,7 +592,7 @@ public:
         extract_arrow_structure();
         std::size_t N = block_info.size();
 
-        P = utri_to_kkt(data.P_utri);
+        utri_to_kkt(data.P_utri, P);
         P_diag = BlockVec(block_info);
         // P_diag <= diag(P)
         for (std::size_t i = 0; i < N; i++)
@@ -601,8 +603,8 @@ public:
             }
         }
 
-        AT = transpose_to_block_mat(data.AT, true);
-        GT = transpose_to_block_mat(data.GT, true);
+        transpose_to_block_mat<true>(data.AT, true, AT);
+        transpose_to_block_mat<true>(data.GT, true, GT);
         G_scaling = BlockVec(GT.block_row_sizes);
         GT_scaled = GT;
 
@@ -634,7 +636,32 @@ public:
 
     void update_data(int options)
     {
-        assert(false && "not implemented yet");
+        std::size_t N = block_info.size();
+
+        if (options & KKTUpdateOptions::KKT_UPDATE_P)
+        {
+            utri_to_kkt(data.P_utri, P);
+
+            // P_diag <= diag(P)
+            for (std::size_t i = 0; i < N; i++)
+            {
+                if (P.D[i]) {
+                    assert(P_diag.x[i].rows() == P.D[i]->rows() && "size mismatch");
+                    blasfeo_ddiaex(P_diag.x[i].rows(), 1.0, P.D[i]->ref(), 0, 0, P_diag.x[i].ref(), 0);
+                }
+            }
+        }
+
+        if (options & KKTUpdateOptions::KKT_UPDATE_A)
+        {
+            transpose_to_block_mat<false>(data.AT, true, AT);
+            block_syrk_ln_calc(AT, AT, AtA);
+        }
+
+        if (options & KKTUpdateOptions::KKT_UPDATE_G)
+        {
+            transpose_to_block_mat<false>(data.GT, true, GT);
+        }
     }
 
     bool update_scalings_and_factor(bool iterative_refinement,
@@ -965,12 +992,11 @@ protected:
 //        std::cout << "flops_tridiag: " <<  flops_tridiag << "  flops_arrow: " << flops_arrow << std::endl;
     }
 
-    BlockKKT utri_to_kkt(const SparseMat<T, I>& A_utri)
+    void utri_to_kkt(const SparseMat<T, I>& A_utri, BlockKKT& A_kkt)
     {
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
 
-        BlockKKT A_kkt;
         A_kkt.D.resize(N);
         A_kkt.B.resize(N - 2);
         A_kkt.E.resize(N - 1);
@@ -1004,7 +1030,7 @@ protected:
                 assert(j <= i && "P is not upper triangular");
 
                 // check if on diagonal
-                if (j + block_width > i)
+                if (j >= block_start)
                 {
                     if (!A_kkt.D[block_index]) {
                         A_kkt.D[block_index] = std::make_unique<BlasfeoMat>(block_width, block_width);
@@ -1012,9 +1038,9 @@ protected:
                     BLASFEO_DMATEL(A_kkt.D[block_index]->ref(), i - block_start, j - block_start) = v;
                 }
                 // check if on arrow
-                else if (i + arrow_width > n)
+                else if (i >= n - arrow_width)
                 {
-                    while (current_arrow_block_start < j) {
+                    while (current_arrow_block_start + current_arrow_block_width - 1 < j) {
                         current_arrow_block_index++;
                         current_arrow_block_start = block_info[current_arrow_block_index].start;
                         current_arrow_block_width = block_info[current_arrow_block_index].width;
@@ -1036,25 +1062,28 @@ protected:
                 }
             }
         }
-
-        return A_kkt;
     }
 
-    BlockMat transpose_to_block_mat(const SparseMat<T, I>& sAT, bool store_transpose)
+    template<bool init>
+    void transpose_to_block_mat(const SparseMat<T, I>& sAT, bool store_transpose, BlockMat& A_block)
     {
+        Vec<I>& block_fill_counter = A_block.tmp;
+
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
 
-        BlockMat A_block;
-        A_block.perm.resize(sAT.cols());
-        A_block.perm_inv.resize(sAT.cols());
-        A_block.D.resize(N - 2);
-        A_block.B.resize(N - 2);
-        A_block.E.resize(N - 2);
+        if (init) {
+            A_block.perm.resize(sAT.cols());
+            A_block.perm_inv.resize(sAT.cols());
+            A_block.D.resize(N - 2);
+            A_block.B.resize(N - 2);
+            A_block.E.resize(N - 2);
 
-        // keep track on the current fill status of each block
-        A_block.block_row_sizes.resize(Eigen::Index(N - 2));
-        A_block.block_row_sizes.setZero();
+            // keep track on the current fill status of each block
+            A_block.block_row_sizes.resize(Eigen::Index(N - 2));
+            A_block.block_row_sizes.setZero();
+            block_fill_counter.resize(Eigen::Index(N - 2));
+        }
 
         // Iterating over a csc transposed matrix corresponds
         // to iterating over the rows of the non-transposed matrix.
@@ -1062,27 +1091,31 @@ protected:
         // First pass is to determine the number of rows per block
         Eigen::Index rows = sAT.outerSize(); // rows here corresponds to the non-transposed matrix
         Eigen::Index cols = sAT.innerSize();
-        for (Eigen::Index i = 0; i < rows; i++)
-        {
-            typename SparseMat<T, I>::InnerIterator A_row_it(sAT, i);
-            if (A_row_it)
+        if (init) {
+            for (Eigen::Index i = 0; i < rows; i++)
             {
-                I j = A_row_it.index();
-                std::size_t block_index = 0;
-                // find the corresponding block
-                while (block_info[block_index].start + block_info[block_index].width < j) { block_index++; }
-                A_block.block_row_sizes(Eigen::Index(block_index))++;
+                typename SparseMat<T, I>::InnerIterator A_row_it(sAT, i);
+                if (A_row_it)
+                {
+                    I j = A_row_it.index();
+                    std::size_t block_index = 0;
+                    // find the corresponding block
+                    while (block_info[block_index].start + block_info[block_index].width < j && block_index + 1 < N - 2) { block_index++; }
+                    A_block.block_row_sizes(Eigen::Index(block_index))++;
+                }
             }
         }
 
-        Vec<I> block_row_acc(A_block.block_row_sizes.rows() + 1);
-        block_row_acc[0] = 0;
-        for (Eigen::Index i = 0; i < Eigen::Index(N - 2); i++) {
-            block_row_acc[i + 1] = block_row_acc[i] + A_block.block_row_sizes[i];
+        Vec<I> block_row_acc;
+        if (init) {
+            block_row_acc.resize(A_block.block_row_sizes.rows() + 1);
+            block_row_acc[0] = 0;
+            for (Eigen::Index i = 0; i < Eigen::Index(N - 2); i++) {
+                block_row_acc[i + 1] = block_row_acc[i] + A_block.block_row_sizes[i];
+            }
         }
 
         // keep track on where we are in block
-        Vec<I> block_fill_counter(A_block.block_row_sizes.rows());
         block_fill_counter.setZero();
         I no_block_counter = 0;
 
@@ -1097,12 +1130,16 @@ protected:
             {
                 I j = A_row_it.index();
                 // find the corresponding block
-                while (block_info[block_index].start + block_info[block_index].width < j) { block_index++; }
+                while (block_info[block_index].start + block_info[block_index].width < j && block_index + 1 < N - 2) { block_index++; }
                 block_i = block_fill_counter(Eigen::Index(block_index))++;
-                A_block.perm[i] = block_row_acc[Eigen::Index(block_index)] + block_i;
+                if (init) {
+                    A_block.perm[i] = block_row_acc[Eigen::Index(block_index)] + block_i;
+                }
             } else {
-                // empty rows get put in the back to ensure correct permutation
-                A_block.perm[i] = block_row_acc(A_block.block_row_sizes.rows() + 1) + no_block_counter++;
+                if (init) {
+                    // empty rows get put in the back to ensure correct permutation
+                    A_block.perm[i] = block_row_acc(A_block.block_row_sizes.rows()) + no_block_counter++;
+                }
             }
 
             I block_start = block_info[block_index].start;
@@ -1116,7 +1153,7 @@ protected:
                 // arrow
                 if (j + arrow_width >= cols)
                 {
-                    if (!A_block.E[block_index]) {
+                    if (init && !A_block.E[block_index]) {
                         if (store_transpose) {
                             A_block.E[block_index] = std::make_unique<BlasfeoMat>(arrow_width, A_block.block_row_sizes[Eigen::Index(block_index)]);
                         } else {
@@ -1132,7 +1169,7 @@ protected:
                 // first block
                 else if (j < block_start + block_width)
                 {
-                    if (!A_block.D[block_index]) {
+                    if (init && !A_block.D[block_index]) {
                         if (store_transpose) {
                             A_block.D[block_index] = std::make_unique<BlasfeoMat>(block_width, A_block.block_row_sizes[Eigen::Index(block_index)]);
                         } else {
@@ -1151,7 +1188,7 @@ protected:
                     I next_block_width = block_info[block_index + 1].width;
                     assert(j < block_start + block_width + next_block_width && "indexes in no valid block");
 
-                    if (!A_block.B[block_index]) {
+                    if (init && !A_block.B[block_index]) {
                         if (store_transpose) {
                             A_block.B[block_index] = std::make_unique<BlasfeoMat>(next_block_width, A_block.block_row_sizes[Eigen::Index(block_index)]);
                         } else {
@@ -1167,12 +1204,12 @@ protected:
             }
         }
 
-        for (Eigen::Index i = 0; i < sAT.cols(); i++)
-        {
-            A_block.perm_inv[A_block.perm[i]] = I(i);
+        if (init) {
+            for (Eigen::Index i = 0; i < sAT.cols(); i++)
+            {
+                A_block.perm_inv[A_block.perm[i]] = I(i);
+            }
         }
-
-        return A_block;
     }
 
     void block_syrk_ln_alloc(BlockMat& sA, BlockMat& sB, BlockKKT& sD)
@@ -1192,9 +1229,11 @@ protected:
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
 
-        sD.D.resize(N);
-        sD.B.resize(N - 2);
-        sD.E.resize(N - 1);
+        if (allocate) {
+            sD.D.resize(N);
+            sD.B.resize(N - 2);
+            sD.E.resize(N - 1);
+        }
 
         // ----- DIAGONAL -----
 
@@ -1383,6 +1422,8 @@ protected:
                     kkt_mat.D[i] = std::make_unique<BlasfeoMat>(m, m);
                 }
             } else {
+                kkt_mat.D[i]->setZero();
+
                 // diag(D_i) = diag
                 blasfeo_ddiain(m, 1.0, diag_block.x[i].ref(), 0, kkt_mat.D[i]->ref(), 0, 0);
 
@@ -1426,7 +1467,7 @@ protected:
                     }
                 } else {
                     // B_i += P.B_i
-                    blasfeo_dgead(m, n, 1.0, P.D[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+                    blasfeo_dgead(m, n, 1.0, P.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
                 }
             }
 
