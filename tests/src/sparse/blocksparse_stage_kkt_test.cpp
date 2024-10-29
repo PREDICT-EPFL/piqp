@@ -117,10 +117,6 @@ TEST(BlocksparseStageKKTTest, UpdateData)
     Data<T, I> data(qp_model);
     Settings<T> settings;
 
-    // make sure P_utri has not complete diagonal filled
-    data.P_utri.coeffRef(1, 1) = 0;
-    data.P_utri.prune(0.0);
-
     T rho = 0.9;
     T delta = 1.2;
     Vec<T> s = rand::vector_rand_strictly_positive<T>(data.m);

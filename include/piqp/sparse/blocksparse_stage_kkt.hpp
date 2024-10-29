@@ -521,6 +521,10 @@ protected:
                     other(i++) = BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx);
                 }
             }
+            while (i < other.rows())
+            {
+                other(i++) = 0;
+            }
         }
 
         template <typename Derived>
@@ -534,6 +538,10 @@ protected:
                 {
                     other(perm_inv(i++)) = BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx);
                 }
+            }
+            while (i < other.rows())
+            {
+                other(perm_inv(i++)) = 0;
             }
         }
     };
@@ -1673,13 +1681,21 @@ protected:
 
         for (std::size_t i = 1; i < N - 1; i++)
         {
-            m = kkt_factor.B[i-1]->rows();
-            k = kkt_factor.B[i-1]->cols();
-            assert(kkt_mat.D[i]->rows() == m && kkt_mat.D[i]->cols() == m && "size mismatch");
-            assert(kkt_factor.D[i]->rows() == m && kkt_factor.D[i]->cols() == m && "size mismatch");
-            // L_i = chol(D_i - C_{i-1} * C_{i-1}^T)
-            blasfeo_dsyrk_ln(m, k, -1.0, kkt_factor.B[i-1]->ref(), 0, 0, kkt_factor.B[i-1]->ref(), 0, 0, 1.0, kkt_mat.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
-            blasfeo_dpotrf_l(m, kkt_factor.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
+            if (kkt_factor.B[i-1]) {
+                m = kkt_factor.B[i-1]->rows();
+                k = kkt_factor.B[i-1]->cols();
+                assert(kkt_mat.D[i]->rows() == m && kkt_mat.D[i]->cols() == m && "size mismatch");
+                assert(kkt_factor.D[i]->rows() == m && kkt_factor.D[i]->cols() == m && "size mismatch");
+                // L_i = chol(D_i - C_{i-1} * C_{i-1}^T)
+                blasfeo_dsyrk_ln(m, k, -1.0, kkt_factor.B[i-1]->ref(), 0, 0, kkt_factor.B[i-1]->ref(), 0, 0, 1.0, kkt_mat.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
+                blasfeo_dpotrf_l(m, kkt_factor.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
+            } else {
+                m = kkt_mat.D[i]->rows();
+                assert(kkt_mat.D[i]->rows() == m && "size mismatch");
+                assert(kkt_factor.D[i]->rows() == m && kkt_factor.D[i]->cols() == m && "size mismatch");
+                // L_i = chol(D_i)
+                blasfeo_dpotrf_l(m, kkt_mat.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
+            }
 
             if (i < N - 2 && kkt_mat.B[i]) {
                 m = kkt_mat.B[i]->rows();
