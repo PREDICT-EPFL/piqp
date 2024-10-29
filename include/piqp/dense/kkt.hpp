@@ -46,7 +46,7 @@ protected:
     Mat<T> W_delta_inv_G; // temporary matrix
     Vec<T> rhs_z_bar;     // temporary variable needed for back solve
     Vec<T> rhs;           // stores the rhs
-    Vec<T> sol;           // solution of ldldt back solve
+    Vec<T> sol;           // solution of llt back solve
     Vec<T> err_corr;      // temporary variable to calculate error in iterative refinement and correction term
     Vec<T> ref_sol;       // refined solution
 
