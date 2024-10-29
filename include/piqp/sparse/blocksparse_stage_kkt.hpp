@@ -10,7 +10,12 @@
 
 #include <iostream>
 #include <cstring>
+#include <memory>
 #include "blasfeo.h"
+
+#ifdef PIQP_HAS_OPENMP
+#include "omp.h"
+#endif
 
 #include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
@@ -1236,20 +1241,24 @@ protected:
             sD.E.resize(N - 1);
         }
 
+#ifdef PIQP_HAS_OPENMP
+#pragma omp parallel
+        {
+#endif
+
         // ----- DIAGONAL -----
 
-        // D.D_1 = 0
-        if (!allocate && sD.D[0]) {
-            sD.D[0]->setZero();
-        }
-        for (std::size_t i = 0; i < N - 2; i++)
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for nowait
+#endif
+        for (std::size_t i = 0; i < N - 1; i++)
         {
-            // D.D_{i+1} = 0
-            if (!allocate && sD.D[i+1]) {
-                sD.D[i+1]->setZero();
+            // D_{i,i} = 0
+            if (!allocate && sD.D[i]) {
+                sD.D[i]->setZero();
             }
 
-            if (sA.D[i] && sB.D[i]) {
+            if (i < N - 2 && sA.D[i] && sB.D[i]) {
                 int m = sA.D[i]->rows();
                 int k = sA.D[i]->cols();
                 assert(sB.D[i]->rows() == m && sB.D[i]->cols() == k && "size mismatch");
@@ -1258,29 +1267,33 @@ protected:
                         sD.D[i] = std::make_unique<BlasfeoMat>(m, m);
                     }
                 } else {
-                    // D.D_i += lower triangular of A_{i,i} * B_{i,i}^T
+                    // D_{i,i} += lower triangular of A_{i,i} * B_{i,i}^T
                     blasfeo_dsyrk_ln(m, k, 1.0, sA.D[i]->ref(), 0, 0, sB.D[i]->ref(), 0, 0, 1.0, sD.D[i]->ref(), 0, 0, sD.D[i]->ref(), 0, 0);
                 }
             }
 
-            if (sA.B[i] && sB.B[i]) {
-                int m = sA.B[i]->rows();
-                int k = sA.B[i]->cols();
-                assert(sB.B[i]->rows() == m && sB.B[i]->cols() == k && "size mismatch");
+            if (i > 0 && sA.B[i-1] && sB.B[i-1]) {
+                int m = sA.B[i-1]->rows();
+                int k = sA.B[i-1]->cols();
+                assert(sB.B[i-1]->rows() == m && sB.B[i-1]->cols() == k && "size mismatch");
                 if (allocate) {
-                    if (!sD.D[i+1]) {
-                        sD.D[i+1] = std::make_unique<BlasfeoMat>(m, m);
+                    if (!sD.D[i]) {
+                        sD.D[i] = std::make_unique<BlasfeoMat>(m, m);
                     }
                 } else {
-                    // D.D_{i+1} += lower triangular of A_{i,i} * B_{i,i}^T
-                    blasfeo_dsyrk_ln(m, k, 1.0, sA.B[i]->ref(), 0, 0, sB.B[i]->ref(), 0, 0, 1.0, sD.D[i+1]->ref(), 0, 0, sD.D[i+1]->ref(), 0, 0);
+                    // D_{i,i} += lower triangular of A_{i-1,i} * B_{i-1,i}^T
+                    blasfeo_dsyrk_ln(m, k, 1.0, sA.B[i-1]->ref(), 0, 0, sB.B[i-1]->ref(), 0, 0, 1.0, sD.D[i]->ref(), 0, 0, sD.D[i]->ref(), 0, 0);
                 }
             }
         }
 
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp single nowait
+        {
+#endif
         if (arrow_width > 0)
         {
-            // D.D_N = 0
+            // D_{N,N} = 0
             if (!allocate && sD.D[N-1]) {
                 sD.D[N-1]->setZero();
             }
@@ -1296,15 +1309,22 @@ protected:
                             sD.D[N-1] = std::make_unique<BlasfeoMat>(m, m);
                         }
                     } else {
-                        // D.D_N += lower triangular of A_{i,N} * B_{i,N}^T
+                        // D_{N,N} += lower triangular of A_{i,N} * B_{i,N}^T
                         blasfeo_dsyrk_ln(m, k, 1.0, sA.E[i]->ref(), 0, 0, sB.E[i]->ref(), 0, 0, 1.0, sD.D[N-1]->ref(), 0, 0, sD.D[N-1]->ref(), 0, 0);
                     }
                 }
             }
         }
 
+#ifdef PIQP_HAS_OPENMP
+        } // end of single region
+#endif
+
         // ----- OFF-DIAGONAL -----
 
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for nowait
+#endif
         for (std::size_t i = 0; i < N - 2; i++)
         {
             if (sA.B[i] && sB.D[i]) {
@@ -1317,7 +1337,7 @@ protected:
                         sD.B[i] = std::make_unique<BlasfeoMat>(m, n);
                     }
                 } else {
-                    // D.B_i = A_{i,i+1} * B_{i,i}^T
+                    // D_{i+1,i} = A_{i,i+1} * B_{i,i}^T
                     blasfeo_dgemm_nt(m, n, k, 1.0, sA.B[i]->ref(), 0, 0, sB.D[i]->ref(), 0, 0, 0.0, sD.B[i]->ref(), 0, 0, sD.B[i]->ref(), 0, 0);
                 }
             }
@@ -1327,18 +1347,17 @@ protected:
 
         if (arrow_width > 0)
         {
-            // D.E_1 = 0
-            if (!allocate && sD.E[0]) {
-                sD.E[0]->setZero();
-            }
-            for (std::size_t i = 0; i < N - 2; i++)
+#ifdef PIQP_HAS_OPENMP
+            #pragma omp for nowait
+#endif
+            for (std::size_t i = 0; i < N - 1; i++)
             {
-                // D.E_{i+1} = 0
-                if (!allocate && sD.E[i+1]) {
-                    sD.E[i+1]->setZero();
+                // D_{N,i} = 0
+                if (!allocate && sD.E[i]) {
+                    sD.E[i]->setZero();
                 }
 
-                if (sA.E[i] && sB.D[i]) {
+                if (i < N - 2 && sA.E[i] && sB.D[i]) {
                     int m = sA.E[i]->rows();
                     int n = sB.D[i]->rows();
                     int k = sA.E[i]->cols();
@@ -1348,27 +1367,30 @@ protected:
                             sD.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
-                        // D.E_i += A_{i,N} * B_{i,i}^T
+                        // D_{N,i} += A_{i,N} * B_{i,i}^T
                         blasfeo_dgemm_nt(m, n, k, 1.0, sA.E[i]->ref(), 0, 0, sB.D[i]->ref(), 0, 0, 1.0, sD.E[i]->ref(), 0, 0, sD.E[i]->ref(), 0, 0);
                     }
                 }
 
-                if (sA.E[i] && sB.B[i]) {
-                    int m = sA.E[i]->rows();
-                    int n = sB.B[i]->rows();
-                    int k = sA.E[i]->cols();
-                    assert(sB.B[i]->cols() == k && "size mismatch");
+                if (i > 0 && sA.E[i-1] && sB.B[i-1]) {
+                    int m = sA.E[i-1]->rows();
+                    int n = sB.B[i-1]->rows();
+                    int k = sA.E[i-1]->cols();
+                    assert(sB.B[i-1]->cols() == k && "size mismatch");
                     if (allocate) {
-                        if (!sD.E[i+1]) {
-                            sD.E[i+1] = std::make_unique<BlasfeoMat>(m, n);
+                        if (!sD.E[i]) {
+                            sD.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
-                        // D.E_{i+1} += A_{i,N} * B_{i,i+1}^T
-                        blasfeo_dgemm_nt(m, n, k, 1.0, sA.E[i]->ref(), 0, 0, sB.B[i]->ref(), 0, 0, 1.0, sD.E[i+1]->ref(), 0, 0, sD.E[i+1]->ref(), 0, 0);
+                        // D_{N,i} += A_{i-1,N} * B_{i-1,i}^T
+                        blasfeo_dgemm_nt(m, n, k, 1.0, sA.E[i-1]->ref(), 0, 0, sB.B[i-1]->ref(), 0, 0, 1.0, sD.E[i]->ref(), 0, 0, sD.E[i]->ref(), 0, 0);
                     }
                 }
             }
         }
+#ifdef PIQP_HAS_OPENMP
+        } // end of parallel region
+#endif
     }
 
     void init_kkt_mat()
@@ -1412,8 +1434,16 @@ protected:
             diag_block.assign(diag);
         }
 
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp parallel
+        {
+#endif
+
         // ----- DIAGONAL -----
 
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for nowait
+#endif
         for (std::size_t i = 0; i < N; i++)
         {
             I m = block_info[i].width;
@@ -1450,6 +1480,9 @@ protected:
 
         // ----- OFF-DIAGONAL -----
 
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for nowait
+#endif
         for (std::size_t i = 0; i < N - 2; i++)
         {
             int m = block_info[i + 1].width;
@@ -1501,6 +1534,9 @@ protected:
 
         if (arrow_width > 0)
         {
+#ifdef PIQP_HAS_OPENMP
+            #pragma omp for nowait
+#endif
             for (std::size_t i = 0; i < N - 1; i++)
             {
                 int m = arrow_width;
@@ -1548,6 +1584,10 @@ protected:
                 }
             }
         }
+
+#ifdef PIQP_HAS_OPENMP
+        } // end of parallel region
+#endif
     }
 
     // sD = sA * diag(sB)
@@ -1555,6 +1595,14 @@ protected:
     {
         std::size_t N = block_info.size();
 
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp parallel
+        {
+#endif
+
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for nowait
+#endif
         for (std::size_t i = 0; i < N - 2; i++)
         {
             if (sA.D[i]) {
@@ -1581,6 +1629,10 @@ protected:
                 blasfeo_dgemm_nd(m, n, 1.0, sA.E[i]->ref(), 0, 0, sB.x[i].ref(), 0, 0.0, sD.E[i]->ref(), 0, 0, sD.E[i]->ref(), 0, 0);
             }
         }
+
+#ifdef PIQP_HAS_OPENMP
+        } // end of parallel region
+#endif
     }
 
     void factor_kkt()
@@ -1768,9 +1820,18 @@ protected:
 
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
-        for (std::size_t i = 0; i < N - 2; i++)
+
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp parallel
         {
-            if (sA.D[i]) {
+#endif
+
+#ifdef PIQP_HAS_OPENMP
+#pragma omp for nowait
+#endif
+        for (std::size_t i = 0; i < N - 1; i++)
+        {
+            if (i < N - 2 && sA.D[i]) {
                 int m = sA.D[i]->rows();
                 int n = sA.D[i]->cols();
                 assert(x.x[i].rows() == n && "size mismatch");
@@ -1779,24 +1840,41 @@ protected:
                 blasfeo_dgemv_n(m, n, alpha, sA.D[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
             }
 
-            if (sA.B[i]) {
-                int m = sA.B[i]->rows();
-                int n = sA.B[i]->cols();
-                assert(x.x[i].rows() == n && "size mismatch");
-                assert(z.x[i+1].rows() == m && "size mismatch");
-                // z_{i+1} += alpha * B_i * x_i
-                blasfeo_dgemv_n(m, n, alpha, sA.B[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[i+1].ref(), 0, z.x[i+1].ref(), 0);
-            }
-
-            if (arrow_width > 0 && sA.E[i]) {
-                int m = sA.E[i]->rows();
-                int n = sA.E[i]->cols();
-                assert(x.x[i].rows() == n && "size mismatch");
-                assert(z.x[N-1].rows() == m && "size mismatch");
-                // z_{N-1} += alpha * E_i * x_i
-                blasfeo_dgemv_n(m, n, alpha, sA.E[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[N-1].ref(), 0, z.x[N-1].ref(), 0);
+            if (i > 0 && sA.B[i-1]) {
+                int m = sA.B[i-1]->rows();
+                int n = sA.B[i-1]->cols();
+                assert(x.x[i-1].rows() == n && "size mismatch");
+                assert(z.x[i].rows() == m && "size mismatch");
+                // z_i += alpha * B_{i-1} * x_{i-1}
+                blasfeo_dgemv_n(m, n, alpha, sA.B[i-1]->ref(), 0, 0, x.x[i-1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
             }
         }
+
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp single nowait
+        {
+#endif
+        if (arrow_width > 0)
+        {
+            for (std::size_t i = 0; i < N - 2; i++)
+            {
+                if (sA.E[i]) {
+                    int m = sA.E[i]->rows();
+                    int n = sA.E[i]->cols();
+                    assert(x.x[i].rows() == n && "size mismatch");
+                    assert(z.x[N-1].rows() == m && "size mismatch");
+                    // z_{N-1} += alpha * E_i * x_i
+                    blasfeo_dgemv_n(m, n, alpha, sA.E[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[N-1].ref(), 0, z.x[N-1].ref(), 0);
+                }
+            }
+        }
+#ifdef PIQP_HAS_OPENMP
+        } // end of single region
+#endif
+
+#ifdef PIQP_HAS_OPENMP
+        } // end of parallel region
+#endif
     }
 
     // z = beta * y + alpha * A^T * x
@@ -1815,6 +1893,15 @@ protected:
 
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
+
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp parallel
+        {
+#endif
+
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for nowait
+#endif
         for (std::size_t i = 0; i < N - 2; i++)
         {
             if (sA.D[i]) {
@@ -1844,6 +1931,10 @@ protected:
                 blasfeo_dgemv_t(m, n, alpha, sA.E[i]->ref(), 0, 0, x.x[N-1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
             }
         }
+
+#ifdef PIQP_HAS_OPENMP
+        } // end of parallel region
+#endif
     }
 
     // z_n = beta_n * y_n + alpha_n * A * x_n

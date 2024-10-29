@@ -22,6 +22,7 @@ endif()
 #### Interface options ####
 option(BUILD_WITH_TEMPLATE_INSTANTIATION "Build a shared library with common templates instantiated" ON)
 option(BUILD_WITH_BLASFEO "Build with blasfeo which is required for some kkt solvers" ON)
+option(BUILD_WITH_OPENMP "Build with OpenMP parallelization support" OFF)
 option(BUILD_SHARED_LIBS "Build library as shared." ON)
 option(BUILD_WITH_STD_OPTIONAL "Build using std::optional" OFF)
 option(BUILD_WITH_STD_FILESYSTEM "Build using std::filesystem" OFF)
@@ -183,6 +184,38 @@ if (BUILD_WITH_BLASFEO)
 
     target_compile_definitions(piqp_header_only INTERFACE PIQP_HAS_BLASFEO)
     target_link_libraries(piqp_header_only INTERFACE blasfeo)
+endif ()
+
+if (BUILD_WITH_OPENMP)
+    if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.9.0")
+        find_package(OpenMP)
+    else ()
+        if(NOT TARGET OpenMP::OpenMP_CXX)
+            set(OpenMP_CXX_FLAGS "-fopenmp")
+            set(OpenMP_C_FLAGS "-fopenmp")
+            find_package(Threads REQUIRED)
+            add_library(OpenMP::OpenMP_CXX IMPORTED INTERFACE)
+            set_property(TARGET OpenMP::OpenMP_CXX
+                         PROPERTY INTERFACE_COMPILE_OPTIONS ${OpenMP_CXX_FLAGS})
+            # Only works if the same flag is passed to the linker; use CMake 3.9+ otherwise (Intel, AppleClang)
+            set_property(TARGET OpenMP::OpenMP_CXX
+                         PROPERTY INTERFACE_LINK_LIBRARIES ${OpenMP_CXX_FLAGS} Threads::Threads)
+            set(OpenMP_CXX_FOUND TRUE)
+            set(OpenMP_C_FOUND TRUE)
+        endif ()
+    endif ()
+
+    if (OpenMP_CXX_FOUND AND OpenMP_C_FOUND)
+        message(STATUS "Found OpenMP with OpenMP_CXX_FLAGS: ${OpenMP_CXX_FLAGS}, OpenMP_C_FLAGS: ${OpenMP_C_FLAGS}")
+
+        target_compile_definitions(piqp PUBLIC PIQP_HAS_OPENMP)
+        target_link_libraries(piqp PUBLIC OpenMP::OpenMP_CXX)
+
+        target_compile_definitions(piqp_header_only INTERFACE PIQP_HAS_OPENMP)
+        target_link_libraries(piqp_header_only INTERFACE OpenMP::OpenMP_CXX)
+    else ()
+        message(STATUS "OpenMP NOT found.")
+    endif ()
 endif ()
 
 if (BUILD_WITH_STD_OPTIONAL)
