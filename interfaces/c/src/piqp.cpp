@@ -16,6 +16,32 @@ using CSparseMat = Eigen::SparseMatrix<piqp_float, Eigen::ColMajor, piqp_int>;
 using DenseSolver = piqp::DenseSolver<piqp_float>;
 using SparseSolver = piqp::SparseSolver<piqp_float, piqp_int>;
 
+static piqp_kkt_solver cpp_to_c_kkt_solver(piqp::KKTSolver cpp_kkt_solver)
+{
+    switch (cpp_kkt_solver) {
+        case piqp::KKTSolver::dense_cholesky:
+            return PIQP_DENSE_CHOLESKY;
+        case piqp::KKTSolver::sparse_ldlt:
+            return PIQP_SPARSE_LDLT;
+        case piqp::KKTSolver::blocksparse_stagewise:
+            return PIQP_BLOCKSPARSE_STAGEWISE;
+    }
+    return PIQP_DENSE_CHOLESKY;
+}
+
+static piqp::KKTSolver c_to_cpp_kkt_solver(piqp_kkt_solver c_kkt_solver)
+{
+    switch (c_kkt_solver) {
+        case PIQP_DENSE_CHOLESKY:
+            return piqp::KKTSolver::dense_cholesky;
+        case PIQP_SPARSE_LDLT:
+            return piqp::KKTSolver::sparse_ldlt;
+        case PIQP_BLOCKSPARSE_STAGEWISE:
+            return piqp::KKTSolver::blocksparse_stagewise;
+    }
+    return piqp::KKTSolver::dense_cholesky;
+}
+
 piqp_csc* piqp_csc_matrix(piqp_int m, piqp_int n, piqp_int nnz, piqp_int *p, piqp_int *i, piqp_float *x)
 {
     piqp_csc* matrix = (piqp_csc*) malloc(sizeof(piqp_csc));
@@ -32,7 +58,7 @@ piqp_csc* piqp_csc_matrix(piqp_int m, piqp_int n, piqp_int nnz, piqp_int *p, piq
     return matrix;
 }
 
-void piqp_update_result(piqp_result* result, const piqp::Result<piqp_float>& solver_result)
+static void piqp_update_result(piqp_result* result, const piqp::Result<piqp_float>& solver_result)
 {
     result->x = solver_result.x.data();
     result->y = solver_result.y.data();
@@ -95,6 +121,7 @@ void piqp_set_default_settings(piqp_settings* settings)
     settings->preconditioner_scale_cost = default_settings.preconditioner_scale_cost;
     settings->preconditioner_iter = (piqp_int) default_settings.preconditioner_iter;
     settings->tau = default_settings.tau;
+    settings->kkt_solver = cpp_to_c_kkt_solver(default_settings.kkt_solver);
     settings->iterative_refinement_always_enabled = (piqp_int) default_settings.iterative_refinement_always_enabled;
     settings->iterative_refinement_eps_abs = default_settings.iterative_refinement_eps_abs;
     settings->iterative_refinement_eps_rel = default_settings.iterative_refinement_eps_rel;
@@ -106,7 +133,7 @@ void piqp_set_default_settings(piqp_settings* settings)
     settings->compute_timings = default_settings.compute_timings;
 }
 
-piqp::optional<Eigen::Map<CVec>> piqp_optional_vec_map(piqp_float* data, piqp_int n)
+static piqp::optional<Eigen::Map<CVec>> piqp_optional_vec_map(piqp_float* data, piqp_int n)
 {
     piqp::optional<Eigen::Map<CVec>> vec;
     if (data)
@@ -116,7 +143,7 @@ piqp::optional<Eigen::Map<CVec>> piqp_optional_vec_map(piqp_float* data, piqp_in
     return vec;
 }
 
-piqp::optional<Eigen::Map<CMat>> piqp_optional_mat_map(piqp_float* data, piqp_int m, piqp_int n)
+static piqp::optional<Eigen::Map<CMat>> piqp_optional_mat_map(piqp_float* data, piqp_int m, piqp_int n)
 {
     piqp::optional<Eigen::Map<CMat>> mat;
     if (data)
@@ -126,7 +153,7 @@ piqp::optional<Eigen::Map<CMat>> piqp_optional_mat_map(piqp_float* data, piqp_in
     return mat;
 }
 
-piqp::optional<Eigen::Map<CSparseMat>> piqp_optional_sparse_mat_map(piqp_csc* data)
+static piqp::optional<Eigen::Map<CSparseMat>> piqp_optional_sparse_mat_map(piqp_csc* data)
 {
     piqp::optional<Eigen::Map<CSparseMat>> mat;
     if (data)
@@ -222,6 +249,7 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().preconditioner_scale_cost = settings->preconditioner_scale_cost;
         solver->settings().preconditioner_iter = settings->preconditioner_iter;
         solver->settings().tau = settings->tau;
+        solver->settings().kkt_solver = c_to_cpp_kkt_solver(settings->kkt_solver);
         solver->settings().iterative_refinement_always_enabled = settings->iterative_refinement_always_enabled;
         solver->settings().iterative_refinement_eps_abs = settings->iterative_refinement_eps_abs;
         solver->settings().iterative_refinement_eps_rel = settings->iterative_refinement_eps_rel;
@@ -252,6 +280,7 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().preconditioner_scale_cost = settings->preconditioner_scale_cost;
         solver->settings().preconditioner_iter = settings->preconditioner_iter;
         solver->settings().tau = settings->tau;
+        solver->settings().kkt_solver = c_to_cpp_kkt_solver(settings->kkt_solver);
         solver->settings().iterative_refinement_always_enabled = settings->iterative_refinement_always_enabled;
         solver->settings().iterative_refinement_eps_abs = settings->iterative_refinement_eps_abs;
         solver->settings().iterative_refinement_eps_rel = settings->iterative_refinement_eps_rel;
