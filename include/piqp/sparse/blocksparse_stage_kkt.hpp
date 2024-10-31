@@ -22,6 +22,12 @@
 #include "piqp/kkt_fwd.hpp"
 #include "piqp/settings.hpp"
 #include "piqp/sparse/data.hpp"
+#include "piqp/utils/blasfeo_mat.hpp"
+#include "piqp/utils/blasfeo_vec.hpp"
+#include "piqp/sparse/blocksparse/block_info.hpp"
+#include "piqp/sparse/blocksparse/block_kkt.hpp"
+#include "piqp/sparse/blocksparse/block_mat.hpp"
+#include "piqp/sparse/blocksparse/block_vec.hpp"
 
 namespace piqp
 {
@@ -34,516 +40,6 @@ class BlocksparseStageKKT : public KKTSystem<T>
 {
 protected:
     static_assert(std::is_same<T, double>::value, "blocksparse_stagewise only supports doubles");
-
-    struct BlockInfo
-    {
-        I start;
-        I width;
-    };
-
-    class BlasfeoMat
-    {
-    protected:
-        blasfeo_dmat mat{}; // note that {} initializes all values to zero here
-
-    public:
-        BlasfeoMat() = default;
-
-        BlasfeoMat(int m, int n)
-        {
-            resize(m, n);
-        }
-
-        BlasfeoMat(BlasfeoMat&& other) noexcept
-        {
-            this->mat = other.mat;
-            other.mat.mem = nullptr;
-            other.mat.m = 0;
-            other.mat.n = 0;
-        }
-
-        BlasfeoMat(const BlasfeoMat& other)
-        {
-            if (other.mat.mem) {
-                this->resize(other.rows(), other.cols());
-                // B <= A
-                blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
-            }
-        }
-
-        BlasfeoMat& operator=(BlasfeoMat&& other) noexcept
-        {
-            this->mat = other.mat;
-            other.mat.mem = nullptr;
-            other.mat.m = 0;
-            other.mat.n = 0;
-            return *this;
-        }
-
-        BlasfeoMat& operator=(const BlasfeoMat& other)
-        {
-            if (other.mat.mem) {
-                this->resize(other.rows(), other.cols());
-                // B <= A
-                blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
-            } else {
-                if (mat.mem) {
-                    blasfeo_free_dmat(&mat);
-                    mat.mem = nullptr;
-                }
-                mat.m = 0;
-                mat.n = 0;
-            }
-            return *this;
-        }
-
-        ~BlasfeoMat()
-        {
-            if (mat.mem) {
-                blasfeo_free_dmat(&mat);
-            }
-        }
-
-        int rows() const { return mat.m; }
-
-        int cols() const { return mat.n; }
-
-        void resize(int m, int n)
-        {
-            // reuse memory
-            if (this->rows() == m && this->cols() == n) return;
-
-            if (mat.mem) {
-                blasfeo_free_dmat(&mat);
-            }
-
-            if (m == 0 || n == 0) {
-                mat.mem = nullptr;
-                mat.m = m;
-                mat.n = n;
-                return;
-            }
-
-            blasfeo_allocate_dmat(m, n, &mat);
-            // make sure we don't have corrupted memory
-            // which can result in massive slowdowns
-            // https://github.com/giaf/blasfeo/issues/103
-            setZero();
-        }
-
-        void setZero()
-        {
-            // zero out matrix
-            std::memset(mat.mem, 0, static_cast<std::size_t>(mat.memsize));
-        }
-
-        blasfeo_dmat* ref() { return &mat; }
-    };
-
-    class BlasfeoVec
-    {
-    protected:
-        blasfeo_dvec vec{}; // note that {} initializes all values to zero here
-
-    public:
-        BlasfeoVec() = default;
-
-        explicit BlasfeoVec(int m)
-        {
-            resize(m);
-        }
-
-        BlasfeoVec(BlasfeoVec&& other) noexcept
-        {
-            this->vec = other.vec;
-            other.vec.mem = nullptr;
-            other.vec.m = 0;
-        }
-
-        BlasfeoVec(const BlasfeoVec& other)
-        {
-            if (other.vec.mem) {
-                this->resize(other.rows());
-                // y <= x
-                blasfeo_dveccp(other.rows(), const_cast<BlasfeoVec&>(other).ref(), 0, this->ref(), 0);
-            }
-        }
-
-        BlasfeoVec& operator=(BlasfeoVec&& other) noexcept
-        {
-            this->vec = other.vec;
-            other.vec.mem = nullptr;
-            other.vec.m = 0;
-            return *this;
-        }
-
-        BlasfeoVec& operator=(const BlasfeoVec& other)
-        {
-            if (other.vec.mem) {
-                this->resize(other.rows());
-                // y <= x
-                blasfeo_dveccp(other.rows(), const_cast<BlasfeoVec&>(other).ref(), 0, this->ref(), 0);
-            } else {
-                if (vec.mem) {
-                    blasfeo_free_dvec(&vec);
-                    vec.mem = nullptr;
-                }
-                vec.m = 0;
-            }
-            return *this;
-        }
-
-        ~BlasfeoVec()
-        {
-            if (vec.mem) {
-                blasfeo_free_dvec(&vec);
-            }
-        }
-
-        int rows() const { return vec.m; }
-
-        void resize(int m)
-        {
-            // reuse memory
-            if (this->rows() == m) return;
-
-            if (vec.mem) {
-                blasfeo_free_dvec(&vec);
-            }
-
-            if (m == 0) {
-                vec.mem = nullptr;
-                vec.m = 0;
-                return;
-            }
-
-            blasfeo_allocate_dvec(m, &vec);
-            // make sure we don't have corrupted memory
-            // which can result in massive slowdowns
-            // https://github.com/giaf/blasfeo/issues/103
-            setZero();
-        }
-
-        void setZero()
-        {
-            // zero out vector
-            std::memset(vec.mem, 0, static_cast<std::size_t>(vec.memsize));
-        }
-
-        void setConstant(double c)
-        {
-            blasfeo_dvecse(this->rows(), c, &vec, 0);
-        }
-
-        blasfeo_dvec* ref() { return &vec; }
-    };
-
-    // stores all the data of an arrow KKT structure
-    struct BlockKKT
-    {
-        // [D_1                                  ]
-        // [B_1 D_2                              ]
-        // [    B_2 D_3                          ]
-        // [            ...                      ]
-        // [                B_N-3 D_N-2          ]
-        // [                      B_N-2 D_N-1    ]
-        // [E_1 E_2 E_3 ... E_N-3 E_N-2 E_N-1 D_N]
-
-        std::vector<std::unique_ptr<BlasfeoMat>> D; // lower triangular diagonal
-        std::vector<std::unique_ptr<BlasfeoMat>> B; // off diagonal
-        std::vector<std::unique_ptr<BlasfeoMat>> E; // arrow block
-
-        BlockKKT() = default;
-
-        BlockKKT(BlockKKT&&) = default;
-
-        BlockKKT(const BlockKKT& other)
-        {
-            D.resize(other.D.size());
-            B.resize(other.B.size());
-            E.resize(other.E.size());
-
-            for (std::size_t i = 0; i < other.D.size(); i++) {
-                if (other.D[i]) {
-                    D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
-                }
-            }
-
-            for (std::size_t i = 0; i < other.B.size(); i++) {
-                if (other.B[i]) {
-                    B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
-                }
-            }
-
-            for (std::size_t i = 0; i < other.E.size(); i++) {
-                if (other.E[i]) {
-                    E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
-                }
-            }
-        }
-
-        BlockKKT& operator=(BlockKKT&&) = default;
-
-        BlockKKT& operator=(const BlockKKT& other)
-        {
-            D.resize(other.D.size());
-            B.resize(other.B.size());
-            E.resize(other.E.size());
-
-            for (std::size_t i = 0; i < other.D.size(); i++) {
-                if (other.D[i] && !D[i]) {
-                    D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
-                } else if (other.D[i] && D[i]) {
-                    *D[i] = *other.D[i];
-                } else {
-                    D[i] = nullptr;
-                }
-            }
-
-            for (std::size_t i = 0; i < other.B.size(); i++) {
-                if (other.B[i] && !B[i]) {
-                    B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
-                } else if (other.B[i] && B[i]) {
-                    *B[i] = *other.B[i];
-                } else {
-                    B[i] = nullptr;
-                }
-            }
-
-            for (std::size_t i = 0; i < other.E.size(); i++) {
-                if (other.E[i] && !E[i]) {
-                    E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
-                } else if (other.E[i] && E[i]) {
-                    *E[i] = *other.E[i];
-                } else {
-                    E[i] = nullptr;
-                }
-            }
-
-            return *this;
-        }
-    };
-
-    struct BlockMat
-    {
-        // [A_{1,1} A_{1,2}                                      A_{1,N}  ]
-        // [        A_{2,2} A_{2,3}                              A_{2,N}  ]
-        // [                A_{3,3} A_{3,4}                      A_{3,N}  ]
-        // [                        ...                          ...      ]
-        // [                             A_{N-2,N-2} A_{N-2,N-1} A_{N-2,N}]
-
-        // Row permutation from original matrix to block matrix.
-        // For example, if the original matrix b = A * x, then
-        // b_perm = A_block * x, where b_perm[i] = b[perm[i]] and
-        // b = A_block^T * x_perm, where x_perm[i] = x[perm_inv[i]].
-        Vec<I> perm;
-        Vec<I> perm_inv;
-        Vec<I> block_row_sizes; // the row size of each block
-        Vec<I> tmp; // temporary matrix for internal calculations
-        std::vector<std::unique_ptr<BlasfeoMat>> D; // A_{i,i}
-        std::vector<std::unique_ptr<BlasfeoMat>> B; // A_{i,i+1}
-        std::vector<std::unique_ptr<BlasfeoMat>> E; // A_{i,N}
-
-        BlockMat() = default;
-
-        BlockMat(BlockMat&&) = default;
-
-        BlockMat(const BlockMat& other)
-        {
-            perm = other.perm;
-            perm_inv = other.perm_inv;
-            block_row_sizes = other.block_row_sizes;
-
-            D.resize(other.D.size());
-            B.resize(other.B.size());
-            E.resize(other.E.size());
-
-            for (std::size_t i = 0; i < other.D.size(); i++) {
-                if (other.D[i]) {
-                    D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
-                }
-            }
-
-            for (std::size_t i = 0; i < other.B.size(); i++) {
-                if (other.B[i]) {
-                    B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
-                }
-            }
-
-            for (std::size_t i = 0; i < other.E.size(); i++) {
-                if (other.E[i]) {
-                    E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
-                }
-            }
-        }
-
-        BlockMat& operator=(BlockMat&&) = default;
-
-        BlockMat& operator=(const BlockMat& other)
-        {
-            perm = other.perm;
-            perm_inv = other.perm_inv;
-            block_row_sizes = other.block_row_sizes;
-
-            D.resize(other.D.size());
-            B.resize(other.B.size());
-            E.resize(other.E.size());
-
-            for (std::size_t i = 0; i < other.D.size(); i++) {
-                if (other.D[i] && !D[i]) {
-                    D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
-                } else if (other.D[i] && D[i]) {
-                    *D[i] = *other.D[i];
-                } else {
-                    D[i] = nullptr;
-                }
-            }
-
-            for (std::size_t i = 0; i < other.B.size(); i++) {
-                if (other.B[i] && !B[i]) {
-                    B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
-                } else if (other.B[i] && B[i]) {
-                    *B[i] = *other.B[i];
-                } else {
-                    B[i] = nullptr;
-                }
-            }
-
-            for (std::size_t i = 0; i < other.E.size(); i++) {
-                if (other.E[i] && !E[i]) {
-                    E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
-                } else if (other.E[i] && E[i]) {
-                    *E[i] = *other.E[i];
-                } else {
-                    E[i] = nullptr;
-                }
-            }
-
-            return *this;
-        }
-    };
-
-    struct BlockVec
-    {
-        std::vector<BlasfeoVec> x;
-
-        BlockVec() = default;
-
-        BlockVec(BlockVec&&) = default;
-
-        BlockVec(const BlockVec& other)
-        {
-            x.resize(other.x.size());
-
-            for (std::size_t i = 0; i < other.x.size(); i++) {
-                x[i] = other.x[i];
-            }
-        }
-
-        explicit BlockVec(const std::vector<BlockInfo>& block_info)
-        {
-            std::size_t N = block_info.size();
-            x.resize(N);
-            for (std::size_t i = 0; i < N; i++)
-            {
-                x[i].resize(block_info[i].width);
-            }
-        }
-
-        explicit BlockVec(const Vec<I>& block_info)
-        {
-            std::size_t N = std::size_t(block_info.rows());
-            x.resize(N);
-            for (std::size_t i = 0; i < N; i++)
-            {
-                x[i].resize(block_info[Eigen::Index(i)]);
-            }
-        }
-
-        BlockVec& operator=(BlockVec&&) = default;
-
-        BlockVec& operator=(const BlockVec& other)
-        {
-            x.resize(other.x.size());
-
-            for (std::size_t i = 0; i < other.x.size(); i++) {
-                x[i] = other.x[i];
-            }
-
-            return *this;
-        }
-
-        template <typename Derived>
-        BlockVec& operator=(const Eigen::DenseBase<Derived>& other)
-        {
-            assign(other);
-            return *this;
-        }
-
-        template <typename Derived>
-        void assign(const Eigen::DenseBase<Derived>& other)
-        {
-            Eigen::Index i = 0;
-            for (std::size_t block_idx = 0; block_idx < x.size(); block_idx++)
-            {
-                int block_size = x[block_idx].rows();
-                for (int inner_idx = 0; inner_idx < block_size; inner_idx++)
-                {
-                    BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx) = other(i++);
-                }
-            }
-        }
-
-        template <typename Derived>
-        void assign(const Eigen::DenseBase<Derived>& other, const Vec<I>& perm_inv)
-        {
-            Eigen::Index i = 0;
-            for (std::size_t block_idx = 0; block_idx < x.size(); block_idx++)
-            {
-                int block_size = x[block_idx].rows();
-                for (int inner_idx = 0; inner_idx < block_size; inner_idx++)
-                {
-                    BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx) = other(perm_inv(i++));
-                }
-            }
-        }
-
-        template <typename Derived>
-        void load(Eigen::DenseBase<Derived>& other)
-        {
-            Eigen::Index i = 0;
-            for (std::size_t block_idx = 0; block_idx < x.size(); block_idx++)
-            {
-                int block_size = x[block_idx].rows();
-                for (int inner_idx = 0; inner_idx < block_size; inner_idx++)
-                {
-                    other(i++) = BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx);
-                }
-            }
-            while (i < other.rows())
-            {
-                other(i++) = 0;
-            }
-        }
-
-        template <typename Derived>
-        void load(Eigen::DenseBase<Derived>& other, const Vec<I>& perm_inv)
-        {
-            Eigen::Index i = 0;
-            for (std::size_t block_idx = 0; block_idx < x.size(); block_idx++)
-            {
-                int block_size = x[block_idx].rows();
-                for (int inner_idx = 0; inner_idx < block_size; inner_idx++)
-                {
-                    other(perm_inv(i++)) = BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx);
-                }
-            }
-            while (i < other.rows())
-            {
-                other(perm_inv(i++)) = 0;
-            }
-        }
-    };
 
     const Data<T, I>& data;
     const Settings<T>& settings;
@@ -561,14 +57,14 @@ protected:
     Vec<T> tmp_x;
     Vec<T> tmp_z;
 
-    std::vector<BlockInfo> block_info;
+    std::vector<BlockInfo<I>> block_info;
 
     BlockKKT P;
     BlockVec P_diag;
-    BlockMat AT;
-    BlockMat GT;
+    BlockMat<I> AT;
+    BlockMat<I> GT;
     BlockVec G_scaling;
-    BlockMat GT_scaled;
+    BlockMat<I> GT_scaled;
 
     BlockKKT AtA;
     BlockKKT GtG;
@@ -1078,7 +574,7 @@ protected:
     }
 
     template<bool init>
-    void transpose_to_block_mat(const SparseMat<T, I>& sAT, bool store_transpose, BlockMat& A_block)
+    void transpose_to_block_mat(const SparseMat<T, I>& sAT, bool store_transpose, BlockMat<I>& A_block)
     {
         Vec<I>& block_fill_counter = A_block.tmp;
 
@@ -1225,19 +721,19 @@ protected:
         }
     }
 
-    void block_syrk_ln_alloc(BlockMat& sA, BlockMat& sB, BlockKKT& sD)
+    void block_syrk_ln_alloc(BlockMat<I>& sA, BlockMat<I>& sB, BlockKKT& sD)
     {
         block_syrk_ln<true>(sA, sB, sD);
     }
 
-    void block_syrk_ln_calc(BlockMat& sA, BlockMat& sB, BlockKKT& sD)
+    void block_syrk_ln_calc(BlockMat<I>& sA, BlockMat<I>& sB, BlockKKT& sD)
     {
         block_syrk_ln<false>(sA, sB, sD);
     }
 
     // D += A * B^T
     template<bool allocate>
-    void block_syrk_ln(BlockMat& sA, BlockMat& sB, BlockKKT& sD)
+    void block_syrk_ln(BlockMat<I>& sA, BlockMat<I>& sB, BlockKKT& sD)
     {
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
@@ -1249,7 +745,7 @@ protected:
         }
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+        #pragma omp parallel
         {
 #endif
 
@@ -1598,7 +1094,7 @@ protected:
     }
 
     // sD = sA * diag(sB)
-    void block_gemm_nd(BlockMat& sA, BlockVec& sB, BlockMat& sD)
+    void block_gemm_nd(BlockMat<I>& sA, BlockVec& sB, BlockMat<I>& sD)
     {
         std::size_t N = block_info.size();
 
@@ -1828,7 +1324,7 @@ protected:
     //     [                A_{3,4} A_{4,4}                        A_{N-2,N-2}]
     //     [                          ...                          A_{N-2,N-1}]
     //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}  ]
-    void block_t_gemv_n(double alpha, BlockMat& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
+    void block_t_gemv_n(double alpha, BlockMat<I>& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
     {
         // z = beta * y
         block_veccpsc(beta, y, z);
@@ -1842,7 +1338,7 @@ protected:
 #endif
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp for nowait
+        #pragma omp for nowait
 #endif
         for (std::size_t i = 0; i < N - 1; i++)
         {
@@ -1901,7 +1397,7 @@ protected:
     //     [                A_{3,4} A_{4,4}                        A_{N-2,N-2}]
     //     [                          ...                          A_{N-2,N-1}]
     //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}  ]
-    void block_t_gemv_t(double alpha, BlockMat& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
+    void block_t_gemv_t(double alpha, BlockMat<I>& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
     {
         // z = beta * y
         block_veccpsc(beta, y, z);
@@ -1962,7 +1458,7 @@ protected:
     //     [                A_{3,4} A_{4,4}                        A_{N-2,N-2}]
     //     [                          ...                          A_{N-2,N-1}]
     //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}  ]
-    void block_t_gemv_nt(double alpha_n, double alpha_t, BlockMat& sA, BlockVec& x_n, BlockVec& x_t,
+    void block_t_gemv_nt(double alpha_n, double alpha_t, BlockMat<I>& sA, BlockVec& x_n, BlockVec& x_t,
                          double beta_n, double beta_t, BlockVec& y_n, BlockVec& y_t, BlockVec& z_n, BlockVec& z_t)
     {
         // z_n = beta_n * y_n
