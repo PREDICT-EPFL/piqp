@@ -45,7 +45,7 @@ protected:
         T W_delta_inv = T(1) / (1 + m_delta);
         Eigen::Map<Vec<T>>(GT_W_delta_inv_G.valuePtr(), GT_W_delta_inv_G.nonZeros()).array() *= W_delta_inv;
 
-        tmp_scatter.resize(std::max(A.cols(), G.cols()));
+        tmp_scatter.resize((std::max)(A.cols(), G.cols()));
         tmp_scatter.setZero();
 
         P_utri_to_Ki.resize(data.P_utri.nonZeros());

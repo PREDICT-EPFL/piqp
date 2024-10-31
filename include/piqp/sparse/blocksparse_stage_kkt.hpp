@@ -8,8 +8,7 @@
 #ifndef PIQP_SPARSE_BLOCKSPARSE_STAGE_KKT_HPP
 #define PIQP_SPARSE_BLOCKSPARSE_STAGE_KKT_HPP
 
-#include <iostream>
-#include <cstring>
+#include <cassert>
 #include <memory>
 #include "blasfeo.h"
 
@@ -930,10 +929,10 @@ protected:
                     // calculate new block size
                     I new_block_size = j - current_diag_block_start + 1;
                     // split block size equally into diagonal and off diagonal block
-                    I new_diag_block_size = std::max(current_diag_block_size, (new_block_size + 1) / 2); // round up
-                    I new_off_diag_block_size = std::max(current_off_diag_block_size, new_block_size - new_diag_block_size);
+                    I new_diag_block_size = (std::max)(current_diag_block_size, (new_block_size + 1) / 2); // round up
+                    I new_off_diag_block_size = (std::max)(current_off_diag_block_size, new_block_size - new_diag_block_size);
                     // potential new arrow width
-                    I new_arrow_width = std::max(arrow_width, I(n) - j);
+                    I new_arrow_width = (std::max)(arrow_width, I(n) - j);
 
                     usize flops_tridiag_new = flops_tridiag;
                     // L_i = chol(D_i - C_{i-1} * C_{i-1}^T

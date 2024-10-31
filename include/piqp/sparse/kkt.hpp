@@ -417,22 +417,22 @@ protected:
                 isize last_col_idx = data.P_utri.outerIndexPtr()[col + 1] - 1;
                 if (col_nnz > 0 && data.P_utri.innerIndexPtr()[last_col_idx] == col)
                 {
-                    static_kkt_diag_max = std::max(static_kkt_diag_max, data.P_utri.valuePtr()[last_col_idx]);
+                    static_kkt_diag_max = (std::max)(static_kkt_diag_max, data.P_utri.valuePtr()[last_col_idx]);
                 }
             }
 
             T max_diag = static_kkt_diag_max;
             for (isize i = 0; i < data.m; i++)
             {
-                max_diag = std::max(max_diag, m_z_inv(i) * m_s(i));
+                max_diag = (std::max)(max_diag, m_z_inv(i) * m_s(i));
             }
             for (isize i = 0; i < data.n_lb; i++)
             {
-                max_diag = std::max(max_diag, m_z_lb_inv(i) * m_s_lb(i));
+                max_diag = (std::max)(max_diag, m_z_lb_inv(i) * m_s_lb(i));
             }
             for (isize i = 0; i < data.n_ub; i++)
             {
-                max_diag = std::max(max_diag, m_z_ub_inv(i) * m_s_ub(i));
+                max_diag = (std::max)(max_diag, m_z_ub_inv(i) * m_s_ub(i));
             }
 
             T reg = settings.iterative_refinement_static_regularization_eps + settings.iterative_refinement_static_regularization_rel * max_diag;
@@ -460,13 +460,13 @@ protected:
         }
 
         // regularize diagonal
-        T rho_reg = std::max(T(0), reg - m_rho);
+        T rho_reg = (std::max)(T(0), reg - m_rho);
         for (isize col = 0; col < data.n; col++)
         {
             PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += rho_reg;
         }
 
-        T delta_reg = std::max(T(0), reg - m_delta);
+        T delta_reg = (std::max)(T(0), reg - m_delta);
         for (isize col = data.n; col < n_kkt; col++)
         {
             PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] -= delta_reg;

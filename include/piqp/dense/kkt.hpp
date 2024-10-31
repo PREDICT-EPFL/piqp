@@ -330,15 +330,15 @@ protected:
             T max_diag = static_kkt_diag_max;
             for (isize i = 0; i < data.m; i++)
             {
-                max_diag = std::max(max_diag, m_z_inv(i) * m_s(i));
+                max_diag = (std::max)(max_diag, m_z_inv(i) * m_s(i));
             }
             for (isize i = 0; i < data.n_lb; i++)
             {
-                max_diag = std::max(max_diag, m_z_lb_inv(i) * m_s_lb(i));
+                max_diag = (std::max)(max_diag, m_z_lb_inv(i) * m_s_lb(i));
             }
             for (isize i = 0; i < data.n_ub; i++)
             {
-                max_diag = std::max(max_diag, m_z_ub_inv(i) * m_s_ub(i));
+                max_diag = (std::max)(max_diag, m_z_ub_inv(i) * m_s_ub(i));
             }
 
             T reg = settings.iterative_refinement_static_regularization_eps + settings.iterative_refinement_static_regularization_rel * max_diag;
@@ -361,7 +361,7 @@ protected:
         kkt_diag = kkt_mat.diagonal();
 
         // regularize diagonal
-        T rho_reg = std::max(T(0), reg - m_rho);
+        T rho_reg = (std::max)(T(0), reg - m_rho);
         kkt_mat.diagonal().array() += rho_reg;
     }
 

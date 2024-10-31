@@ -445,7 +445,7 @@ protected:
                 m_result.info.delta *= 100;
                 m_result.info.rho *= 100;
                 m_result.info.factor_retires++;
-                m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.eps_abs);
+                m_result.info.reg_limit = (std::min)(10 * m_result.info.reg_limit, m_settings.eps_abs);
             }
             else
             {
@@ -474,9 +474,9 @@ protected:
         if (m_data.m + m_data.n_lb + m_data.n_ub > 0)
         {
             T s_norm = T(0);
-            s_norm = std::max(s_norm, m_result.s.template lpNorm<Eigen::Infinity>());
-            s_norm = std::max(s_norm, s_lb.template lpNorm<Eigen::Infinity>());
-            s_norm = std::max(s_norm, s_ub.template lpNorm<Eigen::Infinity>());
+            s_norm = (std::max)(s_norm, m_result.s.template lpNorm<Eigen::Infinity>());
+            s_norm = (std::max)(s_norm, s_lb.template lpNorm<Eigen::Infinity>());
+            s_norm = (std::max)(s_norm, s_ub.template lpNorm<Eigen::Infinity>());
             if (s_norm <= 1e-4)
             {
                 // 0.1 is arbitrary
@@ -489,13 +489,13 @@ protected:
             }
 
             T delta_s = T(0);
-            if (m_data.m > 0) delta_s = std::max(delta_s, -T(1.5) * m_result.s.minCoeff());
-            if (m_data.n_lb > 0) delta_s = std::max(delta_s, -T(1.5) * s_lb.minCoeff());
-            if (m_data.n_ub > 0) delta_s = std::max(delta_s, -T(1.5) * s_ub.minCoeff());
+            if (m_data.m > 0) delta_s = (std::max)(delta_s, -T(1.5) * m_result.s.minCoeff());
+            if (m_data.n_lb > 0) delta_s = (std::max)(delta_s, -T(1.5) * s_lb.minCoeff());
+            if (m_data.n_ub > 0) delta_s = (std::max)(delta_s, -T(1.5) * s_ub.minCoeff());
             T delta_z = T(0);
-            if (m_data.m > 0) delta_z = std::max(delta_z, -T(1.5) * m_result.z.minCoeff());
-            if (m_data.n_lb > 0) delta_z = std::max(delta_z, -T(1.5) * z_lb.minCoeff());
-            if (m_data.n_ub > 0) delta_z = std::max(delta_z, -T(1.5) * z_ub.minCoeff());
+            if (m_data.m > 0) delta_z = (std::max)(delta_z, -T(1.5) * m_result.z.minCoeff());
+            if (m_data.n_lb > 0) delta_z = (std::max)(delta_z, -T(1.5) * z_lb.minCoeff());
+            if (m_data.n_ub > 0) delta_z = (std::max)(delta_z, -T(1.5) * z_ub.minCoeff());
             T tmp_prod = (m_result.s.array() + delta_s).matrix().dot((m_result.z.array() + delta_z).matrix());
             tmp_prod += (s_lb.array() + delta_s).matrix().dot((z_lb.array() + delta_z).matrix());
             tmp_prod += (s_ub.array() + delta_s).matrix().dot((z_ub.array() + delta_z).matrix());
@@ -558,7 +558,7 @@ protected:
             rz_lb.head(m_data.n_lb) = rz_lb_nr.head(m_data.n_lb) - m_result.info.delta * (nu_lb.head(m_data.n_lb) - z_lb.head(m_data.n_lb));
             rz_ub.head(m_data.n_ub) = rz_ub_nr.head(m_data.n_ub) - m_result.info.delta * (nu_ub.head(m_data.n_ub) - z_ub.head(m_data.n_ub));
 
-            if (m_result.info.no_dual_update > std::min(isize(5), m_settings.reg_finetune_dual_update_threshold) &&
+            if (m_result.info.no_dual_update > (std::min)(isize(5), m_settings.reg_finetune_dual_update_threshold) &&
                 primal_prox_inf() > 1e12 &&
                 primal_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf)
             {
@@ -566,7 +566,7 @@ protected:
                 return m_result.info.status;
             }
 
-            if (m_result.info.no_primal_update > std::min(isize(5), m_settings.reg_finetune_primal_update_threshold) &&
+            if (m_result.info.no_primal_update > (std::min)(isize(5), m_settings.reg_finetune_primal_update_threshold) &&
                 dual_prox_inf() > 1e12 &&
                 dual_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.dual_rel_inf)
             {
@@ -628,7 +628,7 @@ protected:
                     m_result.info.rho *= 100;
                     m_result.info.iter--;
                     m_result.info.factor_retires++;
-                    m_result.info.reg_limit = std::min(10 * m_result.info.reg_limit, m_settings.eps_abs);
+                    m_result.info.reg_limit = (std::min)(10 * m_result.info.reg_limit, m_settings.eps_abs);
                     continue;
                 }
                 else
@@ -656,33 +656,33 @@ protected:
                 {
                     if (ds(i) < 0)
                     {
-                        alpha_s = std::min(alpha_s, -m_result.s(i) / ds(i));
+                        alpha_s = (std::min)(alpha_s, -m_result.s(i) / ds(i));
                     }
                     if (dz(i) < 0)
                     {
-                        alpha_z = std::min(alpha_z, -m_result.z(i) / dz(i));
+                        alpha_z = (std::min)(alpha_z, -m_result.z(i) / dz(i));
                     }
                 }
                 for (isize i = 0; i < m_data.n_lb; i++)
                 {
                     if (ds_lb(i) < 0)
                     {
-                        alpha_s = std::min(alpha_s, -m_result.s_lb(i) / ds_lb(i));
+                        alpha_s = (std::min)(alpha_s, -m_result.s_lb(i) / ds_lb(i));
                     }
                     if (dz_lb(i) < 0)
                     {
-                        alpha_z = std::min(alpha_z, -m_result.z_lb(i) / dz_lb(i));
+                        alpha_z = (std::min)(alpha_z, -m_result.z_lb(i) / dz_lb(i));
                     }
                 }
                 for (isize i = 0; i < m_data.n_ub; i++)
                 {
                     if (ds_ub(i) < 0)
                     {
-                        alpha_s = std::min(alpha_s, -m_result.s_ub(i) / ds_ub(i));
+                        alpha_s = (std::min)(alpha_s, -m_result.s_ub(i) / ds_ub(i));
                     }
                     if (dz_ub(i) < 0)
                     {
-                        alpha_z = std::min(alpha_z, -m_result.z_ub(i) / dz_ub(i));
+                        alpha_z = (std::min)(alpha_z, -m_result.z_ub(i) / dz_ub(i));
                     }
                 }
                 // avoid getting to close to the boundary
@@ -693,7 +693,7 @@ protected:
                 m_result.info.sigma += (s_lb + alpha_s * ds_lb.head(m_data.n_lb)).dot(z_lb + alpha_z * dz_lb.head(m_data.n_lb));
                 m_result.info.sigma += (s_ub + alpha_s * ds_ub.head(m_data.n_ub)).dot(z_ub + alpha_z * dz_ub.head(m_data.n_ub));
                 m_result.info.sigma /= (m_result.info.mu * T(m_data.m + m_data.n_lb + m_data.n_ub));
-                m_result.info.sigma = std::max(T(0), std::min(T(1), m_result.info.sigma));
+                m_result.info.sigma = (std::max)(T(0), (std::min)(T(1), m_result.info.sigma));
                 m_result.info.sigma = m_result.info.sigma * m_result.info.sigma * m_result.info.sigma;
 
                 // ------------------ corrector step ------------------
@@ -711,33 +711,33 @@ protected:
                 {
                     if (ds(i) < 0)
                     {
-                        alpha_s = std::min(alpha_s, -m_result.s(i) / ds(i));
+                        alpha_s = (std::min)(alpha_s, -m_result.s(i) / ds(i));
                     }
                     if (dz(i) < 0)
                     {
-                        alpha_z = std::min(alpha_z, -m_result.z(i) / dz(i));
+                        alpha_z = (std::min)(alpha_z, -m_result.z(i) / dz(i));
                     }
                 }
                 for (isize i = 0; i < m_data.n_lb; i++)
                 {
                     if (ds_lb(i) < 0)
                     {
-                        alpha_s = std::min(alpha_s, -m_result.s_lb(i) / ds_lb(i));
+                        alpha_s = (std::min)(alpha_s, -m_result.s_lb(i) / ds_lb(i));
                     }
                     if (dz_lb(i) < 0)
                     {
-                        alpha_z = std::min(alpha_z, -m_result.z_lb(i) / dz_lb(i));
+                        alpha_z = (std::min)(alpha_z, -m_result.z_lb(i) / dz_lb(i));
                     }
                 }
                 for (isize i = 0; i < m_data.n_ub; i++)
                 {
                     if (ds_ub(i) < 0)
                     {
-                        alpha_s = std::min(alpha_s, -m_result.s_ub(i) / ds_ub(i));
+                        alpha_s = (std::min)(alpha_s, -m_result.s_ub(i) / ds_ub(i));
                     }
                     if (dz_ub(i) < 0)
                     {
-                        alpha_z = std::min(alpha_z, -m_result.z_ub(i) / dz_ub(i));
+                        alpha_z = (std::min)(alpha_z, -m_result.z_ub(i) / dz_ub(i));
                     }
                 }
                 // avoid getting to close to the boundary
@@ -756,7 +756,7 @@ protected:
 
                 T mu_prev = m_result.info.mu;
                 m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / T(m_data.m + m_data.n_lb + m_data.n_ub);
-                T mu_rate = std::max(T(0), (mu_prev - m_result.info.mu) / mu_prev);
+                T mu_rate = (std::max)(T(0), (mu_prev - m_result.info.mu) / mu_prev);
 
                 // ------------------ update regularization ------------------
                 update_nr_residuals();
@@ -764,12 +764,12 @@ protected:
                 if (dual_inf_nr() < 0.95 * m_result.info.dual_inf || (m_result.info.rho == m_settings.reg_finetune_lower_limit && dual_prox_inf() < 1e2))
                 {
                     m_result.zeta = m_result.x;
-                    m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.rho);
+                    m_result.info.rho = (std::max)(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.rho);
                 }
                 else
                 {
                     m_result.info.no_primal_update++;
-                    m_result.info.rho = std::max(m_result.info.reg_limit, (T(1) - T(0.666) * mu_rate) * m_result.info.rho);
+                    m_result.info.rho = (std::max)(m_result.info.reg_limit, (T(1) - T(0.666) * mu_rate) * m_result.info.rho);
                 }
 
                 if (primal_inf_nr() < 0.95 * m_result.info.primal_inf || (m_result.info.delta == m_settings.reg_finetune_lower_limit && primal_prox_inf() < 1e2))
@@ -778,12 +778,12 @@ protected:
                     m_result.nu = m_result.z;
                     nu_lb = z_lb;
                     nu_ub = z_ub;
-                    m_result.info.delta = std::max(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.delta);
+                    m_result.info.delta = (std::max)(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.delta);
                 }
                 else
                 {
                     m_result.info.no_dual_update++;
-                    m_result.info.delta = std::max(m_result.info.reg_limit, (T(1) - T(0.666) * mu_rate) * m_result.info.delta);
+                    m_result.info.delta = (std::max)(m_result.info.reg_limit, (T(1) - T(0.666) * mu_rate) * m_result.info.delta);
                 }
             }
             else
@@ -803,23 +803,23 @@ protected:
                 if (dual_inf_nr() < 0.95 * m_result.info.dual_inf)
                 {
                     m_result.zeta = m_result.x;
-                    m_result.info.rho = std::max(m_result.info.reg_limit, T(0.1) * m_result.info.rho);
+                    m_result.info.rho = (std::max)(m_result.info.reg_limit, T(0.1) * m_result.info.rho);
                 }
                 else
                 {
                     m_result.info.no_primal_update++;
-                    m_result.info.rho = std::max(m_result.info.reg_limit, T(0.5) * m_result.info.rho);
+                    m_result.info.rho = (std::max)(m_result.info.reg_limit, T(0.5) * m_result.info.rho);
                 }
 
                 if (primal_inf_nr() < 0.95 * m_result.info.primal_inf)
                 {
                     m_result.lambda = m_result.y;
-                    m_result.info.delta = std::max(m_result.info.reg_limit, T(0.1) * m_result.info.delta);
+                    m_result.info.delta = (std::max)(m_result.info.reg_limit, T(0.1) * m_result.info.delta);
                 }
                 else
                 {
                     m_result.info.no_dual_update++;
-                    m_result.info.delta = std::max(m_result.info.reg_limit, T(0.5) * m_result.info.delta);
+                    m_result.info.delta = (std::max)(m_result.info.reg_limit, T(0.5) * m_result.info.delta);
                 }
             }
         }
@@ -844,19 +844,19 @@ protected:
         m_result.info.duality_gap_rel = m_preconditioner.unscale_cost(abs(tmp));
         tmp = m_data.c.dot(m_result.x);
         m_result.info.primal_obj += tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
+        m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
         tmp = m_data.b.dot(m_result.y);
         m_result.info.dual_obj -= tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
+        m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
         tmp = m_data.h.dot(m_result.z);
         m_result.info.dual_obj -= tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
+        m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
         tmp = m_data.x_lb_n.head(m_data.n_lb).dot(m_result.z_lb.head(m_data.n_lb));
         m_result.info.dual_obj -= tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
+        m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
         tmp = m_data.x_ub.head(m_data.n_ub).dot(m_result.z_ub.head(m_data.n_ub));
         m_result.info.dual_obj -= tmp;
-        m_result.info.duality_gap_rel = std::max(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
+        m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
 
         m_result.info.duality_gap = abs(m_result.info.primal_obj - m_result.info.dual_obj);
 
@@ -866,7 +866,7 @@ protected:
 
         // dual residual and infeasibility calculation
         rx_nr.noalias() -= m_data.c;
-        m_result.info.dual_rel_inf = std::max(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(m_data.c).template lpNorm<Eigen::Infinity>());
+        m_result.info.dual_rel_inf = (std::max)(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(m_data.c).template lpNorm<Eigen::Infinity>());
         dx.noalias() = m_data.AT * m_result.y; // use dx as a temporary
         dx.noalias() += m_data.GT * m_result.z;
         for (isize i = 0; i < m_data.n_lb; i++)
@@ -877,64 +877,64 @@ protected:
         {
             dx(m_data.x_ub_idx(i)) += m_data.x_ub_scaling(i) * m_result.z_ub(i);
         }
-        m_result.info.dual_rel_inf = std::max(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(dx).template lpNorm<Eigen::Infinity>());
+        m_result.info.dual_rel_inf = (std::max)(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(dx).template lpNorm<Eigen::Infinity>());
         rx_nr.noalias() -= dx;
 
         // primal residual and infeasibility calculation
         ry_nr.noalias() = -m_data.AT.transpose() * m_result.x;
         m_result.info.primal_rel_inf = m_preconditioner.unscale_primal_res_eq(ry_nr).template lpNorm<Eigen::Infinity>();
         ry_nr.noalias() += m_data.b;
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_eq(m_data.b).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_eq(m_data.b).template lpNorm<Eigen::Infinity>());
 
         rz_nr.noalias() = -m_data.GT.transpose() * m_result.x;
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(rz_nr).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(rz_nr).template lpNorm<Eigen::Infinity>());
         rz_nr.noalias() += m_data.h - m_result.s;
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_data.h).template lpNorm<Eigen::Infinity>());
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_result.s).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_data.h).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_result.s).template lpNorm<Eigen::Infinity>());
 
         for (isize i = 0; i < m_data.n_lb; i++)
         {
             rz_lb_nr(i) = m_data.x_lb_scaling(i) * m_result.x(m_data.x_lb_idx(i));
         }
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_lb(rz_lb_nr.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_lb(rz_lb_nr.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
         rz_lb_nr.head(m_data.n_lb).noalias() += m_data.x_lb_n.head(m_data.n_lb) - m_result.s_lb.head(m_data.n_lb);
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_lb(m_data.x_lb_n.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_lb(m_result.s_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_lb(m_data.x_lb_n.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_lb(m_result.s_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
 
         for (isize i = 0; i < m_data.n_ub; i++)
         {
             rz_ub_nr(i) = -m_data.x_ub_scaling(i) * m_result.x(m_data.x_ub_idx(i));
         }
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ub(rz_ub_nr.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ub(rz_ub_nr.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
         rz_ub_nr.head(m_data.n_ub).noalias() += m_data.x_ub.head(m_data.n_ub) - m_result.s_ub.head(m_data.n_ub);
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ub(m_data.x_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
-        m_result.info.primal_rel_inf = std::max(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ub(m_result.s_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ub(m_data.x_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ub(m_result.s_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
     }
 
     T primal_inf_nr()
     {
         T inf = m_preconditioner.unscale_primal_res_eq(ry_nr).template lpNorm<Eigen::Infinity>();
-        inf = std::max(inf, m_preconditioner.unscale_primal_res_ineq(rz_nr).template lpNorm<Eigen::Infinity>());
-        inf = std::max(inf, m_preconditioner.unscale_primal_res_lb(rz_lb_nr.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
-        inf = std::max(inf, m_preconditioner.unscale_primal_res_ub(rz_ub_nr.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(rz_nr).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_lb(rz_lb_nr.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ub(rz_ub_nr.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
         return inf;
     }
 
     T primal_inf_r()
     {
         T inf = m_preconditioner.unscale_primal_res_eq(ry).template lpNorm<Eigen::Infinity>();
-        inf = std::max(inf, m_preconditioner.unscale_primal_res_ineq(rz).template lpNorm<Eigen::Infinity>());
-        inf = std::max(inf, m_preconditioner.unscale_primal_res_lb(rz_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
-        inf = std::max(inf, m_preconditioner.unscale_primal_res_ub(rz_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(rz).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_lb(rz_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ub(rz_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
         return inf;
     }
 
     T primal_prox_inf()
     {
         T inf = m_preconditioner.unscale_dual_eq(m_result.lambda - m_result.y).template lpNorm<Eigen::Infinity>();
-        inf = std::max(inf, m_preconditioner.unscale_dual_ineq(m_result.nu - m_result.z).template lpNorm<Eigen::Infinity>());
-        inf = std::max(inf, m_preconditioner.unscale_dual_lb(m_result.nu_lb.head(m_data.n_lb) - m_result.z_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
-        inf = std::max(inf, m_preconditioner.unscale_dual_ub(m_result.nu_ub.head(m_data.n_ub) - m_result.z_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_dual_ineq(m_result.nu - m_result.z).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_dual_lb(m_result.nu_lb.head(m_data.n_lb) - m_result.z_lb.head(m_data.n_lb)).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_dual_ub(m_result.nu_ub.head(m_data.n_ub) - m_result.z_ub.head(m_data.n_ub)).template lpNorm<Eigen::Infinity>());
         return inf;
     }
 
