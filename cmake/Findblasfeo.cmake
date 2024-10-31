@@ -8,13 +8,19 @@ mark_as_advanced(blasfeo_INCLUDE_DIR)
 
 # Look for the library.
 find_library(blasfeo_LIBRARY
-  HINTS ${blasfeo_DIR}/lib
+  HINTS ${blasfeo_DIR}/lib  "/opt/blasfeo/lib"
   NAMES blasfeo)
 
 # handle the QUIETLY and REQUIRED arguments and set blasfeo_FOUND to TRUE if
 # all listed variables are TRUE
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(blasfeo DEFAULT_MSG blasfeo_LIBRARY blasfeo_INCLUDE_DIR)
+
+if (NOT blasfeo_FOUND)
+  # try to find blasfeo installed via cmake
+  find_package(blasfeo CONFIG)
+  set(blasfeo_LIBRARIES blasfeo)
+endif ()
 
 if (blasfeo_FOUND)
   message(STATUS "Found blasfeo: ${blasfeo_INCLUDE_DIR}")
