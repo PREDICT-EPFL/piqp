@@ -28,6 +28,8 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - uses: ilammy/msvc-dev-cmd@v1
+
       - uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
@@ -44,6 +46,9 @@ jobs:
           conda install cmake compilers make pkg-config
           # Dependencies
           conda install eigen=${{ matrix.eigen }} libmatio
+
+      - name: Setup external build directory
+        run: mkdir -p build_external
 
       - name: Setup Ninja
         if: runner.os == 'Windows'

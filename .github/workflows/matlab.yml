@@ -34,6 +34,8 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - uses: ilammy/msvc-dev-cmd@v1
+
       - name: Setup external build directory
         run: mkdir -p build_external
 

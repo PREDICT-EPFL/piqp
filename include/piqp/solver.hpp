@@ -10,6 +10,7 @@
 #define PIQP_SOLVER_HPP
 
 #include <cstdio>
+#include <memory>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
