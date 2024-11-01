@@ -89,7 +89,10 @@ To set custom settings, a `piqp_settings` struct has to be instantiated and the 
 ```c
 piqp_settings* settings = (piqp_settings*) malloc(sizeof(piqp_settings));
 
-piqp_set_default_settings(settings);
+// dense interface
+piqp_set_default_settings_dense(settings);
+// sparse interface
+piqp_set_default_settings_sparse(settings);
 settings->verbose = 1;
 settings->compute_timings = 1;
 ```
