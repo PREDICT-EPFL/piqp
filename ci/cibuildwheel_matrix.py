@@ -6,7 +6,7 @@ platforms = [
     ('linux', 'ubuntu-22.04', 'x86_64,i686,aarch64'),
     ('macos', 'macos-12', 'x86_64'),
     ('macos', 'macos-14', 'arm64'),
-    ('windows', 'windows-2022', 'x86,AMD64')
+    ('windows', 'windows-2022', 'AMD64')
 ]
 
 targets = []
@@ -20,10 +20,7 @@ for platform, runner, archs in platforms:
     # group targets by python version
     grouped_targets = {}
     for platform_target in platform_targets:
-        if platform_target.endswith('win32'):
-            arch = 'x86'
-        else:
-            arch = platform_target.split('_', 1)[1]
+        arch = platform_target.split('_', 1)[1]
         if arch not in grouped_targets:
             grouped_targets[arch] = []
         grouped_targets[arch].append(platform_target)
