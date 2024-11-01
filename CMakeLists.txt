@@ -208,8 +208,8 @@ if (BUILD_WITH_BLASFEO)
         create_blasfeo_library(blasfeo_arm64 ${BLASFEO_ARM64_DIR})
     endif ()
 
-    target_compile_definitions(piqp PUBLIC PIQP_HAS_BLASFEO)
-    target_link_libraries(piqp PUBLIC blasfeo)
+    target_compile_definitions(piqp INTERFACE PIQP_HAS_BLASFEO)
+    target_link_libraries(piqp INTERFACE blasfeo)
 
     target_compile_definitions(piqp_header_only INTERFACE PIQP_HAS_BLASFEO)
     target_compile_definitions(piqp_header_only_no_blasfeo_linked INTERFACE PIQP_HAS_BLASFEO)
@@ -238,8 +238,8 @@ if (BUILD_WITH_OPENMP)
     if (OpenMP_CXX_FOUND AND OpenMP_C_FOUND)
         message(STATUS "Found OpenMP with OpenMP_CXX_FLAGS: ${OpenMP_CXX_FLAGS}, OpenMP_C_FLAGS: ${OpenMP_C_FLAGS}")
 
-        target_compile_definitions(piqp PUBLIC PIQP_HAS_OPENMP)
-        target_link_libraries(piqp PUBLIC OpenMP::OpenMP_CXX)
+        target_compile_definitions(piqp INTERFACE PIQP_HAS_OPENMP)
+        target_link_libraries(piqp INTERFACE OpenMP::OpenMP_CXX)
 
         target_compile_definitions(piqp_header_only_no_blasfeo_linked INTERFACE PIQP_HAS_OPENMP)
         target_link_libraries(piqp_header_only_no_blasfeo_linked INTERFACE OpenMP::OpenMP_CXX)
