@@ -39,7 +39,17 @@ jobs:
 
       - name: Install Eigen
         working-directory: build_external
-        run: bash  ../ci/install_eigen.sh
+        run: bash ../ci/install_eigen.sh
+
+      - name: Setup Ninja
+        if: runner.os == 'Windows'
+        uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Install blasfeo
+        working-directory: build_external
+        run: |
+          bash ../ci/download_blasfeo.sh
+          bash ../ci/build_install_blasfeo.sh GENERIC generic
 
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
@@ -51,7 +61,7 @@ jobs:
         with:
           command: cd interfaces/matlab, make_piqp
 
-      - name: Run tests  in MATLAB
+      - name: Run tests in MATLAB
         uses: matlab-actions/run-command@v2
         with:
           command: cd interfaces/matlab, runtest_piqp
