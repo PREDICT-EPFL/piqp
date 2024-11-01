@@ -101,36 +101,45 @@ static void piqp_update_result(piqp_result* result, const piqp::Result<piqp_floa
     result->info.run_time = solver_result.info.run_time;
 }
 
-void piqp_set_default_settings(piqp_settings* settings)
+template<typename Solver>
+static void piqp_set_default_settings(piqp_settings* settings, Solver&& solver)
 {
-    piqp::Settings<piqp_float> default_settings;
+    settings->rho_init = solver.settings().rho_init;
+    settings->delta_init = solver.settings().delta_init;
+    settings->eps_abs = solver.settings().eps_abs;
+    settings->eps_rel = solver.settings().eps_rel;
+    settings->check_duality_gap = solver.settings().check_duality_gap;
+    settings->eps_duality_gap_abs = solver.settings().eps_duality_gap_abs;
+    settings->eps_duality_gap_rel = solver.settings().eps_duality_gap_rel;
+    settings->reg_lower_limit = solver.settings().reg_lower_limit;
+    settings->reg_finetune_lower_limit = solver.settings().reg_finetune_lower_limit;
+    settings->reg_finetune_primal_update_threshold = (piqp_int)  solver.settings().reg_finetune_primal_update_threshold;
+    settings->reg_finetune_dual_update_threshold = (piqp_int)  solver.settings().reg_finetune_dual_update_threshold;
+    settings->max_iter = (piqp_int) solver.settings().max_iter;
+    settings->max_factor_retires = (piqp_int) solver.settings().max_factor_retires;
+    settings->preconditioner_scale_cost = solver.settings().preconditioner_scale_cost;
+    settings->preconditioner_iter = (piqp_int) solver.settings().preconditioner_iter;
+    settings->tau = solver.settings().tau;
+    settings->kkt_solver = cpp_to_c_kkt_solver(solver.settings().kkt_solver);
+    settings->iterative_refinement_always_enabled = (piqp_int) solver.settings().iterative_refinement_always_enabled;
+    settings->iterative_refinement_eps_abs = solver.settings().iterative_refinement_eps_abs;
+    settings->iterative_refinement_eps_rel = solver.settings().iterative_refinement_eps_rel;
+    settings->iterative_refinement_max_iter = (piqp_int) solver.settings().iterative_refinement_max_iter;
+    settings->iterative_refinement_min_improvement_rate = solver.settings().iterative_refinement_min_improvement_rate;
+    settings->iterative_refinement_static_regularization_eps = solver.settings().iterative_refinement_static_regularization_eps;
+    settings->iterative_refinement_static_regularization_rel = solver.settings().iterative_refinement_static_regularization_rel;
+    settings->verbose = solver.settings().verbose;
+    settings->compute_timings = solver.settings().compute_timings;
+}
 
-    settings->rho_init = default_settings.rho_init;
-    settings->delta_init = default_settings.delta_init;
-    settings->eps_abs = default_settings.eps_abs;
-    settings->eps_rel = default_settings.eps_rel;
-    settings->check_duality_gap = default_settings.check_duality_gap;
-    settings->eps_duality_gap_abs = default_settings.eps_duality_gap_abs;
-    settings->eps_duality_gap_rel = default_settings.eps_duality_gap_rel;
-    settings->reg_lower_limit = default_settings.reg_lower_limit;
-    settings->reg_finetune_lower_limit = default_settings.reg_finetune_lower_limit;
-    settings->reg_finetune_primal_update_threshold = (piqp_int)  default_settings.reg_finetune_primal_update_threshold;
-    settings->reg_finetune_dual_update_threshold = (piqp_int)  default_settings.reg_finetune_dual_update_threshold;
-    settings->max_iter = (piqp_int) default_settings.max_iter;
-    settings->max_factor_retires = (piqp_int) default_settings.max_factor_retires;
-    settings->preconditioner_scale_cost = default_settings.preconditioner_scale_cost;
-    settings->preconditioner_iter = (piqp_int) default_settings.preconditioner_iter;
-    settings->tau = default_settings.tau;
-    settings->kkt_solver = cpp_to_c_kkt_solver(default_settings.kkt_solver);
-    settings->iterative_refinement_always_enabled = (piqp_int) default_settings.iterative_refinement_always_enabled;
-    settings->iterative_refinement_eps_abs = default_settings.iterative_refinement_eps_abs;
-    settings->iterative_refinement_eps_rel = default_settings.iterative_refinement_eps_rel;
-    settings->iterative_refinement_max_iter = (piqp_int) default_settings.iterative_refinement_max_iter;
-    settings->iterative_refinement_min_improvement_rate = default_settings.iterative_refinement_min_improvement_rate;
-    settings->iterative_refinement_static_regularization_eps = default_settings.iterative_refinement_static_regularization_eps;
-    settings->iterative_refinement_static_regularization_rel = default_settings.iterative_refinement_static_regularization_rel;
-    settings->verbose = default_settings.verbose;
-    settings->compute_timings = default_settings.compute_timings;
+void piqp_set_default_settings_dense(piqp_settings* settings)
+{
+    piqp_set_default_settings(settings, DenseSolver());
+}
+
+void piqp_set_default_settings_sparse(piqp_settings* settings)
+{
+    piqp_set_default_settings(settings, SparseSolver());
 }
 
 static piqp::optional<Eigen::Map<CVec>> piqp_optional_vec_map(piqp_float* data, piqp_int n)

@@ -42,7 +42,7 @@ TEST(CInterfaceTest, SimpleDenseQPWithUpdate)
     piqp_settings* settings = (piqp_settings*) malloc(sizeof(piqp_settings));
     piqp_data_dense* data = (piqp_data_dense*) malloc(sizeof(piqp_data_dense));
 
-    piqp_set_default_settings(settings);
+    piqp_set_default_settings_dense(settings);
     settings->verbose = 1;
 
     data->n = n;
@@ -135,7 +135,7 @@ TEST(CInterfaceTest, SimpleSparseQPWithUpdate)
     piqp_settings* settings = (piqp_settings*) malloc(sizeof(piqp_settings));
     piqp_data_sparse* data = (piqp_data_sparse*) malloc(sizeof(piqp_data_sparse));
 
-    piqp_set_default_settings(settings);
+    piqp_set_default_settings_sparse(settings);
     settings->verbose = 1;
 
     data->n = n;
