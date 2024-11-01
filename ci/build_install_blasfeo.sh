@@ -15,13 +15,15 @@ echo "Installing blasfeo..."
 cd blasfeo
 mkdir "build_$ARCH_SUFFIX"
 cd "build_$ARCH_SUFFIX"
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBLASFEO_CROSSCOMPILING=ON -DTARGET="$BLASFEO_TARGET" ${3:+-DCMAKE_INSTALL_PREFIX="$3"}
-cmake --build .
 case "$(uname -sr)" in
   CYGWIN*|MINGW*|MINGW32*|MSYS*) # detect windows
+    cmake .. -G"Ninja" -DCMAKE_C_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release -DBLASFEO_CROSSCOMPILING=ON -DTARGET="$BLASFEO_TARGET" -DBLASFEO_REF_API=OFF -DBLAS_API=OFF -DBLASFEO_EXAMPLES=OFF ${3:+-DCMAKE_INSTALL_PREFIX="$3"}
+    cmake --build .
     cmake --install .
     ;;
   *) # other OS
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DBLASFEO_CROSSCOMPILING=ON -DTARGET="$BLASFEO_TARGET" -DBLASFEO_REF_API=OFF -DBLAS_API=OFF -DBLASFEO_EXAMPLES=OFF ${3:+-DCMAKE_INSTALL_PREFIX="$3"}
+    cmake --build .
     if [ "$EUID" -ne 0 ] # check if already root
       then
         sudo cmake --install .
