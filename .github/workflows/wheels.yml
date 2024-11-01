@@ -61,7 +61,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21.3
         env:
-          CIBW_ARCHS: ${{ matrix.target.arch }}
+          CIBW_ARCHS_LINUX: ${{ matrix.target.arch }}
           CIBW_BEFORE_ALL_LINUX: bash ci/cibw_before_all_linux.sh
           CIBW_BEFORE_ALL_WINDOWS: bash ci/cibw_before_all_windows.sh
           CIBW_BEFORE_ALL_MACOS: bash ci/cibw_before_all_macos_${{ runner.os == 'macos-14' && 'arm64' || 'x86_64' }}.sh
