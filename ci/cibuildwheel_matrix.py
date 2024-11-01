@@ -20,14 +20,14 @@ for platform, runner, archs in platforms:
     # group targets by python version
     grouped_targets = {}
     for platform_target in platform_targets:
-        python_version = platform_target.split('-')[0]
-        if python_version not in grouped_targets:
-            grouped_targets[python_version] = []
-        grouped_targets[python_version].append(platform_target)
+        arch = platform_target.split('_')[1]
+        if arch not in grouped_targets:
+            grouped_targets[arch] = []
+        grouped_targets[arch].append(platform_target)
 
-    for python_version, group_targets in grouped_targets.items():
+    for arch, group_targets in grouped_targets.items():
         targets.append({
-            'version': python_version,
+            'arch': arch,
             'os': runner,
             'build': ' '.join(group_targets),
         })
