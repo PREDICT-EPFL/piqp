@@ -2,17 +2,18 @@ import os
 import subprocess
 import json
 
-platforms = ['linux', 'macos', 'windows']
-runners = {
-    'linux': 'ubuntu-22.04',
-    'macos': 'macos-12',
-    'windows': 'windows-2022',
-}
+platforms = [
+    ('linux', 'ubuntu-22.04', 'x86_64,i686,aarch64'),
+    ('macos', 'macos-12', 'x86_64'),
+    ('macos', 'macos-14', 'arm64'),
+    ('windows', 'windows-2022', 'x86,AMD64')
+]
 
 targets = []
-for platform in platforms:
+for platform, runner, archs in platforms:
 
-    platform_targets = subprocess.check_output(['cibuildwheel', '--platform', platform, '--print-build-identifiers'])
+    platform_targets = subprocess.check_output(['cibuildwheel', '--platform', platform, '--archs', archs,
+                                                '--print-build-identifiers'])
     platform_targets = platform_targets.decode('utf-8')
     platform_targets = platform_targets.strip('\n').split('\n')
 
@@ -27,11 +28,11 @@ for platform in platforms:
     for python_version, group_targets in grouped_targets.items():
         targets.append({
             'version': python_version,
-            'os': runners[platform],
+            'os': runner,
             'build': ' '.join(group_targets),
         })
 
-# print('matrix=' + json.dumps({'target': targets}))
+print(targets)
 
 with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
     print('matrix=' + json.dumps({'target': targets}), file=fh)

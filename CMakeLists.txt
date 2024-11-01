@@ -167,22 +167,52 @@ if (BUILD_WITH_TEMPLATE_INSTANTIATION)
     target_compile_options(piqp PRIVATE ${compiler_flags})
     target_link_options(piqp PRIVATE ${compiler_flags})
 
+    create_piqp_library(piqp_header_only_no_blasfeo_linked INTERFACE)
     create_piqp_library(piqp_header_only INTERFACE)
+    target_link_libraries(piqp_header_only INTERFACE piqp_header_only_no_blasfeo_linked)
 else ()
     message(STATUS "Building without template instantiation")
 
     create_piqp_library(piqp INTERFACE)
+    create_piqp_library(piqp_header_only_no_blasfeo_linked INTERFACE)
     create_piqp_library(piqp_header_only INTERFACE)
+    target_link_libraries(piqp_header_only INTERFACE piqp_header_only_no_blasfeo_linked)
 endif ()
+
+function(CREATE_BLASFEO_LIBRARY library_name library_dir)
+    find_library(library_lib NAMES blasfeo HINTS "${library_dir}/lib")
+
+    add_library(${library_name} UNKNOWN IMPORTED)
+    set_target_properties(${library_name} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${library_dir}/include")
+    set_property(TARGET ${library_name} APPEND PROPERTY IMPORTED_LOCATION "${library_lib}")
+
+    message(STATUS "Found ${library_name}: ${library_dir}/include ${library_lib}")
+endfunction()
 
 if (BUILD_WITH_BLASFEO)
     # Find Blasfeo
     find_package(blasfeo REQUIRED)
 
+    # Create architecture specific library for blasfeo.
+    # Used in Python and Matlab interfaces.
+    if (DEFINED BLASFEO_X64_DIR)
+        create_blasfeo_library(blasfeo_x64 ${BLASFEO_X64_DIR})
+    endif ()
+    if (DEFINED BLASFEO_X64_AVX2_DIR)
+        create_blasfeo_library(blasfeo_x64_avx2 ${BLASFEO_X64_AVX2_DIR})
+    endif ()
+    if (DEFINED BLASFEO_X64_AVX512_DIR)
+        create_blasfeo_library(blasfeo_x64_avx512 ${BLASFEO_X64_AVX512_DIR})
+    endif ()
+    if (DEFINED BLASFEO_ARM64_DIR)
+        create_blasfeo_library(blasfeo_arm64 ${BLASFEO_ARM64_DIR})
+    endif ()
+
     target_compile_definitions(piqp PUBLIC PIQP_HAS_BLASFEO)
     target_link_libraries(piqp PUBLIC blasfeo)
 
     target_compile_definitions(piqp_header_only INTERFACE PIQP_HAS_BLASFEO)
+    target_compile_definitions(piqp_header_only_no_blasfeo_linked INTERFACE PIQP_HAS_BLASFEO)
     target_link_libraries(piqp_header_only INTERFACE blasfeo)
 endif ()
 
@@ -211,8 +241,8 @@ if (BUILD_WITH_OPENMP)
         target_compile_definitions(piqp PUBLIC PIQP_HAS_OPENMP)
         target_link_libraries(piqp PUBLIC OpenMP::OpenMP_CXX)
 
-        target_compile_definitions(piqp_header_only INTERFACE PIQP_HAS_OPENMP)
-        target_link_libraries(piqp_header_only INTERFACE OpenMP::OpenMP_CXX)
+        target_compile_definitions(piqp_header_only_no_blasfeo_linked INTERFACE PIQP_HAS_OPENMP)
+        target_link_libraries(piqp_header_only_no_blasfeo_linked INTERFACE OpenMP::OpenMP_CXX)
     else ()
         message(STATUS "OpenMP NOT found.")
     endif ()
@@ -220,16 +250,16 @@ endif ()
 
 if (BUILD_WITH_STD_OPTIONAL)
     target_compile_definitions(piqp INTERFACE PIQP_STD_OPTIONAL)
-    target_compile_definitions(piqp_header_only INTERFACE PIQP_STD_OPTIONAL)
+    target_compile_definitions(piqp_header_only_no_blasfeo_linked INTERFACE PIQP_STD_OPTIONAL)
 endif ()
 if (BUILD_WITH_STD_FILESYSTEM)
     target_compile_definitions(piqp INTERFACE PIQP_STD_FILESYSTEM)
-    target_compile_definitions(piqp_header_only INTERFACE PIQP_STD_FILESYSTEM)
+    target_compile_definitions(piqp_header_only_no_blasfeo_linked INTERFACE PIQP_STD_FILESYSTEM)
 endif ()
 
 if (DEBUG_PRINTS)
     target_compile_definitions(piqp INTERFACE PIQP_DEBUG_PRINT)
-    target_compile_definitions(piqp_header_only INTERFACE PIQP_DEBUG_PRINT)
+    target_compile_definitions(piqp_header_only_no_blasfeo_linked INTERFACE PIQP_DEBUG_PRINT)
 endif ()
 
 add_library(piqp::piqp ALIAS piqp)
@@ -280,7 +310,7 @@ if (ENABLE_INSTALL)
     )
 
     install(
-        TARGETS piqp piqp_header_only
+        TARGETS piqp piqp_header_only_no_blasfeo_linked piqp_header_only
         EXPORT piqpTargets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
