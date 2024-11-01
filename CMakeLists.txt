@@ -180,13 +180,14 @@ else ()
 endif ()
 
 function(CREATE_BLASFEO_LIBRARY library_name library_dir)
-    find_library(library_lib NAMES blasfeo HINTS "${library_dir}/lib")
+    set(lib_var "${library_name}_lib")
+    find_library(${lib_var} NAMES blasfeo HINTS "${library_dir}/lib")
 
     add_library(${library_name} UNKNOWN IMPORTED)
     set_target_properties(${library_name} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${library_dir}/include")
-    set_property(TARGET ${library_name} APPEND PROPERTY IMPORTED_LOCATION "${library_lib}")
+    set_property(TARGET ${library_name} APPEND PROPERTY IMPORTED_LOCATION "${${lib_var}}")
 
-    message(STATUS "Found ${library_name}: ${library_dir}/include ${library_lib}")
+    message(STATUS "Found ${library_name}: ${library_dir}/include ${${lib_var}}")
 endfunction()
 
 if (BUILD_WITH_BLASFEO)
