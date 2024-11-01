@@ -1,12 +1,10 @@
 name: Tests
 
 on:
+  pull_request:
   push:
     branches:
-      - '*'
-  pull_request:
-    branches:
-      - '*'
+      - main
 
 env:
   CMAKE_BUILD_TYPE: Release
