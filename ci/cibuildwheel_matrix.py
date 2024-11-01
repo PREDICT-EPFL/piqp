@@ -20,7 +20,10 @@ for platform, runner, archs in platforms:
     # group targets by python version
     grouped_targets = {}
     for platform_target in platform_targets:
-        arch = platform_target.split('_')[1]
+        if platform_target.endswith('win32'):
+            arch = 'x86'
+        else:
+            arch = platform_target.split('_', 1)[1]
         if arch not in grouped_targets:
             grouped_targets[arch] = []
         grouped_targets[arch].append(platform_target)
