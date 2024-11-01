@@ -52,6 +52,10 @@ jobs:
         with:
           platforms: all
 
+      - name: Setup Ninja
+        if: runner.os == 'Windows'
+        uses: seanmiddleditch/gha-setup-ninja@master
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21.3
         env:
