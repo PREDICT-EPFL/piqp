@@ -956,27 +956,45 @@ protected:
                     kkt_mat.D[i] = std::make_unique<BlasfeoMat>(m, m);
                 }
             } else {
-                kkt_mat.D[i]->setZero();
-
-                // diag(D_i) = diag
-                blasfeo_ddiain(m, 1.0, diag_block.x[i].ref(), 0, kkt_mat.D[i]->ref(), 0, 0);
+                bool mat_set = false;
 
                 if (P.D[i]) {
                     assert(P.D[i]->rows() == m && P.D[i]->cols() == m && "size mismatch");
-                    // D_i += P.D_i
-                    blasfeo_dgead(m, m, 1.0, P.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+                    // D_i = P.D_i, lower triangular
+                    blasfeo_dtrcp_l(m, P.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+                    mat_set = true;
                 }
 
                 if (AtA.D[i]) {
                     assert(AtA.D[i]->rows() == m && AtA.D[i]->cols() == m && "size mismatch");
-                    // D_i += delta^{-1} * AtA.D_i
-                    blasfeo_dgead(m, m, delta_inv, AtA.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+                    if (mat_set) {
+                        // D_i += delta^{-1} * AtA.D_i
+                        blasfeo_dgead(m, m, delta_inv, AtA.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+                    } else {
+                        // D_i = delta^{-1} * AtA.D_i, lower triangular
+                        blasfeo_dtrcpsc_l(m, delta_inv, AtA.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+                        mat_set = true;
+                    }
                 }
 
                 if (GtG.D[i]) {
                     assert(GtG.D[i]->rows() == m && GtG.D[i]->cols() == m && "size mismatch");
-                    // D_i += GtG.D_i
-                    blasfeo_dgead(m, m, 1.0, GtG.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+                    if (mat_set) {
+                        // D_i += GtG.D_i
+                        blasfeo_dgead(m, m, 1.0, GtG.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+                    } else {
+                        // D_i = GtG.D_i, lower triangular
+                        blasfeo_dtrcp_l(m, GtG.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+                        mat_set = true;
+                    }
+                }
+
+                if (mat_set) {
+                    // diag(D_i) += diag
+                    blasfeo_ddiaad(m, 1.0, diag_block.x[i].ref(), 0, kkt_mat.D[i]->ref(), 0, 0);
+                } else {
+                    // diag(D_i) = diag
+                    blasfeo_ddiain(m, 1.0, diag_block.x[i].ref(), 0, kkt_mat.D[i]->ref(), 0, 0);
                 }
             }
         }
@@ -991,10 +1009,7 @@ protected:
             int m = block_info[i + 1].width;
             int n = block_info[i].width;
 
-            // B_i = 0
-            if (!allocate && kkt_mat.B[i]) {
-                kkt_mat.B[i]->setZero();
-            }
+            bool mat_set = false;
 
             if (P.B[i]) {
                 assert(P.B[i]->rows() == m && P.B[i]->cols() == n && "size mismatch");
@@ -1003,8 +1018,9 @@ protected:
                         kkt_mat.B[i] = std::make_unique<BlasfeoMat>(m, n);
                     }
                 } else {
-                    // B_i += P.B_i
-                    blasfeo_dgead(m, n, 1.0, P.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+                    // B_i = P.B_i
+                    blasfeo_dgecp(m, n, P.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+                    mat_set = true;
                 }
             }
 
@@ -1015,8 +1031,14 @@ protected:
                         kkt_mat.B[i] = std::make_unique<BlasfeoMat>(m, n);
                     }
                 } else {
-                    // B_i += delta^{-1} * AtA.B_i
-                    blasfeo_dgead(m, n, delta_inv, AtA.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+                    if (mat_set) {
+                        // B_i += delta^{-1} * AtA.B_i
+                        blasfeo_dgead(m, n, delta_inv, AtA.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+                    } else {
+                        // B_i = delta^{-1} * AtA.B_i
+                        blasfeo_dgecpsc(m, n, delta_inv, AtA.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+                        mat_set = true;
+                    }
                 }
             }
 
@@ -1027,8 +1049,13 @@ protected:
                         kkt_mat.B[i] = std::make_unique<BlasfeoMat>(m, n);
                     }
                 } else {
-                    // B_i += GtG.B_i
-                    blasfeo_dgead(m, n, 1.0, GtG.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+                    if (mat_set) {
+                        // B_i += GtG.B_i
+                        blasfeo_dgead(m, n, 1.0, GtG.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+                    } else {
+                        // B_i = GtG.B_i
+                        blasfeo_dgecp(m, n, GtG.B[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0);
+                    }
                 }
             }
         }
@@ -1045,10 +1072,7 @@ protected:
                 int m = arrow_width;
                 int n = block_info[i].width;
 
-                // E_i = 0
-                if (!allocate && kkt_mat.E[i]) {
-                    kkt_mat.E[i]->setZero();
-                }
+                bool mat_set = false;
 
                 if (P.E[i]) {
                     assert(P.E[i]->rows() == m && P.E[i]->cols() == n && "size mismatch");
@@ -1057,8 +1081,9 @@ protected:
                             kkt_mat.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
-                        // E_i += P.E_i
-                        blasfeo_dgead(m, n, 1.0, P.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                        // E_i = P.E_i
+                        blasfeo_dgecp(m, n, P.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                        mat_set = true;
                     }
                 }
 
@@ -1069,8 +1094,13 @@ protected:
                             kkt_mat.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
-                        // E_i += delta^{-1} * AtA.E_i
-                        blasfeo_dgead(m, n, delta_inv, AtA.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                        if (mat_set) {
+                            // E_i += delta^{-1} * AtA.E_i
+                            blasfeo_dgead(m, n, delta_inv, AtA.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                        } else {
+                            // E_i = delta^{-1} * AtA.E_i
+                            blasfeo_dgecpsc(m, n, delta_inv, AtA.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                        }
                     }
                 }
 
@@ -1081,8 +1111,13 @@ protected:
                             kkt_mat.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
-                        // E_i += GtG.E_i
-                        blasfeo_dgead(m, n, 1.0, GtG.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                        if (mat_set) {
+                            // E_i += GtG.E_i
+                            blasfeo_dgead(m, n, 1.0, GtG.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                        } else {
+                            // E_i = GtG.E_i
+                            blasfeo_dgecp(m, n, GtG.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                        }
                     }
                 }
             }
