@@ -1100,6 +1100,7 @@ protected:
                         } else {
                             // E_i = delta^{-1} * AtA.E_i
                             blasfeo_dgecpsc(m, n, delta_inv, AtA.E[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0);
+                            mat_set = true;
                         }
                     }
                 }
