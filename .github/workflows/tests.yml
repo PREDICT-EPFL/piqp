@@ -45,21 +45,7 @@ jobs:
           # Compiler infrastructure
           conda install cmake compilers make pkg-config
           # Dependencies
-          conda install eigen=${{ matrix.eigen }} libmatio
-
-      - name: Setup external build directory
-        run: mkdir -p build_external
-
-      - name: Setup Ninja
-        if: runner.os == 'Windows'
-        uses: seanmiddleditch/gha-setup-ninja@master
-
-      # replace with conda as soon as https://github.com/giaf/blasfeo/issues/181 is resolved
-      - name: Install blasfeo
-        working-directory: build_external
-        run: |
-          bash ../ci/download_blasfeo.sh
-          bash ../ci/build_install_blasfeo.sh GENERIC generic
+          conda install eigen=${{ matrix.eigen }} libmatio libblasfeo
 
       - name: Setup working directories
         shell: bash -l {0}
