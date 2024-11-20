@@ -972,7 +972,14 @@ protected:
                         blasfeo_dgead(m, m, delta_inv, AtA.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
                     } else {
                         // D_i = delta^{-1} * AtA.D_i, lower triangular
+#ifdef TARGET_X64_INTEL_SKYLAKE_X
+                        // blasfeo_dtrcpsc_l not implemented on Skylake yet
+                        // and reference implementation not exported ...
+                        kkt_mat.D[i]->setZero();
+                        blasfeo_dgead(m, m, delta_inv, AtA.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+#else
                         blasfeo_dtrcpsc_l(m, delta_inv, AtA.D[i]->ref(), 0, 0, kkt_mat.D[i]->ref(), 0, 0);
+#endif
                         mat_set = true;
                     }
                 }
