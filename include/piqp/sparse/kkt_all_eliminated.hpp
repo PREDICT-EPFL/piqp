@@ -19,8 +19,9 @@ namespace sparse
 {
 
 template<typename Derived, typename T, typename I>
-struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
+class KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
 {
+protected:
     SparseMat<T, I> A;
     SparseMat<T, I> G;
     SparseMat<T, I> AT_A;
@@ -44,7 +45,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
         T W_delta_inv = T(1) / (1 + m_delta);
         Eigen::Map<Vec<T>>(GT_W_delta_inv_G.valuePtr(), GT_W_delta_inv_G.nonZeros()).array() *= W_delta_inv;
 
-        tmp_scatter.resize(std::max(A.cols(), G.cols()));
+        tmp_scatter.resize((std::max)(A.cols(), G.cols()));
         tmp_scatter.setZero();
 
         P_utri_to_Ki.resize(data.P_utri.nonZeros());
@@ -165,7 +166,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
         }
     }
 
-    void update_data(int options)
+    void update_data_impl(int options)
     {
         auto& data = static_cast<Derived*>(this)->data;
 
@@ -178,14 +179,6 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_ALL_ELIMINATED>
         if (options & KKTUpdateOptions::KKT_UPDATE_G)
         {
             transpose_no_allocation<T, I>(data.GT, G);
-        }
-
-        if (options != KKTUpdateOptions::KKT_UPDATE_NONE)
-        {
-            update_kkt_cost_scalings();
-            update_kkt_equality_scalings();
-            update_kkt_inequality_scaling();
-            static_cast<Derived*>(this)->update_kkt_box_scalings();
         }
     }
 

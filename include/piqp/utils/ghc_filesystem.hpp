@@ -3002,7 +3002,7 @@ GHC_INLINE int path::compare(const path& p) const noexcept
 #ifdef GHC_OS_WINDOWS
     auto rnc = detail::compare_simple_insensitive(_path.c_str(), rnl1, p._path.c_str(), rnl2);
 #else
-    auto rnc = _path.compare(0, rnl1, p._path, 0, (std::min(rnl1, rnl2)));
+    auto rnc = _path.compare(0, rnl1, p._path, 0, ((std::min)(rnl1, rnl2)));
 #endif
     if (rnc) {
         return rnc;
@@ -4246,7 +4246,7 @@ GHC_INLINE path current_path(std::error_code& ec)
     }
     return path(buffer.get());
 #else
-    size_t pathlen = static_cast<size_t>(std::max(int(::pathconf(".", _PC_PATH_MAX)), int(PATH_MAX)));
+    size_t pathlen = static_cast<size_t>((std::max)(int(::pathconf(".", _PC_PATH_MAX)), int(PATH_MAX)));
     std::unique_ptr<char[]> buffer(new char[pathlen + 1]);
     if (::getcwd(buffer.get(), pathlen) == nullptr) {
         ec = detail::make_system_error();

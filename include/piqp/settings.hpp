@@ -15,6 +15,13 @@
 namespace piqp
 {
 
+enum class KKTSolver
+{
+    dense_cholesky,
+    sparse_ldlt,
+    blocksparse_stagewise
+};
+
 template<typename T>
 struct Settings
 {
@@ -40,6 +47,8 @@ struct Settings
     isize preconditioner_iter = 10;
 
     T tau = 0.99;
+
+    KKTSolver kkt_solver = KKTSolver::dense_cholesky;
 
     bool iterative_refinement_always_enabled = false;
     T iterative_refinement_eps_abs = 1e-12;
