@@ -81,6 +81,12 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("nu_ub", &piqp::Result<T>::nu_ub)
         .def_readwrite("info", &piqp::Result<T>::info);
 
+    py::enum_<piqp::KKTSolver>(m, "KKTSolver")
+            .value("dense_cholesky", piqp::KKTSolver::dense_cholesky)
+            .value("sparse_ldlt", piqp::KKTSolver::sparse_ldlt)
+            .value("blocksparse_stagewise", piqp::KKTSolver::blocksparse_stagewise)
+            .export_values();
+
     py::class_<piqp::Settings<T>>(m, "Settings")
         .def_readwrite("rho_init", &piqp::Settings<T>::rho_init)
         .def_readwrite("delta_init", &piqp::Settings<T>::delta_init)
@@ -98,6 +104,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("preconditioner_scale_cost", &piqp::Settings<T>::preconditioner_scale_cost)
         .def_readwrite("preconditioner_iter", &piqp::Settings<T>::preconditioner_iter)
         .def_readwrite("tau", &piqp::Settings<T>::tau)
+        .def_readwrite("kkt_solver", &piqp::Settings<T>::kkt_solver)
         .def_readwrite("iterative_refinement_always_enabled", &piqp::Settings<T>::iterative_refinement_always_enabled)
         .def_readwrite("iterative_refinement_eps_abs", &piqp::Settings<T>::iterative_refinement_eps_abs)
         .def_readwrite("iterative_refinement_eps_rel", &piqp::Settings<T>::iterative_refinement_eps_rel)
@@ -117,16 +124,18 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              [](SparseSolver &solver,
                 const piqp::SparseMat<T, I>& P,
                 const piqp::CVecRef<T>& c,
-                const piqp::optional<piqp::SparseMat<T, I>>& A,
-                const piqp::optional<piqp::CVecRef<T>>& b,
-                const piqp::optional<piqp::SparseMat<T, I>>& G,
-                const piqp::optional<piqp::CVecRef<T>>& h,
+                const piqp::optional<piqp::SparseMat<T, I>>& A = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& b = piqp::nullopt,
+                const piqp::optional<piqp::SparseMat<T, I>>& G = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& h = piqp::nullopt,
                 const piqp::optional<piqp::CVecRef<T>>& x_lb = piqp::nullopt,
                 const piqp::optional<piqp::CVecRef<T>>& x_ub = piqp::nullopt)
              {
                  solver.setup(P, c, A, b, G, h, x_lb, x_ub);
              },
-             py::arg("P"), py::arg("c"), py::arg("A"), py::arg("b"), py::arg("G"), py::arg("h"),
+             py::arg("P"), py::arg("c"),
+             py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
+             py::arg("G") = piqp::nullopt, py::arg("h") = piqp::nullopt,
              py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt)
         .def("update",
              [](SparseSolver &solver,
