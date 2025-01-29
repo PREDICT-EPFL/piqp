@@ -429,7 +429,8 @@ protected:
                     I new_diag_block_size = (std::max)(current_diag_block_size, (new_block_size + 1) / 2); // round up
                     I new_off_diag_block_size = (std::max)(current_off_diag_block_size, new_block_size - new_diag_block_size);
                     // potential new arrow width
-                    I new_arrow_width = (std::max)(arrow_width, I(n) - j);
+                    I remaining_width = I(n) - current_diag_block_start - current_diag_block_size - current_off_diag_block_size;
+                    I new_arrow_width = (std::min)((std::max)(arrow_width, I(n) - j), remaining_width);
 
                     usize flops_tridiag_new = flops_tridiag;
                     // L_i = chol(D_i - C_{i-1} * C_{i-1}^T
@@ -438,19 +439,23 @@ protected:
                     // C_i = B_i * L_i^{-T}
                     flops_tridiag_new += flops_trsm(static_cast<size_t>(new_diag_block_size), static_cast<size_t>(new_off_diag_block_size));
 
+                    // the dense kernels will use blocks of min width 4
+                    // thus, we calculate the expected flops with arrows which are multiples of 4
+                    I arrow_width_flops = ((arrow_width + 3) / 4) * 4;
+                    I new_arrow_width_flops = ((new_arrow_width + 3) / 4) * 4;
                     // calculate current arrow flop count from normalized counts
-                    usize flops_arrow = static_cast<usize>(arrow_width) * flops_arrow_normalized_no_syrk
-                            + static_cast<usize>(arrow_width) * static_cast<usize>(arrow_width) * flops_arrow_normalized_syrk
-                            + flops_potrf(static_cast<usize>(arrow_width));
+                    usize flops_arrow = static_cast<usize>(arrow_width_flops) * flops_arrow_normalized_no_syrk
+                            + static_cast<usize>(arrow_width_flops) * static_cast<usize>(arrow_width_flops) * flops_arrow_normalized_syrk
+                            + flops_potrf(static_cast<usize>(arrow_width_flops));
                     // calculate new arrow flop count from normalized counts
-                    usize flops_arrow_new = static_cast<usize>(new_arrow_width) * flops_arrow_normalized_no_syrk
-                            + static_cast<usize>(new_arrow_width) * static_cast<usize>(new_arrow_width) * flops_arrow_normalized_syrk;;
+                    usize flops_arrow_new = static_cast<usize>(new_arrow_width_flops) * flops_arrow_normalized_no_syrk
+                            + static_cast<usize>(new_arrow_width_flops) * static_cast<usize>(new_arrow_width_flops) * flops_arrow_normalized_syrk;;
                     // F_i = (E_i - F_{i-1} * C_{i-1}^T) * L_i^{-T}
-                    flops_arrow_new += flops_gemm(static_cast<usize>(new_arrow_width), static_cast<usize>(prev_diag_block_size), static_cast<usize>(new_diag_block_size));
-                    flops_arrow_new += flops_trsm(static_cast<usize>(new_diag_block_size), static_cast<usize>(new_arrow_width));
+                    flops_arrow_new += flops_gemm(static_cast<usize>(new_arrow_width_flops), static_cast<usize>(prev_diag_block_size), static_cast<usize>(new_diag_block_size));
+                    flops_arrow_new += flops_trsm(static_cast<usize>(new_diag_block_size), static_cast<usize>(new_arrow_width_flops));
                     // L_N = chol(D_N - sum F_i * F_i^T)
-                    flops_arrow_new += flops_syrk(static_cast<usize>(new_arrow_width), static_cast<usize>(new_diag_block_size));
-                    flops_arrow_new += flops_potrf(static_cast<usize>(new_arrow_width));
+                    flops_arrow_new += flops_syrk(static_cast<usize>(new_arrow_width_flops), static_cast<usize>(new_diag_block_size));
+                    flops_arrow_new += flops_potrf(static_cast<usize>(new_arrow_width_flops));
 
                     // decide if we accept new diagonal block size or assign it to the arrow
                     if (flops_tridiag_new - flops_tridiag <= flops_arrow_new - flops_arrow) {
@@ -500,6 +505,11 @@ protected:
 //        flops_arrow += flops_potrf(static_cast<usize>(arrow_width));
 //
 //        std::cout << "flops_tridiag: " <<  flops_tridiag << "  flops_arrow: " << flops_arrow << std::endl;
+//
+//        std::size_t N = block_info.size();
+//        for (std::size_t i = 0; i < N; i++) {
+//            std::cout << block_info[i].start << ", " << block_info[i].width << ";" << std::endl;
+//        }
     }
 
     void utri_to_kkt(const SparseMat<T, I>& A_utri, BlockKKT& A_kkt)
@@ -610,7 +620,7 @@ protected:
                     I j = A_row_it.index();
                     std::size_t block_index = 0;
                     // find the corresponding block
-                    while (block_info[block_index].start + block_info[block_index].width < j && block_index + 1 < N - 2) { block_index++; }
+                    while (block_info[block_index].start + block_info[block_index].width <= j && block_index + 1 < N - 2) { block_index++; }
                     A_block.block_row_sizes(Eigen::Index(block_index))++;
                 }
             }
@@ -640,7 +650,7 @@ protected:
             {
                 I j = A_row_it.index();
                 // find the corresponding block
-                while (block_info[block_index].start + block_info[block_index].width < j && block_index + 1 < N - 2) { block_index++; }
+                while (block_info[block_index].start + block_info[block_index].width <= j && block_index + 1 < N - 2) { block_index++; }
                 block_i = block_fill_counter(Eigen::Index(block_index))++;
                 if (init) {
                     A_block.perm[i] = block_row_acc[Eigen::Index(block_index)] + block_i;
