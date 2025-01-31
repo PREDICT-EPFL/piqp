@@ -105,24 +105,25 @@ public:
             piqp_print("----------------------------------------------------------\n");
             piqp_print("                           PIQP                           \n");
             piqp_print("                    (c) Roland Schwan                     \n");
-            piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2024   \n");
+            piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2025   \n");
             piqp_print("----------------------------------------------------------\n");
             if (MatrixType == PIQP_DENSE)
             {
-                piqp_print("dense backend\n");
+                piqp_print("dense backend (%s)\n", kkt_solver_to_string(m_settings.kkt_solver));
                 piqp_print("variables n = %zd\n", m_data.n);
                 piqp_print("equality constraints p = %zd\n", m_data.p);
                 piqp_print("inequality constraints m = %zd\n", m_data.m);
             }
             else
             {
-                piqp_print("sparse backend\n");
+                piqp_print("sparse backend (%s)\n", kkt_solver_to_string(m_settings.kkt_solver));
                 piqp_print("variables n = %zd, nzz(P upper triangular) = %zd\n", m_data.n, m_data.non_zeros_P_utri());
                 piqp_print("equality constraints p = %zd, nnz(A) = %zd\n", m_data.p, m_data.non_zeros_A());
                 piqp_print("inequality constraints m = %zd, nnz(G) = %zd\n", m_data.m, m_data.non_zeros_G());
             }
             piqp_print("variable lower bounds n_lb = %zd\n", m_data.n_lb);
             piqp_print("variable upper bounds n_ub = %zd\n", m_data.n_ub);
+            m_kkt->print_info();
             piqp_print("\n");
             piqp_print("iter  prim_obj       dual_obj       duality_gap   prim_inf      dual_inf      rho         delta       mu          p_step   d_step\n");
         }

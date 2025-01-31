@@ -363,6 +363,16 @@ public:
                                                 m_s_ub.head(data.n_ub).array() * delta_z_ub.head(data.n_ub).array());
     }
 
+    void print_info()
+    {
+        std::size_t N = block_info.size();
+        piqp_print("block sizes:");
+        for (std::size_t i = 0; i < N - 1; i++) {
+            piqp_print(" %zd", block_info[i].width);
+        }
+        piqp_print("\narrow width: %zd\n", block_info[N - 1].width);
+    }
+
 protected:
     // A * B, A \in R^{m x k}, B \in R^{k x m}
     usize flops_gemm(usize m, usize n, usize k)

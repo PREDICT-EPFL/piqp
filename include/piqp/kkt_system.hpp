@@ -39,6 +39,8 @@ public:
                        VecRef<T> delta_x, VecRef<T> delta_y,
                        VecRef<T> delta_z, VecRef<T> delta_z_lb, VecRef<T> delta_z_ub,
                        VecRef<T> delta_s, VecRef<T> delta_s_lb, VecRef<T> delta_s_ub) = 0;
+
+    virtual void print_info() {};
 };
 
 } // namespace piqp

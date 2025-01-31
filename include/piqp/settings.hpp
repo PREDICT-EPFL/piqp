@@ -22,6 +22,17 @@ enum class KKTSolver
     blocksparse_stagewise
 };
 
+constexpr const char* kkt_solver_to_string(KKTSolver kkt_solver)
+{
+    switch (kkt_solver)
+    {
+        case KKTSolver::dense_cholesky: return "dense_cholesky";
+        case KKTSolver::sparse_ldlt: return "sparse_ldlt";
+        case KKTSolver::blocksparse_stagewise: return "blocksparse_stagewise";
+        default: return "unknown";
+    }
+}
+
 template<typename T>
 struct Settings
 {
