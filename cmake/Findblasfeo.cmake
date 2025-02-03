@@ -9,7 +9,7 @@ mark_as_advanced(blasfeo_INCLUDE_DIR)
 # Look for the library.
 find_library(blasfeo_LIBRARY
   HINTS ${blasfeo_DIR}/lib  "/opt/blasfeo/lib"
-  NAMES blasfeo)
+  NAMES libblasfeo.a blasfeo)
 
 # handle the QUIETLY and REQUIRED arguments and set blasfeo_FOUND to TRUE if
 # all listed variables are TRUE
