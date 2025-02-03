@@ -835,8 +835,7 @@ protected:
         using std::abs;
 
         // first part of dual residual and infeasibility calculation (used in cost calculation)
-        rx_nr.noalias() = -m_data.P_utri * m_result.x;
-        rx_nr.noalias() -= m_data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * m_result.x;
+        m_kkt->eval_P_x(T(-1), m_result.x, rx_nr);
         m_result.info.dual_rel_inf = m_preconditioner.unscale_dual_res(rx_nr).template lpNorm<Eigen::Infinity>();
 
         // calculate primal cost, dual cost, and duality gap
@@ -866,11 +865,18 @@ protected:
         m_result.info.dual_obj = m_preconditioner.unscale_cost(m_result.info.dual_obj);
         m_result.info.duality_gap = m_preconditioner.unscale_cost(m_result.info.duality_gap);
 
+        // ry_nr = -A * x
+        // dx = A^T * y, use dx as a temporary
+        m_kkt->eval_A_xn_and_AT_xt(T(-1), T(1), m_result.x, m_result.y, T(0), T(0), ry_nr, dx, ry_nr, dx);
+        // rz_nr = -G * x
+        // dx += G^T * z
+        m_kkt->eval_G_xn_and_GT_xt(T(-1), T(1), m_result.x, m_result.z, T(0), T(1), rz_nr, dx, rz_nr, dx);
+
         // dual residual and infeasibility calculation
         rx_nr.noalias() -= m_data.c;
         m_result.info.dual_rel_inf = (std::max)(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(m_data.c).template lpNorm<Eigen::Infinity>());
-        dx.noalias() = m_data.AT * m_result.y; // use dx as a temporary
-        dx.noalias() += m_data.GT * m_result.z;
+//        dx.noalias() = m_data.AT * m_result.y; // use dx as a temporary
+//        dx.noalias() += m_data.GT * m_result.z;
         for (isize i = 0; i < m_data.n_lb; i++)
         {
             dx(m_data.x_lb_idx(i)) -= m_data.x_lb_scaling(i) * m_result.z_lb(i);
@@ -883,12 +889,12 @@ protected:
         rx_nr.noalias() -= dx;
 
         // primal residual and infeasibility calculation
-        ry_nr.noalias() = -m_data.AT.transpose() * m_result.x;
+//        ry_nr.noalias() = -m_data.AT.transpose() * m_result.x;
         m_result.info.primal_rel_inf = m_preconditioner.unscale_primal_res_eq(ry_nr).template lpNorm<Eigen::Infinity>();
         ry_nr.noalias() += m_data.b;
         m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_eq(m_data.b).template lpNorm<Eigen::Infinity>());
 
-        rz_nr.noalias() = -m_data.GT.transpose() * m_result.x;
+//        rz_nr.noalias() = -m_data.GT.transpose() * m_result.x;
         m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(rz_nr).template lpNorm<Eigen::Infinity>());
         rz_nr.noalias() += m_data.h - m_result.s;
         m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_data.h).template lpNorm<Eigen::Infinity>());

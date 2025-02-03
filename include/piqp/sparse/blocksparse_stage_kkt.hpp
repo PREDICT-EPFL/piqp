@@ -230,7 +230,7 @@ public:
         block_delta_z.assign(delta_z, GT.perm_inv);
 
         // block_rhs_x = P * block_delta_x, P is symmetric and only the lower triangular part of P is accessed
-        block_symv_l(P, block_delta_x, block_rhs_x);
+        block_symv_l(1.0, P, block_delta_x, block_rhs_x);
         // block_rhs_x += AT * block_delta_y
         // block_rhs_y = A * block_delta_x
         block_t_gemv_nt(1.0, 1.0, AT, block_delta_y, block_delta_x, 1.0, 0.0, block_rhs_x, block_rhs_y, block_rhs_x, block_rhs_y);
@@ -239,10 +239,10 @@ public:
         block_t_gemv_nt(1.0, 1.0, GT, block_delta_z, block_delta_x, 1.0, 0.0, block_rhs_x, block_rhs_z, block_rhs_x, block_rhs_z);
 
         rhs_x.setZero();
-        rhs_y.setZero();
-        rhs_z.setZero();
         block_rhs_x.load(rhs_x);
+        rhs_y.setZero();
         block_rhs_y.load(rhs_y, AT.perm_inv);
+        rhs_z.setZero();
         block_rhs_z.load(rhs_z, GT.perm_inv);
 
         rhs_x.noalias() += m_rho * delta_x;
@@ -332,8 +332,11 @@ public:
         // block_delta_z = G * block_delta_x
         block_t_gemv_t(1.0, GT, block_delta_x, 0.0, block_delta_z, block_delta_z);
 
+        delta_x.setZero();
         block_delta_x.load(delta_x);
+        delta_y.setZero();
         block_delta_y.load(delta_y, AT.perm_inv);
+        delta_z.setZero();
         block_delta_z.load(delta_z, GT.perm_inv);
 
         delta_y.noalias() -= delta_inv * rhs_y;
@@ -363,14 +366,70 @@ public:
                                                 m_s_ub.head(data.n_ub).array() * delta_z_ub.head(data.n_ub).array());
     }
 
+    // z = alpha * P * x
+    void eval_P_x(const T& alpha, const CVecRef<T>& x, VecRef<T> z)
+    {
+        BlockVec& block_x = tmp1_x_block;
+        BlockVec& block_z = tmp2_x_block;
+
+        block_x.assign(x);
+        // block_z = alpha * P * block_x, P is symmetric and only the lower triangular part of P is accessed
+        block_symv_l(alpha, P, block_x, block_z);
+
+        z.setZero();
+        block_z.load(z);
+    }
+
+    // zn = beta_n * yn + alpha_n * A * xn, zt = beta_t * yt + alpha_t * A^T * xt
+    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, const T& beta_n, const T& beta_t, const CVecRef<T>& yn, const CVecRef<T>& yt, VecRef<T> zn, VecRef<T> zt)
+    {
+        BlockVec& block_xn = tmp1_x_block;
+        BlockVec& block_xt = tmp1_y_block;
+        BlockVec& block_zn = tmp2_y_block;
+        BlockVec& block_zt = tmp2_x_block;
+
+        block_xn.assign(xn);
+        block_xt.assign(xt, AT.perm_inv);
+
+        // block_zt = alpha_t * AT * block_xt
+        // block_zn = alpha_n * A * block_xn
+        block_t_gemv_nt(alpha_t, alpha_n, AT, block_xt, block_xn, 0.0, 0.0, block_zt, block_zn, block_zt, block_zn);
+
+        zn.noalias() = beta_n * yn;
+        block_zn.load(zn, AT.perm_inv);
+        zt.noalias() = beta_t * yt;
+        block_zt.load(zt);
+    }
+
+    // zn = beta_n * yn + alpha_n * G * xn, zt = beta_t * yt + alpha_t * G^T * xt
+    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, const T& beta_n, const T& beta_t, const CVecRef<T>& yn, const CVecRef<T>& yt, VecRef<T> zn, VecRef<T> zt)
+    {
+        BlockVec& block_xn = tmp1_x_block;
+        BlockVec& block_xt = tmp1_z_block;
+        BlockVec& block_zn = tmp2_z_block;
+        BlockVec& block_zt = tmp2_x_block;
+
+        block_xn.assign(xn);
+        block_xt.assign(xt, GT.perm_inv);
+
+        // block_zt = alpha_t * GT * block_xt
+        // block_zn = alpha_n * G * block_xn
+        block_t_gemv_nt(alpha_t, alpha_n, GT, block_xt, block_xn, 0.0, 0.0, block_zt, block_zn, block_zt, block_zn);
+
+        zn.noalias() = beta_n * yn;
+        block_zn.load(zn, GT.perm_inv);
+        zt.noalias() = beta_t * yt;
+        block_zt.load(zt);
+    }
+
     void print_info()
     {
         std::size_t N = block_info.size();
         piqp_print("block sizes:");
         for (std::size_t i = 0; i < N - 1; i++) {
-            piqp_print(" %zd", block_info[i].width);
+            piqp_print(" %d", block_info[i].width);
         }
-        piqp_print("\narrow width: %zd\n", block_info[N - 1].width);
+        piqp_print("\narrow width: %d\n", block_info[N - 1].width);
     }
 
 protected:
@@ -1278,8 +1337,8 @@ protected:
         blasfeo_dpotrf_l(arrow_width, kkt_factor.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
     }
 
-    // z = sA * x
-    void block_symv_l(BlockKKT& sA, BlockVec& x, BlockVec& z)
+    // z = alpha * sA * x
+    void block_symv_l(double alpha, BlockKKT& sA, BlockVec& x, BlockVec& z)
     {
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
@@ -1289,8 +1348,8 @@ protected:
                 int m = sA.D[i]->rows();
                 assert(x.x[i].rows() == m && "size mismatch");
                 assert(z.x[i].rows() == m && "size mismatch");
-                // z_i = D_i * x_i, D_i is symmetric and only the lower triangular part of D_i is accessed
-                blasfeo_dsymv_l(m, 1.0, sA.D[i]->ref(), 0, 0, x.x[i].ref(), 0, 0.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
+                // z_i = alpha * D_i * x_i, D_i is symmetric and only the lower triangular part of D_i is accessed
+                blasfeo_dsymv_l(m, alpha, sA.D[i]->ref(), 0, 0, x.x[i].ref(), 0, 0.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
             } else {
                 z.x[i].setZero();
             }
@@ -1304,9 +1363,9 @@ protected:
                 assert(x.x[i+1].rows() == m && "size mismatch");
                 assert(z.x[i+1].rows() == m && "size mismatch");
                 assert(z.x[i].rows() == n && "size mismatch");
-                // z_{i+1} += B_i * x_i
-                // z_i += B_i^T * x_{i+1}
-                blasfeo_dgemv_nt(m, n, 1.0, 1.0, sA.B[i]->ref(), 0, 0, x.x[i].ref(), 0, x.x[i+1].ref(), 0, 1.0, 1.0, z.x[i+1].ref(), 0, z.x[i].ref(), 0, z.x[i+1].ref(), 0, z.x[i].ref(), 0);
+                // z_{i+1} += alpha * B_i * x_i
+                // z_i += alpha * B_i^T * x_{i+1}
+                blasfeo_dgemv_nt(m, n, alpha, alpha, sA.B[i]->ref(), 0, 0, x.x[i].ref(), 0, x.x[i+1].ref(), 0, 1.0, 1.0, z.x[i+1].ref(), 0, z.x[i].ref(), 0, z.x[i+1].ref(), 0, z.x[i].ref(), 0);
             }
         }
         if (arrow_width > 0)
@@ -1320,9 +1379,9 @@ protected:
                     assert(z.x[N-1].rows() == m && "size mismatch");
                     assert(x.x[N-1].rows() == m && "size mismatch");
                     assert(z.x[i].rows() == n && "size mismatch");
-                    // z_{N-1} += E_i * x_i
-                    // z_i += E_i^T * x_{N-1}
-                    blasfeo_dgemv_nt(m, n, 1.0, 1.0, sA.E[i]->ref(), 0, 0, x.x[i].ref(), 0, x.x[N-1].ref(), 0, 1.0, 1.0, z.x[N-1].ref(), 0, z.x[i].ref(), 0, z.x[N-1].ref(), 0, z.x[i].ref(), 0);
+                    // z_{N-1} += alpha * E_i * x_i
+                    // z_i += alpha * E_i^T * x_{N-1}
+                    blasfeo_dgemv_nt(m, n, alpha, alpha, sA.E[i]->ref(), 0, 0, x.x[i].ref(), 0, x.x[N-1].ref(), 0, 1.0, 1.0, z.x[N-1].ref(), 0, z.x[i].ref(), 0, z.x[N-1].ref(), 0, z.x[i].ref(), 0);
                 }
             }
         }
