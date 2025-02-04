@@ -28,7 +28,7 @@ using T = double;
 using I = int;
 
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
-    py::enum_<piqp::Status>(m, "Status")
+    py::enum_<piqp::Status>(m, "Status", py::module_local())
         .value("PIQP_SOLVED", piqp::Status::PIQP_SOLVED)
         .value("PIQP_MAX_ITER_REACHED", piqp::Status::PIQP_MAX_ITER_REACHED)
         .value("PIQP_PRIMAL_INFEASIBLE", piqp::Status::PIQP_PRIMAL_INFEASIBLE)
@@ -38,7 +38,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .value("PIQP_INVALID_SETTINGS", piqp::Status::PIQP_INVALID_SETTINGS)
         .export_values();
 
-    py::class_<piqp::Info<T>>(m, "Info")
+    py::class_<piqp::Info<T>>(m, "Info", py::module_local())
         .def(py::init<>())
         .def_readwrite("status", &piqp::Info<T>::status)
         .def_readwrite("iter", &piqp::Info<T>::iter)
@@ -65,7 +65,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("solve_time", &piqp::Info<T>::solve_time)
         .def_readwrite("run_time", &piqp::Info<T>::run_time);
 
-    py::class_<piqp::Result<T>>(m, "Result")
+    py::class_<piqp::Result<T>>(m, "Result", py::module_local())
         .def_readwrite("x", &piqp::Result<T>::x)
         .def_readwrite("y", &piqp::Result<T>::y)
         .def_readwrite("z", &piqp::Result<T>::z)
@@ -81,13 +81,13 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("nu_ub", &piqp::Result<T>::nu_ub)
         .def_readwrite("info", &piqp::Result<T>::info);
 
-    py::enum_<piqp::KKTSolver>(m, "KKTSolver")
+    py::enum_<piqp::KKTSolver>(m, "KKTSolver", py::module_local())
             .value("dense_cholesky", piqp::KKTSolver::dense_cholesky)
             .value("sparse_ldlt", piqp::KKTSolver::sparse_ldlt)
             .value("blocksparse_stagewise", piqp::KKTSolver::blocksparse_stagewise)
             .export_values();
 
-    py::class_<piqp::Settings<T>>(m, "Settings")
+    py::class_<piqp::Settings<T>>(m, "Settings", py::module_local())
         .def_readwrite("rho_init", &piqp::Settings<T>::rho_init)
         .def_readwrite("delta_init", &piqp::Settings<T>::delta_init)
         .def_readwrite("eps_abs", &piqp::Settings<T>::eps_abs)
@@ -116,7 +116,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("compute_timings", &piqp::Settings<T>::compute_timings);
 
     using SparseSolver = piqp::SparseSolver<T, I, piqp::KKTMode::KKT_FULL>;
-    py::class_<SparseSolver>(m, "SparseSolver")
+    py::class_<SparseSolver>(m, "SparseSolver", py::module_local())
         .def(py::init<>())
         .def_property("settings", &SparseSolver::settings, &SparseSolver::settings)
         .def_property_readonly("result", &SparseSolver::result)
@@ -159,7 +159,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def("solve", &SparseSolver::solve);
 
     using DenseSolver = piqp::DenseSolver<T>;
-    py::class_<DenseSolver>(m, "DenseSolver")
+    py::class_<DenseSolver>(m, "DenseSolver", py::module_local())
         .def(py::init<>())
         .def_property("settings", &DenseSolver::settings, &DenseSolver::settings)
         .def_property_readonly("result", &DenseSolver::result)
