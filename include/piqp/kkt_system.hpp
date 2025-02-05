@@ -42,10 +42,10 @@ public:
 
     // z = alpha * P * x
     virtual void eval_P_x(const T& alpha, const CVecRef<T>& x, VecRef<T> z) = 0;
-    // zn = beta_n * yn + alpha_n * A * xn, zt = beta_t * yt + alpha_t * A^T * xt
-    virtual void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, const T& beta_n, const T& beta_t, const CVecRef<T>& yn, const CVecRef<T>& yt, VecRef<T> zn, VecRef<T> zt) = 0;
-    // zn = beta_n * yn + alpha_n * G * xn, zt = beta_t * yt + alpha_t * G^T * xt
-    virtual void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, const T& beta_n, const T& beta_t, const CVecRef<T>& yn, const CVecRef<T>& yt, VecRef<T> zn, VecRef<T> zt) = 0;
+    // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
+    virtual void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt) = 0;
+    // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
+    virtual void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt) = 0;
 
     virtual void print_info() {};
 };

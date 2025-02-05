@@ -834,6 +834,15 @@ protected:
     {
         using std::abs;
 
+        // we calculate these term here first to be able to reuse temporary vectors
+        // ry_nr = -A * x
+        // dx = A^T * y, use dx as a temporary
+        m_kkt->eval_A_xn_and_AT_xt(T(-1), T(1), m_result.x, m_result.y, ry_nr, dx);
+        // rz_nr = -G * x
+        // dx += G^T * z, use rx_nr as a temporary
+        m_kkt->eval_G_xn_and_GT_xt(T(-1), T(1), m_result.x, m_result.z, rz_nr, rx_nr);
+        dx.noalias() += rx_nr;
+
         // first part of dual residual and infeasibility calculation (used in cost calculation)
         m_kkt->eval_P_x(T(-1), m_result.x, rx_nr);
         m_result.info.dual_rel_inf = m_preconditioner.unscale_dual_res(rx_nr).template lpNorm<Eigen::Infinity>();
@@ -864,13 +873,6 @@ protected:
         m_result.info.primal_obj = m_preconditioner.unscale_cost(m_result.info.primal_obj);
         m_result.info.dual_obj = m_preconditioner.unscale_cost(m_result.info.dual_obj);
         m_result.info.duality_gap = m_preconditioner.unscale_cost(m_result.info.duality_gap);
-
-        // ry_nr = -A * x
-        // dx = A^T * y, use dx as a temporary
-        m_kkt->eval_A_xn_and_AT_xt(T(-1), T(1), m_result.x, m_result.y, T(0), T(0), ry_nr, dx, ry_nr, dx);
-        // rz_nr = -G * x
-        // dx += G^T * z
-        m_kkt->eval_G_xn_and_GT_xt(T(-1), T(1), m_result.x, m_result.z, T(0), T(1), rz_nr, dx, rz_nr, dx);
 
         // dual residual and infeasibility calculation
         rx_nr.noalias() -= m_data.c;

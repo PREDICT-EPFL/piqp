@@ -117,13 +117,13 @@ struct BlockVec
             int block_size = x[block_idx].rows();
             for (int inner_idx = 0; inner_idx < block_size; inner_idx++)
             {
-                other(i++) += BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx);
+                other(i++) = BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx);
             }
         }
-//        while (i < other.rows())
-//        {
-//            other(i++) = 0;
-//        }
+        while (i < other.rows())
+        {
+            other(i++) = 0;
+        }
     }
 
     template <typename Derived1, typename Derived2>
@@ -135,13 +135,13 @@ struct BlockVec
             int block_size = x[block_idx].rows();
             for (int inner_idx = 0; inner_idx < block_size; inner_idx++)
             {
-                other(perm_inv(i++)) += BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx);
+                other(perm_inv(i++)) = BLASFEO_DVECEL(this->x[block_idx].ref(), inner_idx);
             }
         }
-//        while (i < other.rows())
-//        {
-//            other(perm_inv(i++)) = 0;
-//        }
+        while (i < other.rows())
+        {
+            other(perm_inv(i++)) = 0;
+        }
     }
 };
 

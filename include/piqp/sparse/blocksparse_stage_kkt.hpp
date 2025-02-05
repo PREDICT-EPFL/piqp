@@ -238,11 +238,8 @@ public:
         // block_rhs_z = G * block_delta_x
         block_t_gemv_nt(1.0, 1.0, GT, block_delta_z, block_delta_x, 1.0, 0.0, block_rhs_x, block_rhs_z, block_rhs_x, block_rhs_z);
 
-        rhs_x.setZero();
         block_rhs_x.load(rhs_x);
-        rhs_y.setZero();
         block_rhs_y.load(rhs_y, AT.perm_inv);
-        rhs_z.setZero();
         block_rhs_z.load(rhs_z, GT.perm_inv);
 
         rhs_x.noalias() += m_rho * delta_x;
@@ -332,11 +329,8 @@ public:
         // block_delta_z = G * block_delta_x
         block_t_gemv_t(1.0, GT, block_delta_x, 0.0, block_delta_z, block_delta_z);
 
-        delta_x.setZero();
         block_delta_x.load(delta_x);
-        delta_y.setZero();
         block_delta_y.load(delta_y, AT.perm_inv);
-        delta_z.setZero();
         block_delta_z.load(delta_z, GT.perm_inv);
 
         delta_y.noalias() -= delta_inv * rhs_y;
@@ -373,15 +367,15 @@ public:
         BlockVec& block_z = tmp2_x_block;
 
         block_x.assign(x);
+
         // block_z = alpha * P * block_x, P is symmetric and only the lower triangular part of P is accessed
         block_symv_l(alpha, P, block_x, block_z);
 
-        z.setZero();
         block_z.load(z);
     }
 
-    // zn = beta_n * yn + alpha_n * A * xn, zt = beta_t * yt + alpha_t * A^T * xt
-    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, const T& beta_n, const T& beta_t, const CVecRef<T>& yn, const CVecRef<T>& yt, VecRef<T> zn, VecRef<T> zt)
+    // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
+    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt)
     {
         BlockVec& block_xn = tmp1_x_block;
         BlockVec& block_xt = tmp1_y_block;
@@ -395,14 +389,12 @@ public:
         // block_zn = alpha_n * A * block_xn
         block_t_gemv_nt(alpha_t, alpha_n, AT, block_xt, block_xn, 0.0, 0.0, block_zt, block_zn, block_zt, block_zn);
 
-        zn.noalias() = beta_n * yn;
         block_zn.load(zn, AT.perm_inv);
-        zt.noalias() = beta_t * yt;
         block_zt.load(zt);
     }
 
-    // zn = beta_n * yn + alpha_n * G * xn, zt = beta_t * yt + alpha_t * G^T * xt
-    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, const T& beta_n, const T& beta_t, const CVecRef<T>& yn, const CVecRef<T>& yt, VecRef<T> zn, VecRef<T> zt)
+    // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
+    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt)
     {
         BlockVec& block_xn = tmp1_x_block;
         BlockVec& block_xt = tmp1_z_block;
@@ -416,9 +408,7 @@ public:
         // block_zn = alpha_n * G * block_xn
         block_t_gemv_nt(alpha_t, alpha_n, GT, block_xt, block_xn, 0.0, 0.0, block_zt, block_zn, block_zt, block_zn);
 
-        zn.noalias() = beta_n * yn;
         block_zn.load(zn, GT.perm_inv);
-        zt.noalias() = beta_t * yt;
         block_zt.load(zt);
     }
 

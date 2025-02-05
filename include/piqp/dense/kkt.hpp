@@ -297,18 +297,18 @@ public:
         z.noalias() += data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * (alpha * x);
     }
 
-    // zn = beta_n * yn + alpha_n * A * xn, zt = beta_t * yt + alpha_t * A^T * xt
-    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, const T& beta_n, const T& beta_t, const CVecRef<T>& yn, const CVecRef<T>& yt, VecRef<T> zn, VecRef<T> zt)
+    // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
+    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt)
     {
-        zn.noalias() = beta_n * yn + alpha_n * data.AT.transpose() * xn;
-        zt.noalias() = beta_t * yt + alpha_t * data.AT * xt;
+        zn.noalias() = alpha_n * data.AT.transpose() * xn;
+        zt.noalias() = alpha_t * data.AT * xt;
     }
 
-    // zn = beta_n * yn + alpha_n * G * xn, zt = beta_t * yt + alpha_t * G^T * xt
-    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, const T& beta_n, const T& beta_t, const CVecRef<T>& yn, const CVecRef<T>& yt, VecRef<T> zn, VecRef<T> zt)
+    // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
+    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt)
     {
-        zn.noalias() = beta_n * yn + alpha_n * data.GT.transpose() * xn;
-        zt.noalias() = beta_t * yt + alpha_t * data.GT * xt;
+        zn.noalias() = alpha_n * data.GT.transpose() * xn;
+        zt.noalias() = alpha_t * data.GT * xt;
     }
 
     Mat<T>& internal_kkt_mat()
