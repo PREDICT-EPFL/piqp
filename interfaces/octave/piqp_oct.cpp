@@ -77,19 +77,6 @@ inline octave_value eigen_to_ov(const Vec& vec)
     return octave_value(arr);
 }
 
-constexpr const char* kkt_solver_to_string(piqp::KKTSolver kkt_solver)
-{
-    switch (kkt_solver) {
-        case piqp::KKTSolver::dense_cholesky:
-            return "dense_cholesky";
-        case piqp::KKTSolver::sparse_ldlt:
-            return "sparse_ldlt";
-        case piqp::KKTSolver::blocksparse_stagewise:
-            return "blocksparse_stagewise";
-    }
-    return "unknown";
-}
-
 piqp::KKTSolver kkt_solver_from_string(const std::string& kkt_solver, bool is_dense)
 {
     if (kkt_solver == "dense_cholesky") return piqp::KKTSolver::dense_cholesky;
@@ -123,7 +110,7 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     ov_struct.assign("preconditioner_scale_cost", octave_value(settings.preconditioner_scale_cost));
     ov_struct.assign("preconditioner_iter", octave_value(settings.preconditioner_iter));
     ov_struct.assign("tau", octave_value(settings.tau));
-    ov_struct.assign("kkt_solver", octave_value(kkt_solver_to_string(settings.kkt_solver)));
+    ov_struct.assign("kkt_solver", octave_value(piqp::kkt_solver_to_string(settings.kkt_solver)));
     ov_struct.assign("iterative_refinement_always_enabled", octave_value(settings.iterative_refinement_always_enabled));
     ov_struct.assign("iterative_refinement_eps_abs", octave_value(settings.iterative_refinement_eps_abs));
     ov_struct.assign("iterative_refinement_eps_rel", octave_value(settings.iterative_refinement_eps_rel));

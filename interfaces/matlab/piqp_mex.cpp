@@ -149,19 +149,6 @@ inline mxArray* eigen_to_mx(const Vec& vec)
     return mx_ptr;
 }
 
-constexpr const char* kkt_solver_to_string(piqp::KKTSolver kkt_solver)
-{
-    switch (kkt_solver) {
-        case piqp::KKTSolver::dense_cholesky:
-            return "dense_cholesky";
-        case piqp::KKTSolver::sparse_ldlt:
-            return "sparse_ldlt";
-        case piqp::KKTSolver::blocksparse_stagewise:
-            return "blocksparse_stagewise";
-    }
-    return "unknown";
-}
-
 piqp::KKTSolver kkt_solver_from_string(const char* kkt_solver, bool is_dense)
 {
     std::string kkt_solver_str(kkt_solver);
@@ -197,7 +184,7 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     mxSetField(mx_ptr, 0, "preconditioner_scale_cost", mxCreateDoubleScalar(settings.preconditioner_scale_cost));
     mxSetField(mx_ptr, 0, "preconditioner_iter", mxCreateDoubleScalar((double) settings.preconditioner_iter));
     mxSetField(mx_ptr, 0, "tau", mxCreateDoubleScalar(settings.tau));
-    mxSetField(mx_ptr, 0, "kkt_solver", mxCreateString(kkt_solver_to_string(settings.kkt_solver)));
+    mxSetField(mx_ptr, 0, "kkt_solver", mxCreateString(piqp::kkt_solver_to_string(settings.kkt_solver)));
     mxSetField(mx_ptr, 0, "iterative_refinement_always_enabled", mxCreateDoubleScalar(settings.iterative_refinement_always_enabled));
     mxSetField(mx_ptr, 0, "iterative_refinement_eps_abs", mxCreateDoubleScalar(settings.iterative_refinement_eps_abs));
     mxSetField(mx_ptr, 0, "iterative_refinement_eps_rel", mxCreateDoubleScalar(settings.iterative_refinement_eps_rel));
