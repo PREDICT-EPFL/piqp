@@ -19,7 +19,7 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-          - os: macos-12
+          - os: macos-13
             platform: maci
           - os: macos-14
             platform: maca
@@ -69,7 +69,7 @@ jobs:
           command: cd interfaces/matlab, runtest_piqp
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           path: ./interfaces/matlab/piqp-matlab-${{ matrix.platform}}64.tar.gz
 
