@@ -70,8 +70,7 @@ protected:
     BlockKKT AtA;
     BlockKKT GtG;
 
-    BlockKKT kkt_mat;
-    BlockKKT kkt_factor;
+    BlockKKT kkt_fac;
 
     BlockVec tmp1_x_block;
     BlockVec tmp2_x_block;
@@ -122,18 +121,7 @@ public:
 
         block_syrk_ln_alloc(GT, GT_scaled, GtG);
 
-        init_kkt_mat();
-
-        // We can mostly reuse the structure from the kkt matrix.
-        // Only the arrow can have more allocated blocks because
-        // of the factorization if the previous factors exist.
-        kkt_factor = kkt_mat;
-        for (std::size_t i = 1; i < N - 1; i++)
-        {
-            if (!kkt_factor.E[i] && kkt_factor.E[i - 1] && kkt_factor.B[i - 1]) {
-                kkt_factor.E[i] = std::make_unique<BlasfeoMat>(kkt_factor.E[i - 1]->rows(), kkt_factor.B[i - 1]->rows());
-            }
-        }
+        init_kkt_fac();
 
         tmp1_x_block = BlockVec(block_info);
         tmp2_x_block = BlockVec(block_info);
@@ -205,7 +193,7 @@ public:
 
         block_gemm_nd(GT, G_scaling, GT_scaled);
         block_syrk_ln_calc(GT, GT_scaled, GtG);
-        populate_kkt_mat();
+        populate_kkt_fac();
         factor_kkt();
 
         return true;
@@ -481,7 +469,7 @@ protected:
             {
                 I j = C_utri_row_it.index();
 
-                if (j >= current_diag_block_start && j < n - arrow_width) {
+                if (j >= current_diag_block_start && j + arrow_width < n) {
                     // calculate new block size
                     I new_block_size = j - current_diag_block_start + 1;
                     // split block size equally into diagonal and off diagonal block
@@ -530,7 +518,7 @@ protected:
 
             if (i >= n - arrow_width) break;
 
-            if (i - current_diag_block_start + 1 >= current_diag_block_size) {
+            if (i + 1 >= current_diag_block_start + current_diag_block_size) {
 //                std::cout << "B " << current_diag_block_start << " " << current_diag_block_size << " " << current_off_diag_block_size << " " << arrow_width << std::endl;
                 block_info.push_back({current_diag_block_start, current_diag_block_size});
 
@@ -954,18 +942,18 @@ protected:
 #endif
     }
 
-    void init_kkt_mat()
+    void init_kkt_fac()
     {
-        construct_kkt_mat<true>();
+        construct_kkt_fac<true>();
     }
 
-    void populate_kkt_mat()
+    void populate_kkt_fac()
     {
-        construct_kkt_mat<false>();
+        construct_kkt_fac<false>();
     }
 
     template<bool allocate>
-    void construct_kkt_mat()
+    void construct_kkt_fac()
     {
         Vec<T>& diag = tmp_x;
         BlockVec& diag_block = tmp1_x_block;
@@ -974,9 +962,9 @@ protected:
         I arrow_width = block_info.back().width;
         T delta_inv = 1.0 / m_delta;
 
-        kkt_mat.D.resize(N);
-        kkt_mat.B.resize(N - 2);
-        kkt_mat.E.resize(N - 1);
+        kkt_fac.D.resize(N);
+        kkt_fac.B.resize(N - 2);
+        kkt_fac.E.resize(N - 1);
 
         if (!allocate)
         {
@@ -1010,25 +998,25 @@ protected:
             I m = block_info[i].width;
 
             if (allocate) {
-                if (!kkt_mat.D[i]) {
-                    kkt_mat.D[i] = std::make_unique<BlasfeoMat>(m, m);
+                if (!kkt_fac.D[i]) {
+                    kkt_fac.D[i] = std::make_unique<BlasfeoMat>(m, m);
                 }
             } else {
                 bool mat_set = false;
 
                 if (P.D[i]) {
                     // D_i = P.D_i, lower triangular
-                    blasfeo_dtrcp_l(*P.D[i], *kkt_mat.D[i]);
+                    blasfeo_dtrcp_l(*P.D[i], *kkt_fac.D[i]);
                     mat_set = true;
                 }
 
                 if (AtA.D[i]) {
                     if (mat_set) {
                         // D_i += delta^{-1} * AtA.D_i
-                        blasfeo_dgead(delta_inv, *AtA.D[i], *kkt_mat.D[i]);
+                        blasfeo_dgead(delta_inv, *AtA.D[i], *kkt_fac.D[i]);
                     } else {
                         // D_i = delta^{-1} * AtA.D_i, lower triangular
-                        blasfeo_dtrcpsc_l(delta_inv, *AtA.D[i], *kkt_mat.D[i]);
+                        blasfeo_dtrcpsc_l(delta_inv, *AtA.D[i], *kkt_fac.D[i]);
                         mat_set = true;
                     }
                 }
@@ -1036,20 +1024,21 @@ protected:
                 if (GtG.D[i]) {
                     if (mat_set) {
                         // D_i += GtG.D_i
-                        blasfeo_dgead(1.0, *GtG.D[i], *kkt_mat.D[i]);
+                        blasfeo_dgead(1.0, *GtG.D[i], *kkt_fac.D[i]);
                     } else {
                         // D_i = GtG.D_i, lower triangular
-                        blasfeo_dtrcp_l(*GtG.D[i], *kkt_mat.D[i]);
+                        blasfeo_dtrcp_l(*GtG.D[i], *kkt_fac.D[i]);
                         mat_set = true;
                     }
                 }
 
                 if (mat_set) {
                     // diag(D_i) += diag
-                    blasfeo_ddiaad(1.0, diag_block.x[i], *kkt_mat.D[i]);
+                    blasfeo_ddiaad(1.0, diag_block.x[i], *kkt_fac.D[i]);
                 } else {
-                    // diag(D_i) = diag
-                    blasfeo_ddiain(1.0, diag_block.x[i], *kkt_mat.D[i]);
+                    // D_i = diag
+                    kkt_fac.D[i]->setZero();
+                    blasfeo_ddiain(1.0, diag_block.x[i], *kkt_fac.D[i]);
                 }
             }
         }
@@ -1068,28 +1057,28 @@ protected:
 
             if (P.B[i]) {
                 if (allocate) {
-                    if (!kkt_mat.B[i]) {
-                        kkt_mat.B[i] = std::make_unique<BlasfeoMat>(m, n);
+                    if (!kkt_fac.B[i]) {
+                        kkt_fac.B[i] = std::make_unique<BlasfeoMat>(m, n);
                     }
                 } else {
                     // B_i = P.B_i
-                    blasfeo_dgecp(*P.B[i], *kkt_mat.B[i]);
+                    blasfeo_dgecp(*P.B[i], *kkt_fac.B[i]);
                     mat_set = true;
                 }
             }
 
             if (AtA.B[i]) {
                 if (allocate) {
-                    if (!kkt_mat.B[i]) {
-                        kkt_mat.B[i] = std::make_unique<BlasfeoMat>(m, n);
+                    if (!kkt_fac.B[i]) {
+                        kkt_fac.B[i] = std::make_unique<BlasfeoMat>(m, n);
                     }
                 } else {
                     if (mat_set) {
                         // B_i += delta^{-1} * AtA.B_i
-                        blasfeo_dgead(delta_inv, *AtA.B[i], *kkt_mat.B[i]);
+                        blasfeo_dgead(delta_inv, *AtA.B[i], *kkt_fac.B[i]);
                     } else {
                         // B_i = delta^{-1} * AtA.B_i
-                        blasfeo_dgecpsc(delta_inv, *AtA.B[i], *kkt_mat.B[i]);
+                        blasfeo_dgecpsc(delta_inv, *AtA.B[i], *kkt_fac.B[i]);
                         mat_set = true;
                     }
                 }
@@ -1097,16 +1086,16 @@ protected:
 
             if (GtG.B[i]) {
                 if (allocate) {
-                    if (!kkt_mat.B[i]) {
-                        kkt_mat.B[i] = std::make_unique<BlasfeoMat>(m, n);
+                    if (!kkt_fac.B[i]) {
+                        kkt_fac.B[i] = std::make_unique<BlasfeoMat>(m, n);
                     }
                 } else {
                     if (mat_set) {
                         // B_i += GtG.B_i
-                        blasfeo_dgead(1.0, *GtG.B[i], *kkt_mat.B[i]);
+                        blasfeo_dgead(1.0, *GtG.B[i], *kkt_fac.B[i]);
                     } else {
                         // B_i = GtG.B_i
-                        blasfeo_dgecp(*GtG.B[i], *kkt_mat.B[i]);
+                        blasfeo_dgecp(*GtG.B[i], *kkt_fac.B[i]);
                     }
                 }
             }
@@ -1128,28 +1117,28 @@ protected:
 
                 if (P.E[i]) {
                     if (allocate) {
-                        if (!kkt_mat.E[i]) {
-                            kkt_mat.E[i] = std::make_unique<BlasfeoMat>(m, n);
+                        if (!kkt_fac.E[i]) {
+                            kkt_fac.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
                         // E_i = P.E_i
-                        blasfeo_dgecp(*P.E[i], *kkt_mat.E[i]);
+                        blasfeo_dgecp(*P.E[i], *kkt_fac.E[i]);
                         mat_set = true;
                     }
                 }
 
                 if (AtA.E[i]) {
                     if (allocate) {
-                        if (!kkt_mat.E[i]) {
-                            kkt_mat.E[i] = std::make_unique<BlasfeoMat>(m, n);
+                        if (!kkt_fac.E[i]) {
+                            kkt_fac.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
                         if (mat_set) {
                             // E_i += delta^{-1} * AtA.E_i
-                            blasfeo_dgead(delta_inv, *AtA.E[i], *kkt_mat.E[i]);
+                            blasfeo_dgead(delta_inv, *AtA.E[i], *kkt_fac.E[i]);
                         } else {
                             // E_i = delta^{-1} * AtA.E_i
-                            blasfeo_dgecpsc(delta_inv, *AtA.E[i], *kkt_mat.E[i]);
+                            blasfeo_dgecpsc(delta_inv, *AtA.E[i], *kkt_fac.E[i]);
                             mat_set = true;
                         }
                     }
@@ -1157,17 +1146,27 @@ protected:
 
                 if (GtG.E[i]) {
                     if (allocate) {
-                        if (!kkt_mat.E[i]) {
-                            kkt_mat.E[i] = std::make_unique<BlasfeoMat>(m, n);
+                        if (!kkt_fac.E[i]) {
+                            kkt_fac.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
                         if (mat_set) {
                             // E_i += GtG.E_i
-                            blasfeo_dgead(1.0, *GtG.E[i], *kkt_mat.E[i]);
+                            blasfeo_dgead(1.0, *GtG.E[i], *kkt_fac.E[i]);
                         } else {
                             // E_i = GtG.E_i
-                            blasfeo_dgecp(*GtG.E[i], *kkt_mat.E[i]);
+                            blasfeo_dgecp(*GtG.E[i], *kkt_fac.E[i]);
                         }
+                    }
+                }
+
+                // Only the arrow can have more allocated blocks because
+                // of the factorization if the previous factors exist.
+                if (!mat_set && i > 0 && kkt_fac.E[i - 1] && kkt_fac.B[i - 1]) {
+                    if (allocate) {
+                        kkt_fac.E[i] = std::make_unique<BlasfeoMat>(kkt_fac.E[i - 1]->rows(), kkt_fac.B[i - 1]->rows());
+                    } else {
+                        kkt_fac.E[i]->setZero();
                     }
                 }
             }
@@ -1219,112 +1218,96 @@ protected:
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
 
-        int m = kkt_mat.D[0]->rows();
+        int m = kkt_fac.D[0]->rows();
         int n, k;
         // L_1 = chol(D_1)
-        blasfeo_dpotrf_l(m, kkt_mat.D[0]->ref(), 0, 0, kkt_factor.D[0]->ref(), 0, 0);
+        blasfeo_dpotrf_l(m, kkt_fac.D[0]->ref(), 0, 0, kkt_fac.D[0]->ref(), 0, 0);
 
-        if (kkt_mat.B[0]) {
-            m = kkt_mat.B[0]->rows();
-            n = kkt_mat.B[0]->cols();
-            assert(kkt_factor.D[0]->rows() == n && kkt_factor.D[0]->cols() == n && "size mismatch");
-            assert(kkt_factor.B[0]->rows() == m && kkt_factor.B[0]->cols() == n && "size mismatch");
+        if (kkt_fac.B[0]) {
+            m = kkt_fac.B[0]->rows();
+            n = kkt_fac.B[0]->cols();
+            assert(kkt_fac.D[0]->rows() == n && kkt_fac.D[0]->cols() == n && "size mismatch");
             // C_1 = B_1 * L_1^{-T}
-            blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[0]->ref(), 0, 0, kkt_mat.B[0]->ref(), 0, 0, kkt_factor.B[0]->ref(), 0, 0);
+            blasfeo_dtrsm_rltn(m, n, 1.0, kkt_fac.D[0]->ref(), 0, 0, kkt_fac.B[0]->ref(), 0, 0, kkt_fac.B[0]->ref(), 0, 0);
         }
 
         if (arrow_width > 0)
         {
-            if (kkt_mat.E[0]) {
-                m = kkt_mat.E[0]->rows();
-                n = kkt_mat.E[0]->cols();
-                assert(kkt_factor.D[0]->rows() == n && kkt_factor.D[0]->cols() == n && "size mismatch");
-                assert(kkt_factor.E[0]->rows() == m && kkt_factor.E[0]->cols() == n && "size mismatch");
+            if (kkt_fac.E[0]) {
+                m = kkt_fac.E[0]->rows();
+                n = kkt_fac.E[0]->cols();
+                assert(kkt_fac.D[0]->rows() == n && kkt_fac.D[0]->cols() == n && "size mismatch");
                 // F_1 = E_1 * L_1^{-T}
-                blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[0]->ref(), 0, 0, kkt_mat.E[0]->ref(), 0, 0, kkt_factor.E[0]->ref(), 0, 0);
+                blasfeo_dtrsm_rltn(m, n, 1.0, kkt_fac.D[0]->ref(), 0, 0, kkt_fac.E[0]->ref(), 0, 0, kkt_fac.E[0]->ref(), 0, 0);
                 // L_N = D_N - F_1 * F_1^T
-                blasfeo_dsyrk_ln(arrow_width, n, -1.0, kkt_factor.E[0]->ref(), 0, 0, kkt_factor.E[0]->ref(), 0, 0, 1.0, kkt_mat.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
+                blasfeo_dsyrk_ln(arrow_width, n, -1.0, kkt_fac.E[0]->ref(), 0, 0, kkt_fac.E[0]->ref(), 0, 0, 1.0, kkt_fac.D[N-1]->ref(), 0, 0, kkt_fac.D[N-1]->ref(), 0, 0);
             } else {
                 // L_N = D_N
-                blasfeo_dtrcp_l(arrow_width, kkt_mat.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
+                blasfeo_dtrcp_l(arrow_width, kkt_fac.D[N-1]->ref(), 0, 0, kkt_fac.D[N-1]->ref(), 0, 0);
             }
         }
 
         for (std::size_t i = 1; i < N - 1; i++)
         {
-            if (kkt_factor.B[i-1]) {
-                m = kkt_factor.B[i-1]->rows();
-                k = kkt_factor.B[i-1]->cols();
-                assert(kkt_mat.D[i]->rows() == m && kkt_mat.D[i]->cols() == m && "size mismatch");
-                assert(kkt_factor.D[i]->rows() == m && kkt_factor.D[i]->cols() == m && "size mismatch");
+            if (kkt_fac.B[i-1]) {
+                m = kkt_fac.B[i-1]->rows();
+                k = kkt_fac.B[i-1]->cols();
+                assert(kkt_fac.D[i]->rows() == m && kkt_fac.D[i]->cols() == m && "size mismatch");
                 // L_i = chol(D_i - C_{i-1} * C_{i-1}^T)
-                blasfeo_dsyrk_ln(m, k, -1.0, kkt_factor.B[i-1]->ref(), 0, 0, kkt_factor.B[i-1]->ref(), 0, 0, 1.0, kkt_mat.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
-                blasfeo_dpotrf_l(m, kkt_factor.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
+                blasfeo_dsyrk_ln(m, k, -1.0, kkt_fac.B[i-1]->ref(), 0, 0, kkt_fac.B[i-1]->ref(), 0, 0, 1.0, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.D[i]->ref(), 0, 0);
+                blasfeo_dpotrf_l(m, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.D[i]->ref(), 0, 0);
             } else {
-                m = kkt_mat.D[i]->rows();
-                assert(kkt_mat.D[i]->rows() == m && "size mismatch");
-                assert(kkt_factor.D[i]->rows() == m && kkt_factor.D[i]->cols() == m && "size mismatch");
+                m = kkt_fac.D[i]->rows();
+                assert(kkt_fac.D[i]->rows() == m && "size mismatch");
                 // L_i = chol(D_i)
-                blasfeo_dpotrf_l(m, kkt_mat.D[i]->ref(), 0, 0, kkt_factor.D[i]->ref(), 0, 0);
+                blasfeo_dpotrf_l(m, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.D[i]->ref(), 0, 0);
             }
 
-            if (i < N - 2 && kkt_mat.B[i]) {
-                m = kkt_mat.B[i]->rows();
-                n = kkt_mat.B[i]->cols();
-                assert(kkt_factor.D[i]->rows() == n && kkt_factor.D[i]->cols() == n && "size mismatch");
-                assert(kkt_factor.B[i]->rows() == m && kkt_factor.B[i]->cols() == n && "size mismatch");
+            if (i < N - 2 && kkt_fac.B[i]) {
+                m = kkt_fac.B[i]->rows();
+                n = kkt_fac.B[i]->cols();
+                assert(kkt_fac.D[i]->rows() == n && kkt_fac.D[i]->cols() == n && "size mismatch");
                 // C_i = B_i * L_i^{-T}
-                blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[i]->ref(), 0, 0, kkt_mat.B[i]->ref(), 0, 0, kkt_factor.B[i]->ref(), 0, 0);
+                blasfeo_dtrsm_rltn(m, n, 1.0, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.B[i]->ref(), 0, 0, kkt_fac.B[i]->ref(), 0, 0);
             }
 
             if (arrow_width > 0)
             {
-                if (kkt_mat.E[i] && kkt_factor.E[i-1] && kkt_factor.B[i-1])
+                if (kkt_fac.E[i] && kkt_fac.E[i-1] && kkt_fac.B[i-1])
                 {
-                    m = kkt_factor.E[i-1]->rows();
-                    n = kkt_factor.B[i-1]->rows();
-                    k = kkt_factor.E[i-1]->cols();
-                    assert(kkt_factor.B[i-1]->cols() == k && "size mismatch");
-                    assert(kkt_mat.E[i]->rows() == m && kkt_mat.E[i]->cols() == n && "size mismatch");
-                    assert(kkt_factor.D[i]->rows() == n && kkt_factor.D[i]->cols() == n && "size mismatch");
+                    m = kkt_fac.E[i-1]->rows();
+                    n = kkt_fac.B[i-1]->rows();
+                    k = kkt_fac.E[i-1]->cols();
+                    assert(kkt_fac.B[i-1]->cols() == k && "size mismatch");
+                    assert(kkt_fac.E[i]->rows() == m && kkt_fac.E[i]->cols() == n && "size mismatch");
+                    assert(kkt_fac.D[i]->rows() == n && kkt_fac.D[i]->cols() == n && "size mismatch");
                     // F_i = (E_i - F_{i-1} * C_{i-1}^T) * L_i^{-T}
-                    blasfeo_dgemm_nt(m, n, k, -1.0, kkt_factor.E[i-1]->ref(), 0, 0, kkt_factor.B[i-1]->ref(), 0, 0, 1.0, kkt_mat.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
-                    blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
+                    blasfeo_dgemm_nt(m, n, k, -1.0, kkt_fac.E[i-1]->ref(), 0, 0, kkt_fac.B[i-1]->ref(), 0, 0, 1.0, kkt_fac.E[i]->ref(), 0, 0, kkt_fac.E[i]->ref(), 0, 0);
+                    blasfeo_dtrsm_rltn(m, n, 1.0, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.E[i]->ref(), 0, 0, kkt_fac.E[i]->ref(), 0, 0);
                 }
-                else if (kkt_mat.E[i])
+                else if (kkt_fac.E[i])
                 {
-                    m = kkt_mat.E[i]->rows();
-                    n = kkt_mat.E[i]->cols();
-                    assert(kkt_factor.D[i]->rows() == n && kkt_factor.D[i]->cols() == n && "size mismatch");
+                    m = kkt_fac.E[i]->rows();
+                    n = kkt_fac.E[i]->cols();
+                    assert(kkt_fac.D[i]->rows() == n && kkt_fac.D[i]->cols() == n && "size mismatch");
                     // F_i = E_i * L_i^{-T}
-                    blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[i]->ref(), 0, 0, kkt_mat.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
-                }
-                else if (kkt_factor.E[i-1] && kkt_factor.B[i-1])
-                {
-                    m = kkt_factor.E[i-1]->rows();
-                    n = kkt_factor.B[i-1]->rows();
-                    k = kkt_factor.E[i-1]->cols();
-                    assert(kkt_factor.B[i-1]->cols() == k && "size mismatch");
-                    assert(kkt_factor.D[i]->rows() == n && kkt_factor.D[i]->cols() == n && "size mismatch");
-                    // F_i = -(F_{i-1} * C_{i-1}^T) * L_i^{-T}
-                    blasfeo_dgemm_nt(m, n, k, -1.0, kkt_factor.E[i-1]->ref(), 0, 0, kkt_factor.B[i-1]->ref(), 0, 0, 0.0, kkt_factor.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
-                    blasfeo_dtrsm_rltn(m, n, 1.0, kkt_factor.D[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0);
+                    blasfeo_dtrsm_rltn(m, n, 1.0, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.E[i]->ref(), 0, 0, kkt_fac.E[i]->ref(), 0, 0);
                 }
 
-                if (kkt_factor.E[i]) {
-                    m = kkt_factor.E[i]->rows();
-                    k = kkt_factor.E[i]->cols();
+                if (kkt_fac.E[i]) {
+                    m = kkt_fac.E[i]->rows();
+                    k = kkt_fac.E[i]->cols();
                     assert(m == arrow_width && "size mismatch");
-                    assert(kkt_mat.D[N - 1]->rows() == m && kkt_mat.D[N - 1]->cols() == m && "size mismatch");
+                    assert(kkt_fac.D[N - 1]->rows() == m && kkt_fac.D[N - 1]->cols() == m && "size mismatch");
                     // L_N -= F_i * F_i^T
-                    blasfeo_dsyrk_ln(m, k, -1.0, kkt_factor.E[i]->ref(), 0, 0, kkt_factor.E[i]->ref(), 0, 0, 1.0, kkt_factor.D[N - 1]->ref(), 0, 0, kkt_factor.D[N - 1]->ref(), 0, 0);
+                    blasfeo_dsyrk_ln(m, k, -1.0, kkt_fac.E[i]->ref(), 0, 0, kkt_fac.E[i]->ref(), 0, 0, 1.0, kkt_fac.D[N - 1]->ref(), 0, 0, kkt_fac.D[N - 1]->ref(), 0, 0);
                 }
             }
         }
 
         // L_N = chol(D_N - sum F_i * F_i^T)
         // note that inner is also computed and stored in L_N
-        blasfeo_dpotrf_l(arrow_width, kkt_factor.D[N-1]->ref(), 0, 0, kkt_factor.D[N-1]->ref(), 0, 0);
+        blasfeo_dpotrf_l(arrow_width, kkt_fac.D[N-1]->ref(), 0, 0, kkt_fac.D[N-1]->ref(), 0, 0);
     }
 
     // z = alpha * sA * x
@@ -1592,23 +1575,23 @@ protected:
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().width;
 
-        int m = kkt_factor.D[0]->rows();
+        int m = kkt_fac.D[0]->rows();
         int n;
         assert(b_and_x.x[0].rows() == m && "size mismatch");
         // y_1 = L_1^{-1} * b_1
-        blasfeo_dtrsv_lnn(m, kkt_factor.D[0]->ref(), 0, 0, b_and_x.x[0].ref(), 0, b_and_x.x[0].ref(), 0);
+        blasfeo_dtrsv_lnn(m, kkt_fac.D[0]->ref(), 0, 0, b_and_x.x[0].ref(), 0, b_and_x.x[0].ref(), 0);
 
         for (std::size_t i = 1; i < N - 1; i++)
         {
-            if (kkt_factor.B[i-1]) {
-                m = kkt_factor.D[i]->rows();
-                n = kkt_factor.B[i-1]->cols();
-                assert(kkt_factor.B[i-1]->rows() == m && "size mismatch");
+            if (kkt_fac.B[i-1]) {
+                m = kkt_fac.D[i]->rows();
+                n = kkt_fac.B[i-1]->cols();
+                assert(kkt_fac.B[i-1]->rows() == m && "size mismatch");
                 assert(b_and_x.x[i-1].rows() == n && "size mismatch");
                 assert(b_and_x.x[i].rows() == m && "size mismatch");
                 // y_i = L_i^{-1} * (b_i - C_{i-1} * y_{i-1})
-                blasfeo_dgemv_n(m, n, -1.0, kkt_factor.B[i-1]->ref(), 0, 0, b_and_x.x[i-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
-                blasfeo_dtrsv_lnn(m, kkt_factor.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+                blasfeo_dgemv_n(m, n, -1.0, kkt_fac.B[i-1]->ref(), 0, 0, b_and_x.x[i-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+                blasfeo_dtrsv_lnn(m, kkt_fac.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
             }
         }
 
@@ -1616,69 +1599,69 @@ protected:
         {
             for (std::size_t i = 0; i < N - 1; i++)
             {
-                if (kkt_factor.E[i]) {
-                    m = kkt_factor.E[i]->rows();
-                    n = kkt_factor.E[i]->cols();
+                if (kkt_fac.E[i]) {
+                    m = kkt_fac.E[i]->rows();
+                    n = kkt_fac.E[i]->cols();
                     assert(b_and_x.x[i].rows() == n && "size mismatch");
                     assert(b_and_x.x[N-1].rows() == m && "size mismatch");
                     // y_N -= F_i * y_i
-                    blasfeo_dgemv_n(m, n, -1.0, kkt_factor.E[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, 1.0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+                    blasfeo_dgemv_n(m, n, -1.0, kkt_fac.E[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, 1.0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
                 }
             }
-            m = kkt_factor.D[N-1]->rows();
+            m = kkt_fac.D[N-1]->rows();
             assert(b_and_x.x[N-1].rows() == m && "size mismatch");
             // y_N = L_N^{-1} * y_N
-            blasfeo_dtrsv_lnn(m, kkt_factor.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+            blasfeo_dtrsv_lnn(m, kkt_fac.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
         }
 
         // ----- BACK SUBSTITUTION -----
 
         if (arrow_width > 0)
         {
-            m = kkt_factor.D[N-1]->rows();
+            m = kkt_fac.D[N-1]->rows();
             assert(b_and_x.x[N-1].rows() == m && "size mismatch");
             // x_N = L_N^{-T} * y_N
-            blasfeo_dtrsv_ltn(m, kkt_factor.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+            blasfeo_dtrsv_ltn(m, kkt_fac.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
 
-            if (kkt_factor.E[N-2]) {
-                m = kkt_factor.E[N-2]->rows();
-                n = kkt_factor.E[N-2]->cols();
+            if (kkt_fac.E[N-2]) {
+                m = kkt_fac.E[N-2]->rows();
+                n = kkt_fac.E[N-2]->cols();
                 assert(b_and_x.x[N-1].rows() == m && "size mismatch");
                 assert(b_and_x.x[N-2].rows() == n && "size mismatch");
                 // x_{N-1} = y_{N-1} - F_{N-1}^T * x_N
-                blasfeo_dgemv_t(m, n, -1.0, kkt_factor.E[N-2]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
+                blasfeo_dgemv_t(m, n, -1.0, kkt_fac.E[N-2]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
             }
         }
 
-        m = kkt_factor.D[N-2]->rows();
+        m = kkt_fac.D[N-2]->rows();
         assert(b_and_x.x[N-2].rows() == m && "size mismatch");
         // x_{N-1} = L_{N-1}^{-T} * x_{N-1}
-        blasfeo_dtrsv_ltn(m, kkt_factor.D[N-2]->ref(), 0, 0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
+        blasfeo_dtrsv_ltn(m, kkt_fac.D[N-2]->ref(), 0, 0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
 
         for (std::size_t i = N - 2; i--;)
         {
-            if (kkt_factor.B[i]) {
-                m = kkt_factor.B[i]->rows();
-                n = kkt_factor.B[i]->cols();
+            if (kkt_fac.B[i]) {
+                m = kkt_fac.B[i]->rows();
+                n = kkt_fac.B[i]->cols();
                 assert(b_and_x.x[i+1].rows() == m && "size mismatch");
                 assert(b_and_x.x[i].rows() == n && "size mismatch");
                 // x_i = y_i - C_i^T * x_{i+1}
-                blasfeo_dgemv_t(m, n, -1.0, kkt_factor.B[i]->ref(), 0, 0, b_and_x.x[i+1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+                blasfeo_dgemv_t(m, n, -1.0, kkt_fac.B[i]->ref(), 0, 0, b_and_x.x[i+1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
             }
 
-            if (kkt_factor.E[i]) {
-                m = kkt_factor.E[i]->rows();
-                n = kkt_factor.E[i]->cols();
+            if (kkt_fac.E[i]) {
+                m = kkt_fac.E[i]->rows();
+                n = kkt_fac.E[i]->cols();
                 assert(b_and_x.x[N-1].rows() == m && "size mismatch");
                 assert(b_and_x.x[i].rows() == n && "size mismatch");
                 // x_i -= F_i^T * x_N
-                blasfeo_dgemv_t(m, n, -1.0, kkt_factor.E[i]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+                blasfeo_dgemv_t(m, n, -1.0, kkt_fac.E[i]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
             }
 
-            m = kkt_factor.D[i]->rows();
+            m = kkt_fac.D[i]->rows();
             assert(b_and_x.x[i].rows() == m && "size mismatch");
             // x_i = L_i^{-T} * x_i
-            blasfeo_dtrsv_ltn(m, kkt_factor.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+            blasfeo_dtrsv_ltn(m, kkt_fac.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
         }
     }
 };
