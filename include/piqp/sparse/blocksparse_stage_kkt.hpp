@@ -446,11 +446,14 @@ protected:
         SparseMat<T, I> GtG_sp = (data.GT * data.GT.transpose()).template triangularView<Eigen::Lower>();
         SparseMat<T, I> C = P_ltri + identity + AtA_sp + GtG_sp;
 
-        I prev_diag_block_size = 0;
-        I current_diag_block_start = 0;
-        I current_diag_block_size = 0;
-        I current_off_diag_block_size = 0;
-        I arrow_width = 0;
+        struct block_structure_info {
+            I prev_diag_block_size = 0;
+            I diag_block_start = 0;
+            I diag_block_size = 0;
+            I off_diag_block_size = 0;
+            I arrow_width = 0;
+        };
+        block_structure_info current_block_info;
 
         // flop count corresponding to tri-diagonal factorization
         usize flops_tridiag = 0;
@@ -465,91 +468,128 @@ protected:
         Eigen::Index n = C.outerSize();
         for (Eigen::Index i = 0; i < n; i++)
         {
-            for (typename SparseMat<T, I>::InnerIterator C_utri_row_it(C, i); C_utri_row_it; ++C_utri_row_it)
+            auto get_next_block_structure = [&](I row, const block_structure_info& current_info)
             {
-                I j = C_utri_row_it.index();
+                block_structure_info next_info = current_info;
 
-                if (j >= current_diag_block_start && j + arrow_width < n) {
-                    // calculate new block size
-                    I new_block_size = j - current_diag_block_start + 1;
-                    // split block size equally into diagonal and off diagonal block
-                    I new_diag_block_size = (std::max)(current_diag_block_size, (new_block_size + 1) / 2); // round up
-                    I new_off_diag_block_size = (std::max)(current_off_diag_block_size, new_block_size - new_diag_block_size);
-                    // potential new arrow width
-                    I remaining_width = I(n) - current_diag_block_start - current_diag_block_size - current_off_diag_block_size;
-                    I new_arrow_width = (std::min)((std::max)(arrow_width, I(n) - j), remaining_width);
+                for (typename SparseMat<T, I>::InnerIterator C_utri_row_it(C, row); C_utri_row_it; ++C_utri_row_it)
+                {
+                    I col = C_utri_row_it.index();
 
-                    usize flops_tridiag_new = flops_tridiag;
-                    // L_i = chol(D_i - C_{i-1} * C_{i-1}^T
-                    flops_tridiag_new += flops_syrk(static_cast<size_t>(new_diag_block_size), static_cast<size_t>(prev_diag_block_size));
-                    flops_tridiag_new += flops_potrf(static_cast<size_t>(new_diag_block_size));
-                    // C_i = B_i * L_i^{-T}
-                    flops_tridiag_new += flops_trsm(static_cast<size_t>(new_diag_block_size), static_cast<size_t>(new_off_diag_block_size));
+                    if (col >= current_info.diag_block_start && col + current_info.arrow_width < n) {
+                        // current block size
+                        I current_block_size = current_info.diag_block_size + current_info.off_diag_block_size;
+                        // calculate new block size
+                        I new_block_size = (std::max)(col - current_info.diag_block_start + 1, current_block_size);
+                        // diag block is limited to current block height
+                        I max_diag_block_size = row - current_info.diag_block_start + 1;
+                        // min diagonal block must be at least have the block size
+                        I new_min_diag_block_size = (new_block_size + 1) / 2; // round up
+                        // split block size to have the highest diag block
+                        I new_diag_block_size = (std::max)(new_min_diag_block_size, max_diag_block_size);
+                        I new_off_diag_block_size = new_block_size - new_diag_block_size;
+                        // potential new arrow width
+                        I remaining_width = I(n) - current_info.diag_block_start - current_info.diag_block_size - current_info.off_diag_block_size;
+                        I new_arrow_width = (std::min)((std::max)(current_info.arrow_width, I(n) - col), remaining_width);
 
-                    // the dense kernels will use blocks of min width 4
-                    // thus, we calculate the expected flops with arrows which are multiples of 4
-                    I arrow_width_flops = ((arrow_width + 3) / 4) * 4;
-                    I new_arrow_width_flops = ((new_arrow_width + 3) / 4) * 4;
-                    // calculate current arrow flop count from normalized counts
-                    usize flops_arrow = static_cast<usize>(arrow_width_flops) * flops_arrow_normalized_no_syrk
-                            + static_cast<usize>(arrow_width_flops) * static_cast<usize>(arrow_width_flops) * flops_arrow_normalized_syrk
-                            + flops_potrf(static_cast<usize>(arrow_width_flops));
-                    // calculate new arrow flop count from normalized counts
-                    usize flops_arrow_new = static_cast<usize>(new_arrow_width_flops) * flops_arrow_normalized_no_syrk
-                            + static_cast<usize>(new_arrow_width_flops) * static_cast<usize>(new_arrow_width_flops) * flops_arrow_normalized_syrk;;
-                    // F_i = (E_i - F_{i-1} * C_{i-1}^T) * L_i^{-T}
-                    flops_arrow_new += flops_gemm(static_cast<usize>(new_arrow_width_flops), static_cast<usize>(prev_diag_block_size), static_cast<usize>(new_diag_block_size));
-                    flops_arrow_new += flops_trsm(static_cast<usize>(new_diag_block_size), static_cast<usize>(new_arrow_width_flops));
-                    // L_N = chol(D_N - sum F_i * F_i^T)
-                    flops_arrow_new += flops_syrk(static_cast<usize>(new_arrow_width_flops), static_cast<usize>(new_diag_block_size));
-                    flops_arrow_new += flops_potrf(static_cast<usize>(new_arrow_width_flops));
+                        usize flops_tridiag_new = flops_tridiag;
+                        // L_i = chol(D_i - C_{i-1} * C_{i-1}^T
+                        flops_tridiag_new += flops_syrk(static_cast<size_t>(new_diag_block_size), static_cast<size_t>(current_info.prev_diag_block_size));
+                        flops_tridiag_new += flops_potrf(static_cast<size_t>(new_diag_block_size));
+                        // C_i = B_i * L_i^{-T}
+                        flops_tridiag_new += flops_trsm(static_cast<size_t>(new_diag_block_size), static_cast<size_t>(new_off_diag_block_size));
 
-                    // decide if we accept new diagonal block size or assign it to the arrow
-                    if (flops_tridiag_new - flops_tridiag <= flops_arrow_new - flops_arrow) {
-                        current_diag_block_size = new_diag_block_size;
-                        current_off_diag_block_size = new_off_diag_block_size;
-                    } else {
-                        arrow_width = new_arrow_width;
+                        // the dense kernels will use blocks of min width 4
+                        // thus, we calculate the expected flops with arrows which are multiples of 4
+                        I arrow_width_flops = ((current_info.arrow_width + 3) / 4) * 4;
+                        I new_arrow_width_flops = ((new_arrow_width + 3) / 4) * 4;
+                        // calculate current arrow flop count from normalized counts
+                        usize flops_arrow = static_cast<usize>(arrow_width_flops) * flops_arrow_normalized_no_syrk
+                                            + static_cast<usize>(arrow_width_flops) * static_cast<usize>(arrow_width_flops) * flops_arrow_normalized_syrk
+                                            + flops_potrf(static_cast<usize>(arrow_width_flops));
+                        // calculate new arrow flop count from normalized counts
+                        usize flops_arrow_new = static_cast<usize>(new_arrow_width_flops) * flops_arrow_normalized_no_syrk
+                                                + static_cast<usize>(new_arrow_width_flops) * static_cast<usize>(new_arrow_width_flops) * flops_arrow_normalized_syrk;;
+                        // F_i = (E_i - F_{i-1} * C_{i-1}^T) * L_i^{-T}
+                        flops_arrow_new += flops_gemm(static_cast<usize>(new_arrow_width_flops), static_cast<usize>(current_info.prev_diag_block_size), static_cast<usize>(new_diag_block_size));
+                        flops_arrow_new += flops_trsm(static_cast<usize>(new_diag_block_size), static_cast<usize>(new_arrow_width_flops));
+                        // L_N = chol(D_N - sum F_i * F_i^T)
+                        flops_arrow_new += flops_syrk(static_cast<usize>(new_arrow_width_flops), static_cast<usize>(new_diag_block_size));
+                        flops_arrow_new += flops_potrf(static_cast<usize>(new_arrow_width_flops));
+
+                        // decide if we accept new diagonal block size or assign it to the arrow
+                        if (flops_tridiag_new - flops_tridiag <= flops_arrow_new - flops_arrow) {
+                            next_info.diag_block_size = new_diag_block_size;
+                            next_info.off_diag_block_size = new_off_diag_block_size;
+                        } else {
+                            next_info.arrow_width = new_arrow_width;
+                        }
+//                        std::cout << row << " " << col << " " << next_info.diag_block_start << " " << next_info.diag_block_size << " " << next_info.off_diag_block_size << " " << next_info.arrow_width << " " << (flops_tridiag_new - flops_tridiag) << " " << (flops_arrow_new - flops_arrow) << std::endl;
                     }
-//                    std::cout << i << " " << j << " " << current_diag_block_start << " " << current_diag_block_size << " " << current_off_diag_block_size << " " << arrow_width << " " << (flops_tridiag_new - flops_tridiag) << " " << (flops_arrow_new - flops_arrow) << std::endl;
                 }
-            }
-//            std::cout << i << " " << current_diag_block_start << " " << current_diag_block_size << " " << current_off_diag_block_size << " " << arrow_width << std::endl;
 
-            if (i >= n - arrow_width) break;
+                return next_info;
+            };
 
-            if (i + 1 >= current_diag_block_start + current_diag_block_size) {
-//                std::cout << "B " << current_diag_block_start << " " << current_diag_block_size << " " << current_off_diag_block_size << " " << arrow_width << std::endl;
-                block_info.push_back({current_diag_block_start, current_diag_block_size});
+            current_block_info = get_next_block_structure(I(i), current_block_info);
 
-                // L_i = chol(D_i - C_{i-1} * C_{i-1}^T
-                flops_tridiag += flops_syrk(static_cast<size_t>(current_diag_block_size), static_cast<size_t>(prev_diag_block_size + 1));
-                flops_tridiag += flops_potrf(static_cast<size_t>(current_diag_block_size));
-                // C_i = B_i * L_i^{-T}
-                flops_tridiag += flops_trsm(static_cast<size_t>(current_diag_block_size), static_cast<size_t>(current_off_diag_block_size));
+//            std::cout << i << " " << current_block_info.diag_block_start << " " << current_block_info.diag_block_size << " " << current_block_info.off_diag_block_size << " " << current_block_info.arrow_width << std::endl;
 
-                // F_i = (E_i - F_{i-1} * C_{i-1}^T) * L_i^{-T}
-                flops_arrow_normalized_no_syrk += flops_gemm(1, static_cast<usize>(prev_diag_block_size), static_cast<usize>(current_diag_block_size));
-                flops_arrow_normalized_no_syrk += flops_trsm(static_cast<usize>(current_diag_block_size), 1);
-                // L_N = chol(D_N - sum F_i * F_i^T)
-                flops_arrow_normalized_syrk += flops_syrk(1, static_cast<usize>(current_diag_block_size));
+            if (i + 1 >= current_block_info.diag_block_start + current_block_info.diag_block_size) {
 
-                current_diag_block_start += current_diag_block_size;
-                prev_diag_block_size = current_diag_block_size;
-                current_diag_block_size = current_off_diag_block_size;
-                current_off_diag_block_size = 0;
+                bool hit_optimal_ratio = current_block_info.diag_block_size >= 2 * current_block_info.off_diag_block_size;
+                auto next_block_grows = [&]() {
+                    if (i >= n) return false;
+                    block_structure_info next_block_info = get_next_block_structure(I(i) + 1, current_block_info);
+                    return next_block_info.diag_block_size + next_block_info.off_diag_block_size > current_block_info.diag_block_size + current_block_info.off_diag_block_size;
+                };
+                bool at_end = i + 1 >= n - current_block_info.arrow_width;
+
+                if (hit_optimal_ratio || at_end || next_block_grows()) {
+//                    std::cout << "B " << current_block_info.diag_block_start << " " << current_block_info.diag_block_size << " " << current_block_info.off_diag_block_size << " " << current_block_info.arrow_width << std::endl;
+                    block_info.push_back({current_block_info.diag_block_start, current_block_info.diag_block_size});
+
+                    // L_i = chol(D_i - C_{i-1} * C_{i-1}^T
+                    flops_tridiag += flops_syrk(static_cast<size_t>(current_block_info.diag_block_size), static_cast<size_t>(current_block_info.prev_diag_block_size + 1));
+                    flops_tridiag += flops_potrf(static_cast<size_t>(current_block_info.diag_block_size));
+                    // C_i = B_i * L_i^{-T}
+                    flops_tridiag += flops_trsm(static_cast<size_t>(current_block_info.diag_block_size), static_cast<size_t>(current_block_info.off_diag_block_size));
+
+                    // F_i = (E_i - F_{i-1} * C_{i-1}^T) * L_i^{-T}
+                    flops_arrow_normalized_no_syrk += flops_gemm(1, static_cast<usize>(current_block_info.prev_diag_block_size), static_cast<usize>(current_block_info.diag_block_size));
+                    flops_arrow_normalized_no_syrk += flops_trsm(static_cast<usize>(current_block_info.diag_block_size), 1);
+                    // L_N = chol(D_N - sum F_i * F_i^T)
+                    flops_arrow_normalized_syrk += flops_syrk(1, static_cast<usize>(current_block_info.diag_block_size));
+
+                    current_block_info.diag_block_start += current_block_info.diag_block_size;
+                    current_block_info.prev_diag_block_size = current_block_info.diag_block_size;
+                    current_block_info.diag_block_size = current_block_info.off_diag_block_size;
+                    current_block_info.off_diag_block_size = 0;
+                }
+
+                if (at_end) {
+                    // finalize last block
+                    block_info.push_back({current_block_info.diag_block_start, current_block_info.diag_block_size});
+                    assert(current_block_info.off_diag_block_size == 0);
+
+                    current_block_info.diag_block_start += current_block_info.diag_block_size;
+                    current_block_info.prev_diag_block_size = current_block_info.diag_block_size;
+                    current_block_info.diag_block_size = current_block_info.off_diag_block_size;
+                    current_block_info.off_diag_block_size = 0;
+                    break;
+                }
             }
         }
 
         // last block corresponds to corner block of arrow
-        block_info.push_back({current_diag_block_start, arrow_width});
+        block_info.push_back({current_block_info.diag_block_start, current_block_info.arrow_width});
         assert(block_info.size() >= 2);
 
 //        // calculate current arrow flop count from normalized counts
-//        usize flops_arrow = static_cast<usize>(arrow_width) * flops_arrow_normalized_no_syrk
-//                            + static_cast<usize>(arrow_width) * static_cast<usize>(arrow_width) * flops_arrow_normalized_syrk;
+//        usize flops_arrow = static_cast<usize>(current_block_info.arrow_width) * flops_arrow_normalized_no_syrk
+//                            + static_cast<usize>(current_block_info.arrow_width) * static_cast<usize>(current_block_info.arrow_width) * flops_arrow_normalized_syrk;
 //        // L_N = chol(D_N - sum F_i * F_i^T)
-//        flops_arrow += flops_potrf(static_cast<usize>(arrow_width));
+//        flops_arrow += flops_potrf(static_cast<usize>(current_block_info.arrow_width));
 //
 //        std::cout << "flops_tridiag: " <<  flops_tridiag << "  flops_arrow: " << flops_arrow << std::endl;
 //
