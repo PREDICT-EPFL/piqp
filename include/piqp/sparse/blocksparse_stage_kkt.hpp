@@ -483,8 +483,8 @@ protected:
                         I new_block_size = (std::max)(col - current_info.diag_block_start + 1, current_block_size);
                         // diag block is limited to current block height
                         I max_diag_block_size = row - current_info.diag_block_start + 1;
-                        // min diagonal block must be at least have the block size
-                        I new_min_diag_block_size = (new_block_size + 1) / 2; // round up
+                        // min diagonal block must be at least halve the block size
+                        I new_min_diag_block_size = (std::max)(current_info.diag_block_size, (new_block_size + 1) / 2); // round up
                         // split block size to have the highest diag block
                         I new_diag_block_size = (std::max)(new_min_diag_block_size, max_diag_block_size);
                         I new_off_diag_block_size = new_block_size - new_diag_block_size;
