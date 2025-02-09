@@ -45,7 +45,7 @@ struct BlockVec
         x.resize(N);
         for (std::size_t i = 0; i < N; i++)
         {
-            x[i].resize(block_info[i].width);
+            x[i].resize(block_info[i].diag_size);
         }
     }
 

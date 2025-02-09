@@ -18,7 +18,8 @@ template<typename I>
 struct BlockInfo
 {
     I start;
-    I width;
+    I diag_size;
+    I off_diag_size;
 };
 
 } // namespace sparse

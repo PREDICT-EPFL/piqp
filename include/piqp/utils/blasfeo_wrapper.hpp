@@ -91,8 +91,8 @@ inline void blasfeo_dgemm_nt(double alpha, BlasfeoMat& A, BlasfeoMat& B, double 
     int n = B.rows();
     int k = A.cols();
     assert(B.cols() == k && "size mismatch");
-    assert(C.rows() == m && C.cols() == n && "size mismatch");
-    assert(D.rows() == m && D.cols() == n && "size mismatch");
+    assert(C.rows() >= m && C.cols() >= n && "size mismatch");
+    assert(D.rows() >= m && D.cols() >= n && "size mismatch");
     blasfeo_dgemm_nt(m, n, k, alpha, A.ref(), 0, 0, B.ref(), 0, 0, beta, C.ref(), 0, 0, D.ref(), 0, 0);
 }
 
@@ -102,8 +102,8 @@ inline void blasfeo_dsyrk_ln(double alpha, BlasfeoMat& A, BlasfeoMat& B, double 
     int m = A.rows();
     int k = A.cols();
     assert(B.rows() == m && B.cols() == k && "size mismatch");
-    assert(C.rows() == m && C.cols() == m && "size mismatch");
-    assert(D.rows() == m && D.cols() == m && "size mismatch");
+    assert(C.rows() >= m && C.cols() >= m && "size mismatch");
+    assert(D.rows() >= m && D.cols() >= m && "size mismatch");
     blasfeo_dsyrk_ln(m, k, alpha, A.ref(), 0, 0, B.ref(), 0, 0, beta, C.ref(), 0, 0, D.ref(), 0, 0);
 }
 

@@ -405,9 +405,9 @@ public:
         std::size_t N = block_info.size();
         piqp_print("block sizes:");
         for (std::size_t i = 0; i < N - 1; i++) {
-            piqp_print(" %d", block_info[i].width);
+            piqp_print(" %d,%d", block_info[i].diag_size, block_info[i].off_diag_size);
         }
-        piqp_print("\narrow width: %d\n", block_info[N - 1].width);
+        piqp_print("\narrow width: %d\n", block_info[N - 1].diag_size);
     }
 
 protected:
@@ -547,7 +547,7 @@ protected:
 
                 if (hit_optimal_ratio || at_end || next_block_grows()) {
 //                    std::cout << "B " << current_block_info.diag_block_start << " " << current_block_info.diag_block_size << " " << current_block_info.off_diag_block_size << " " << current_block_info.arrow_width << std::endl;
-                    block_info.push_back({current_block_info.diag_block_start, current_block_info.diag_block_size});
+                    block_info.push_back({current_block_info.diag_block_start, current_block_info.diag_block_size, current_block_info.off_diag_block_size});
 
                     // L_i = chol(D_i - C_{i-1} * C_{i-1}^T
                     flops_tridiag += flops_syrk(static_cast<size_t>(current_block_info.diag_block_size), static_cast<size_t>(current_block_info.prev_diag_block_size + 1));
@@ -569,7 +569,7 @@ protected:
 
                 if (at_end) {
                     // finalize last block
-                    block_info.push_back({current_block_info.diag_block_start, current_block_info.diag_block_size});
+                    block_info.push_back({current_block_info.diag_block_start, current_block_info.diag_block_size, current_block_info.off_diag_block_size});
                     assert(current_block_info.off_diag_block_size == 0);
 
                     current_block_info.diag_block_start += current_block_info.diag_block_size;
@@ -582,7 +582,7 @@ protected:
         }
 
         // last block corresponds to corner block of arrow
-        block_info.push_back({current_block_info.diag_block_start, current_block_info.arrow_width});
+        block_info.push_back({current_block_info.diag_block_start, current_block_info.arrow_width, 0});
         assert(block_info.size() >= 2);
 
 //        // calculate current arrow flop count from normalized counts
@@ -595,14 +595,14 @@ protected:
 //
 //        std::size_t N = block_info.size();
 //        for (std::size_t i = 0; i < N; i++) {
-//            std::cout << block_info[i].start << ", " << block_info[i].width << ";" << std::endl;
+//            std::cout << block_info[i].start << ", " << block_info[i].diag_size << ", " << block_info[i].off_diag_size << ";" << std::endl;
 //        }
     }
 
     void utri_to_kkt(const SparseMat<T, I>& A_utri, BlockKKT& A_kkt)
     {
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
 
         A_kkt.D.resize(N);
         A_kkt.B.resize(N - 2);
@@ -610,25 +610,25 @@ protected:
 
         std::size_t block_index = 0;
         I block_start = block_info[block_index].start;
-        I block_width = block_info[block_index].width;
-        I last_block_width = 0;
+        I block_diag_size = block_info[block_index].diag_size;
+        I block_off_diag_size = block_info[block_index].off_diag_size;
 
         // Iterating over a csc symmetric upper triangular matrix corresponds
         // to iterating over the rows of the corresponding transpose (lower triangular)
         Eigen::Index n = A_utri.outerSize();
         for (Eigen::Index i = 0; i < n; i++)
         {
-            if (i >= block_start + block_width)
+            if (i >= block_start + block_diag_size)
             {
-                last_block_width = block_width;
                 block_index++;
                 block_start = block_info[block_index].start;
-                block_width = block_info[block_index].width;
+                block_diag_size = block_info[block_index].diag_size;
+                block_off_diag_size = block_info[block_index].off_diag_size;
             }
 
             std::size_t current_arrow_block_index = 0;
             I current_arrow_block_start = block_info[current_arrow_block_index].start;
-            I current_arrow_block_width = block_info[current_arrow_block_index].width;
+            I current_arrow_block_width = block_info[current_arrow_block_index].diag_size;
 
             for (typename SparseMat<T, I>::InnerIterator A_ltri_row_it(A_utri, i); A_ltri_row_it; ++A_ltri_row_it)
             {
@@ -640,7 +640,7 @@ protected:
                 if (j >= block_start)
                 {
                     if (!A_kkt.D[block_index]) {
-                        A_kkt.D[block_index] = std::make_unique<BlasfeoMat>(block_width, block_width);
+                        A_kkt.D[block_index] = std::make_unique<BlasfeoMat>(block_diag_size, block_diag_size);
                     }
                     BLASFEO_DMATEL(A_kkt.D[block_index]->ref(), i - block_start, j - block_start) = v;
                 }
@@ -650,7 +650,7 @@ protected:
                     while (current_arrow_block_start + current_arrow_block_width - 1 < j) {
                         current_arrow_block_index++;
                         current_arrow_block_start = block_info[current_arrow_block_index].start;
-                        current_arrow_block_width = block_info[current_arrow_block_index].width;
+                        current_arrow_block_width = block_info[current_arrow_block_index].diag_size;
                     }
 
                     if (!A_kkt.E[current_arrow_block_index]) {
@@ -661,11 +661,13 @@ protected:
                 // we have to be on off diagonal
                 else
                 {
-                    assert(j + block_width + last_block_width > i && "indexes in no valid block");
+                    I last_block_diag_size = block_info[block_index - 1].diag_size;
+                    I last_block_off_diag_size = block_info[block_index - 1].off_diag_size;
+                    assert(j + block_diag_size + last_block_off_diag_size > i && "indexes in no valid block");
                     if (!A_kkt.B[block_index - 1]) {
-                        A_kkt.B[block_index - 1] = std::make_unique<BlasfeoMat>(block_width, last_block_width);
+                        A_kkt.B[block_index - 1] = std::make_unique<BlasfeoMat>(last_block_off_diag_size, last_block_diag_size);
                     }
-                    BLASFEO_DMATEL(A_kkt.B[block_index - 1]->ref(), i - block_start, j + last_block_width - block_start) = v;
+                    BLASFEO_DMATEL(A_kkt.B[block_index - 1]->ref(), i - block_start, j + last_block_off_diag_size - block_start) = v;
                 }
             }
         }
@@ -677,7 +679,7 @@ protected:
         Vec<I>& block_fill_counter = A_block.tmp;
 
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
 
         if (init) {
             A_block.perm.resize(sAT.cols());
@@ -707,7 +709,7 @@ protected:
                     I j = A_row_it.index();
                     std::size_t block_index = 0;
                     // find the corresponding block
-                    while (block_info[block_index].start + block_info[block_index].width <= j && block_index + 1 < N - 2) { block_index++; }
+                    while (block_info[block_index].start + block_info[block_index].diag_size <= j && block_index + 1 < N - 2) { block_index++; }
                     A_block.block_row_sizes(Eigen::Index(block_index))++;
                 }
             }
@@ -737,7 +739,7 @@ protected:
             {
                 I j = A_row_it.index();
                 // find the corresponding block
-                while (block_info[block_index].start + block_info[block_index].width <= j && block_index + 1 < N - 2) { block_index++; }
+                while (block_info[block_index].start + block_info[block_index].diag_size <= j && block_index + 1 < N - 2) { block_index++; }
                 block_i = block_fill_counter(Eigen::Index(block_index))++;
                 if (init) {
                     A_block.perm[i] = block_row_acc[Eigen::Index(block_index)] + block_i;
@@ -750,7 +752,7 @@ protected:
             }
 
             I block_start = block_info[block_index].start;
-            I block_width = block_info[block_index].width;
+            I block_diag_size = block_info[block_index].diag_size;
 
             for (; A_row_it; ++A_row_it)
             {
@@ -774,13 +776,13 @@ protected:
                     }
                 }
                 // first block
-                else if (j < block_start + block_width)
+                else if (j < block_start + block_diag_size)
                 {
                     if (init && !A_block.D[block_index]) {
                         if (store_transpose) {
-                            A_block.D[block_index] = std::make_unique<BlasfeoMat>(block_width, A_block.block_row_sizes[Eigen::Index(block_index)]);
+                            A_block.D[block_index] = std::make_unique<BlasfeoMat>(block_diag_size, A_block.block_row_sizes[Eigen::Index(block_index)]);
                         } else {
-                            A_block.D[block_index] = std::make_unique<BlasfeoMat>(A_block.block_row_sizes[Eigen::Index(block_index)], block_width);
+                            A_block.D[block_index] = std::make_unique<BlasfeoMat>(A_block.block_row_sizes[Eigen::Index(block_index)], block_diag_size);
                         }
                     }
                     if (store_transpose) {
@@ -792,20 +794,20 @@ protected:
                 // second block
                 else
                 {
-                    I next_block_width = block_info[block_index + 1].width;
-                    assert(j < block_start + block_width + next_block_width && "indexes in no valid block");
+                    I block_off_diag_size = block_info[block_index].off_diag_size;
+                    assert(j < block_start + block_diag_size + block_off_diag_size && "indexes in no valid block");
 
                     if (init && !A_block.B[block_index]) {
                         if (store_transpose) {
-                            A_block.B[block_index] = std::make_unique<BlasfeoMat>(next_block_width, A_block.block_row_sizes[Eigen::Index(block_index)]);
+                            A_block.B[block_index] = std::make_unique<BlasfeoMat>(block_off_diag_size, A_block.block_row_sizes[Eigen::Index(block_index)]);
                         } else {
-                            A_block.B[block_index] = std::make_unique<BlasfeoMat>(A_block.block_row_sizes[Eigen::Index(block_index)], next_block_width);
+                            A_block.B[block_index] = std::make_unique<BlasfeoMat>(A_block.block_row_sizes[Eigen::Index(block_index)], block_off_diag_size);
                         }
                     }
                     if (store_transpose) {
-                        BLASFEO_DMATEL(A_block.B[block_index]->ref(), j - block_start - block_width, block_i) = v;
+                        BLASFEO_DMATEL(A_block.B[block_index]->ref(), j - block_start - block_diag_size, block_i) = v;
                     } else {
-                        BLASFEO_DMATEL(A_block.B[block_index]->ref(), block_i, j - block_start - block_width) = v;
+                        BLASFEO_DMATEL(A_block.B[block_index]->ref(), block_i, j - block_start - block_diag_size) = v;
                     }
                 }
             }
@@ -834,7 +836,7 @@ protected:
     void block_syrk_ln(BlockMat<I>& sA, BlockMat<I>& sB, BlockKKT& sD)
     {
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
 
         if (allocate) {
             sD.D.resize(N);
@@ -999,7 +1001,7 @@ protected:
         BlockVec& diag_block = tmp1_x_block;
 
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
         T delta_inv = 1.0 / m_delta;
 
         kkt_fac.D.resize(N);
@@ -1035,7 +1037,7 @@ protected:
 #endif
         for (std::size_t i = 0; i < N; i++)
         {
-            I m = block_info[i].width;
+            I m = block_info[i].diag_size;
 
             if (allocate) {
                 if (!kkt_fac.D[i]) {
@@ -1090,8 +1092,8 @@ protected:
 #endif
         for (std::size_t i = 0; i < N - 2; i++)
         {
-            int m = block_info[i + 1].width;
-            int n = block_info[i].width;
+            int m = block_info[i].off_diag_size;
+            int n = block_info[i].diag_size;
 
             bool mat_set = false;
 
@@ -1151,7 +1153,7 @@ protected:
             for (std::size_t i = 0; i < N - 1; i++)
             {
                 int m = arrow_width;
-                int n = block_info[i].width;
+                int n = block_info[i].diag_size;
 
                 bool mat_set = false;
 
@@ -1203,8 +1205,8 @@ protected:
                 // Only the arrow can have more allocated blocks because
                 // of the factorization if the previous factors exist.
                 if (!mat_set && i > 0 && kkt_fac.E[i - 1] && kkt_fac.B[i - 1]) {
-                    if (allocate) {
-                        kkt_fac.E[i] = std::make_unique<BlasfeoMat>(kkt_fac.E[i - 1]->rows(), kkt_fac.B[i - 1]->rows());
+                    if (allocate && !kkt_fac.E[i]) {
+                        kkt_fac.E[i] = std::make_unique<BlasfeoMat>(kkt_fac.E[i - 1]->rows(), kkt_fac.D[i - 1]->rows());
                     } else {
                         kkt_fac.E[i]->setZero();
                     }
@@ -1256,7 +1258,7 @@ protected:
     void factor_kkt()
     {
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
 
         int m = kkt_fac.D[0]->rows();
         int n, k;
@@ -1292,9 +1294,10 @@ protected:
             if (kkt_fac.B[i-1]) {
                 m = kkt_fac.B[i-1]->rows();
                 k = kkt_fac.B[i-1]->cols();
-                assert(kkt_fac.D[i]->rows() == m && kkt_fac.D[i]->cols() == m && "size mismatch");
+                assert(kkt_fac.D[i]->rows() >= m && kkt_fac.D[i]->cols() >= m && "size mismatch");
                 // L_i = chol(D_i - C_{i-1} * C_{i-1}^T)
                 blasfeo_dsyrk_ln(m, k, -1.0, kkt_fac.B[i-1]->ref(), 0, 0, kkt_fac.B[i-1]->ref(), 0, 0, 1.0, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.D[i]->ref(), 0, 0);
+                m = kkt_fac.D[i]->rows();
                 blasfeo_dpotrf_l(m, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.D[i]->ref(), 0, 0);
             } else {
                 m = kkt_fac.D[i]->rows();
@@ -1319,10 +1322,11 @@ protected:
                     n = kkt_fac.B[i-1]->rows();
                     k = kkt_fac.E[i-1]->cols();
                     assert(kkt_fac.B[i-1]->cols() == k && "size mismatch");
-                    assert(kkt_fac.E[i]->rows() == m && kkt_fac.E[i]->cols() == n && "size mismatch");
-                    assert(kkt_fac.D[i]->rows() == n && kkt_fac.D[i]->cols() == n && "size mismatch");
+                    assert(kkt_fac.E[i]->rows() == m && kkt_fac.E[i]->cols() >= n && "size mismatch");
+                    assert(kkt_fac.D[i]->rows() >= n && kkt_fac.D[i]->cols() >= n && "size mismatch");
                     // F_i = (E_i - F_{i-1} * C_{i-1}^T) * L_i^{-T}
                     blasfeo_dgemm_nt(m, n, k, -1.0, kkt_fac.E[i-1]->ref(), 0, 0, kkt_fac.B[i-1]->ref(), 0, 0, 1.0, kkt_fac.E[i]->ref(), 0, 0, kkt_fac.E[i]->ref(), 0, 0);
+                    n = kkt_fac.D[i]->rows();
                     blasfeo_dtrsm_rltn(m, n, 1.0, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.E[i]->ref(), 0, 0, kkt_fac.E[i]->ref(), 0, 0);
                 }
                 else if (kkt_fac.E[i])
@@ -1354,7 +1358,7 @@ protected:
     void block_symv_l(double alpha, BlockKKT& sA, BlockVec& x, BlockVec& z)
     {
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
         for (std::size_t i = 0; i < N; i++)
         {
             if (sA.D[i]) {
@@ -1429,7 +1433,7 @@ protected:
         block_veccpsc(beta, y, z);
 
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
 
 #ifdef PIQP_HAS_OPENMP
         #pragma omp parallel
@@ -1454,7 +1458,7 @@ protected:
                 int m = sA.B[i-1]->rows();
                 int n = sA.B[i-1]->cols();
                 assert(x.x[i-1].rows() == n && "size mismatch");
-                assert(z.x[i].rows() == m && "size mismatch");
+                assert(z.x[i].rows() >= m && "size mismatch");
                 // z_i += alpha * B_{i-1} * x_{i-1}
                 blasfeo_dgemv_n(m, n, alpha, sA.B[i-1]->ref(), 0, 0, x.x[i-1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
             }
@@ -1502,7 +1506,7 @@ protected:
         block_veccpsc(beta, y, z);
 
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
 
 #ifdef PIQP_HAS_OPENMP
         #pragma omp parallel
@@ -1526,7 +1530,7 @@ protected:
             if (sA.B[i]) {
                 int m = sA.B[i]->rows();
                 int n = sA.B[i]->cols();
-                assert(x.x[i+1].rows() == m && "size mismatch");
+                assert(x.x[i+1].rows() >= m && "size mismatch");
                 assert(z.x[i].rows() == n && "size mismatch");
                 // z_i += alpha * B_i^T * x_{i+1}
                 blasfeo_dgemv_t(m, n, alpha, sA.B[i]->ref(), 0, 0, x.x[i+1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
@@ -1566,7 +1570,7 @@ protected:
         block_veccpsc(beta_t, y_t, z_t);
 
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
         for (std::size_t i = 0; i < N - 2; i++)
         {
             if (sA.D[i]) {
@@ -1585,8 +1589,8 @@ protected:
                 int m = sA.B[i]->rows();
                 int n = sA.B[i]->cols();
                 assert(x_n.x[i].rows() == n && "size mismatch");
-                assert(z_n.x[i+1].rows() == m && "size mismatch");
-                assert(x_t.x[i+1].rows() == m && "size mismatch");
+                assert(z_n.x[i+1].rows() >= m && "size mismatch");
+                assert(x_t.x[i+1].rows() >= m && "size mismatch");
                 assert(z_t.x[i].rows() == n && "size mismatch");
                 // z_n_{i+1} += alpha_n * B_i * x_n_i
                 // z_t_i += alpha_t * B_i^T * x_t_{i+1}
@@ -1613,7 +1617,7 @@ protected:
         // ----- FORWARD SUBSTITUTION -----
 
         std::size_t N = block_info.size();
-        I arrow_width = block_info.back().width;
+        I arrow_width = block_info.back().diag_size;
 
         int m = kkt_fac.D[0]->rows();
         int n;
@@ -1624,13 +1628,14 @@ protected:
         for (std::size_t i = 1; i < N - 1; i++)
         {
             if (kkt_fac.B[i-1]) {
-                m = kkt_fac.D[i]->rows();
+                m = kkt_fac.B[i-1]->rows();
                 n = kkt_fac.B[i-1]->cols();
-                assert(kkt_fac.B[i-1]->rows() == m && "size mismatch");
+                assert(kkt_fac.D[i]->rows() >= m && "size mismatch");
                 assert(b_and_x.x[i-1].rows() == n && "size mismatch");
-                assert(b_and_x.x[i].rows() == m && "size mismatch");
+                assert(b_and_x.x[i].rows() >= m && "size mismatch");
                 // y_i = L_i^{-1} * (b_i - C_{i-1} * y_{i-1})
                 blasfeo_dgemv_n(m, n, -1.0, kkt_fac.B[i-1]->ref(), 0, 0, b_and_x.x[i-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+                m = kkt_fac.D[i]->rows();
                 blasfeo_dtrsv_lnn(m, kkt_fac.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
             }
         }
@@ -1683,7 +1688,7 @@ protected:
             if (kkt_fac.B[i]) {
                 m = kkt_fac.B[i]->rows();
                 n = kkt_fac.B[i]->cols();
-                assert(b_and_x.x[i+1].rows() == m && "size mismatch");
+                assert(b_and_x.x[i+1].rows() >= m && "size mismatch");
                 assert(b_and_x.x[i].rows() == n && "size mismatch");
                 // x_i = y_i - C_i^T * x_{i+1}
                 blasfeo_dgemv_t(m, n, -1.0, kkt_fac.B[i]->ref(), 0, 0, b_and_x.x[i+1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
