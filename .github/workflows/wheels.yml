@@ -70,8 +70,9 @@ jobs:
           CIBW_BEFORE_ALL_MACOS: bash ci/cibw_before_all_macos_${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}.sh
           CIBW_BUILD: ${{ matrix.target.build }}
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
+          name: wheels-${{ matrix.target.arch }}-${{ matrix.target.os }}
           path: ./wheelhouse/*.whl
 
   build_sdist:
@@ -89,6 +90,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
+          name: wheels-source
           path: dist/*.tar.gz
 
   upload_pypi:
@@ -107,9 +109,9 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          # unpacks default artifact into dist/
-          # if `name: artifact` is omitted, the action will create extra parent dir
-          name: artifact
+          # unpacks artifacts into dist/
+          pattern: wheels-*
+          merge-multiple: true
           path: dist
 
       - uses: pypa/gh-action-pypi-publish@release/v1

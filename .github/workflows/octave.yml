@@ -29,7 +29,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt update
-          sudo apt install --no-install-recommends octave liboctave-dev
+          sudo apt install --no-install-recommends octave octave-dev
 
       - name: Install Octave (macOS)
         if: runner.os == 'macOS'
@@ -55,6 +55,7 @@ jobs:
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
+          name: piqp-octave
           path: ./interfaces/octave/piqp-octave.tar.gz
 
       - name: Upload tarballs

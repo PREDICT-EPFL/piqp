@@ -71,6 +71,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
+          name: piqp-matlab-${{ matrix.platform}}64
           path: ./interfaces/matlab/piqp-matlab-${{ matrix.platform}}64.tar.gz
 
       - name: Upload tarballs
