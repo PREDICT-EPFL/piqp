@@ -102,6 +102,28 @@ struct BlockKKT
 
         return *this;
     }
+
+    void print()
+    {
+        for (std::size_t i = 0; i < D.size(); i++) {
+            if (D[i]) {
+                printf("D%zu:\n", i);
+                D[i]->print();
+            }
+        }
+        for (std::size_t i = 0; i < B.size(); i++) {
+            if (B[i]) {
+                printf("B%zu:\n", i);
+                B[i]->print();
+            }
+        }
+        for (std::size_t i = 0; i < E.size(); i++) {
+            if (E[i]) {
+                printf("E%zu:\n", i);
+                E[i]->print();
+            }
+        }
+    }
 };
 
 } // namespace sparse

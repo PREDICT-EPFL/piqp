@@ -28,6 +28,7 @@ struct BlockMat
     // [                A_{3,3} A_{3,4}                      A_{3,N}  ]
     // [                        ...                          ...      ]
     // [                             A_{N-2,N-2} A_{N-2,N-1} A_{N-2,N}]
+    // [                                         A_{N-1,N-1} A_{N-1,N}]
 
     // Row permutation from original matrix to block matrix.
     // For example, if the original matrix b = A * x, then
@@ -117,6 +118,28 @@ struct BlockMat
         }
 
         return *this;
+    }
+
+    void print()
+    {
+        for (std::size_t i = 0; i < D.size(); i++) {
+            if (D[i]) {
+                printf("D%zu:\n", i);
+                D[i]->print();
+            }
+        }
+        for (std::size_t i = 0; i < B.size(); i++) {
+            if (B[i]) {
+                printf("B%zu:\n", i);
+                B[i]->print();
+            }
+        }
+        for (std::size_t i = 0; i < E.size(); i++) {
+            if (E[i]) {
+                printf("E%zu:\n", i);
+                E[i]->print();
+            }
+        }
     }
 };
 

@@ -58,14 +58,14 @@ void test_solve_multiply(Data<T, I>& data, KKT1& kkt1, KKT2& kkt2)
                delta_x_2, delta_y_2, delta_z_2, delta_z_lb_2, delta_z_ub_2, delta_s_2, delta_s_lb_2, delta_s_ub_2);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    ASSERT_TRUE(delta_x_1.isApprox(delta_x_2, 1e-5));
-    ASSERT_TRUE(delta_y_1.isApprox(delta_y_2, 1e-5));
-    ASSERT_TRUE(delta_z_1.isApprox(delta_z_2, 1e-5));
-    ASSERT_TRUE(delta_z_lb_1.head(data.n_lb).isApprox(delta_z_lb_2.head(data.n_lb), 1e-5));
-    ASSERT_TRUE(delta_z_ub_1.head(data.n_ub).isApprox(delta_z_ub_2.head(data.n_ub), 1e-5));
-    ASSERT_TRUE(delta_s_1.isApprox(delta_s_2, 1e-5));
-    ASSERT_TRUE(delta_s_lb_1.head(data.n_lb).isApprox(delta_s_lb_2.head(data.n_lb), 1e-5));
-    ASSERT_TRUE(delta_s_ub_1.head(data.n_ub).isApprox(delta_s_ub_2.head(data.n_ub), 1e-5));
+    ASSERT_TRUE(delta_x_1.isApprox(delta_x_2, 1e-8));
+    ASSERT_TRUE(delta_y_1.isApprox(delta_y_2, 1e-8));
+    ASSERT_TRUE(delta_z_1.isApprox(delta_z_2, 1e-8));
+    ASSERT_TRUE(delta_z_lb_1.head(data.n_lb).isApprox(delta_z_lb_2.head(data.n_lb), 1e-8));
+    ASSERT_TRUE(delta_z_ub_1.head(data.n_ub).isApprox(delta_z_ub_2.head(data.n_ub), 1e-8));
+    ASSERT_TRUE(delta_s_1.isApprox(delta_s_2, 1e-8));
+    ASSERT_TRUE(delta_s_lb_1.head(data.n_lb).isApprox(delta_s_lb_2.head(data.n_lb), 1e-8));
+    ASSERT_TRUE(delta_s_ub_1.head(data.n_ub).isApprox(delta_s_ub_2.head(data.n_ub), 1e-8));
 
     Vec<T> rhs_x_sol_1(data.n);
     Vec<T> rhs_y_sol_1(data.p);
@@ -194,5 +194,6 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
 }
 
 INSTANTIATE_TEST_SUITE_P(FromFolder, BlocksparseStageKKTTest,
-                         ::testing::Values("small_dense", "chain_mass_sqp", "robot_arm_sqp",
+                         ::testing::Values("small_sparse_dual_inf", "small_dense",
+                                           "chain_mass_sqp", "robot_arm_sqp",
                                            "robot_arm_sqp_constr_perm", "robot_arm_sqp_no_global"));

@@ -567,8 +567,8 @@ protected:
                     current_block_info.off_diag_block_size = 0;
                 }
 
-                if (at_end) {
-                    // finalize last block
+                // finalize last block before arrow if it exists
+                if (at_end && current_block_info.diag_block_size > 0) {
                     block_info.push_back({current_block_info.diag_block_start, current_block_info.diag_block_size, current_block_info.off_diag_block_size});
                     assert(current_block_info.off_diag_block_size == 0);
 
@@ -684,14 +684,14 @@ protected:
         if (init) {
             A_block.perm.resize(sAT.cols());
             A_block.perm_inv.resize(sAT.cols());
-            A_block.D.resize(N - 2);
+            A_block.D.resize(N - 1);
             A_block.B.resize(N - 2);
-            A_block.E.resize(N - 2);
+            A_block.E.resize(N - 1);
 
             // keep track on the current fill status of each block
-            A_block.block_row_sizes.resize(Eigen::Index(N - 2));
+            A_block.block_row_sizes.resize(Eigen::Index(N - 1));
             A_block.block_row_sizes.setZero();
-            block_fill_counter.resize(Eigen::Index(N - 2));
+            block_fill_counter.resize(Eigen::Index(N - 1));
         }
 
         // Iterating over a csc transposed matrix corresponds
@@ -709,7 +709,7 @@ protected:
                     I j = A_row_it.index();
                     std::size_t block_index = 0;
                     // find the corresponding block
-                    while (block_info[block_index].start + block_info[block_index].diag_size <= j && block_index + 1 < N - 2) { block_index++; }
+                    while (block_info[block_index].start + block_info[block_index].diag_size <= j && block_index + 1 < N - 1) { block_index++; }
                     A_block.block_row_sizes(Eigen::Index(block_index))++;
                 }
             }
@@ -719,7 +719,7 @@ protected:
         if (init) {
             block_row_acc.resize(A_block.block_row_sizes.rows() + 1);
             block_row_acc[0] = 0;
-            for (Eigen::Index i = 0; i < Eigen::Index(N - 2); i++) {
+            for (Eigen::Index i = 0; i < Eigen::Index(N - 1); i++) {
                 block_row_acc[i + 1] = block_row_acc[i] + A_block.block_row_sizes[i];
             }
         }
@@ -739,7 +739,7 @@ protected:
             {
                 I j = A_row_it.index();
                 // find the corresponding block
-                while (block_info[block_index].start + block_info[block_index].diag_size <= j && block_index + 1 < N - 2) { block_index++; }
+                while (block_info[block_index].start + block_info[block_index].diag_size <= j && block_index + 1 < N - 1) { block_index++; }
                 block_i = block_fill_counter(Eigen::Index(block_index))++;
                 if (init) {
                     A_block.perm[i] = block_row_acc[Eigen::Index(block_index)] + block_i;
@@ -861,7 +861,7 @@ protected:
                 sD.D[i]->setZero();
             }
 
-            if (i < N - 2 && sA.D[i] && sB.D[i]) {
+            if (sA.D[i] && sB.D[i]) {
                 if (allocate) {
                     if (!sD.D[i]) {
                         int m = sA.D[i]->rows();
@@ -897,7 +897,7 @@ protected:
                 sD.D[N-1]->setZero();
             }
 
-            for (std::size_t i = 0; i < N - 2; i++)
+            for (std::size_t i = 0; i < N - 1; i++)
             {
                 if (sA.E[i] && sB.E[i]) {
                     if (allocate) {
@@ -952,7 +952,7 @@ protected:
                     sD.E[i]->setZero();
                 }
 
-                if (i < N - 2 && sA.E[i] && sB.D[i]) {
+                if (sA.E[i] && sB.D[i]) {
                     if (allocate) {
                         if (!sD.E[i]) {
                             int m = sA.E[i]->rows();
@@ -1232,14 +1232,14 @@ protected:
 #ifdef PIQP_HAS_OPENMP
         #pragma omp for nowait
 #endif
-        for (std::size_t i = 0; i < N - 2; i++)
+        for (std::size_t i = 0; i < N - 1; i++)
         {
             if (sA.D[i]) {
                 // sD.D = sA.D * diag(sB)
                 blasfeo_dgemm_nd(1.0, *sA.D[i], sB.x[i], 0.0, *sD.D[i], *sD.D[i]);
             }
 
-            if (sA.B[i]) {
+            if (i < N - 2 && sA.B[i]) {
                 // sD.B = sA.B * diag(sB)
                 blasfeo_dgemm_nd(1.0, *sA.B[i], sB.x[i], 0.0, *sD.B[i], *sD.B[i]);
             }
@@ -1421,12 +1421,12 @@ protected:
     // z = beta * y + alpha * A * x
     // here it's assumed that the sparsity of the block matrix
     // is transposed without the blocks individually transposed
-    // A = [A_{1,1}                                                           ]
-    //     [A_{1,2} A_{2,2}                                                   ]
-    //     [        A_{2,3} A_{3,3}                                           ]
-    //     [                A_{3,4} A_{4,4}                        A_{N-2,N-2}]
-    //     [                          ...                          A_{N-2,N-1}]
-    //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}  ]
+    // A = [A_{1,1}                                                             ]
+    //     [A_{1,2} A_{2,2}                                                     ]
+    //     [        A_{2,3} A_{3,3}                                             ]
+    //     [                A_{3,4} A_{4,4}                                     ]
+    //     [                          ...                A_{N-2,N-1} A_{N-1,N-1}]
+    //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N}   A_{N-1,N}  ]
     void block_t_gemv_n(double alpha, BlockMat<I>& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
     {
         // z = beta * y
@@ -1445,7 +1445,7 @@ protected:
 #endif
         for (std::size_t i = 0; i < N - 1; i++)
         {
-            if (i < N - 2 && sA.D[i]) {
+            if (sA.D[i]) {
                 int m = sA.D[i]->rows();
                 int n = sA.D[i]->cols();
                 assert(x.x[i].rows() == n && "size mismatch");
@@ -1470,7 +1470,7 @@ protected:
 #endif
         if (arrow_width > 0)
         {
-            for (std::size_t i = 0; i < N - 2; i++)
+            for (std::size_t i = 0; i < N - 1; i++)
             {
                 if (sA.E[i]) {
                     int m = sA.E[i]->rows();
@@ -1494,12 +1494,12 @@ protected:
     // z = beta * y + alpha * A^T * x
     // here it's assumed that the sparsity of the block matrix
     // is transposed without the blocks individually transposed
-    // A = [A_{1,1}                                                           ]
-    //     [A_{1,2} A_{2,2}                                                   ]
-    //     [        A_{2,3} A_{3,3}                                           ]
-    //     [                A_{3,4} A_{4,4}                        A_{N-2,N-2}]
-    //     [                          ...                          A_{N-2,N-1}]
-    //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}  ]
+    // A = [A_{1,1}                                                             ]
+    //     [A_{1,2} A_{2,2}                                                     ]
+    //     [        A_{2,3} A_{3,3}                                             ]
+    //     [                A_{3,4} A_{4,4}                                     ]
+    //     [                          ...                A_{N-2,N-1} A_{N-1,N-1}]
+    //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}    ]
     void block_t_gemv_t(double alpha, BlockMat<I>& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
     {
         // z = beta * y
@@ -1516,7 +1516,7 @@ protected:
 #ifdef PIQP_HAS_OPENMP
         #pragma omp for nowait
 #endif
-        for (std::size_t i = 0; i < N - 2; i++)
+        for (std::size_t i = 0; i < N - 1; i++)
         {
             if (sA.D[i]) {
                 int m = sA.D[i]->rows();
@@ -1527,7 +1527,7 @@ protected:
                 blasfeo_dgemv_t(m, n, alpha, sA.D[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
             }
 
-            if (sA.B[i]) {
+            if (i < N - 2 && sA.B[i]) {
                 int m = sA.B[i]->rows();
                 int n = sA.B[i]->cols();
                 assert(x.x[i+1].rows() >= m && "size mismatch");
@@ -1555,12 +1555,12 @@ protected:
     // z_t = beta_t * y_t + alpha_t * A^T * x_t
     // here it's assumed that the sparsity of the block matrix
     // is transposed without the blocks individually transposed
-    // A = [A_{1,1}                                                           ]
-    //     [A_{1,2} A_{2,2}                                                   ]
-    //     [        A_{2,3} A_{3,3}                                           ]
-    //     [                A_{3,4} A_{4,4}                        A_{N-2,N-2}]
-    //     [                          ...                          A_{N-2,N-1}]
-    //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}  ]
+    // A = [A_{1,1}                                                             ]
+    //     [A_{1,2} A_{2,2}                                                     ]
+    //     [        A_{2,3} A_{3,3}                                             ]
+    //     [                A_{3,4} A_{4,4}                                     ]
+    //     [                          ...                A_{N-2,N-1} A_{N-1,N-1}]
+    //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}    ]
     void block_t_gemv_nt(double alpha_n, double alpha_t, BlockMat<I>& sA, BlockVec& x_n, BlockVec& x_t,
                          double beta_n, double beta_t, BlockVec& y_n, BlockVec& y_t, BlockVec& z_n, BlockVec& z_t)
     {
@@ -1571,7 +1571,7 @@ protected:
 
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().diag_size;
-        for (std::size_t i = 0; i < N - 2; i++)
+        for (std::size_t i = 0; i < N - 1; i++)
         {
             if (sA.D[i]) {
                 int m = sA.D[i]->rows();
@@ -1585,7 +1585,7 @@ protected:
                 blasfeo_dgemv_nt(m, n, alpha_n, alpha_t, sA.D[i]->ref(), 0, 0, x_n.x[i].ref(), 0, x_t.x[i].ref(), 0, 1.0, 1.0, z_n.x[i].ref(), 0, z_t.x[i].ref(), 0, z_n.x[i].ref(), 0, z_t.x[i].ref(), 0);
             }
 
-            if (sA.B[i]) {
+            if (i < N - 2 && sA.B[i]) {
                 int m = sA.B[i]->rows();
                 int n = sA.B[i]->cols();
                 assert(x_n.x[i].rows() == n && "size mismatch");
@@ -1633,11 +1633,13 @@ protected:
                 assert(kkt_fac.D[i]->rows() >= m && "size mismatch");
                 assert(b_and_x.x[i-1].rows() == n && "size mismatch");
                 assert(b_and_x.x[i].rows() >= m && "size mismatch");
-                // y_i = L_i^{-1} * (b_i - C_{i-1} * y_{i-1})
+                // y_i = b_i - C_{i-1} * y_{i-1}
                 blasfeo_dgemv_n(m, n, -1.0, kkt_fac.B[i-1]->ref(), 0, 0, b_and_x.x[i-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
-                m = kkt_fac.D[i]->rows();
-                blasfeo_dtrsv_lnn(m, kkt_fac.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
             }
+            m = kkt_fac.D[i]->rows();
+            assert(b_and_x.x[i].rows() == m && "size mismatch");
+            // y_i = L_i^{-1} * y_i
+            blasfeo_dtrsv_lnn(m, kkt_fac.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
         }
 
         if (arrow_width > 0)

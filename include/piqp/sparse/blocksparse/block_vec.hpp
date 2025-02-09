@@ -143,6 +143,13 @@ struct BlockVec
             other(perm_inv(i++)) = 0;
         }
     }
+
+    void print()
+    {
+        for (BlasfeoVec& i : x) {
+            i.print();
+        }
+    }
 };
 
 } // namespace sparse

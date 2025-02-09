@@ -111,6 +111,11 @@ public:
     }
 
     blasfeo_dvec* ref() { return &vec; }
+
+    void print()
+    {
+        blasfeo_print_dvec(rows(), ref(), 0);
+    }
 };
 
 } // namespace piqp

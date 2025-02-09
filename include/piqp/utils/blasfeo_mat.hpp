@@ -112,6 +112,11 @@ public:
     }
 
     blasfeo_dmat* ref() { return &mat; }
+
+    void print()
+    {
+        blasfeo_print_dmat(rows(), cols(), ref(), 0, 0);
+    }
 };
 
 } // namespace piqp
