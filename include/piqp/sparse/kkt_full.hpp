@@ -19,8 +19,9 @@ namespace sparse
 {
 
 template<typename Derived, typename T, typename I>
-struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
+class KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
 {
+protected:
     Vec<I> P_utri_to_Ki; // mapping from P_utri row indices to KKT matrix
     Vec<T> P_diagonal;   // diagonal of P
     Vec<I> AT_to_Ki;     // mapping from AT row indices to KKT matrix
@@ -218,7 +219,7 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
         }
     }
 
-    void update_data(int options)
+    void update_data_impl(int options)
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
@@ -239,8 +240,6 @@ struct KKTImpl<Derived, T, I, KKTMode::KKT_FULL>
                     }
                 }
             }
-            update_kkt_cost_scalings();
-            static_cast<Derived*>(this)->update_kkt_box_scalings();
         }
 
         if (options & KKTUpdateOptions::KKT_UPDATE_A)

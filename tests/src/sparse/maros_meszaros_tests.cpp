@@ -21,7 +21,7 @@ class SparseMarosMeszarosTest : public testing::TestWithParam<std::string> {};
 
 TEST_P(SparseMarosMeszarosTest, CanSolveProblemKKTFull)
 {
-    std::string path = "maros_meszaros_data/" + GetParam();
+    std::string path = "data/maros_meszaros/" + GetParam();
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>(path);
 
     piqp::SparseSolver<T, I> solver;
@@ -38,7 +38,7 @@ TEST_P(SparseMarosMeszarosTest, CanSolveProblemKKTFull)
 std::vector<std::string> get_maros_meszaros_problems()
 {
     std::vector<std::string> problem_names;
-    for (const auto & entry : piqp::fs::directory_iterator("maros_meszaros_data"))
+    for (const auto & entry : piqp::fs::directory_iterator("data/maros_meszaros"))
     {
         std::string file_name = entry.path().filename().string();
         if (file_name == "README.md" || file_name == "LICENSE") continue;

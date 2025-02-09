@@ -17,8 +17,8 @@ namespace piqp
 namespace sparse
 {
 
-extern template struct KKTImpl<KKT<common::Scalar, common::StorageIndex, KKTMode::KKT_FULL, common::sparse::Ordering>, common::Scalar, common::StorageIndex, KKTMode::KKT_FULL>;
-extern template struct KKT<common::Scalar, common::StorageIndex>;
+extern template class KKTImpl<KKT<common::Scalar, common::StorageIndex, KKTMode::KKT_FULL, common::sparse::Ordering>, common::Scalar, common::StorageIndex, KKTMode::KKT_FULL>;
+extern template class KKT<common::Scalar, common::StorageIndex>;
 
 } // namespace sparse
 
