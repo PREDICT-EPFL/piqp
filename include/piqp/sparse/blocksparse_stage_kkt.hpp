@@ -186,13 +186,13 @@ public:
             for (I inner_idx = 0; inner_idx < block_size; inner_idx++)
             {
                 I perm_idx = GT.perm_inv(i);
-                BLASFEO_DVECEL(G_scaling.x[std::size_t(block_idx)].ref(), inner_idx) = T(1) / (m_s(perm_idx) * m_z_inv(perm_idx) + m_delta);
+                BLASFEO_DVECEL(G_scaling.x[std::size_t(block_idx)].ref(), inner_idx) = std::sqrt(T(1) / (m_s(perm_idx) * m_z_inv(perm_idx) + m_delta));
                 i++;
             }
         }
 
         block_gemm_nd(GT, G_scaling, GT_scaled);
-        block_syrk_ln_calc(GT, GT_scaled, GtG);
+        block_syrk_ln_calc(GT_scaled, GT_scaled, GtG);
         populate_kkt_fac();
         factor_kkt();
 
