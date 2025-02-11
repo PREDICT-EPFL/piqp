@@ -18,7 +18,7 @@ namespace piqp
 {
 
 // B <= A
-inline void blasfeo_dgecp(BlasfeoMat& A, BlasfeoMat& B)
+static inline void blasfeo_dgecp(BlasfeoMat& A, BlasfeoMat& B)
 {
     int m = A.rows();
     int n = A.cols();
@@ -27,7 +27,7 @@ inline void blasfeo_dgecp(BlasfeoMat& A, BlasfeoMat& B)
 }
 
 // B <= alpha * A
-inline void blasfeo_dgecpsc(double alpha, BlasfeoMat& A, BlasfeoMat& B)
+static inline void blasfeo_dgecpsc(double alpha, BlasfeoMat& A, BlasfeoMat& B)
 {
     int m = A.rows();
     int n = A.cols();
@@ -36,7 +36,7 @@ inline void blasfeo_dgecpsc(double alpha, BlasfeoMat& A, BlasfeoMat& B)
 }
 
 // B <= A, A lower triangular
-inline void blasfeo_dtrcp_l(BlasfeoMat& A, BlasfeoMat& B)
+static inline void blasfeo_dtrcp_l(BlasfeoMat& A, BlasfeoMat& B)
 {
     int m = A.rows();
     assert(A.cols() == m && B.rows() == m && B.cols() == m && "size mismatch");
@@ -44,7 +44,7 @@ inline void blasfeo_dtrcp_l(BlasfeoMat& A, BlasfeoMat& B)
 }
 
 // B <= alpha * A, A lower triangular
-inline void blasfeo_dtrcpsc_l(double alpha, BlasfeoMat& A, BlasfeoMat& B)
+static inline void blasfeo_dtrcpsc_l(double alpha, BlasfeoMat& A, BlasfeoMat& B)
 {
     int m = A.rows();
     assert(A.cols() == m && B.rows() == m && B.cols() == m && "size mismatch");
@@ -59,7 +59,7 @@ inline void blasfeo_dtrcpsc_l(double alpha, BlasfeoMat& A, BlasfeoMat& B)
 }
 
 // B <= B + alpha * A
-inline void blasfeo_dgead(double alpha, BlasfeoMat& A, BlasfeoMat& B)
+static inline void blasfeo_dgead(double alpha, BlasfeoMat& A, BlasfeoMat& B)
 {
     int m = A.rows();
     int n = A.cols();
@@ -68,7 +68,7 @@ inline void blasfeo_dgead(double alpha, BlasfeoMat& A, BlasfeoMat& B)
 }
 
 // diag(A) <= alpha * x
-inline void blasfeo_ddiain(double alpha, BlasfeoVec& x, BlasfeoMat& A)
+static inline void blasfeo_ddiain(double alpha, BlasfeoVec& x, BlasfeoMat& A)
 {
     int kmax = x.rows();
     assert(A.rows() == kmax && A.cols() == kmax && "size mismatch");
@@ -76,7 +76,7 @@ inline void blasfeo_ddiain(double alpha, BlasfeoVec& x, BlasfeoMat& A)
 }
 
 // diag(A) += alpha * x
-inline void blasfeo_ddiaad(double alpha, BlasfeoVec& x, BlasfeoMat& A)
+static inline void blasfeo_ddiaad(double alpha, BlasfeoVec& x, BlasfeoMat& A)
 {
     int kmax = x.rows();
     assert(A.rows() == kmax && A.cols() == kmax && "size mismatch");
@@ -85,7 +85,7 @@ inline void blasfeo_ddiaad(double alpha, BlasfeoVec& x, BlasfeoMat& A)
 
 
 // D <= beta * C + alpha * A * B^T
-inline void blasfeo_dgemm_nt(double alpha, BlasfeoMat& A, BlasfeoMat& B, double beta, BlasfeoMat& C, BlasfeoMat& D)
+static inline void blasfeo_dgemm_nt(double alpha, BlasfeoMat& A, BlasfeoMat& B, double beta, BlasfeoMat& C, BlasfeoMat& D)
 {
     int m = A.rows();
     int n = B.rows();
@@ -97,7 +97,7 @@ inline void blasfeo_dgemm_nt(double alpha, BlasfeoMat& A, BlasfeoMat& B, double 
 }
 
 // D <= beta * C + alpha * A * B^T ; C, D lower triangular
-inline void blasfeo_dsyrk_ln(double alpha, BlasfeoMat& A, BlasfeoMat& B, double beta, BlasfeoMat& C, BlasfeoMat& D)
+static inline void blasfeo_dsyrk_ln(double alpha, BlasfeoMat& A, BlasfeoMat& B, double beta, BlasfeoMat& C, BlasfeoMat& D)
 {
     int m = A.rows();
     int k = A.cols();
@@ -108,7 +108,7 @@ inline void blasfeo_dsyrk_ln(double alpha, BlasfeoMat& A, BlasfeoMat& B, double 
 }
 
 // D <= alpha * A * B + beta * C, with B diagonal
-inline void blasfeo_dgemm_nd(double alpha, BlasfeoMat& A, BlasfeoVec& B, double beta, BlasfeoMat& C, BlasfeoMat& D)
+static inline void blasfeo_dgemm_nd(double alpha, BlasfeoMat& A, BlasfeoVec& B, double beta, BlasfeoMat& C, BlasfeoMat& D)
 {
     int m = A.rows();
     int n = A.cols();
