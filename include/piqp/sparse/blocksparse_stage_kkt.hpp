@@ -661,9 +661,10 @@ protected:
                 // we have to be on off diagonal
                 else
                 {
+                    I last_block_start = block_info[block_index - 1].start;
                     I last_block_diag_size = block_info[block_index - 1].diag_size;
                     I last_block_off_diag_size = block_info[block_index - 1].off_diag_size;
-                    assert(j + block_diag_size + last_block_off_diag_size > i && "indexes in no valid block");
+                    assert(j >= last_block_start && "indexes in no valid block");
                     if (!A_kkt.B[block_index - 1]) {
                         A_kkt.B[block_index - 1] = std::make_unique<BlasfeoMat>(last_block_off_diag_size, last_block_diag_size);
                     }
