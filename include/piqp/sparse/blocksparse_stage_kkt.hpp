@@ -669,7 +669,7 @@ protected:
                     if (!A_kkt.B[block_index - 1]) {
                         A_kkt.B[block_index - 1] = std::make_unique<BlasfeoMat>(last_block_off_diag_size, last_block_diag_size);
                     }
-                    BLASFEO_DMATEL(A_kkt.B[block_index - 1]->ref(), i - block_start, j + last_block_off_diag_size - block_start) = v;
+                    BLASFEO_DMATEL(A_kkt.B[block_index - 1]->ref(), i - block_start, j - last_block_start) = v;
                 }
             }
         }

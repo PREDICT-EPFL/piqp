@@ -194,6 +194,6 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
 }
 
 INSTANTIATE_TEST_SUITE_P(FromFolder, BlocksparseStageKKTTest,
-                         ::testing::Values("small_sparse_dual_inf", "small_dense",
+                         ::testing::Values("small_sparse_dual_inf", "small_dense", "scenario_mpc",
                                            "chain_mass_sqp", "robot_arm_sqp",
                                            "robot_arm_sqp_constr_perm", "robot_arm_sqp_no_global"));
