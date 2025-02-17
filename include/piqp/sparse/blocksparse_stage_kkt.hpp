@@ -576,8 +576,9 @@ protected:
                     current_block_info.prev_diag_block_size = current_block_info.diag_block_size;
                     current_block_info.diag_block_size = current_block_info.off_diag_block_size;
                     current_block_info.off_diag_block_size = 0;
-                    break;
                 }
+
+                if (at_end) break;
             }
         }
 
@@ -1170,20 +1171,20 @@ protected:
                     }
                 }
 
+                // the terms AtA.E or GtG.E might be smaller,
+                // thus we have to zero the whole matrix just in case
+                if (!allocate && kkt_fac.E[i] && !mat_set) {
+                    kkt_fac.E[i]->setZero();
+                }
+
                 if (AtA.E[i]) {
                     if (allocate) {
                         if (!kkt_fac.E[i]) {
                             kkt_fac.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
-                        if (mat_set) {
-                            // E_i += delta^{-1} * AtA.E_i
-                            blasfeo_dgead(delta_inv, *AtA.E[i], *kkt_fac.E[i]);
-                        } else {
-                            // E_i = delta^{-1} * AtA.E_i
-                            blasfeo_dgecpsc(delta_inv, *AtA.E[i], *kkt_fac.E[i]);
-                            mat_set = true;
-                        }
+                        // E_i += delta^{-1} * AtA.E_i
+                        blasfeo_dgead(delta_inv, *AtA.E[i], *kkt_fac.E[i]);
                     }
                 }
 
@@ -1193,13 +1194,8 @@ protected:
                             kkt_fac.E[i] = std::make_unique<BlasfeoMat>(m, n);
                         }
                     } else {
-                        if (mat_set) {
-                            // E_i += GtG.E_i
-                            blasfeo_dgead(1.0, *GtG.E[i], *kkt_fac.E[i]);
-                        } else {
-                            // E_i = GtG.E_i
-                            blasfeo_dgecp(*GtG.E[i], *kkt_fac.E[i]);
-                        }
+                        // E_i += GtG.E_i
+                        blasfeo_dgead(1.0, *GtG.E[i], *kkt_fac.E[i]);
                     }
                 }
 
@@ -1207,9 +1203,7 @@ protected:
                 // of the factorization if the previous factors exist.
                 if (!mat_set && i > 0 && kkt_fac.E[i - 1] && kkt_fac.B[i - 1]) {
                     if (allocate && !kkt_fac.E[i]) {
-                        kkt_fac.E[i] = std::make_unique<BlasfeoMat>(kkt_fac.E[i - 1]->rows(), kkt_fac.D[i - 1]->rows());
-                    } else {
-                        kkt_fac.E[i]->setZero();
+                        kkt_fac.E[i] = std::make_unique<BlasfeoMat>(kkt_fac.E[i - 1]->rows(), kkt_fac.D[i]->rows());
                     }
                 }
             }

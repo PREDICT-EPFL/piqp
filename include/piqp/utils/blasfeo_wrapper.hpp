@@ -22,7 +22,7 @@ static inline void blasfeo_dgecp(BlasfeoMat& A, BlasfeoMat& B)
 {
     int m = A.rows();
     int n = A.cols();
-    assert(B.rows() == m && B.cols() == n && "size mismatch");
+    assert(B.rows() >= m && B.cols() >= n && "size mismatch");
     blasfeo_dgecp(m, n, A.ref(), 0, 0, B.ref(), 0, 0);
 }
 
@@ -31,7 +31,7 @@ static inline void blasfeo_dgecpsc(double alpha, BlasfeoMat& A, BlasfeoMat& B)
 {
     int m = A.rows();
     int n = A.cols();
-    assert(B.rows() == m && B.cols() == n && "size mismatch");
+    assert(B.rows() >= m && B.cols() >= n && "size mismatch");
     blasfeo_dgecpsc(m, n, alpha, A.ref(), 0, 0, B.ref(), 0, 0);
 }
 
@@ -63,7 +63,7 @@ static inline void blasfeo_dgead(double alpha, BlasfeoMat& A, BlasfeoMat& B)
 {
     int m = A.rows();
     int n = A.cols();
-    assert(B.rows() == m && B.cols() == n && "size mismatch");
+    assert(B.rows() >= m && B.cols() >= n && "size mismatch");
     blasfeo_dgead(m, n, alpha, A.ref(), 0, 0, B.ref(), 0, 0);
 }
 
