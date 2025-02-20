@@ -538,12 +538,12 @@ protected:
             if (i + 1 >= current_block_info.diag_block_start + current_block_info.diag_block_size) {
 
                 bool hit_optimal_ratio = current_block_info.diag_block_size >= 2 * current_block_info.off_diag_block_size;
+                bool at_end = i + 1 >= n - current_block_info.arrow_width;
                 auto next_block_grows = [&]() {
                     if (i >= n) return false;
                     block_structure_info next_block_info = get_next_block_structure(I(i) + 1, current_block_info);
                     return next_block_info.diag_block_size + next_block_info.off_diag_block_size > current_block_info.diag_block_size + current_block_info.off_diag_block_size;
                 };
-                bool at_end = i + 1 >= n - current_block_info.arrow_width;
 
                 if (hit_optimal_ratio || at_end || next_block_grows()) {
 //                    std::cout << "B " << current_block_info.diag_block_start << " " << current_block_info.diag_block_size << " " << current_block_info.off_diag_block_size << " " << current_block_info.arrow_width << std::endl;
@@ -579,6 +579,18 @@ protected:
                 }
 
                 if (at_end) break;
+            }
+        }
+
+        // merge blocks which are split in two
+        // this doesn't change the flops, but reduces the number of kernel calls
+        for (std::size_t i = 0; i < block_info.size() - 1; i++) {
+            if (block_info[i].off_diag_size == block_info[i + 1].diag_size && block_info[i + 1].off_diag_size == 0) {
+                block_info[i].diag_size += block_info[i].off_diag_size;
+                block_info[i].off_diag_size = 0;
+                auto iter = block_info.begin();
+                std::advance(iter, i + 1);
+                block_info.erase(iter);
             }
         }
 
@@ -1260,7 +1272,7 @@ protected:
         // L_1 = chol(D_1)
         blasfeo_dpotrf_l(m, kkt_fac.D[0]->ref(), 0, 0, kkt_fac.D[0]->ref(), 0, 0);
 
-        if (kkt_fac.B[0]) {
+        if (N > 2 && kkt_fac.B[0]) {
             m = kkt_fac.B[0]->rows();
             n = kkt_fac.B[0]->cols();
             assert(kkt_fac.D[0]->rows() == n && kkt_fac.D[0]->cols() == n && "size mismatch");
