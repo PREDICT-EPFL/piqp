@@ -41,15 +41,15 @@ jobs:
 
       - name: Package interface
         working-directory: interfaces/octave
-        run: octave package_piqp.m
+        run: octave-cli --no-gui package_piqp.m
 
       - name: Install pkg
         working-directory: interfaces/octave
-        run: octave --eval "pkg install piqp-octave.tar.gz"
+        run: octave-cli --no-gui --eval "pkg install piqp-octave.tar.gz"
 
       - name: Load pkg
         working-directory: interfaces/octave
-        run: octave --eval "pkg load piqp; piqp('sparse')"
+        run: octave-cli --no-gui --eval "pkg load piqp; piqp('sparse')"
 
       - name: Upload artifact
         if: runner.os == 'Linux'
