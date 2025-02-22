@@ -63,10 +63,27 @@ jobs:
         with:
           release: R2023b
 
-      - name: Build and package interface
+      - name: Build and package interface (Unix X64)
+        if: runner.os != 'Windows' && runner.arch == 'X64'
         uses: matlab-actions/run-command@v2
         env:
-          CMAKE_ARGS: ${{ runner.arch == 'X64' && '-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512' || (runner.arch == 'ARM64' && '-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64' || '') }}
+          CMAKE_ARGS: -DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512
+        with:
+          command: cd interfaces/matlab, make_piqp
+
+      - name: Build and package interface (Unix ARM64)
+        if: runner.os != 'Windows' && runner.arch == 'ARM64'
+        uses: matlab-actions/run-command@v2
+        env:
+          CMAKE_ARGS: -DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64
+        with:
+          command: cd interfaces/matlab, make_piqp
+
+      - name: Build and package interface (Windows)
+        if: runner.os == 'Windows'
+        uses: matlab-actions/run-command@v2
+        env:
+          CMAKE_ARGS: -DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=c:/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=c:/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=c:/opt/blasfeo_x64_avx512
         with:
           command: cd interfaces/matlab, make_piqp
 
