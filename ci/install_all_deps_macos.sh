@@ -15,15 +15,15 @@ cd build_external
 bash "$SCRIPT_DIR/install_eigen.sh"
 
 bash "$SCRIPT_DIR/download_blasfeo.sh"
-bash "$SCRIPT_DIR/build_install_blasfeo.sh GENERIC generic"
+bash "$SCRIPT_DIR/build_install_blasfeo.sh" GENERIC generic
 
 case $(uname -m) in
     x86_64)
-        bash "$SCRIPT_DIR/build_install_blasfeo.sh X64_INTEL_CORE x64 /opt/blasfeo_x64"
-        bash "$SCRIPT_DIR/build_install_blasfeo.sh X64_INTEL_HASWELL x64_avx2 /opt/blasfeo_x64_avx2"
-        bash "$SCRIPT_DIR/build_install_blasfeo.sh X64_INTEL_SKYLAKE_X arm64 /opt/blasfeo_x64_avx512"
+        bash "$SCRIPT_DIR/build_install_blasfeo.sh" X64_INTEL_CORE x64 /opt/blasfeo_x64
+        bash "$SCRIPT_DIR/build_install_blasfeo.sh" X64_INTEL_HASWELL x64_avx2 /opt/blasfeo_x64_avx2
+        bash "$SCRIPT_DIR/build_install_blasfeo.sh" X64_INTEL_SKYLAKE_X arm64 /opt/blasfeo_x64_avx512
         ;;
     aarch64|arm64)
-        bash "$SCRIPT_DIR/build_install_blasfeo.sh ARMV8A_APPLE_M1 arm64 /opt/blasfeo_arm64"
+        bash "$SCRIPT_DIR/build_install_blasfeo.sh" ARMV8A_APPLE_M1 arm64 /opt/blasfeo_arm64
         ;;
 esac
