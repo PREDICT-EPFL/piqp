@@ -217,7 +217,7 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
     settings.preconditioner_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "preconditioner_iter"));
     settings.tau = (double) mxGetScalar(mxGetField(mx_ptr, 0, "tau"));
     char kkt_solver[30];
-    mxGetString(mx_ptr, kkt_solver, 30);
+    mxGetString(mxGetField(mx_ptr, 0, "kkt_solver"), kkt_solver, 30);
     settings.kkt_solver = kkt_solver_from_string(kkt_solver, is_dense);
     settings.iterative_refinement_always_enabled = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_always_enabled"));
     settings.iterative_refinement_eps_abs = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_eps_abs"));
