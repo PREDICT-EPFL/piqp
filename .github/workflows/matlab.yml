@@ -65,10 +65,10 @@ jobs:
 
       - name: Build and package interface
         uses: matlab-actions/run-command@v2
+        env:
+          CMAKE_ARGS: ${{ runner.arch == 'X64' && '-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512' || (X64 == 'ARM64' && '-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64' || '') }}
         with:
           command: cd interfaces/matlab, make_piqp
-        env:
-          CMAKE_ARGS: ${{ runner.arch == 'X64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || (X64 == 'ARM64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
 
       - name: Run tests in MATLAB
         uses: matlab-actions/run-command@v2
