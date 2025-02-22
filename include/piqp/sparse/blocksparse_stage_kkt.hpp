@@ -624,7 +624,6 @@ protected:
         std::size_t block_index = 0;
         I block_start = block_info[block_index].start;
         I block_diag_size = block_info[block_index].diag_size;
-        I block_off_diag_size = block_info[block_index].off_diag_size;
 
         // Iterating over a csc symmetric upper triangular matrix corresponds
         // to iterating over the rows of the corresponding transpose (lower triangular)
@@ -636,7 +635,6 @@ protected:
                 block_index++;
                 block_start = block_info[block_index].start;
                 block_diag_size = block_info[block_index].diag_size;
-                block_off_diag_size = block_info[block_index].off_diag_size;
             }
 
             std::size_t current_arrow_block_index = 0;
