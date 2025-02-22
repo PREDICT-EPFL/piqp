@@ -22,6 +22,6 @@ case $(uname -m) in
         bash ../ci/build_install_blasfeo.sh X64_INTEL_SKYLAKE_X arm64 /opt/blasfeo_x64_avx512
         ;;
     aarch64|arm64)
-        bash ../ci/build_install_blasfeo.sh TARGET_ARMV8A_ARM_CORTEX_A76 arm64 /opt/blasfeo_arm64
+        bash ../ci/build_install_blasfeo.sh ARMV8A_ARM_CORTEX_A76 arm64 /opt/blasfeo_arm64
         ;;
 esac
