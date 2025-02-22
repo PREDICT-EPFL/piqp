@@ -10,14 +10,14 @@ cmake_minimum_required(VERSION 3.21)
 
 # Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
-    cmake_policy(SET CMP0135 NEW)
+    cmake_policy(SET CMP0135 OLD)
 endif()
 
 # Find pybind11
 include(FetchContent)
 FetchContent_Declare(
     pybind11
-    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.12.0.zip
+    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.13.6.zip
 )
 FetchContent_MakeAvailable(pybind11)
 

@@ -18,6 +18,10 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
     cmake_policy(SET CMP0135 NEW)
 endif()
+# Avoid warning about FetchContent_GetProperties in CMake 3.30:
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30.0")
+    cmake_policy(SET CMP0169 OLD)
+endif()
 
 #### Interface options ####
 option(BUILD_WITH_TEMPLATE_INSTANTIATION "Build a shared library with common templates instantiated" ON)

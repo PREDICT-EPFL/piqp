@@ -18,4 +18,4 @@ bash ../ci/build_install_blasfeo.sh X64_INTEL_CORE x64 c:/opt/blasfeo_x64
 bash ../ci/build_install_blasfeo.sh X64_INTEL_HASWELL x64_avx2 c:/opt/blasfeo_x64_avx2
 bash ../ci/build_install_blasfeo.sh X64_INTEL_SKYLAKE_X arm64 c:/opt/blasfeo_x64_avx512
 
-export CMAKE_ARGS="-DBLASFEO_X64_DIR=c:/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=c:/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=c:/opt/blasfeo_x64_avx512"
+echo "CMAKE_ARGS=\"-DBLASFEO_X64_DIR=c:/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=c:/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=c:/opt/blasfeo_x64_avx512\"" >> $GITHUB_ENV

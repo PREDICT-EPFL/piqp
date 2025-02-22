@@ -39,19 +39,24 @@ jobs:
       - name: Setup external build directory
         run: mkdir -p build_external
 
-      - name: Install Eigen
-        working-directory: build_external
-        run: bash ../ci/install_eigen.sh
-
       - name: Setup Ninja
         if: runner.os == 'Windows'
         uses: seanmiddleditch/gha-setup-ninja@master
 
-      - name: Install blasfeo
+      - name: Install Dependencies (Linux)
+        if: runner.os == 'Linux'
         working-directory: build_external
-        run: |
-          bash ../ci/download_blasfeo.sh
-          bash ../ci/build_install_blasfeo.sh GENERIC generic
+        run: bash ../ci/install_all_deps_linux.sh
+
+      - name: Install Dependencies (macOS)
+        if: runner.os == 'macOS'
+        working-directory: build_external
+        run: bash ../ci/install_all_deps_macos.sh
+
+      - name: Install Dependencies (Windows)
+        if: runner.os == 'Windows'
+        working-directory: build_external
+        run: bash ../ci/install_all_deps_windows.sh
 
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2

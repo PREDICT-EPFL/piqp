@@ -65,9 +65,9 @@ jobs:
           CIBW_ENVIRONMENT_MACOS: ${{ (matrix.target.arch == 'x86_64' || matrix.target.arch == 'amd64') && 'CMAKE_ARGS="-DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || ((matrix.target.arch == 'arm64' || matrix.target.arch == 'aarch64') && 'CMAKE_ARGS="-DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
           CIBW_ENVIRONMENT_WINDOWS: CMAKE_ARGS="-DBLASFEO_X64_DIR=c:/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=c:/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=c:/opt/blasfeo_x64_avx512"
           CIBW_ARCHS_LINUX: ${{ matrix.target.arch }}
-          CIBW_BEFORE_ALL_LINUX: bash ci/cibw_before_all_linux.sh
-          CIBW_BEFORE_ALL_WINDOWS: bash ci/cibw_before_all_windows.sh
-          CIBW_BEFORE_ALL_MACOS: bash ci/cibw_before_all_macos_${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}.sh
+          CIBW_BEFORE_ALL_LINUX: bash ci/install_all_deps_linux.sh
+          CIBW_BEFORE_ALL_WINDOWS: bash ci/install_all_deps_windows.sh
+          CIBW_BEFORE_ALL_MACOS: bash ci/install_all_deps_macos.sh
           CIBW_BUILD: ${{ matrix.target.build }}
 
       - uses: actions/upload-artifact@v4
