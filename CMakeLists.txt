@@ -25,7 +25,7 @@ endif()
 
 #### Interface options ####
 option(BUILD_WITH_TEMPLATE_INSTANTIATION "Build a shared library with common templates instantiated" ON)
-option(BUILD_WITH_BLASFEO "Build with blasfeo which is required for some kkt solvers" ON)
+option(BUILD_WITH_BLASFEO "Build with blasfeo which is required for some kkt solvers" OFF)
 option(BUILD_WITH_OPENMP "Build with OpenMP parallelization support" OFF)
 option(BUILD_SHARED_LIBS "Build library as shared." ON)
 option(BUILD_WITH_STD_OPTIONAL "Build using std::optional" OFF)

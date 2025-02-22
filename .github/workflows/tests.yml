@@ -52,7 +52,7 @@ jobs:
       - name: Configure piqp
         shell: bash -l {0}
         working-directory: build
-        run: cmake .. -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DENABLE_SANITIZERS=$ENABLE_SANITIZERS
+        run: cmake .. -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DBUILD_WITH_BLASFEO=ON -DENABLE_SANITIZERS=$ENABLE_SANITIZERS
 
       - name: Build piqp
         shell: bash -l {0}
