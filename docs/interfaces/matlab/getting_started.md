@@ -53,7 +53,7 @@ Settings can be updated using the `update_settings` method:
 solver.update_settings('verbose', true, 'compute_timings', true);
 ```
 
-In this example we enable the verbose output and internal timings. The full set of configuration options can be found [here](/interfaces/settings).
+In this example we enable the verbose output and internal timings. The full set of configuration options can be found [here]({{site.baseurl}}/interfaces/settings).
 
 ## Solving the Problem
 

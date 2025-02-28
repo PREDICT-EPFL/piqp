@@ -84,7 +84,7 @@ solver.settings().verbose = true;
 solver.settings().compute_timings = true;
 ```
 
-In this example we enable the verbose output and internal timings. The full set of configuration options can be found [here](/interfaces/settings).
+In this example we enable the verbose output and internal timings. The full set of configuration options can be found [here]({{site.baseurl}}/interfaces/settings).
 
 ## Solving the Problem
 
