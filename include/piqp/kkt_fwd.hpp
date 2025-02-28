@@ -32,7 +32,7 @@ namespace sparse
 {
 
 template<typename Derived, typename T, typename I, int Mode>
-struct KKTImpl;
+class KKTImpl;
 
 } // namespace sparse
 

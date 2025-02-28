@@ -271,8 +271,8 @@ private:
         SparseMatrix<typename Derived::Scalar, ColMajor, int> dst(matrix.rows(), matrix.cols());
         dst = matrix;
         dst.makeCompressed();
-        Matrix<mat_uint32_t, Dynamic, 1> dst_ir;
-        Matrix<mat_uint32_t, Dynamic, 1> dst_jc;
+        Matrix<typename std::remove_reference<decltype(*sparse.ir)>::type, Dynamic, 1> dst_ir;
+        Matrix<typename std::remove_reference<decltype(*sparse.jc)>::type, Dynamic, 1> dst_jc;
         Matrix<mat_type, Dynamic, 1> dst_re_val;
         Matrix<mat_type, Dynamic, 1> dst_im_val;
         mat_complex_split_t cs;
@@ -280,11 +280,11 @@ private:
         mat_uint32_t nz = static_cast<mat_uint32_t>(dst.nonZeros());
         sparse.nzmax = nz;
         dst_ir.resize(dst.nonZeros());
-        dst_ir = Map<Matrix<int, Dynamic, 1>>(dst.innerIndexPtr(), dst.nonZeros()).template cast<mat_uint32_t>();
+        dst_ir = Map<Matrix<int, Dynamic, 1>>(dst.innerIndexPtr(), dst.nonZeros()).template cast<typename std::remove_reference<decltype(*sparse.ir)>::type>();
         sparse.ir = dst_ir.data();
         sparse.nir = nz;
         dst_jc.resize(dst.outerSize() + 1);
-        dst_jc = Map<Matrix<int, Dynamic, 1>>(dst.outerIndexPtr(), dst.outerSize() + 1).template cast<mat_uint32_t>();
+        dst_jc = Map<Matrix<int, Dynamic, 1>>(dst.outerIndexPtr(), dst.outerSize() + 1).template cast<typename std::remove_reference<decltype(*sparse.jc)>::type>();
         sparse.jc = dst_jc.data();
         sparse.njc = static_cast<mat_uint32_t>(dst.outerSize() + 1);
         sparse.ndata = nz;
@@ -369,7 +369,7 @@ private:
             std::cout << "read_mat() wrong sparse format\n ";
             return -1;
         }
-        Map<SparseMatrix<data_t, ColMajor, uint32_t> > map(rows, cols, sparse->ndata, sparse->jc, sparse->ir, (data_t*) sparse->data);
+        Map<SparseMatrix<data_t, ColMajor, typename std::remove_reference<decltype(*sparse->ir)>::type> > map(rows, cols, sparse->ndata, sparse->jc, sparse->ir, (data_t*) sparse->data);
         matrix = map.template cast<Scalar>();
         return 0;
     }
@@ -390,7 +390,7 @@ private:
         Matrix<Scalar, Dynamic, 1> tmp(sparse->ndata);
         tmp.real() = map_re.template cast<Scalar>();
         tmp.imag() = map_im.template cast<Scalar>();
-        Map<SparseMatrix<Scalar, ColMajor, uint32_t> > map(rows, cols, sparse->ndata, sparse->jc, sparse->ir, tmp.data());
+        Map<SparseMatrix<Scalar, ColMajor, typename std::remove_reference<decltype(*sparse->ir)>::type> > map(rows, cols, sparse->ndata, sparse->jc, sparse->ir, tmp.data());
         matrix = map.template cast<Scalar>();
         return 0;
     }

@@ -28,51 +28,6 @@ template <typename T>
 class SparseKKTTest : public ::testing::Test {};
 TYPED_TEST_SUITE(SparseKKTTest, kkt_types);
 
-TYPED_TEST(SparseKKTTest, UpdateScalings)
-{
-    isize dim = 10;
-    isize n_eq = 8;
-    isize n_ineq = 9;
-    T sparsity_factor = 0.2;
-
-    Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
-    Data<T, I> data(qp_model);
-    Settings<T> settings;
-
-    // make sure P_utri has not complete diagonal filled
-    data.P_utri.coeffRef(1, 1) = 0;
-    data.P_utri.prune(0.0);
-
-    T rho = 0.9;
-    T delta = 1.2;
-
-    TypeParam kkt(data, settings);
-    kkt.init(rho, delta);
-
-    rho = 0.8;
-    delta = 0.2;
-    Vec<T> s(n_ineq); s.setConstant(1);
-    Vec<T> s_lb(dim); s_lb.setConstant(1);
-    Vec<T> s_ub(dim); s_ub.setConstant(1);
-    Vec<T> z(n_ineq); z.setConstant(1);
-    Vec<T> z_lb(dim); z_lb.setConstant(1);
-    Vec<T> z_ub(dim); z_ub.setConstant(1);
-
-    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings(rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
-    PIQP_EIGEN_MALLOC_ALLOWED();
-
-    // assert PKPt matrix is upper triangular
-    SparseMat<T, I> PKPt_upper = kkt.PKPt.template triangularView<Eigen::Upper>();
-    assert_sparse_matrices_equal(kkt.PKPt, PKPt_upper);
-
-    TypeParam kkt2(data, settings);
-    kkt2.init(rho, delta);
-
-    // assert update was correct, i.e. it's the same as a freshly initialized one
-    EXPECT_TRUE(kkt.PKPt.isApprox(kkt2.PKPt, 1e-8));
-}
-
 TYPED_TEST(SparseKKTTest, UpdateData)
 {
     isize dim = 10;
@@ -90,9 +45,17 @@ TYPED_TEST(SparseKKTTest, UpdateData)
 
     T rho = 0.9;
     T delta = 1.2;
+    Vec<T> s(n_ineq); s.setConstant(1);
+    Vec<T> s_lb(dim); s_lb.setConstant(1);
+    Vec<T> s_ub(dim); s_ub.setConstant(1);
+    Vec<T> z(n_ineq); z.setConstant(1);
+    Vec<T> z_lb(dim); z_lb.setConstant(1);
+    Vec<T> z_ub(dim); z_ub.setConstant(1);
 
     TypeParam kkt(data, settings);
-    kkt.init(rho, delta);
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    PIQP_EIGEN_MALLOC_ALLOWED();
 
     // update data
     Eigen::Map<Vec<T>>(data.P_utri.valuePtr(), data.P_utri.nonZeros()) = rand::vector_rand<T>(data.P_utri.nonZeros());
@@ -102,17 +65,20 @@ TYPED_TEST(SparseKKTTest, UpdateData)
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt.update_data(update_options);
+    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert PKPt matrix is upper triangular
-    SparseMat<T, I> PKPt_upper = kkt.PKPt.template triangularView<Eigen::Upper>();
-    assert_sparse_matrices_equal(kkt.PKPt, PKPt_upper);
+    SparseMat<T, I> PKPt_upper = kkt.internal_kkt_mat().template triangularView<Eigen::Upper>();
+    assert_sparse_matrices_equal(kkt.internal_kkt_mat(), PKPt_upper);
 
     TypeParam kkt2(data, settings);
-    kkt2.init(rho, delta);
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    kkt2.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
-    EXPECT_TRUE(kkt.PKPt.isApprox(kkt2.PKPt, 1e-8));
+    EXPECT_TRUE(kkt.internal_kkt_mat().isApprox(kkt2.internal_kkt_mat(), 1e-8));
 }
 
 TYPED_TEST(SparseKKTTest, FactorizeSolve)
@@ -128,12 +94,16 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
 
     T rho = 0.9;
     T delta = 1.2;
+    Vec<T> s(n_ineq); s.setConstant(1);
+    Vec<T> s_lb(dim); s_lb.setConstant(1);
+    Vec<T> s_ub(dim); s_ub.setConstant(1);
+    Vec<T> z(n_ineq); z.setConstant(1);
+    Vec<T> z_lb(dim); z_lb.setConstant(1);
+    Vec<T> z_ub(dim); z_ub.setConstant(1);
 
     TypeParam kkt(data, settings);
-    kkt.init(rho, delta);
-
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    ASSERT_TRUE(kkt.regularize_and_factorize(false));
+    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Vec<T> rhs_x = rand::vector_rand<T>(dim);
@@ -156,8 +126,7 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt.solve(rhs_x, rhs_y, rhs_z, rhs_z_lb, rhs_z_ub, rhs_s, rhs_s_lb, rhs_s_ub,
-              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub,
-              false);
+              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Vec<T> rhs_x_sol(dim);

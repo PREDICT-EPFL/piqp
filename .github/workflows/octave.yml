@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-12, macos-14, windows-latest ]
+        os: [ ubuntu-latest, macos-13, macos-14 ]
 
     runs-on: ${{ matrix.os }}
 
@@ -29,7 +29,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt update
-          sudo apt install --no-install-recommends octave liboctave-dev
+          sudo apt install --no-install-recommends octave octave-dev
 
       - name: Install Octave (macOS)
         if: runner.os == 'macOS'
@@ -41,20 +41,21 @@ jobs:
 
       - name: Package interface
         working-directory: interfaces/octave
-        run: octave package_piqp.m
+        run: octave-cli --no-gui package_piqp.m
 
       - name: Install pkg
         working-directory: interfaces/octave
-        run: octave --eval "pkg install piqp-octave.tar.gz"
+        run: octave-cli --no-gui --eval "pkg install piqp-octave.tar.gz"
 
       - name: Load pkg
         working-directory: interfaces/octave
-        run: octave --eval "pkg load piqp; piqp('sparse')"
+        run: octave-cli --no-gui --eval "pkg load piqp; piqp('sparse')"
 
       - name: Upload artifact
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
+          name: piqp-octave
           path: ./interfaces/octave/piqp-octave.tar.gz
 
       - name: Upload tarballs

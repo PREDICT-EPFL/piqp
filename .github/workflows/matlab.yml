@@ -15,11 +15,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-12, macos-14, windows-latest ]
+        os: [ ubuntu-20.04, macos-13, macos-14, windows-2019 ]
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             platform: linux
-          - os: macos-12
+          - os: macos-13
             platform: maci
           - os: macos-14
             platform: maca
@@ -34,31 +34,68 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - uses: ilammy/msvc-dev-cmd@v1
+
       - name: Setup external build directory
         run: mkdir -p build_external
 
-      - name: Install Eigen
+      - name: Setup Ninja
+        if: runner.os == 'Windows'
+        uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Install Dependencies (Linux)
+        if: runner.os == 'Linux'
         working-directory: build_external
-        run: bash  ../ci/install_eigen.sh
+        run: bash ../ci/install_all_deps_linux.sh
+
+      - name: Install Dependencies (macOS)
+        if: runner.os == 'macOS'
+        working-directory: build_external
+        run: bash ../ci/install_all_deps_macos.sh
+
+      - name: Install Dependencies (Windows)
+        if: runner.os == 'Windows'
+        working-directory: build_external
+        run: bash ../ci/install_all_deps_windows.sh
 
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
           release: R2023b
 
-      - name: Build and package interface
+      - name: Build and package interface (Unix X64)
+        if: runner.os != 'Windows' && runner.arch == 'X64'
         uses: matlab-actions/run-command@v2
+        env:
+          CMAKE_ARGS: -DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512
         with:
           command: cd interfaces/matlab, make_piqp
 
-      - name: Run tests  in MATLAB
+      - name: Build and package interface (Unix ARM64)
+        if: runner.os != 'Windows' && runner.arch == 'ARM64'
+        uses: matlab-actions/run-command@v2
+        env:
+          CMAKE_ARGS: -DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64
+        with:
+          command: cd interfaces/matlab, make_piqp
+
+      - name: Build and package interface (Windows)
+        if: runner.os == 'Windows'
+        uses: matlab-actions/run-command@v2
+        env:
+          CMAKE_ARGS: -DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=c:/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=c:/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=c:/opt/blasfeo_x64_avx512
+        with:
+          command: cd interfaces/matlab, make_piqp
+
+      - name: Run tests in MATLAB
         uses: matlab-actions/run-command@v2
         with:
           command: cd interfaces/matlab, runtest_piqp
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
+          name: piqp-matlab-${{ matrix.platform}}64
           path: ./interfaces/matlab/piqp-matlab-${{ matrix.platform}}64.tar.gz
 
       - name: Upload tarballs
