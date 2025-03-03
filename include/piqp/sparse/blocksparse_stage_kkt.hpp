@@ -476,32 +476,32 @@ protected:
                 {
                     I col = C_utri_row_it.index();
 
-                    if (col >= current_info.diag_block_start && col + current_info.arrow_width < n) {
+                    if (col >= next_info.diag_block_start && col + next_info.arrow_width < n) {
                         // current block size
-                        I current_block_size = current_info.diag_block_size + current_info.off_diag_block_size;
+                        I current_block_size = next_info.diag_block_size + next_info.off_diag_block_size;
                         // calculate new block size
-                        I new_block_size = (std::max)(col - current_info.diag_block_start + 1, current_block_size);
+                        I new_block_size = (std::max)(col - next_info.diag_block_start + 1, current_block_size);
                         // diag block is limited to current block height
-                        I max_diag_block_size = row - current_info.diag_block_start + 1;
+                        I max_diag_block_size = row - next_info.diag_block_start + 1;
                         // min diagonal block must be at least halve the block size
-                        I new_min_diag_block_size = (std::max)(current_info.diag_block_size, (new_block_size + 1) / 2); // round up
+                        I new_min_diag_block_size = (std::max)(next_info.diag_block_size, (new_block_size + 1) / 2); // round up
                         // split block size to have the highest diag block
                         I new_diag_block_size = (std::max)(new_min_diag_block_size, max_diag_block_size);
                         I new_off_diag_block_size = new_block_size - new_diag_block_size;
                         // potential new arrow width
-                        I remaining_width = I(n) - current_info.diag_block_start - current_info.diag_block_size - current_info.off_diag_block_size;
-                        I new_arrow_width = (std::min)((std::max)(current_info.arrow_width, I(n) - col), remaining_width);
+                        I remaining_width = I(n) - next_info.diag_block_start - next_info.diag_block_size - next_info.off_diag_block_size;
+                        I new_arrow_width = (std::min)((std::max)(next_info.arrow_width, I(n) - col), remaining_width);
 
                         usize flops_tridiag_new = flops_tridiag;
                         // L_i = chol(D_i - C_{i-1} * C_{i-1}^T
-                        flops_tridiag_new += flops_syrk(static_cast<size_t>(new_diag_block_size), static_cast<size_t>(current_info.prev_diag_block_size));
+                        flops_tridiag_new += flops_syrk(static_cast<size_t>(new_diag_block_size), static_cast<size_t>(next_info.prev_diag_block_size));
                         flops_tridiag_new += flops_potrf(static_cast<size_t>(new_diag_block_size));
                         // C_i = B_i * L_i^{-T}
                         flops_tridiag_new += flops_trsm(static_cast<size_t>(new_diag_block_size), static_cast<size_t>(new_off_diag_block_size));
 
                         // the dense kernels will use blocks of min width 4
                         // thus, we calculate the expected flops with arrows which are multiples of 4
-                        I arrow_width_flops = ((current_info.arrow_width + 3) / 4) * 4;
+                        I arrow_width_flops = ((next_info.arrow_width + 3) / 4) * 4;
                         I new_arrow_width_flops = ((new_arrow_width + 3) / 4) * 4;
                         // calculate current arrow flop count from normalized counts
                         usize flops_arrow = static_cast<usize>(arrow_width_flops) * flops_arrow_normalized_no_syrk
@@ -511,7 +511,7 @@ protected:
                         usize flops_arrow_new = static_cast<usize>(new_arrow_width_flops) * flops_arrow_normalized_no_syrk
                                                 + static_cast<usize>(new_arrow_width_flops) * static_cast<usize>(new_arrow_width_flops) * flops_arrow_normalized_syrk;;
                         // F_i = (E_i - F_{i-1} * C_{i-1}^T) * L_i^{-T}
-                        flops_arrow_new += flops_gemm(static_cast<usize>(new_arrow_width_flops), static_cast<usize>(current_info.prev_diag_block_size), static_cast<usize>(new_diag_block_size));
+                        flops_arrow_new += flops_gemm(static_cast<usize>(new_arrow_width_flops), static_cast<usize>(next_info.prev_diag_block_size), static_cast<usize>(new_diag_block_size));
                         flops_arrow_new += flops_trsm(static_cast<usize>(new_diag_block_size), static_cast<usize>(new_arrow_width_flops));
                         // L_N = chol(D_N - sum F_i * F_i^T)
                         flops_arrow_new += flops_syrk(static_cast<usize>(new_arrow_width_flops), static_cast<usize>(new_diag_block_size));
