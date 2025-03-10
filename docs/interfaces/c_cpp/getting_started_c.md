@@ -135,7 +135,7 @@ The result of the optimization can be obtained from the `work->result` struct. M
 * `work->result->info.primal_obj`: primal objective value
 * `work->result->info.run_time`: total runtime
 
-The full set of configuration options can be found [here]({{site.baseurl}}/interfaces/result).
+A detailed list of elements in the results object can be found [here]({{site.baseurl}}/interfaces/result).
 
 {: .warning }
 Timing information like `work->result->info.run_time` is only measured if `settings->compute_timings` is set to `1`.

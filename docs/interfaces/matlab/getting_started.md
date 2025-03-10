@@ -81,7 +81,7 @@ The result of the optimization are directly returned. More specifically, the mos
 * `result.info.primal_obj`: primal objective value
 * `result.info.run_time`: total runtime
 
-The full set of configuration options can be found [here]({{site.baseurl}}/interfaces/result).
+A detailed list of elements in the results object can be found [here]({{site.baseurl}}/interfaces/result).
 
 {: .warning }
 Timing information like `result.info.run_time` is only measured if `compute_timings` is set to `true`.

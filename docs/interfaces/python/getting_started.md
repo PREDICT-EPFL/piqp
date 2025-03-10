@@ -97,7 +97,7 @@ The result of the optimization can be obtained from the `solver.result` object. 
 * `solver.result.info.primal_obj`: primal objective value
 * `solver.result.info.run_time`: total runtime
 
-The full set of configuration options can be found [here]({{site.baseurl}}/interfaces/result).
+A detailed list of elements in the results object can be found [here]({{site.baseurl}}/interfaces/result).
 
 {: .warning }
 Timing information like `solver.result.info.run_time` is only measured if `solver.settings.compute_timings` is set to `true`.
