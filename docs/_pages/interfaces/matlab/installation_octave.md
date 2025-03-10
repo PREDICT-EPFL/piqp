@@ -2,7 +2,6 @@
 title: Installation (Octave)
 layout: default
 parent: Matlab / Octave
-grand_parent: Interfaces
 nav_order: 2
 ---
 

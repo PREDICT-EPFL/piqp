@@ -2,7 +2,6 @@
 title: Installation 
 layout: default
 parent: C/C++
-grand_parent: Interfaces
 nav_order: 1
 ---
 

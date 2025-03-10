@@ -3,6 +3,15 @@ description: An embedded Proximal Interior Point Quadratic Programming solver
 theme: just-the-docs
 color_scheme: piqp
 
+collections:
+  pages:
+    output: true
+    permalink: /:path
+
+just_the_docs:
+  collections:
+    pages:
+
 permalink: /:categories/:title
 url: https://github.com/PREDICT-EPFL/piqp
 

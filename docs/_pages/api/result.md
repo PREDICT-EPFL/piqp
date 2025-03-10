@@ -1,8 +1,8 @@
 ---
 title: Result
 layout: default
-parent: Interfaces
-nav_order: 11
+parent: API
+nav_order: 2
 ---
 
 | Field                  | Description                                  |

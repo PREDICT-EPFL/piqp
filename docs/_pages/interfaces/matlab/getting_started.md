@@ -2,7 +2,6 @@
 title: Getting Started
 layout: default
 parent: Matlab / Octave
-grand_parent: Interfaces
 nav_order: 3
 ---
 
@@ -53,7 +52,7 @@ Settings can be updated using the `update_settings` method:
 solver.update_settings('verbose', true, 'compute_timings', true);
 ```
 
-In this example we enable the verbose output and internal timings. The full set of configuration options can be found [here]({{site.baseurl}}/interfaces/settings).
+In this example we enable the verbose output and internal timings. The full set of configuration options can be found [here]({{site.baseurl}}/api/settings).
 
 ## Solving the Problem
 
@@ -81,7 +80,7 @@ The result of the optimization are directly returned. More specifically, the mos
 * `result.info.primal_obj`: primal objective value
 * `result.info.run_time`: total runtime
 
-A detailed list of elements in the results object can be found [here]({{site.baseurl}}/interfaces/result).
+A detailed list of elements in the results object can be found [here]({{site.baseurl}}/api/result).
 
 {: .warning }
 Timing information like `result.info.run_time` is only measured if `compute_timings` is set to `true`.

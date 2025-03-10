@@ -2,7 +2,6 @@
 title: Installation 
 layout: default
 parent: Python
-grand_parent: Interfaces
 nav_order: 1
 ---
 

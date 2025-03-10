@@ -2,7 +2,6 @@
 title: Interfaces
 layout: default
 nav_order: 2
-has_children: true
 expand_nav: true
 ---
 
