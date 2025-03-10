@@ -84,7 +84,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     py::enum_<piqp::KKTSolver>(m, "KKTSolver", py::module_local())
             .value("dense_cholesky", piqp::KKTSolver::dense_cholesky)
             .value("sparse_ldlt", piqp::KKTSolver::sparse_ldlt)
-            .value("blocksparse_stagewise", piqp::KKTSolver::blocksparse_stagewise)
+            .value("sparse_multistage", piqp::KKTSolver::sparse_multistage)
             .export_values();
 
     py::class_<piqp::Settings<T>>(m, "Settings", py::module_local())

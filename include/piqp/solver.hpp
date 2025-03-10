@@ -265,9 +265,9 @@ protected:
                 m_kkt = std::make_unique<sparse::KKT<T, I, Mode>>(m_data, m_settings);
                 break;
 #ifdef PIQP_HAS_BLASFEO
-            case KKTSolver::blocksparse_stagewise:
+            case KKTSolver::sparse_multistage:
                 if (m_settings.iterative_refinement_always_enabled) {
-                    piqp_eprint("The blocksparse stagewise kkt solver does not support iterative refinement.\n");
+                    piqp_eprint("The sparse_multistage kkt solver does not support iterative refinement.\n");
                     piqp_eprint("The setting will be ignored.\n");
                 }
                 m_kkt = std::make_unique<sparse::BlocksparseStageKKT<T, I>>(m_data, m_settings);

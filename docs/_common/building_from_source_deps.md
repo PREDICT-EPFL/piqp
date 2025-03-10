@@ -1,4 +1,4 @@
-To build PIQP it is required to have [CMake](https://cmake.org/), [Eigen 3.3.4+](https://eigen.tuxfamily.org/index.php?title=Main_Page) and a compatible compiler like [GCC](https://gcc.gnu.org/), [Clang](https://clang.llvm.org/), or [Visual Studio](https://visualstudio.microsoft.com/de/) with C++ extensions on Windows installed. CMake and a compatible compiler should already be installed on most systems. The (optional) KKT solver backend `blocksparse_stagewise` needs the additional dependency [Blasfeo](https://github.com/giaf/blasfeo).
+To build PIQP it is required to have [CMake](https://cmake.org/), [Eigen 3.3.4+](https://eigen.tuxfamily.org/index.php?title=Main_Page) and a compatible compiler like [GCC](https://gcc.gnu.org/), [Clang](https://clang.llvm.org/), or [Visual Studio](https://visualstudio.microsoft.com/de/) with C++ extensions on Windows installed. CMake and a compatible compiler should already be installed on most systems. The (optional) KKT solver backend `sparse_multistage` needs the additional dependency [Blasfeo](https://github.com/giaf/blasfeo).
 
 ### Installing Eigen
 

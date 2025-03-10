@@ -154,7 +154,7 @@ piqp::KKTSolver kkt_solver_from_string(const char* kkt_solver, bool is_dense)
     std::string kkt_solver_str(kkt_solver);
     if (kkt_solver_str == "dense_cholesky") return piqp::KKTSolver::dense_cholesky;
     if (kkt_solver_str == "sparse_ldlt") return piqp::KKTSolver::sparse_ldlt;
-    if (kkt_solver_str == "blocksparse_stagewise") return piqp::KKTSolver::blocksparse_stagewise;
+    if (kkt_solver_str == "sparse_multistage") return piqp::KKTSolver::sparse_multistage;
     if (is_dense) {
         mexWarnMsgTxt("Unknown kkt_solver, using dense_cholesky as a fallback.");
         return piqp::KKTSolver::dense_cholesky;

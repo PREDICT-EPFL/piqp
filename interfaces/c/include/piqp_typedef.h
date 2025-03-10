@@ -64,7 +64,7 @@ typedef struct {
 typedef enum {
     PIQP_DENSE_CHOLESKY,
     PIQP_SPARSE_LDLT,
-    PIQP_BLOCKSPARSE_STAGEWISE
+    PIQP_SPARSE_MULTISTAGE
 } piqp_kkt_solver;
 
 typedef struct {

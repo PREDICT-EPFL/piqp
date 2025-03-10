@@ -27,7 +27,7 @@ git clone https://github.com/PREDICT-EPFL/piqp.git
 * Build the interface in Matlab by executing the following commands
 ```matlab
 cd interfaces/matlab
-# to build with Blasfeo (needed for blocksparse_stagewise backend)
+# to build with Blasfeo (needed for sparse_multistage backend)
 # setenv("CMAKE_ARGS", "-DBUILD_WITH_BLASFEO=ON")
 make_piqp
 ```

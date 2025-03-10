@@ -4,7 +4,7 @@ import numpy
 import piqp
 import scipy.sparse
 import typing
-__all__ = ['DenseSolver', 'Info', 'KKTSolver', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseSolver', 'Status', 'blocksparse_stagewise', 'dense_cholesky', 'sparse_ldlt']
+__all__ = ['DenseSolver', 'Info', 'KKTSolver', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseSolver', 'Status', 'sparse_multistage', 'dense_cholesky', 'sparse_ldlt']
 class DenseSolver:
     def __init__(self: piqp.DenseSolver) -> None:
         ...
@@ -58,13 +58,13 @@ class KKTSolver:
 
       sparse_ldlt
 
-      blocksparse_stagewise
+      sparse_multistage
     """
-    __members__: typing.ClassVar[dict[str, piqp.KKTSolver]]  # value = {'dense_cholesky': <KKTSolver.dense_cholesky: 0>, 'sparse_ldlt': <KKTSolver.sparse_ldlt: 1>, 'blocksparse_stagewise': <KKTSolver.blocksparse_stagewise: 2>}
-    blocksparse_stagewise: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.blocksparse_stagewise: 2>
+    __members__: typing.ClassVar[dict[str, piqp.KKTSolver]]  # value = {'dense_cholesky': <KKTSolver.dense_cholesky: 0>, 'sparse_ldlt': <KKTSolver.sparse_ldlt: 1>, 'sparse_multistage': <KKTSolver.sparse_multistage: 2>}
     dense_cholesky: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.dense_cholesky: 0>
     sparse_ldlt: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_ldlt: 1>
-    def __eq__(self, other: typing.Any) -> bool:
+    sparse_multistage: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_multistage: 2>
+def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
         ...
@@ -210,6 +210,6 @@ PIQP_PRIMAL_INFEASIBLE: piqp.Status  # value = <Status.PIQP_PRIMAL_INFEASIBLE: -
 PIQP_SOLVED: piqp.Status  # value = <Status.PIQP_SOLVED: 1>
 PIQP_UNSOLVED: piqp.Status  # value = <Status.PIQP_UNSOLVED: -9>
 __version__: str = '0.4.2'
-blocksparse_stagewise: piqp.KKTSolver  # value = <KKTSolver.blocksparse_stagewise: 2>
 dense_cholesky: piqp.KKTSolver  # value = <KKTSolver.dense_cholesky: 0>
 sparse_ldlt: piqp.KKTSolver  # value = <KKTSolver.sparse_ldlt: 1>
+sparse_multistage: piqp.KKTSolver  # value = <KKTSolver.sparse_multistage: 2>

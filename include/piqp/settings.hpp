@@ -19,7 +19,7 @@ enum class KKTSolver
 {
     dense_cholesky,
     sparse_ldlt,
-    blocksparse_stagewise
+    sparse_multistage
 };
 
 constexpr const char* kkt_solver_to_string(KKTSolver kkt_solver)
@@ -28,7 +28,7 @@ constexpr const char* kkt_solver_to_string(KKTSolver kkt_solver)
     {
         case KKTSolver::dense_cholesky: return "dense_cholesky";
         case KKTSolver::sparse_ldlt: return "sparse_ldlt";
-        case KKTSolver::blocksparse_stagewise: return "blocksparse_stagewise";
+        case KKTSolver::sparse_multistage: return "sparse_multistage";
         default: return "unknown";
     }
 }

@@ -46,7 +46,7 @@ static void BM_CHAIN_MASS_SQP_BLOCKSPARSE_STAGE_KKT(benchmark::State& state)
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
 
     piqp::SparseSolver<T, I> solver;
-    solver.settings().kkt_solver = piqp::KKTSolver::blocksparse_stagewise;
+    solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage;
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
 
     for (auto _ : state)
@@ -93,7 +93,7 @@ static void BM_ROBOT_ARM_SQP_BLOCKSPARSE_STAGE_KKT(benchmark::State& state)
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/robot_arm_sqp.mat");
 
     piqp::SparseSolver<T, I> solver;
-    solver.settings().kkt_solver = piqp::KKTSolver::blocksparse_stagewise;
+    solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage;
     solver.settings().reg_lower_limit = 1e-8;
     solver.settings().reg_finetune_lower_limit = 1e-8;
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);

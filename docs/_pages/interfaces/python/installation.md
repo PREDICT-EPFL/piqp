@@ -34,7 +34,7 @@ git clone https://github.com/PREDICT-EPFL/piqp.git
 * Building and installing PIQP
 ```shell
 cd piqp
-# to build with Blasfeo (needed for blocksparse_stagewise backend)
+# to build with Blasfeo (needed for sparse_multistage backend)
 # export CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON"
 python3 -m pip install .
 ```

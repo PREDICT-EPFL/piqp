@@ -28,7 +28,7 @@ struct KKTModeBackendWrapper
 };
 
 using solver_types = testing::Types<KKTModeBackendWrapper<KKTMode::KKT_FULL, KKTSolver::sparse_ldlt>,
-                                    KKTModeBackendWrapper<KKTMode::KKT_FULL, KKTSolver::blocksparse_stagewise>,
+                                    KKTModeBackendWrapper<KKTMode::KKT_FULL, KKTSolver::sparse_multistage>,
                                     KKTModeBackendWrapper<KKTMode::KKT_EQ_ELIMINATED, KKTSolver::sparse_ldlt>,
                                     KKTModeBackendWrapper<KKTMode::KKT_INEQ_ELIMINATED, KKTSolver::sparse_ldlt>,
                                     KKTModeBackendWrapper<KKTMode::KKT_ALL_ELIMINATED, KKTSolver::sparse_ldlt>>;

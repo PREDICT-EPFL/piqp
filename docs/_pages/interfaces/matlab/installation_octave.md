@@ -8,7 +8,7 @@ nav_order: 2
 ## Installing package
 
 {: .warning }
-The Octave interface doesn't support the KKT solver backend `blocksparse_stagewise`.
+The Octave interface doesn't support the KKT solver backend `sparse_multistage`.
 
 PIQP can be directly installed running the following command
 

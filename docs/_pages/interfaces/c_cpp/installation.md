@@ -28,7 +28,7 @@ git clone https://github.com/PREDICT-EPFL/piqp.git
 cd piqp
 mkdir build
 cd build
-# add -DBUILD_WITH_BLASFEO=ON to build with Blasfeo (needed for blocksparse_stagewise backend)
+# add -DBUILD_WITH_BLASFEO=ON to build with Blasfeo (needed for sparse_multistage backend)
 cmake .. -DCMAKE_CXX_FLAGS="-march=native" -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF
 cmake --build . --config Release
 ```

@@ -40,7 +40,7 @@ template<typename T, typename I>
 class BlocksparseStageKKT : public KKTSystem<T>
 {
 protected:
-    static_assert(std::is_same<T, double>::value, "blocksparse_stagewise only supports doubles");
+    static_assert(std::is_same<T, double>::value, "sparse_multistage only supports doubles");
 
     const Data<T, I>& data;
     const Settings<T>& settings;
