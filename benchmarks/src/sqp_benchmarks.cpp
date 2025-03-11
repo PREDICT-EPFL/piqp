@@ -41,7 +41,7 @@ static void BM_CHAIN_MASS_SQP_KKT_ALL_ELIMINATED(benchmark::State& state)
     }
 }
 
-static void BM_CHAIN_MASS_SQP_BLOCKSPARSE_STAGE_KKT(benchmark::State& state)
+static void BM_CHAIN_MASS_SQP_MULTISTAGE_KKT(benchmark::State& state)
 {
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
 
@@ -88,7 +88,7 @@ static void BM_ROBOT_ARM_SQP_KKT_ALL_ELIMINATED(benchmark::State& state)
     }
 }
 
-static void BM_ROBOT_ARM_SQP_BLOCKSPARSE_STAGE_KKT(benchmark::State& state)
+static void BM_ROBOT_ARM_SQP_MULTISTAGE_KKT(benchmark::State& state)
 {
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/robot_arm_sqp.mat");
 
@@ -107,10 +107,10 @@ static void BM_ROBOT_ARM_SQP_BLOCKSPARSE_STAGE_KKT(benchmark::State& state)
 
 BENCHMARK(BM_CHAIN_MASS_SQP_KKT_FULL)->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_CHAIN_MASS_SQP_KKT_ALL_ELIMINATED)->Unit(benchmark::kMicrosecond);
-BENCHMARK(BM_CHAIN_MASS_SQP_BLOCKSPARSE_STAGE_KKT)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_CHAIN_MASS_SQP_MULTISTAGE_KKT)->Unit(benchmark::kMicrosecond);
 
 BENCHMARK(BM_ROBOT_ARM_SQP_KKT_FULL)->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_ROBOT_ARM_SQP_KKT_ALL_ELIMINATED)->Unit(benchmark::kMicrosecond);
-BENCHMARK(BM_ROBOT_ARM_SQP_BLOCKSPARSE_STAGE_KKT)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_ROBOT_ARM_SQP_MULTISTAGE_KKT)->Unit(benchmark::kMicrosecond);
 
 BENCHMARK_MAIN();

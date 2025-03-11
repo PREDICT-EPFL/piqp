@@ -126,7 +126,7 @@ TEST(BlocksparseStageKKTTest, UpdateData)
     Vec<T> z_lb = rand::vector_rand_strictly_positive<T>(data.n_lb);
     Vec<T> z_ub = rand::vector_rand_strictly_positive<T>(data.n_ub);
 
-    BlocksparseStageKKT<T, I> kkt_tridiag(data, settings);
+    MultistageKKT<T, I> kkt_tridiag(data, settings);
     KKT<T, I> kkt_sparse(data, settings);
 //    KKT<T, I, KKTMode::KKT_ALL_ELIMINATED, NaturalOrdering<I>> kkt_sparse(data, settings);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
@@ -183,7 +183,7 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
     Vec<T> z_lb = rand::vector_rand_strictly_positive<T>(data.n_lb);
     Vec<T> z_ub = rand::vector_rand_strictly_positive<T>(data.n_ub);
 
-    BlocksparseStageKKT<T, I> kkt_tridiag(data, settings);
+    MultistageKKT<T, I> kkt_tridiag(data, settings);
     KKT<T, I> kkt_sparse(data, settings);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt_tridiag.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);

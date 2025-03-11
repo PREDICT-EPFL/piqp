@@ -27,7 +27,7 @@
 #include "piqp/sparse/preconditioner.hpp"
 #include "piqp/sparse/kkt.hpp"
 #ifdef PIQP_HAS_BLASFEO
-#include "piqp/sparse/blocksparse_stage_kkt.hpp"
+#include "piqp/sparse/multistage_kkt.hpp"
 #endif
 #include "piqp/utils/optional.hpp"
 
@@ -270,7 +270,7 @@ protected:
                     piqp_eprint("The sparse_multistage kkt solver does not support iterative refinement.\n");
                     piqp_eprint("The setting will be ignored.\n");
                 }
-                m_kkt = std::make_unique<sparse::BlocksparseStageKKT<T, I>>(m_data, m_settings);
+                m_kkt = std::make_unique<sparse::MultistageKKT<T, I>>(m_data, m_settings);
                 break;
 #endif
             default:

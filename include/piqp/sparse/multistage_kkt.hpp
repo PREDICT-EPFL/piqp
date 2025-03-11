@@ -5,8 +5,8 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_SPARSE_BLOCKSPARSE_STAGE_KKT_HPP
-#define PIQP_SPARSE_BLOCKSPARSE_STAGE_KKT_HPP
+#ifndef PIQP_SPARSE_MULTISTAGE_KKT_HPP
+#define PIQP_SPARSE_MULTISTAGE_KKT_HPP
 
 #include <cassert>
 #include <memory>
@@ -37,7 +37,7 @@ namespace sparse
 {
 
 template<typename T, typename I>
-class BlocksparseStageKKT : public KKTSystem<T>
+class MultistageKKT : public KKTSystem<T>
 {
 protected:
     static_assert(std::is_same<T, double>::value, "sparse_multistage only supports doubles");
@@ -80,7 +80,7 @@ protected:
     BlockVec tmp2_z_block;
 
 public:
-    BlocksparseStageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
+    MultistageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
     {
         // init workspace
         m_rho = T(1);
@@ -1723,7 +1723,7 @@ protected:
 } // namespace piqp
 
 #ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
-#include "piqp/sparse/blocksparse_stage_kkt.tpp"
+#include "piqp/sparse/multistage_kkt.tpp"
 #endif
 
-#endif //PIQP_SPARSE_BLOCKSPARSE_STAGE_KKT_HPP
+#endif //PIQP_SPARSE_MULTISTAGE_KKT_HPP
