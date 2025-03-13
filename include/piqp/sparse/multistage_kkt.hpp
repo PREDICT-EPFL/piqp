@@ -457,9 +457,9 @@ protected:
 
         // flop count corresponding to tri-diagonal factorization
         usize flops_tridiag = 0;
-        // flop count corresponding to arrow (width = 1) factorization without syrk operations
+        // flop count corresponding to arrow width factorization without syrk operations
         usize flops_arrow_normalized_no_syrk = 0;
-        // flop count corresponding to arrow (width = 1) factorization only with syrk operations
+        // flop count corresponding to arrow width factorization only with syrk operations
         usize flops_arrow_normalized_syrk = 0;
 
         // Since C is lower triangular and stored in column major,
