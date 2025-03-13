@@ -5,3 +5,21 @@
 
 <!-- To automatically render math in text elements, include the auto-render extension: -->
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body);"></script>
+
+<script>
+    function resizeIFrameToFitContent(iFrame) {
+        var scrollHeight = iFrame.contentWindow.document.documentElement.scrollHeight + 'px';
+        if (iFrame.parentElement.style.paddingBottom !== scrollHeight) {
+            iFrame.parentElement.style.paddingBottom = (iFrame.contentWindow.document.documentElement.scrollHeight + 10) + 'px';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        setInterval(function() {
+            var iframes = document.querySelectorAll("iframe");
+            for (var i = 0; i < iframes.length; i++) {
+                resizeIFrameToFitContent(iframes[i]);
+            }
+        }, 500);
+    });
+</script>
