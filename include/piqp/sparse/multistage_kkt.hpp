@@ -1382,8 +1382,8 @@ protected:
                 int m = sA.B[i]->rows();
                 int n = sA.B[i]->cols();
                 assert(x.x[i].rows() == n && "size mismatch");
-                assert(x.x[i+1].rows() == m && "size mismatch");
-                assert(z.x[i+1].rows() == m && "size mismatch");
+                assert(x.x[i+1].rows() >= m && "size mismatch");
+                assert(z.x[i+1].rows() >= m && "size mismatch");
                 assert(z.x[i].rows() == n && "size mismatch");
                 // z_{i+1} += alpha * B_i * x_i
                 // z_i += alpha * B_i^T * x_{i+1}
