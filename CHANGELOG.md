@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In the sparse interface for Python A, b, G, and h are now None by default
 - Use Cholesky decomposition instead of LDLt factorization in dense interface
 - New KKT solver backend `sparse_multistage` for multistage optimization problems [#14](https://github.com/PREDICT-EPFL/piqp/pull/14)
+- Fix with run_time calculation, i.e., now it's run_time = setup_time/update_time + solve_time and not accumulated over multiple runs.
 
 ## [0.4.2] - 2024-08-02
 

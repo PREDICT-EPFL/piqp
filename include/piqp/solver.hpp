@@ -54,6 +54,7 @@ protected:
     Preconditioner m_preconditioner;
     std::unique_ptr<KKTSystem<T>> m_kkt;
 
+    bool m_first_run = true;
     bool m_setup_done = false;
     bool m_enable_iterative_refinement = false;
 
@@ -142,7 +143,11 @@ public:
         {
             T solve_time = m_timer.stop();
             m_result.info.solve_time = solve_time;
-            m_result.info.run_time += solve_time;
+            if (m_first_run) {
+                m_result.info.run_time = m_result.info.setup_time + m_result.info.solve_time;
+            } else {
+                m_result.info.run_time = m_result.info.update_time + m_result.info.solve_time;
+            }
         }
 
         if (m_settings.verbose)
@@ -154,11 +159,16 @@ public:
             if (m_settings.compute_timings)
             {
                 piqp_print("total run time:       %.3es\n", (double) m_result.info.run_time);
-                piqp_print("  setup time:         %.3es\n", (double) m_result.info.setup_time);
-                piqp_print("  update time:        %.3es\n", (double) m_result.info.update_time);
+                if (m_first_run) {
+                    piqp_print("  setup time:         %.3es\n", (double) m_result.info.setup_time);
+                } else {
+                    piqp_print("  update time:        %.3es\n", (double) m_result.info.update_time);
+                }
                 piqp_print("  solve time:         %.3es\n", (double) m_result.info.solve_time);
             }
         }
+
+        m_first_run = false;
 
         return status;
     }
@@ -229,15 +239,19 @@ protected:
                                     m_settings.preconditioner_scale_cost,
                                     m_settings.preconditioner_iter);
 
-        if (!init_kkt()) return;
+        if (!init_kkt())
+        {
+            m_setup_done = false;
+            return;
+        };
 
+        m_first_run = true;
         m_setup_done = true;
 
         if (m_settings.compute_timings)
         {
             T setup_time = m_timer.stop();
             m_result.info.setup_time = setup_time;
-            m_result.info.run_time += setup_time;
         }
     }
 
@@ -1103,7 +1117,6 @@ public:
         {
             T update_time = this->m_timer.stop();
             this->m_result.info.update_time = update_time;
-            this->m_result.info.run_time += update_time;
         }
     }
 };
@@ -1217,7 +1230,6 @@ public:
         {
             T update_time = this->m_timer.stop();
             this->m_result.info.update_time = update_time;
-            this->m_result.info.run_time += update_time;
         }
     }
 };
