@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-03-17
+
 ### Changed
 - In the sparse interface for Python A, b, G, and h are now None by default
 - Use Cholesky decomposition instead of LDLt factorization in dense interface
@@ -111,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.2...HEAD
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.3.1...v0.4.0

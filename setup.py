@@ -144,7 +144,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name="piqp",
-    version="0.4.2",
+    version="0.5.0",
     url='https://github.com/PREDICT-EPFL/piqp',
     author="Roland Schwan",
     author_email="roland.schwan@epfl.ch",
