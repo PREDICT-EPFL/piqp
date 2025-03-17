@@ -27,7 +27,7 @@ ArXiv, 2023
 
 * PIQP is written in header only C++ 14 leveraging the [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) library for vectorized linear algebra.
 * Dense and sparse problem formulations are supported. For small dense problems, vectorized instructions and cache locality can be exploited more efficiently.
-* Interface to Python with many more to follow.
+* Special backend for multistage optimization problems.
 * Allocation free problem updates and re-solves.
 * Open source under the BSD 2-Clause License.
 
@@ -55,6 +55,7 @@ This work was supported by the [Swiss National Science Foundation](https://www.s
 
 PIQP is an adapted implementation of [work](https://link.springer.com/article/10.1007/s10589-020-00240-9) by Spyridon Pougkakiotis and Jacek Gondzio, and is built on the following open-source libraries:
 * [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page): It's the work horse under the hood, responsible for producing optimized numerical linear algebra code.
+* [Blasfeo](https://github.com/giaf/blasfeo): Used in the sparse_multistage KKT solver backend.
 * [ProxSuite](https://github.com/Simple-Robotics/proxsuite): The code structure (folder/namespace structure, etc.), some utility functions/helper macros, and the instruction set optimized python bindings are based on ProxSuite.
 * [SuiteSparse - LDL](https://github.com/DrTimothyAldenDavis/SuiteSparse) (modified version): Used for solving linear systems in the sparse solver.
 * [pybind11](https://github.com/pybind/pybind11): Used for generating the python bindings.

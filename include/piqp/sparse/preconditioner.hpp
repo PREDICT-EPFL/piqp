@@ -104,10 +104,10 @@ public:
                     for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
                     {
                         I i_row = P_utri_it.index();
-                        delta_iter(j) = std::max(delta_iter(j), abs(P_utri_it.value()));
+                        delta_iter(j) = (std::max)(delta_iter(j), abs(P_utri_it.value()));
                         if (i_row != j)
                         {
-                            delta_iter(i_row) = std::max(delta_iter(i_row), abs(P_utri_it.value()));
+                            delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(P_utri_it.value()));
                         }
                     }
                 }
@@ -116,8 +116,8 @@ public:
                     for (typename SparseMat<T, I>::InnerIterator AT_it(data.AT, j); AT_it; ++AT_it)
                     {
                         I i_row = AT_it.index();
-                        delta_iter(i_row) = std::max(delta_iter(i_row), abs(AT_it.value()));
-                        delta_iter(n + j) = std::max(delta_iter(n + j), abs(AT_it.value()));
+                        delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(AT_it.value()));
+                        delta_iter(n + j) = (std::max)(delta_iter(n + j), abs(AT_it.value()));
                     }
                 }
                 for (isize j = 0; j < m; j++)
@@ -125,18 +125,18 @@ public:
                     for (typename SparseMat<T, I>::InnerIterator GT_it(data.GT, j); GT_it; ++GT_it)
                     {
                         I i_row = GT_it.index();
-                        delta_iter(i_row) = std::max(delta_iter(i_row), abs(GT_it.value()));
-                        delta_iter(n + p + j) = std::max(delta_iter(n + p + j), abs(GT_it.value()));
+                        delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(GT_it.value()));
+                        delta_iter(n + p + j) = (std::max)(delta_iter(n + p + j), abs(GT_it.value()));
                     }
                 }
                 for (isize j = 0; j < n_lb; j++)
                 {
-                    delta_iter(data.x_lb_idx(j)) = std::max(delta_iter(data.x_lb_idx(j)), data.x_lb_scaling(j));
+                    delta_iter(data.x_lb_idx(j)) = (std::max)(delta_iter(data.x_lb_idx(j)), data.x_lb_scaling(j));
                     delta_iter_lb(j) = data.x_lb_scaling(j);
                 }
                 for (isize j = 0; j < n_ub; j++)
                 {
-                    delta_iter(data.x_ub_idx(j)) = std::max(delta_iter(data.x_ub_idx(j)), data.x_ub_scaling(j));
+                    delta_iter(data.x_ub_idx(j)) = (std::max)(delta_iter(data.x_ub_idx(j)), data.x_ub_scaling(j));
                     delta_iter_ub(j) = data.x_ub_scaling(j);
                 }
 
@@ -185,16 +185,16 @@ public:
                         for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
                         {
                             I i_row = P_utri_it.index();
-                            delta_iter_cost(j) = std::max(delta_iter_cost(j), abs(P_utri_it.value()));
+                            delta_iter_cost(j) = (std::max)(delta_iter_cost(j), abs(P_utri_it.value()));
                             if (i_row != j)
                             {
-                                delta_iter_cost(i_row) = std::max(delta_iter_cost(i_row), abs(P_utri_it.value()));
+                                delta_iter_cost(i_row) = (std::max)(delta_iter_cost(i_row), abs(P_utri_it.value()));
                             }
                         }
                     }
                     T gamma = delta_iter_cost.sum() / T(n);
                     limit_scaling(gamma);
-                    gamma = std::max(gamma, data.c.template lpNorm<Eigen::Infinity>());
+                    gamma = (std::max)(gamma, data.c.template lpNorm<Eigen::Infinity>());
                     limit_scaling(gamma);
                     gamma = T(1) / gamma;
 

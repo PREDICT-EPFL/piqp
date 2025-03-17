@@ -77,6 +77,19 @@ inline octave_value eigen_to_ov(const Vec& vec)
     return octave_value(arr);
 }
 
+piqp::KKTSolver kkt_solver_from_string(const std::string& kkt_solver, bool is_dense)
+{
+    if (kkt_solver == "dense_cholesky") return piqp::KKTSolver::dense_cholesky;
+    if (kkt_solver == "sparse_ldlt") return piqp::KKTSolver::sparse_ldlt;
+    if (kkt_solver == "sparse_multistage") return piqp::KKTSolver::sparse_multistage;
+    if (is_dense) {
+        warning("Unknown kkt_solver, using dense_cholesky as a fallback.");
+        return piqp::KKTSolver::dense_cholesky;
+    }
+    warning("Unknown kkt_solver, using sparse_ldlt as a fallback.");
+    return piqp::KKTSolver::sparse_ldlt;
+}
+
 octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
 {
     octave_scalar_map ov_struct;
@@ -97,6 +110,7 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     ov_struct.assign("preconditioner_scale_cost", octave_value(settings.preconditioner_scale_cost));
     ov_struct.assign("preconditioner_iter", octave_value(settings.preconditioner_iter));
     ov_struct.assign("tau", octave_value(settings.tau));
+    ov_struct.assign("kkt_solver", octave_value(piqp::kkt_solver_to_string(settings.kkt_solver)));
     ov_struct.assign("iterative_refinement_always_enabled", octave_value(settings.iterative_refinement_always_enabled));
     ov_struct.assign("iterative_refinement_eps_abs", octave_value(settings.iterative_refinement_eps_abs));
     ov_struct.assign("iterative_refinement_eps_rel", octave_value(settings.iterative_refinement_eps_rel));
@@ -110,7 +124,7 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     return octave_value(ov_struct);
 }
 
-void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settings<double>& settings)
+void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settings<double>& settings, bool is_dense)
 {
     settings.rho_init = ov_struct.getfield("rho_init").double_value();
     settings.delta_init = ov_struct.getfield("delta_init").double_value();
@@ -128,6 +142,7 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
     settings.preconditioner_scale_cost = ov_struct.getfield("preconditioner_scale_cost").bool_value();
     settings.preconditioner_iter = ov_struct.getfield("preconditioner_iter").int_value();
     settings.tau = ov_struct.getfield("tau").double_value();
+    settings.kkt_solver = kkt_solver_from_string(ov_struct.getfield("kkt_solver").string_value(), is_dense);
     settings.iterative_refinement_always_enabled = ov_struct.getfield("iterative_refinement_always_enabled").bool_value();
     settings.iterative_refinement_eps_abs = ov_struct.getfield("iterative_refinement_eps_abs").double_value();
     settings.iterative_refinement_eps_rel = ov_struct.getfield("iterative_refinement_eps_rel").double_value();
@@ -261,9 +276,9 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
     // Update settings
     if (args(0).string_value() == "update_settings") {
         if (oct_handle->isDense()) {
-            copy_ov_struct_to_settings(args(2).scalar_map_value(), oct_handle->as_dense_ptr()->settings());
+            copy_ov_struct_to_settings(args(2).scalar_map_value(), oct_handle->as_dense_ptr()->settings(), oct_handle->isDense());
         } else {
-            copy_ov_struct_to_settings(args(2).scalar_map_value(), oct_handle->as_sparse_ptr()->settings());
+            copy_ov_struct_to_settings(args(2).scalar_map_value(), oct_handle->as_sparse_ptr()->settings(), oct_handle->isDense());
         }
         return {};
     }
@@ -313,7 +328,7 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
         Eigen::Map<const Vec> x_ub(x_ub_ref.is_scalar_type() ? &x_ub_value : x_ub_ref.vector_value().data(), n);
 
         if (oct_handle->isDense()) {
-            copy_ov_struct_to_settings(args(13).scalar_map_value(), oct_handle->as_dense_ptr()->settings());
+            copy_ov_struct_to_settings(args(13).scalar_map_value(), oct_handle->as_dense_ptr()->settings(), oct_handle->isDense());
 
             double P_value = P_ref.is_scalar_type() ? P_ref.double_value() : 0;
             double A_value = A_ref.is_scalar_type() ? A_ref.double_value() : 0;
@@ -325,7 +340,7 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
 
             oct_handle->as_dense_ptr()->setup(P, c, A, b, G, h, x_lb, x_ub);
         } else {
-            copy_ov_struct_to_settings(args(13).scalar_map_value(), oct_handle->as_sparse_ptr()->settings());
+            copy_ov_struct_to_settings(args(13).scalar_map_value(), oct_handle->as_sparse_ptr()->settings(), oct_handle->isDense());
 
             IVec Pp = to_int_vec(P_ref.sparse_matrix_value().xcidx(), n + 1);
             IVec Pi = to_int_vec(P_ref.sparse_matrix_value().xridx(), Pp(n));

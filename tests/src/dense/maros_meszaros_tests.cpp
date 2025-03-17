@@ -20,7 +20,7 @@ class DenseMarosMeszarosTest : public testing::TestWithParam<std::string> {};
 
 TEST_P(DenseMarosMeszarosTest, CanSolveProblemKKTFull)
 {
-    std::string path = "maros_meszaros_data/" + GetParam();
+    std::string path = "data/maros_meszaros/" + GetParam();
     piqp::sparse::Model<T, int> sparse_model = piqp::load_sparse_model<T, int>(path);
     piqp::dense::Model<T> model = sparse_model.dense_model();
 
@@ -38,12 +38,12 @@ TEST_P(DenseMarosMeszarosTest, CanSolveProblemKKTFull)
 std::vector<std::string> get_maros_meszaros_problems()
 {
     std::vector<std::string> problem_names;
-    for (const auto & entry : piqp::fs::directory_iterator("maros_meszaros_data"))
+    for (const auto & entry : piqp::fs::directory_iterator("data/maros_meszaros"))
     {
         std::string file_name = entry.path().filename().string();
         if (file_name == "README.md" || file_name == "LICENSE") continue;
 
-        std::string path = "maros_meszaros_data/" + file_name;
+        std::string path = "data/maros_meszaros/" + file_name;
         piqp::sparse::Model<T, int> model = piqp::load_sparse_model<T, int>(path);
 
         // only solve small problems

@@ -61,32 +61,39 @@ typedef struct {
     piqp_float* x_ub; // decision variables upper bounds x_ub (size n), can be NULL
 } piqp_data_sparse;
 
+typedef enum {
+    PIQP_DENSE_CHOLESKY,
+    PIQP_SPARSE_LDLT,
+    PIQP_SPARSE_MULTISTAGE
+} piqp_kkt_solver;
+
 typedef struct {
-    piqp_float rho_init;
-    piqp_float delta_init;
-    piqp_float eps_abs;
-    piqp_float eps_rel;
-    piqp_int  check_duality_gap;
-    piqp_float eps_duality_gap_abs;
-    piqp_float eps_duality_gap_rel;
-    piqp_float reg_lower_limit;
-    piqp_float reg_finetune_lower_limit;
-    piqp_int  reg_finetune_primal_update_threshold;
-    piqp_int  reg_finetune_dual_update_threshold;
-    piqp_int  max_iter;
-    piqp_int  max_factor_retires;
-    piqp_int  preconditioner_scale_cost;
-    piqp_int  preconditioner_iter;
-    piqp_float tau;
-    piqp_int  iterative_refinement_always_enabled;
-    piqp_float iterative_refinement_eps_abs;
-    piqp_float iterative_refinement_eps_rel;
-    piqp_int  iterative_refinement_max_iter;
-    piqp_float iterative_refinement_min_improvement_rate;
-    piqp_float iterative_refinement_static_regularization_eps;
-    piqp_float iterative_refinement_static_regularization_rel;
-    piqp_int  verbose;
-    piqp_int  compute_timings;
+    piqp_float       rho_init;
+    piqp_float       delta_init;
+    piqp_float       eps_abs;
+    piqp_float       eps_rel;
+    piqp_int        check_duality_gap;
+    piqp_float       eps_duality_gap_abs;
+    piqp_float       eps_duality_gap_rel;
+    piqp_float       reg_lower_limit;
+    piqp_float       reg_finetune_lower_limit;
+    piqp_int        reg_finetune_primal_update_threshold;
+    piqp_int        reg_finetune_dual_update_threshold;
+    piqp_int        max_iter;
+    piqp_int        max_factor_retires;
+    piqp_int        preconditioner_scale_cost;
+    piqp_int        preconditioner_iter;
+    piqp_float       tau;
+    piqp_kkt_solver kkt_solver;
+    piqp_int        iterative_refinement_always_enabled;
+    piqp_float       iterative_refinement_eps_abs;
+    piqp_float       iterative_refinement_eps_rel;
+    piqp_int        iterative_refinement_max_iter;
+    piqp_float       iterative_refinement_min_improvement_rate;
+    piqp_float       iterative_refinement_static_regularization_eps;
+    piqp_float       iterative_refinement_static_regularization_rel;
+    piqp_int        verbose;
+    piqp_int        compute_timings;
 } piqp_settings;
 
 typedef enum {

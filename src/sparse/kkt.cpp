@@ -13,8 +13,8 @@ namespace piqp
 namespace sparse
 {
 
-template struct KKTImpl<KKT<common::Scalar, common::StorageIndex, KKTMode::KKT_FULL, common::sparse::Ordering>, common::Scalar, common::StorageIndex, KKTMode::KKT_FULL>;
-template struct KKT<common::Scalar, common::StorageIndex>;
+template class KKTImpl<KKT<common::Scalar, common::StorageIndex, KKTMode::KKT_FULL, common::sparse::Ordering>, common::Scalar, common::StorageIndex, KKTMode::KKT_FULL>;
+template class KKT<common::Scalar, common::StorageIndex>;
 
 } // namespace sparse
 

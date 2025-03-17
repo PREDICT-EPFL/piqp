@@ -42,6 +42,7 @@ const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "preconditioner_scale_cost",
                                       "preconditioner_iter",
                                       "tau",
+                                      "kkt_solver",
                                       "iterative_refinement_always_enabled",
                                       "iterative_refinement_eps_abs",
                                       "iterative_refinement_eps_rel",
@@ -148,6 +149,20 @@ inline mxArray* eigen_to_mx(const Vec& vec)
     return mx_ptr;
 }
 
+piqp::KKTSolver kkt_solver_from_string(const char* kkt_solver, bool is_dense)
+{
+    std::string kkt_solver_str(kkt_solver);
+    if (kkt_solver_str == "dense_cholesky") return piqp::KKTSolver::dense_cholesky;
+    if (kkt_solver_str == "sparse_ldlt") return piqp::KKTSolver::sparse_ldlt;
+    if (kkt_solver_str == "sparse_multistage") return piqp::KKTSolver::sparse_multistage;
+    if (is_dense) {
+        mexWarnMsgTxt("Unknown kkt_solver, using dense_cholesky as a fallback.");
+        return piqp::KKTSolver::dense_cholesky;
+    }
+    mexWarnMsgTxt("Unknown kkt_solver, using sparse_ldlt as a fallback.");
+    return piqp::KKTSolver::sparse_ldlt;
+}
+
 mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
 {
     int n_fields  = sizeof(PIQP_SETTINGS_FIELDS) / sizeof(PIQP_SETTINGS_FIELDS[0]);
@@ -169,6 +184,7 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     mxSetField(mx_ptr, 0, "preconditioner_scale_cost", mxCreateDoubleScalar(settings.preconditioner_scale_cost));
     mxSetField(mx_ptr, 0, "preconditioner_iter", mxCreateDoubleScalar((double) settings.preconditioner_iter));
     mxSetField(mx_ptr, 0, "tau", mxCreateDoubleScalar(settings.tau));
+    mxSetField(mx_ptr, 0, "kkt_solver", mxCreateString(piqp::kkt_solver_to_string(settings.kkt_solver)));
     mxSetField(mx_ptr, 0, "iterative_refinement_always_enabled", mxCreateDoubleScalar(settings.iterative_refinement_always_enabled));
     mxSetField(mx_ptr, 0, "iterative_refinement_eps_abs", mxCreateDoubleScalar(settings.iterative_refinement_eps_abs));
     mxSetField(mx_ptr, 0, "iterative_refinement_eps_rel", mxCreateDoubleScalar(settings.iterative_refinement_eps_rel));
@@ -182,7 +198,7 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     return mx_ptr;
 }
 
-void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& settings)
+void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& settings, bool is_dense)
 {
     settings.rho_init = (double) mxGetScalar(mxGetField(mx_ptr, 0, "rho_init"));
     settings.delta_init = (double) mxGetScalar(mxGetField(mx_ptr, 0, "delta_init"));
@@ -200,6 +216,9 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
     settings.preconditioner_scale_cost = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "preconditioner_scale_cost"));
     settings.preconditioner_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "preconditioner_iter"));
     settings.tau = (double) mxGetScalar(mxGetField(mx_ptr, 0, "tau"));
+    char kkt_solver[30];
+    mxGetString(mxGetField(mx_ptr, 0, "kkt_solver"), kkt_solver, 30);
+    settings.kkt_solver = kkt_solver_from_string(kkt_solver, is_dense);
     settings.iterative_refinement_always_enabled = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_always_enabled"));
     settings.iterative_refinement_eps_abs = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_eps_abs"));
     settings.iterative_refinement_eps_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_eps_rel"));
@@ -336,9 +355,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
     // Update settings
     if (!strcmp("update_settings", cmd)) {
         if (mex_handle->isDense()) {
-            copy_mx_struct_to_settings(prhs[2], mex_handle->as_dense_ptr()->settings());
+            copy_mx_struct_to_settings(prhs[2], mex_handle->as_dense_ptr()->settings(), mex_handle->isDense());
         } else {
-            copy_mx_struct_to_settings(prhs[2], mex_handle->as_sparse_ptr()->settings());
+            copy_mx_struct_to_settings(prhs[2], mex_handle->as_sparse_ptr()->settings(), mex_handle->isDense());
         }
         return;
     }
@@ -378,7 +397,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         Eigen::Map<Vec> x_ub(mxGetPr(x_ub_ptr), n);
 
         if (mex_handle->isDense()) {
-            copy_mx_struct_to_settings(prhs[13], mex_handle->as_dense_ptr()->settings());
+            copy_mx_struct_to_settings(prhs[13], mex_handle->as_dense_ptr()->settings(), mex_handle->isDense());
 
             Eigen::Map<Mat> P(mxGetPr(P_ptr), n, n);
             Eigen::Map<Mat> A(mxGetPr(A_ptr), p, n);
@@ -386,7 +405,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 
             mex_handle->as_dense_ptr()->setup(P, c, A, b, G, h, x_lb, x_ub);
         } else {
-            copy_mx_struct_to_settings(prhs[13], mex_handle->as_sparse_ptr()->settings());
+            copy_mx_struct_to_settings(prhs[13], mex_handle->as_sparse_ptr()->settings(), mex_handle->isDense());
 
             IVec Pp = to_int_vec(mxGetJc(P_ptr), n + 1);
             IVec Pi = to_int_vec(mxGetIr(P_ptr), Pp(n));

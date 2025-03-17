@@ -25,6 +25,7 @@ namespace rand
 
 std::mt19937 gen(42);
 std::uniform_real_distribution<double> uniform_dist(0.0, 1.0);
+std::uniform_real_distribution<double> uniform_dist_pos(0.1, 100.0);
 std::normal_distribution<double> normal_dist;
 
 
@@ -35,6 +36,18 @@ Vec<T> vector_rand(isize n)
 
     for (isize i = 0; i < n; i++) {
         v(i) = T(normal_dist(gen));
+    }
+
+    return v;
+}
+
+template<typename T>
+Vec<T> vector_rand_strictly_positive(isize n)
+{
+    Vec<T> v(n);
+
+    for (isize i = 0; i < n; i++) {
+        v(i) = T(uniform_dist_pos(gen));
     }
 
     return v;

@@ -29,8 +29,8 @@ endif()
 
 enable_testing()
 
-# copy maros meszaros data
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/maros_meszaros_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# copy data
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(pipq-test INTERFACE)
 target_include_directories(pipq-test INTERFACE include)
@@ -49,6 +49,9 @@ target_link_libraries(dense_kkt_test PRIVATE pipq-test)
 
 add_executable(dense_solver_test src/dense/solver_test.cpp)
 target_link_libraries(dense_solver_test PRIVATE pipq-test)
+
+add_executable(multistage_kkt_test src/sparse/multistage_kkt_test.cpp)
+target_link_libraries(multistage_kkt_test PRIVATE pipq-test Matio::Matio)
 
 add_executable(sparse_kkt_test src/sparse/kkt_test.cpp)
 target_link_libraries(sparse_kkt_test PRIVATE pipq-test)
@@ -79,6 +82,7 @@ endif()
 fix_test_dll(dense_ldlt_test)
 fix_test_dll(dense_kkt_test)
 fix_test_dll(dense_solver_test)
+fix_test_dll(multistage_kkt_test)
 fix_test_dll(sparse_kkt_test)
 fix_test_dll(sparse_ldlt_test)
 fix_test_dll(sparse_utils_test)
@@ -94,6 +98,7 @@ include(GoogleTest)
 gtest_discover_tests(dense_ldlt_test)
 gtest_discover_tests(dense_kkt_test)
 gtest_discover_tests(dense_solver_test)
+gtest_discover_tests(multistage_kkt_test)
 gtest_discover_tests(sparse_kkt_test)
 gtest_discover_tests(sparse_ldlt_test)
 gtest_discover_tests(sparse_utils_test)

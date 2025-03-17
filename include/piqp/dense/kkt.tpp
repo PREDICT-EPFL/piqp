@@ -17,7 +17,7 @@ namespace piqp
 namespace dense
 {
 
-extern template struct KKT<common::Scalar>;
+extern template class KKT<common::Scalar>;
 
 } // namespace dense
 

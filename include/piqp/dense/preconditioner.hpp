@@ -116,12 +116,12 @@ public:
                 }
                 for (isize k = 0; k < n_lb; k++)
                 {
-                    delta_iter(data.x_lb_idx(k)) = std::max(delta_iter(data.x_lb_idx(k)), data.x_lb_scaling(k));
+                    delta_iter(data.x_lb_idx(k)) = (std::max)(delta_iter(data.x_lb_idx(k)), data.x_lb_scaling(k));
                     delta_iter_lb(k) = data.x_lb_scaling(k);
                 }
                 for (isize k = 0; k < n_ub; k++)
                 {
-                    delta_iter(data.x_ub_idx(k)) = std::max(delta_iter(data.x_ub_idx(k)), data.x_ub_scaling(k));
+                    delta_iter(data.x_ub_idx(k)) = (std::max)(delta_iter(data.x_ub_idx(k)), data.x_ub_scaling(k));
                     delta_iter_ub(k) = data.x_ub_scaling(k);
                 }
 
@@ -168,12 +168,12 @@ public:
                     T gamma = 0;
                     for (isize k = 0; k < n; k++)
                     {
-                        gamma += std::max(data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
+                        gamma += (std::max)(data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
                                           data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>());
                     }
                     gamma /= T(n);
                     limit_scaling(gamma);
-                    gamma = std::max(gamma, data.c.template lpNorm<Eigen::Infinity>());
+                    gamma = (std::max)(gamma, data.c.template lpNorm<Eigen::Infinity>());
                     limit_scaling(gamma);
                     gamma = T(1) / gamma;
 

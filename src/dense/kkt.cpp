@@ -13,7 +13,7 @@ namespace piqp
 namespace dense
 {
 
-template struct KKT<common::Scalar>;
+template class KKT<common::Scalar>;
 
 } // namespace dense
 

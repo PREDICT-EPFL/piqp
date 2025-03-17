@@ -20,45 +20,6 @@ using namespace piqp::dense;
 
 using T = double;
 
-TEST(DenseKKTTest, UpdateScalings)
-{
-    isize dim = 10;
-    isize n_eq = 8;
-    isize n_ineq = 9;
-
-    Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
-    Data<T> data(qp_model);
-    Settings<T> settings;
-
-    // make sure P_utri has not complete diagonal filled
-    data.P_utri(1, 1) = 0;
-
-    T rho = 0.9;
-    T delta = 1.2;
-
-    KKT<T> kkt(data, settings);
-    kkt.init(rho, delta);
-
-    rho = 0.8;
-    delta = 0.2;
-    Vec<T> s(n_ineq); s.setConstant(1);
-    Vec<T> s_lb(dim); s_lb.setConstant(1);
-    Vec<T> s_ub(dim); s_ub.setConstant(1);
-    Vec<T> z(n_ineq); z.setConstant(1);
-    Vec<T> z_lb(dim); z_lb.setConstant(1);
-    Vec<T> z_ub(dim); z_ub.setConstant(1);
-
-    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings(rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
-    PIQP_EIGEN_MALLOC_ALLOWED();
-
-    KKT<T> kkt2(data, settings);
-    kkt2.init(rho, delta);
-
-    // assert update was correct, i.e. it's the same as a freshly initialized one
-    assert_dense_triangular_equal<T, Eigen::Lower>(kkt.kkt_mat, kkt2.kkt_mat);
-}
-
 TEST(DenseKKTTest, UpdateData)
 {
     isize dim = 10;
@@ -74,9 +35,17 @@ TEST(DenseKKTTest, UpdateData)
 
     T rho = 0.9;
     T delta = 1.2;
+    Vec<T> s(n_ineq); s.setConstant(1);
+    Vec<T> s_lb(dim); s_lb.setConstant(1);
+    Vec<T> s_ub(dim); s_ub.setConstant(1);
+    Vec<T> z(n_ineq); z.setConstant(1);
+    Vec<T> z_lb(dim); z_lb.setConstant(1);
+    Vec<T> z_ub(dim); z_ub.setConstant(1);
 
     KKT<T> kkt(data, settings);
-    kkt.init(rho, delta);
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    PIQP_EIGEN_MALLOC_ALLOWED();
 
     // update data
     Model<T> qp_model_new = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
@@ -87,13 +56,16 @@ TEST(DenseKKTTest, UpdateData)
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt.update_data(update_options);
+    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     KKT<T> kkt2(data, settings);
-    kkt2.init(rho, delta);
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    kkt2.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
-    assert_dense_triangular_equal<T, Eigen::Lower>(kkt.kkt_mat, kkt2.kkt_mat);
+    assert_dense_triangular_equal<T, Eigen::Lower>(kkt.internal_kkt_mat(), kkt2.internal_kkt_mat());
 }
 
 TEST(DenseKKTTest, FactorizeSolve)
@@ -108,12 +80,16 @@ TEST(DenseKKTTest, FactorizeSolve)
 
     T rho = 0.9;
     T delta = 1.2;
+    Vec<T> s(n_ineq); s.setConstant(1);
+    Vec<T> s_lb(dim); s_lb.setConstant(1);
+    Vec<T> s_ub(dim); s_ub.setConstant(1);
+    Vec<T> z(n_ineq); z.setConstant(1);
+    Vec<T> z_lb(dim); z_lb.setConstant(1);
+    Vec<T> z_ub(dim); z_ub.setConstant(1);
 
     KKT<T> kkt(data, settings);
-    kkt.init(rho, delta);
-
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    ASSERT_TRUE(kkt.regularize_and_factorize(false));
+    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Vec<T> rhs_x = rand::vector_rand<T>(dim);
@@ -136,8 +112,7 @@ TEST(DenseKKTTest, FactorizeSolve)
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt.solve(rhs_x, rhs_y, rhs_z, rhs_z_lb, rhs_z_ub, rhs_s, rhs_s_lb, rhs_s_ub,
-              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub,
-              false);
+              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Vec<T> rhs_x_sol(dim);

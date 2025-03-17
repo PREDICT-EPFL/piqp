@@ -1,0 +1,7 @@
+.mobile-hidden {
+  visibility: hidden;
+
+  @include mq(md) {
+    visibility: inherit;
+  }
+}

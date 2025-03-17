@@ -2,6 +2,9 @@
 
 include(CMakeFindDependencyMacro)
 find_dependency(Eigen3 3.3 REQUIRED NO_MODULE)
+if (@BUILD_WITH_BLASFEO@)
+    find_dependency(blasfeo REQUIRED)
+endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
 
