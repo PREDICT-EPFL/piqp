@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- In the sparse interface for Python A, b, G, and h are now None by default
 - Use Cholesky decomposition instead of LDLt factorization in dense interface
 - New KKT solver backend `sparse_multistage` for multistage optimization problems [#14](https://github.com/PREDICT-EPFL/piqp/pull/14)
 
