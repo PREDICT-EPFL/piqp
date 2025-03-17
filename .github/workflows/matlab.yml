@@ -23,7 +23,7 @@ jobs:
             platform: maci
           - os: macos-14
             platform: maca
-          - os: windows-latest
+          - os: windows-2019
             platform: windows
 
     runs-on: ${{ matrix.os }}
