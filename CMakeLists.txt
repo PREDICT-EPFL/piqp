@@ -185,10 +185,20 @@ endif ()
 
 function(CREATE_BLASFEO_LIBRARY library_name library_dir)
     set(lib_var "${library_name}_lib")
-    find_library(${lib_var} NAMES blasfeo HINTS "${library_dir}/lib")
+    set(include_var "${library_name}_include_dir")
+
+    find_library(${lib_var} NAMES blasfeo HINTS "${library_dir}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+    if(NOT ${lib_var})
+        message(FATAL_ERROR "Failed to find the 'blasfeo' library for ${library_name} in directory: ${library_dir}.")
+    endif()
+
+    find_path(${include_var} NAMES "blasfeo_target.h" HINTS "${library_dir}/include" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+    if(NOT ${include_var})
+        message(FATAL_ERROR "Failed to find the include directory for ${library_name} in directory: ${library_dir}.")
+    endif()
 
     add_library(${library_name} UNKNOWN IMPORTED)
-    set_target_properties(${library_name} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${library_dir}/include")
+    set_target_properties(${library_name} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${${include_var}}")
     set_property(TARGET ${library_name} APPEND PROPERTY IMPORTED_LOCATION "${${lib_var}}")
 
     message(STATUS "Found ${library_name}: ${library_dir}/include ${${lib_var}}")
