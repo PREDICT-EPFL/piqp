@@ -17,11 +17,15 @@ $$
 
 with primal decision variables $$x \in \mathbb{R}^n$$, matrices $$P\in \mathbb{S}_+^n$$, $$A \in \mathbb{R}^{p \times n}$$,  $$G \in \mathbb{R}^{m \times n}$$, and vectors $$c \in \mathbb{R}^n$$, $$b \in \mathbb{R}^p$$, $$h \in \mathbb{R}^m$$, $$x_{lb} \in \mathbb{R}^n$$, and $$x_{ub} \in \mathbb{R}^n$$. Combining an infeasible interior point method with the proximal method of multipliers, the algorithm can handle ill-conditioned convex QP problems without the need for linear independence of the constraints.
 
-For more detailed technical results see our pre-print:
+For more detailed technical results see our papers:
 
-[**PIQP: A Proximal Interior-Point Quadratic Programming Solver**](https://arxiv.org/abs/2304.00290)<br>
+[**PIQP: A Proximal Interior-Point Quadratic Programming Solver**](https://ieeexplore.ieee.org/document/10383915)<br>
 R. Schwan, Y. Jiang, D. Kuhn, C.N. Jones<br>
-ArXiv, 2023
+IEEE Conference on Decision and Control (CDC), 2023
+
+[**Exploiting Multistage Optimization Structure in Proximal Solvers**](https://arxiv.org/abs/2503.12664)<br>
+R. Schwan, D. Kuhn, C.N. Jones<br>
+ArXiv, 2025
 
 ### Features
 

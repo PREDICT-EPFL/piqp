@@ -64,7 +64,7 @@ PIQP is an adapted implementation of [work](https://link.springer.com/article/10
 
 ## Citing our Work
 
-If you found PIQP useful in your scientific work, we encourage you to cite our accompanying paper:
+If you found PIQP useful in your scientific work, we encourage you to cite our main paper:
 ```
 @INPROCEEDINGS{schwan2023piqp,
   author={Schwan, Roland and Jiang, Yuning and Kuhn, Daniel and Jones, Colin N.},
@@ -77,7 +77,16 @@ If you found PIQP useful in your scientific work, we encourage you to cite our a
   doi={10.1109/CDC49753.2023.10383915}
 }
 ```
-The benchmarks are available in the following repo: [piqp_benchmarks](https://github.com/PREDICT-EPFL/piqp_benchmarks)
+In case you are specifically using the `sparse_multistage` KKT solver backend, we encourage you to cite the specific paper:
+```
+@misc{schwan2025piqp_multistage,
+  author={Schwan, Roland and Kuhn, Daniel and Jones, Colin N.},
+  title={Exploiting Multistage Optimization Structure in Proximal Solvers}, 
+  year={2025},
+  eprint = {arXiv:2503.12664}
+}
+```
+The benchmarks are available in the following repos: [piqp_benchmarks](https://github.com/PREDICT-EPFL/piqp_benchmarks), [piqp_multistage_benchmarks](https://github.com/PREDICT-EPFL/piqp_multistage_benchmarks)
 
 ## License
 
