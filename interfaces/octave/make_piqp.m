@@ -53,12 +53,22 @@ end
 
 %% piqp_oct
 if any(strcmpi(what,'oct')) || any(strcmpi(what,'all'))
-   fprintf('Compiling PIQP Octave interface...\n');
+    fprintf('Compiling PIQP Octave interface...\n');
 
-    mkoctfile('-O3', '-DNDEBUG', '-march=native', '-std=gnu++14', ...
+    mkoctfile_args = {'-O3', '-DNDEBUG', '-march=native', ...
              ['-I', fullfile(piqp_dir, 'include')], ...
              ['-I', eigen_include_dir], ...
-             '-o', 'piqp_oct.oct', fullfile(piqp_dir, 'interfaces/octave/piqp_oct.cpp'));
+             '-o', 'piqp_oct.oct', ...
+             fullfile(piqp_dir, 'interfaces/octave/piqp_oct.cpp')};
+
+    if ~exist('verLessThan') || verLessThan("Octave", "10")
+        % Octave 10 or newer requires C++17 or newer.
+        % Attempting to lower that requirement to C++14 (with GNU extensions)
+        % leads to compilation errors.
+        mkoctfile_args = [{'-std=gnu++14'}, mkoctfile_args];
+    end
+
+    mkoctfile(mkoctfile_args{:});
 
     fprintf('[done]\n');
 
