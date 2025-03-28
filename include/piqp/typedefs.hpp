@@ -71,6 +71,12 @@ using MatRef = Eigen::Ref<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>;
 template<typename T>
 using CMatRef = Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>;
 
+enum SolverMatrixType
+{
+    PIQP_DENSE = 0,
+    PIQP_SPARSE = 1
+};
+
 } // namespace piqp
 
 #endif //PIQP_TYPEDEFS_HPP

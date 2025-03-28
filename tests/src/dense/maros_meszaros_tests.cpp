@@ -41,7 +41,7 @@ std::vector<std::string> get_maros_meszaros_problems()
     for (const auto & entry : piqp::fs::directory_iterator("data/maros_meszaros"))
     {
         std::string file_name = entry.path().filename().string();
-        if (file_name == "README.md" || file_name == "LICENSE") continue;
+        if (file_name.substr(file_name.size() - 4) != ".mat") continue;
 
         std::string path = "data/maros_meszaros/" + file_name;
         piqp::sparse::Model<T, int> model = piqp::load_sparse_model<T, int>(path);

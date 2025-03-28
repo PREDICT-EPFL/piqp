@@ -9,7 +9,7 @@
 #define PIQP_DENSE_KKT_TPP
 
 #include "piqp/common.hpp"
-#include "piqp/sparse/kkt.hpp"
+#include "piqp/dense/kkt.hpp"
 
 namespace piqp
 {
