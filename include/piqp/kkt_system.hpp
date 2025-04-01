@@ -280,7 +280,7 @@ public:
 			 Vec<T>& rhs_s, Vec<T>& rhs_s_lb, Vec<T>& rhs_s_ub)
 	{
 		eval_P_x(T(1), lhs_x, rhs_x);
-		rhs_x.array() += m_rho;
+		rhs_x.array() += m_rho * lhs_x.array();
 		eval_A_xn_and_AT_xt(T(1), T(1), lhs_x, lhs_y, rhs_y, work_x);
 		rhs_x.array() += work_x.array();
 		rhs_y.array() -= m_delta * lhs_y.array();
