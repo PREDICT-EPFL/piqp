@@ -147,7 +147,7 @@ public:
         }
     }
 
-    bool update_scalings_and_factor(const T& delta, const CVecRef<T>& x_reg, const CVecRef<T>& z_reg) override
+    bool update_scalings_and_factor(const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) override
     {
         m_delta = delta;
         m_z_reg_inv.array() = z_reg.array().inverse();
@@ -173,8 +173,8 @@ public:
         return true;
     }
 
-    void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y, const CVecRef<T>& rhs_z,
-               VecRef<T> delta_x, VecRef<T> delta_y, VecRef<T> delta_z) override
+    void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
+               Vec<T>& delta_x, Vec<T>& delta_y, Vec<T>& delta_z) override
     {
         Vec<T>& rhs_z_bar = work_z;
         BlockVec& block_rhs = work_x_block_1;
@@ -216,7 +216,7 @@ public:
     }
 
     // z = alpha * P * x
-    void eval_P_x(const T& alpha, const CVecRef<T>& x, VecRef<T> z) override
+    void eval_P_x(const T& alpha, const Vec<T>& x, Vec<T>& z) override
     {
         BlockVec& block_x = work_x_block_1;
         BlockVec& block_z = work_x_block_2;
@@ -230,7 +230,7 @@ public:
     }
 
     // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
-    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt) override
+    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
         BlockVec& block_xn = work_x_block_1;
         BlockVec& block_xt = work_y_block_1;
@@ -249,7 +249,7 @@ public:
     }
 
     // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
-    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt) override
+    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
         BlockVec& block_xn = work_x_block_1;
         BlockVec& block_xt = work_z_block_1;
@@ -868,13 +868,13 @@ protected:
         construct_kkt_fac<true>(work_x);
     }
 
-    void populate_kkt_fac(const CVecRef<T>& x_reg)
+    void populate_kkt_fac(const Vec<T>& x_reg)
     {
         construct_kkt_fac<false>(x_reg);
     }
 
     template<bool allocate>
-    void construct_kkt_fac(const CVecRef<T>& x_reg)
+    void construct_kkt_fac(const Vec<T>& x_reg)
     {
         BlockVec& x_reg_block = work_x_block_1;
 

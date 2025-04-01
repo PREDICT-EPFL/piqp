@@ -401,7 +401,7 @@ public:
     }
 
 protected:
-    inline void limit_scaling(VecRef<T> d) const
+    inline void limit_scaling(Vec<T>& d) const
     {
         isize n_d = d.rows();
         for (int i = 0; i < n_d; i++)

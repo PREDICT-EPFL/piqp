@@ -355,13 +355,6 @@ protected:
 
     Status solve_impl()
     {
-        auto s_lb = m_result.s_lb.head(m_data.n_lb);
-        auto s_ub = m_result.s_ub.head(m_data.n_ub);
-        auto z_lb = m_result.z_lb.head(m_data.n_lb);
-        auto z_ub = m_result.z_ub.head(m_data.n_ub);
-        auto nu_lb = m_result.nu_lb.head(m_data.n_lb);
-        auto nu_ub = m_result.nu_ub.head(m_data.n_ub);
-
         if (!m_setup_done)
         {
             piqp_eprint("Solver not setup yet\n");
@@ -388,11 +381,11 @@ protected:
         m_result.info.delta = m_settings.delta_init;
 
         m_result.s.setConstant(1);
-        s_lb.setConstant(1);
-        s_ub.setConstant(1);
+        m_result.s_lb.setConstant(1);
+        m_result.s_ub.setConstant(1);
         m_result.z.setConstant(1);
-        z_lb.setConstant(1);
-        z_ub.setConstant(1);
+        m_result.z_lb.setConstant(1);
+        m_result.z_ub.setConstant(1);
 
         m_enable_iterative_refinement = m_settings.iterative_refinement_always_enabled;
 
@@ -435,6 +428,16 @@ protected:
                            m_result.x, m_result.y,
                            m_result.z, m_result.z_lb, m_result.z_ub,
                            m_result.s, m_result.s_lb, m_result.s_ub);
+
+        // We make an Eigen expression for convince. Note that we are doing it after
+        // the first solve since m_kkt_system.solve might swap internal pointers in m_result
+        // which can invalidate the reference in the Eigen expression.
+        auto s_lb = m_result.s_lb.head(m_data.n_lb);
+        auto s_ub = m_result.s_ub.head(m_data.n_ub);
+        auto z_lb = m_result.z_lb.head(m_data.n_lb);
+        auto z_ub = m_result.z_ub.head(m_data.n_ub);
+        auto nu_lb = m_result.nu_lb.head(m_data.n_lb);
+        auto nu_ub = m_result.nu_ub.head(m_data.n_ub);
 
         if (m_data.m + m_data.n_lb + m_data.n_ub > 0)
         {
@@ -587,7 +590,7 @@ protected:
                     m_enable_iterative_refinement = true;
                     continue;
                 }
-                else if (m_result.info.factor_retires < m_settings.max_factor_retires)
+                if (m_result.info.factor_retires < m_settings.max_factor_retires)
                 {
                     m_result.info.delta *= 100;
                     m_result.info.rho *= 100;
@@ -596,11 +599,9 @@ protected:
                     m_result.info.reg_limit = (std::min)(10 * m_result.info.reg_limit, m_settings.eps_abs);
                     continue;
                 }
-                else
-                {
-                    m_result.info.status = Status::PIQP_NUMERICS;
-                    return m_result.info.status;
-                }
+
+                m_result.info.status = Status::PIQP_NUMERICS;
+                return m_result.info.status;
             }
             m_result.info.factor_retires = 0;
 

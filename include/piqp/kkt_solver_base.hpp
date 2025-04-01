@@ -21,16 +21,16 @@ public:
 
     virtual void update_data(int options) = 0;
 
-    virtual bool update_scalings_and_factor(const T& delta, const CVecRef<T>& x_reg, const CVecRef<T>& z_reg) = 0;
+    virtual bool update_scalings_and_factor(const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) = 0;
 
-    virtual void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y, const CVecRef<T>& rhs_z, VecRef<T> delta_x, VecRef<T> delta_y, VecRef<T> delta_z) = 0;
+    virtual void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z, Vec<T>& delta_x, Vec<T>& delta_y, Vec<T>& delta_z) = 0;
 
     // z = alpha * P * x
-    virtual void eval_P_x(const T& alpha, const CVecRef<T>& x, VecRef<T> z) = 0;
+    virtual void eval_P_x(const T& alpha, const Vec<T>& x, Vec<T>& z) = 0;
     // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
-    virtual void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt) = 0;
+    virtual void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) = 0;
     // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
-    virtual void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt) = 0;
+    virtual void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) = 0;
 
     virtual void print_info() {};
 };

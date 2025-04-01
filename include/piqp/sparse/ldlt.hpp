@@ -159,7 +159,7 @@ struct LDLt
         return n; /* success, diagonal of D is all nonzero */
     }
 
-    void lsolve(VecRef<T> x)
+    void lsolve(Vec<T>& x)
     {
         isize n = x.rows();
         eigen_assert(n == L_cols.rows() - 1 && "vector dimension missmatch!");
@@ -173,14 +173,14 @@ struct LDLt
         }
     }
 
-    void dsolve(VecRef<T> x)
+    void dsolve(Vec<T>& x)
     {
         PIQP_MAYBE_UNUSED isize n = x.rows();
         eigen_assert(n == D_inv.rows() && "vector dimension missmatch!");
         x.array() *= D_inv.array();
     }
 
-    void ltsolve(VecRef<T> x)
+    void ltsolve(Vec<T>& x)
     {
         isize n = x.rows();
         eigen_assert(n == L_cols.rows() - 1 && "vector dimension missmatch!");
@@ -194,7 +194,7 @@ struct LDLt
         }
     }
 
-    void solve_inplace(VecRef<T> x)
+    void solve_inplace(Vec<T>& x)
     {
         lsolve(x);
         dsolve(x);

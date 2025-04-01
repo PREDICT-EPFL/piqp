@@ -64,7 +64,7 @@ public:
         }
     }
 
-    bool update_scalings_and_factor(const T& delta, const CVecRef<T>& x_reg, const CVecRef<T>& z_reg) override
+    bool update_scalings_and_factor(const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) override
     {
         m_delta = delta;
         m_z_reg_inv.array() = z_reg.array().inverse();
@@ -75,8 +75,8 @@ public:
         return llt.info() == Eigen::Success;
     }
 
-    void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y, const CVecRef<T>& rhs_z,
-               VecRef<T> delta_x, VecRef<T> delta_y, VecRef<T> delta_z) override
+    void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
+               Vec<T>& delta_x, Vec<T>& delta_y, Vec<T>& delta_z) override
     {
         T delta_inv = T(1) / m_delta;
 
@@ -96,21 +96,21 @@ public:
     }
 
     // z = alpha * P * x
-    void eval_P_x(const T& alpha, const CVecRef<T>& x, VecRef<T> z) override
+    void eval_P_x(const T& alpha, const Vec<T>& x, Vec<T>& z) override
     {
         z.noalias() = alpha * data.P_utri * x;
         z.noalias() += data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * (alpha * x);
     }
 
     // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
-    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt) override
+    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
         zn.noalias() = alpha_n * data.AT.transpose() * xn;
         zt.noalias() = alpha_t * data.AT * xt;
     }
 
     // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
-    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt) override
+    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
         zn.noalias() = alpha_n * data.GT.transpose() * xn;
         zt.noalias() = alpha_t * data.GT * xt;
@@ -122,7 +122,7 @@ public:
     }
 
 protected:
-    void update_kkt(const CVecRef<T>& x_reg)
+    void update_kkt(const Vec<T>& x_reg)
     {
         kkt_mat.template triangularView<Eigen::Lower>() = data.P_utri.transpose();
         kkt_mat.diagonal() += x_reg;
@@ -139,7 +139,7 @@ protected:
         }
     }
 
-    void solve_ldlt_in_place(VecRef<T> x)
+    void solve_ldlt_in_place(Vec<T>& x)
     {
 #ifdef PIQP_DEBUG_PRINT
         Vec<T> x_copy = x;

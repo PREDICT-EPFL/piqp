@@ -149,7 +149,7 @@ protected:
         return KKT;
     }
 
-    void update_kkt_cost_scalings(const CVecRef<T>& x_reg)
+    void update_kkt_cost_scalings(const Vec<T>& x_reg)
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
@@ -191,7 +191,7 @@ protected:
         }
     }
 
-    void update_kkt_inequality_scaling(const CVecRef<T>& z_reg)
+    void update_kkt_inequality_scaling(const Vec<T>& z_reg)
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
