@@ -143,10 +143,14 @@ struct LDLt
                 isize p;
                 for (p = L_cols[i]; p < p2; p++)
                 {
-                    work.y[L_ind[p]] -= L_vals[p] * yi;
+                    // force compiler to not use fma instruction
+                    T tmp = L_vals[p] * yi;
+                    work.y[L_ind[p]] -= tmp;
                 }
                 T l_ki = yi / D[i]; /* the nonzero entry L(k,i) */
-                D[k] -= l_ki * yi;
+                // force compiler to not use fma instruction
+                T tmp = l_ki * yi;
+                D[k] -= tmp;
                 L_ind[p] = I(k);    /* store L(k,i) in column form of L */
                 L_vals[p] = l_ki;
                 L_nnz[i]++;         /* increment count of nonzeros in col i */
