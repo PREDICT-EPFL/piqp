@@ -10,6 +10,7 @@
 
 #include "piqp/piqp.hpp"
 #include "piqp/dense/kkt.hpp"
+#include "piqp/kkt_system.hpp"
 #include "piqp/utils/random_utils.hpp"
 
 #include "gtest/gtest.h"
@@ -35,16 +36,12 @@ TEST(DenseKKTTest, UpdateData)
 
     T rho = 0.9;
     T delta = 1.2;
-    Vec<T> s(n_ineq); s.setConstant(1);
-    Vec<T> s_lb(dim); s_lb.setConstant(1);
-    Vec<T> s_ub(dim); s_ub.setConstant(1);
-    Vec<T> z(n_ineq); z.setConstant(1);
-    Vec<T> z_lb(dim); z_lb.setConstant(1);
-    Vec<T> z_ub(dim); z_ub.setConstant(1);
+    Vec<T> x_reg(dim); x_reg.setConstant(rho);
+    Vec<T> z_reg(n_ineq); z_reg.setConstant(1 + delta);
 
     KKT<T> kkt(data, settings);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt.update_scalings_and_factor(delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // update data
@@ -56,12 +53,12 @@ TEST(DenseKKTTest, UpdateData)
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt.update_data(update_options);
-    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt.update_scalings_and_factor(delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     KKT<T> kkt2(data, settings);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt2.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt2.update_scalings_and_factor(delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
@@ -87,7 +84,8 @@ TEST(DenseKKTTest, FactorizeSolve)
     Vec<T> z_lb(dim); z_lb.setConstant(1);
     Vec<T> z_ub(dim); z_ub.setConstant(1);
 
-    KKT<T> kkt(data, settings);
+    KKTSystem<T, int, PIQP_DENSE> kkt(data, settings);
+    kkt.init();
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
     PIQP_EIGEN_MALLOC_ALLOWED();
@@ -125,8 +123,8 @@ TEST(DenseKKTTest, FactorizeSolve)
     Vec<T> rhs_s_ub_sol(dim);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.multiply(delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub,
-                 rhs_x_sol, rhs_y_sol, rhs_z_sol, rhs_z_lb_sol, rhs_z_ub_sol, rhs_s_sol, rhs_s_lb_sol, rhs_s_ub_sol);
+    kkt.mul(delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub,
+            rhs_x_sol, rhs_y_sol, rhs_z_sol, rhs_z_lb_sol, rhs_z_ub_sol, rhs_s_sol, rhs_s_lb_sol, rhs_s_ub_sol);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     ASSERT_TRUE(rhs_x.isApprox(rhs_x_sol, 1e-8));
