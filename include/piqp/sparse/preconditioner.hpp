@@ -26,6 +26,9 @@ namespace sparse
 template<typename T, typename I>
 class RuizEquilibration
 {
+    static constexpr T min_scaling = 1e-4;
+    static constexpr T max_scaling = 1e4;
+
     isize n = 0;
     isize p = 0;
     isize m = 0;
@@ -74,9 +77,10 @@ public:
             Vec<T>& delta_iter = delta_inv; // we use the memory of delta_inv as temporary storage
             Vec<T>& delta_iter_b = delta_b_inv; // we use the memory of delta_lb_inv as temporary storage
             delta_iter.setZero();
+            delta_iter_b.setZero();
             for (isize i = 0; i < max_iter && (std::max)({
                     (1 - delta_iter.array()).matrix().template lpNorm<Eigen::Infinity>(),
-                    (1 - delta_iter_b.head(n_lb).array()).matrix().template lpNorm<Eigen::Infinity>()
+                    (1 - delta_iter_b.array()).matrix().template lpNorm<Eigen::Infinity>()
                 }) > epsilon; i++)
             {
                 delta_iter.setZero();
@@ -411,9 +415,6 @@ protected:
     }
     inline void limit_scaling(T& d) const
     {
-        const T min_scaling = 1e-4;
-        const T max_scaling = 1e4;
-
         if (d < min_scaling)
         {
             d = T(1);

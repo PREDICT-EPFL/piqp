@@ -21,7 +21,7 @@
 namespace piqp
 {
 
-template<typename T, typename I, int MatrixType, int Mode>
+template<typename T, typename I, int MatrixType, int Mode = KKT_FULL>
 class KKTSystem
 {
 protected:
@@ -128,20 +128,22 @@ public:
 		m_rho = rho;
 		m_delta = delta;
 		m_s = s;
-		m_s_lb = s_lb;
-		m_s_ub = s_ub;
+		m_s_lb.head(data.n_lb) = s_lb.head(data.n_lb);
+		m_s_ub.head(data.n_ub) = s_ub.head(data.n_ub);
 		m_z_inv.array() = z.array().inverse();
-		m_z_lb_inv.array() = z_lb.array().inverse();
-		m_z_ub_inv.array() = z_ub.array().inverse();
+		m_z_lb_inv.head(data.n_lb).array() = z_lb.head(data.n_lb).array().inverse();
+		m_z_ub_inv.head(data.n_ub).array() = z_ub.head(data.n_ub).array().inverse();
 
 		m_x_reg.setConstant(rho);
 		for (isize i = 0; i < data.n_lb; i++)
 		{
-			m_x_reg(data.x_lb_idx(i)) += data.x_b_scaling(i) * data.x_b_scaling(i) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
+			Eigen::Index idx = data.x_lb_idx(i);
+			m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
 		}
 		for (isize i = 0; i < data.n_ub; i++)
 		{
-			m_x_reg(data.x_ub_idx(i)) += data.x_b_scaling(i) * data.x_b_scaling(i) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
+			Eigen::Index idx = data.x_ub_idx(i);
+			m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
 		}
 
 		m_z_reg.array() = m_s.array() * m_z_inv.array() + delta;
@@ -184,6 +186,7 @@ public:
 											rhs_s, rhs_s_lb, rhs_s_ub,
 											err_x, err_y, err_z, err_z_lb, err_z_ub,
 											err_s, err_s_lb, err_s_ub);
+			// std::cout << "refine_error: " << refine_error << std::endl;
 
 			if (!std::isfinite(refine_error)) return false;
 
@@ -215,6 +218,7 @@ public:
 											  rhs_s, rhs_s_lb, rhs_s_ub,
 											  err_x, err_y, err_z, err_z_lb, err_z_ub,
 											  err_s, err_s_lb, err_s_ub);
+				// std::cout << "refine_error: " << refine_error << std::endl;
 
 				if (!std::isfinite(refine_error)) return false;
 
@@ -386,23 +390,27 @@ protected:
 		rhs_x_bar = rhs_x;
 		for (isize i = 0; i < data.n_lb; i++)
 		{
-			rhs_x_bar(data.x_lb_idx(i)) -= data.x_b_scaling(i) * (rhs_z_lb(i) - m_z_lb_inv(i) * rhs_s_lb(i))
+			Eigen::Index idx = data.x_lb_idx(i);
+			rhs_x_bar(idx) -= data.x_b_scaling(idx) * (rhs_z_lb(i) - m_z_lb_inv(i) * rhs_s_lb(i))
 				/ (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
 		}
 		for (isize i = 0; i < data.n_ub; i++)
 		{
-			rhs_x_bar(data.x_ub_idx(i)) += data.x_b_scaling(i) * (rhs_z_ub(i) - m_z_ub_inv(i) * rhs_s_ub(i))
+			Eigen::Index idx = data.x_ub_idx(i);
+			rhs_x_bar(idx) += data.x_b_scaling(idx) * (rhs_z_ub(i) - m_z_ub_inv(i) * rhs_s_ub(i))
 				/ (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
 		}
 
 		kkt_solver->solve(rhs_x_bar, rhs_y, rhs_z_bar, delta_x, delta_y, delta_z);
 
 		for (isize i = 0; i < data.n_lb; i++) {
-			delta_z_lb(i) = (-data.x_b_scaling(i) * delta_x(data.x_lb_idx(i)) - rhs_z_lb(i) + m_z_lb_inv(i) * rhs_s_lb(i))
+			Eigen::Index idx = data.x_lb_idx(i);
+			delta_z_lb(i) = (-data.x_b_scaling(idx) * delta_x(idx) - rhs_z_lb(i) + m_z_lb_inv(i) * rhs_s_lb(i))
 				/ (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
 		}
 		for (isize i = 0; i < data.n_ub; i++) {
-			delta_z_ub(i) = (data.x_b_scaling(i) * delta_x(data.x_ub_idx(i)) - rhs_z_ub(i) + m_z_ub_inv(i) * rhs_s_ub(i))
+			Eigen::Index idx = data.x_ub_idx(i);
+			delta_z_ub(i) = (data.x_b_scaling(idx) * delta_x(idx) - rhs_z_ub(i) + m_z_ub_inv(i) * rhs_s_ub(i))
 				/ (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
 		}
 
