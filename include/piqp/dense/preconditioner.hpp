@@ -179,7 +179,7 @@ public:
         data.h.array() *= delta.tail(m).array();
         for (isize i = 0; i < data.n_lb; i++)
         {
-            data.x_lb_n(i) *= delta_b(data.x_lb_idx(i));
+            data.x_lb(i) *= delta_b(data.x_lb_idx(i));
         }
         for (isize i = 0; i < data.n_ub; i++)
         {
@@ -211,7 +211,7 @@ public:
         data.h.array() *= delta_inv.tail(m).array();
         for (isize i = 0; i < data.n_lb; i++)
         {
-            data.x_lb_n(i) *= delta_b_inv(data.x_lb_idx(i));
+            data.x_lb(i) *= delta_b_inv(data.x_lb_idx(i));
         }
         for (isize i = 0; i < data.n_ub; i++)
         {

@@ -191,7 +191,7 @@ protected:
         m_data.x_lb_idx.resize(m_data.n);
         m_data.x_ub_idx.resize(m_data.n);
         m_data.x_b_scaling = Vec<T>::Constant(m_data.n, T(1));
-        m_data.x_lb_n.resize(m_data.n);
+        m_data.x_lb.resize(m_data.n);
         m_data.x_ub.resize(m_data.n);
 
         setup_lb_data(x_lb);
@@ -251,7 +251,7 @@ protected:
                 if ((*x_lb)(i) > -PIQP_INF)
                 {
                     n_lb += 1;
-                    m_data.x_lb_n(i_lb) = -(*x_lb)(i);
+                    m_data.x_lb(i_lb) = (*x_lb)(i);
                     m_data.x_lb_idx(i_lb) = i;
                     i_lb++;
                 }
@@ -356,7 +356,7 @@ protected:
         res.x = -m_data.c;
         res.y = m_data.b;
         res.z = m_data.h;
-        res.z_lb = m_data.x_lb_n;
+        res.z_lb = -m_data.x_lb;
         res.z_ub = m_data.x_ub;
         res.s.setZero();
         res.s_lb.setZero();
@@ -758,7 +758,7 @@ protected:
         tmp = m_data.h.dot(m_result.z);
         m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
-        tmp = m_data.x_lb_n.head(m_data.n_lb).dot(m_result.z_lb.head(m_data.n_lb));
+        tmp = -m_data.x_lb.head(m_data.n_lb).dot(m_result.z_lb.head(m_data.n_lb));
         m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
         tmp = m_data.x_ub.head(m_data.n_ub).dot(m_result.z_ub.head(m_data.n_ub));
@@ -802,10 +802,10 @@ protected:
             Eigen::Index idx = m_data.x_lb_idx(i);
             res_nr.z_lb(i) = m_data.x_b_scaling(idx) * m_result.x(idx);
             m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_lb(i), idx));
-            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_data.x_lb_n(i), idx));
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_data.x_lb(i), idx));
             m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_result.s_lb(i), idx));
         }
-        res_nr.z_lb.head(m_data.n_lb).noalias() += m_data.x_lb_n.head(m_data.n_lb) - m_result.s_lb.head(m_data.n_lb);
+        res_nr.z_lb.head(m_data.n_lb).noalias() += -m_data.x_lb.head(m_data.n_lb) - m_result.s_lb.head(m_data.n_lb);
 
         for (isize i = 0; i < m_data.n_ub; i++)
         {

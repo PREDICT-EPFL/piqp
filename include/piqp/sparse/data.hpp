@@ -45,8 +45,8 @@ struct Data
 
     Vec<T> x_b_scaling; // scaling of lb and ub, i.e. x_lb <= x_b_scaling .* x <= x_ub
 
-    Vec<T> x_lb_n; // stores negative finite lower bounds in the first n_lb fields
-    Vec<T> x_ub;   // stores finite upper bounds in the first n_ub fields
+    Vec<T> x_lb; // stores finite lower bounds in the first n_lb fields
+    Vec<T> x_ub; // stores finite upper bounds in the first n_ub fields
 
     Data() = default;
 
@@ -58,7 +58,7 @@ struct Data
           n_lb(0), n_ub(0),
           x_lb_idx(model.P.rows()), x_ub_idx(model.P.rows()),
           x_b_scaling(Vec<T>::Constant(model.P.rows(), T(1))),
-          x_lb_n(model.P.rows()), x_ub(model.P.rows())
+          x_lb(model.P.rows()), x_ub(model.P.rows())
     {
         isize i_lb = 0;
         for (isize i = 0; i < n; i++)
@@ -66,7 +66,7 @@ struct Data
             if (model.x_lb(i) > -PIQP_INF)
             {
                 n_lb += 1;
-                x_lb_n(i_lb) = -model.x_lb(i);
+                x_lb(i_lb) = model.x_lb(i);
                 x_lb_idx(i_lb) = i;
                 i_lb++;
             }
