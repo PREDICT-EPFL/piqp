@@ -101,8 +101,10 @@ public:
 
     void setZero() const
     {
-        // zero out vector
-        std::memset(vec.mem, 0, static_cast<std::size_t>(vec.memsize));
+        if (vec.mem) {
+            // zero out vector
+            std::memset(vec.mem, 0, static_cast<std::size_t>(vec.memsize));
+        }
     }
 
     void setConstant(double c)
