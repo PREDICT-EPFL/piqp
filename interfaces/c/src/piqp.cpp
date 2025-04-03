@@ -69,12 +69,6 @@ static void piqp_update_result(piqp_result* result, const piqp::Result<piqp_floa
     result->s_lb = solver_result.s_lb.data();
     result->s_ub = solver_result.s_ub.data();
 
-    result->zeta = solver_result.zeta.data();
-    result->lambda = solver_result.lambda.data();
-    result->nu = solver_result.nu.data();
-    result->nu_lb = solver_result.nu_lb.data();
-    result->nu_ub = solver_result.nu_ub.data();
-
     result->info.status = (piqp_status) solver_result.info.status;
     result->info.iter = (piqp_int) solver_result.info.iter;
     result->info.rho = solver_result.info.rho;

@@ -24,82 +24,55 @@ class BlocksparseStageKKTTest : public testing::TestWithParam<std::string> {};
 template<typename KKT1, typename KKT2>
 void test_solve_multiply(Data<T, I>& data, KKT1& kkt1, KKT2& kkt2)
 {
-    Vec<T> rhs_x = rand::vector_rand<T>(data.n);
-    Vec<T> rhs_y = rand::vector_rand<T>(data.p);
-    Vec<T> rhs_z = rand::vector_rand<T>(data.m);
-    Vec<T> rhs_z_lb = rand::vector_rand<T>(data.n);
-    Vec<T> rhs_z_ub = rand::vector_rand<T>(data.n);
-    Vec<T> rhs_s = rand::vector_rand<T>(data.m);
-    Vec<T> rhs_s_lb = rand::vector_rand<T>(data.n);
-    Vec<T> rhs_s_ub = rand::vector_rand<T>(data.n);
+    Variables<T> rhs;
+    rhs.x = rand::vector_rand<T>(data.n);
+    rhs.y = rand::vector_rand<T>(data.p);
+    rhs.z = rand::vector_rand<T>(data.m);
+    rhs.z_lb = rand::vector_rand<T>(data.n);
+    rhs.z_ub = rand::vector_rand<T>(data.n);
+    rhs.s = rand::vector_rand<T>(data.m);
+    rhs.s_lb = rand::vector_rand<T>(data.n);
+    rhs.s_ub = rand::vector_rand<T>(data.n);
 
-    Vec<T> delta_x_1(data.n);
-    Vec<T> delta_y_1(data.p);
-    Vec<T> delta_z_1(data.m);
-    Vec<T> delta_z_lb_1(data.n);
-    Vec<T> delta_z_ub_1(data.n);
-    Vec<T> delta_s_1(data.m);
-    Vec<T> delta_s_lb_1(data.n);
-    Vec<T> delta_s_ub_1(data.n);
+    Variables<T> lhs_1;
+    lhs_1.resize(data.n, data.p, data.m);
 
-    Vec<T> delta_x_2(data.n);
-    Vec<T> delta_y_2(data.p);
-    Vec<T> delta_z_2(data.m);
-    Vec<T> delta_z_lb_2(data.n);
-    Vec<T> delta_z_ub_2(data.n);
-    Vec<T> delta_s_2(data.m);
-    Vec<T> delta_s_lb_2(data.n);
-    Vec<T> delta_s_ub_2(data.n);
+    Variables<T> lhs_2;
+    lhs_2.resize(data.n, data.p, data.m);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt1.solve(rhs_x, rhs_y, rhs_z, rhs_z_lb, rhs_z_ub, rhs_s, rhs_s_lb, rhs_s_ub,
-               delta_x_1, delta_y_1, delta_z_1, delta_z_lb_1, delta_z_ub_1, delta_s_1, delta_s_lb_1, delta_s_ub_1);
-    kkt2.solve(rhs_x, rhs_y, rhs_z, rhs_z_lb, rhs_z_ub, rhs_s, rhs_s_lb, rhs_s_ub,
-               delta_x_2, delta_y_2, delta_z_2, delta_z_lb_2, delta_z_ub_2, delta_s_2, delta_s_lb_2, delta_s_ub_2);
+    kkt1.solve(rhs, lhs_1);
+    kkt2.solve(rhs, lhs_2);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    ASSERT_TRUE(delta_x_1.isApprox(delta_x_2, 1e-8));
-    ASSERT_TRUE(delta_y_1.isApprox(delta_y_2, 1e-8));
-    ASSERT_TRUE(delta_z_1.isApprox(delta_z_2, 1e-8));
-    ASSERT_TRUE(delta_z_lb_1.head(data.n_lb).isApprox(delta_z_lb_2.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(delta_z_ub_1.head(data.n_ub).isApprox(delta_z_ub_2.head(data.n_ub), 1e-8));
-    ASSERT_TRUE(delta_s_1.isApprox(delta_s_2, 1e-8));
-    ASSERT_TRUE(delta_s_lb_1.head(data.n_lb).isApprox(delta_s_lb_2.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(delta_s_ub_1.head(data.n_ub).isApprox(delta_s_ub_2.head(data.n_ub), 1e-8));
+    ASSERT_TRUE(lhs_1.x.isApprox(lhs_2.x, 1e-8));
+    ASSERT_TRUE(lhs_1.y.isApprox(lhs_2.y, 1e-8));
+    ASSERT_TRUE(lhs_1.z.isApprox(lhs_2.z, 1e-8));
+    ASSERT_TRUE(lhs_1.z_lb.head(data.n_lb).isApprox(lhs_2.z_lb.head(data.n_lb), 1e-8));
+    ASSERT_TRUE(lhs_1.z_ub.head(data.n_ub).isApprox(lhs_2.z_ub.head(data.n_ub), 1e-8));
+    ASSERT_TRUE(lhs_1.s.isApprox(lhs_2.s, 1e-8));
+    ASSERT_TRUE(lhs_1.s_lb.head(data.n_lb).isApprox(lhs_2.s_lb.head(data.n_lb), 1e-8));
+    ASSERT_TRUE(lhs_1.s_ub.head(data.n_ub).isApprox(lhs_2.s_ub.head(data.n_ub), 1e-8));
 
-    Vec<T> rhs_x_sol_1(data.n);
-    Vec<T> rhs_y_sol_1(data.p);
-    Vec<T> rhs_z_sol_1(data.m);
-    Vec<T> rhs_z_lb_sol_1(data.n);
-    Vec<T> rhs_z_ub_sol_1(data.n);
-    Vec<T> rhs_s_sol_1(data.m);
-    Vec<T> rhs_s_lb_sol_1(data.n);
-    Vec<T> rhs_s_ub_sol_1(data.n);
+    Variables<T> rhs_sol_1;
+    rhs_sol_1.resize(data.n, data.p, data.m);
 
-    Vec<T> rhs_x_sol_2(data.n);
-    Vec<T> rhs_y_sol_2(data.p);
-    Vec<T> rhs_z_sol_2(data.m);
-    Vec<T> rhs_z_lb_sol_2(data.n);
-    Vec<T> rhs_z_ub_sol_2(data.n);
-    Vec<T> rhs_s_sol_2(data.m);
-    Vec<T> rhs_s_lb_sol_2(data.n);
-    Vec<T> rhs_s_ub_sol_2(data.n);
+    Variables<T> rhs_sol_2;
+    rhs_sol_2.resize(data.n, data.p, data.m);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt1.mul(delta_x_1, delta_y_1, delta_z_1, delta_z_lb_1, delta_z_ub_1, delta_s_1, delta_s_lb_1, delta_s_ub_1,
-             rhs_x_sol_1, rhs_y_sol_1, rhs_z_sol_1, rhs_z_lb_sol_1, rhs_z_ub_sol_1, rhs_s_sol_1, rhs_s_lb_sol_1, rhs_s_ub_sol_1);
-    kkt1.mul(delta_x_1, delta_y_1, delta_z_1, delta_z_lb_1, delta_z_ub_1, delta_s_1, delta_s_lb_1, delta_s_ub_1,
-             rhs_x_sol_2, rhs_y_sol_2, rhs_z_sol_2, rhs_z_lb_sol_2, rhs_z_ub_sol_2, rhs_s_sol_2, rhs_s_lb_sol_2, rhs_s_ub_sol_2);
+    kkt1.mul(lhs_1, rhs_sol_1);
+    kkt1.mul(lhs_2, rhs_sol_2);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    ASSERT_TRUE(rhs_x_sol_1.isApprox(rhs_x_sol_2, 1e-8));
-    ASSERT_TRUE(rhs_y_sol_1.isApprox(rhs_y_sol_2, 1e-8));
-    ASSERT_TRUE(rhs_z_sol_1.isApprox(rhs_z_sol_2, 1e-8));
-    ASSERT_TRUE(rhs_z_lb_sol_1.head(data.n_lb).isApprox(rhs_z_lb_sol_2.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(rhs_z_ub_sol_1.head(data.n_ub).isApprox(rhs_z_ub_sol_2.head(data.n_ub), 1e-8));
-    ASSERT_TRUE(rhs_s_sol_1.isApprox(rhs_s_sol_2, 1e-8));
-    ASSERT_TRUE(rhs_s_lb_sol_1.head(data.n_lb).isApprox(rhs_s_lb_sol_2.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(rhs_s_ub_sol_1.head(data.n_ub).isApprox(rhs_s_ub_sol_2.head(data.n_ub), 1e-8));
+    ASSERT_TRUE(rhs_sol_1.x.isApprox(rhs_sol_2.x, 1e-8));
+    ASSERT_TRUE(rhs_sol_1.y.isApprox(rhs_sol_2.y, 1e-8));
+    ASSERT_TRUE(rhs_sol_1.z.isApprox(rhs_sol_2.z, 1e-8));
+    ASSERT_TRUE(rhs_sol_1.z_lb.head(data.n_lb).isApprox(rhs_sol_2.z_lb.head(data.n_lb), 1e-8));
+    ASSERT_TRUE(rhs_sol_1.z_ub.head(data.n_ub).isApprox(rhs_sol_2.z_ub.head(data.n_ub), 1e-8));
+    ASSERT_TRUE(rhs_sol_1.s.isApprox(rhs_sol_2.s, 1e-8));
+    ASSERT_TRUE(rhs_sol_1.s_lb.head(data.n_lb).isApprox(rhs_sol_2.s_lb.head(data.n_lb), 1e-8));
+    ASSERT_TRUE(rhs_sol_1.s_ub.head(data.n_ub).isApprox(rhs_sol_2.s_ub.head(data.n_ub), 1e-8));
 }
 
 TEST(BlocksparseStageKKTTest, UpdateData)
@@ -122,20 +95,21 @@ TEST(BlocksparseStageKKTTest, UpdateData)
 
     T rho = 0.9;
     T delta = 1.2;
-    Vec<T> s = rand::vector_rand_strictly_positive<T>(data.m);
-    Vec<T> s_lb = rand::vector_rand_strictly_positive<T>(data.n_lb);
-    Vec<T> s_ub = rand::vector_rand_strictly_positive<T>(data.n_ub);
-    Vec<T> z = rand::vector_rand_strictly_positive<T>(data.m);
-    Vec<T> z_lb = rand::vector_rand_strictly_positive<T>(data.n_lb);
-    Vec<T> z_ub = rand::vector_rand_strictly_positive<T>(data.n_ub);
+    Variables<T> scaling; scaling.resize(dim, n_eq, n_ineq);
+    scaling.s.setConstant(1);
+    scaling.s_lb.setConstant(1);
+    scaling.s_ub.setConstant(1);
+    scaling.z.setConstant(1);
+    scaling.z_lb.setConstant(1);
+    scaling.z_ub.setConstant(1);
 
     KKTSystem<T, I, PIQP_SPARSE> kkt_multistage(data, settings_multistage);
     kkt_multistage.init();
     KKTSystem<T, I, PIQP_SPARSE> kkt_sparse(data, settings_sparse);
     kkt_sparse.init();
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt_multistage.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
-    kkt_sparse.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt_multistage.update_scalings_and_factor(false, rho, delta, scaling);
+    kkt_sparse.update_scalings_and_factor(false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     test_solve_multiply(data, kkt_multistage, kkt_sparse);
@@ -163,9 +137,9 @@ TEST(BlocksparseStageKKTTest, UpdateData)
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt_multistage.update_data(update_options);
-    kkt_multistage.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt_multistage.update_scalings_and_factor(false, rho, delta, scaling);
     kkt_sparse.update_data(update_options);
-    kkt_sparse.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt_sparse.update_scalings_and_factor(false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     test_solve_multiply(data, kkt_multistage, kkt_sparse);
@@ -185,20 +159,21 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
 
     T rho = 0.9;
     T delta = 1.2;
-    Vec<T> s = rand::vector_rand_strictly_positive<T>(data.m);
-    Vec<T> s_lb = rand::vector_rand_strictly_positive<T>(data.n_lb);
-    Vec<T> s_ub = rand::vector_rand_strictly_positive<T>(data.n_ub);
-    Vec<T> z = rand::vector_rand_strictly_positive<T>(data.m);
-    Vec<T> z_lb = rand::vector_rand_strictly_positive<T>(data.n_lb);
-    Vec<T> z_ub = rand::vector_rand_strictly_positive<T>(data.n_ub);
+    Variables<T> scaling; scaling.resize(data.n, data.p, data.m);
+    scaling.s.setConstant(1);
+    scaling.s_lb.setConstant(1);
+    scaling.s_ub.setConstant(1);
+    scaling.z.setConstant(1);
+    scaling.z_lb.setConstant(1);
+    scaling.z_ub.setConstant(1);
 
     KKTSystem<T, I, PIQP_SPARSE> kkt_multistage(data, settings_multistage);
     kkt_multistage.init();
     KKTSystem<T, I, PIQP_SPARSE> kkt_sparse(data, settings_sparse);
     kkt_sparse.init();
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt_multistage.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
-    kkt_sparse.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt_multistage.update_scalings_and_factor(false, rho, delta, scaling);
+    kkt_sparse.update_scalings_and_factor(false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     test_solve_multiply(data, kkt_multistage, kkt_sparse);

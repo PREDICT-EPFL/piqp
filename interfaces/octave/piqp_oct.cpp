@@ -194,11 +194,6 @@ octave_value result_to_ov_struct(const piqp::Result<double>& result)
     ov_result_struct.assign("s", eigen_to_ov(result.s));
     ov_result_struct.assign("s_lb", eigen_to_ov(result.s_lb));
     ov_result_struct.assign("s_ub", eigen_to_ov(result.s_ub));
-    ov_result_struct.assign("zeta", eigen_to_ov(result.zeta));
-    ov_result_struct.assign("lambda", eigen_to_ov(result.lambda));
-    ov_result_struct.assign("nu", eigen_to_ov(result.nu));
-    ov_result_struct.assign("nu_lb", eigen_to_ov(result.nu_lb));
-    ov_result_struct.assign("nu_ub", eigen_to_ov(result.nu_ub));
     ov_result_struct.assign("info", octave_value(ov_info_struct));
 
     return octave_value(ov_result_struct);

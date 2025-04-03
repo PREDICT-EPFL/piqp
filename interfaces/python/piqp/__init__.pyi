@@ -92,10 +92,6 @@ def __eq__(self, other: typing.Any) -> bool:
         ...
 class Result:
     info: piqp.Info
-    lambda: numpy.ndarray[numpy.float64[m, 1]]
-    nu: numpy.ndarray[numpy.float64[m, 1]]
-    nu_lb: numpy.ndarray[numpy.float64[m, 1]]
-    nu_ub: numpy.ndarray[numpy.float64[m, 1]]
     s: numpy.ndarray[numpy.float64[m, 1]]
     s_lb: numpy.ndarray[numpy.float64[m, 1]]
     s_ub: numpy.ndarray[numpy.float64[m, 1]]
@@ -104,7 +100,6 @@ class Result:
     z: numpy.ndarray[numpy.float64[m, 1]]
     z_lb: numpy.ndarray[numpy.float64[m, 1]]
     z_ub: numpy.ndarray[numpy.float64[m, 1]]
-    zeta: numpy.ndarray[numpy.float64[m, 1]]
 class Settings:
     check_duality_gap: bool
     compute_timings: bool

@@ -23,7 +23,7 @@ public:
 
     virtual bool update_scalings_and_factor(const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) = 0;
 
-    virtual void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z, Vec<T>& delta_x, Vec<T>& delta_y, Vec<T>& delta_z) = 0;
+    virtual void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z, Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) = 0;
 
     // z = alpha * P * x
     virtual void eval_P_x(const T& alpha, const Vec<T>& x, Vec<T>& z) = 0;

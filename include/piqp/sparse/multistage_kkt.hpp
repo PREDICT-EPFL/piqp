@@ -174,7 +174,7 @@ public:
     }
 
     void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
-               Vec<T>& delta_x, Vec<T>& delta_y, Vec<T>& delta_z) override
+               Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) override
     {
         Vec<T>& rhs_z_bar = work_z;
         BlockVec& block_rhs = work_x_block_1;
@@ -196,23 +196,23 @@ public:
 
         solve_llt_in_place(block_rhs);
 
-        BlockVec& block_delta_x = block_rhs;
-        BlockVec& block_delta_y = work_y_block_1;
-        BlockVec& block_delta_z = work_z_block_1;
+        BlockVec& block_lhs_x = block_rhs;
+        BlockVec& block_lhs_y = work_y_block_1;
+        BlockVec& block_lhs_z = work_z_block_1;
 
-        // block_delta_y = delta_inv * A * block_delta_x
-        block_t_gemv_t(delta_inv, AT, block_delta_x, 0.0, block_delta_y, block_delta_y);
-        // block_delta_z = G * block_delta_x
-        block_t_gemv_t(1.0, GT, block_delta_x, 0.0, block_delta_z, block_delta_z);
+        // block_lhs_y = delta_inv * A * block_lhs_x
+        block_t_gemv_t(delta_inv, AT, block_lhs_x, 0.0, block_lhs_y, block_lhs_y);
+        // block_lhs_z = G * block_lhs_x
+        block_t_gemv_t(1.0, GT, block_lhs_x, 0.0, block_lhs_z, block_lhs_z);
 
-        block_delta_x.load(delta_x);
-        block_delta_y.load(delta_y, AT.perm_inv);
-        block_delta_z.load(delta_z, GT.perm_inv);
+        block_lhs_x.load(lhs_x);
+        block_lhs_y.load(lhs_y, AT.perm_inv);
+        block_lhs_z.load(lhs_z, GT.perm_inv);
 
-        delta_y.noalias() -= delta_inv * rhs_y;
+        lhs_y.noalias() -= delta_inv * rhs_y;
 
-        delta_z.noalias() -= rhs_z;
-        delta_z.array() *= m_z_reg_inv.array();
+        lhs_z.noalias() -= rhs_z;
+        lhs_z.array() *= m_z_reg_inv.array();
     }
 
     // z = alpha * P * x

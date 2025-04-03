@@ -148,12 +148,6 @@ typedef struct {
     const piqp_float* s_lb;
     const piqp_float* s_ub;
 
-    const piqp_float* zeta;
-    const piqp_float* lambda;
-    const piqp_float* nu;
-    const piqp_float* nu_lb;
-    const piqp_float* nu_ub;
-
     piqp_info info;
 } piqp_result;
 

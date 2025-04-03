@@ -10,8 +10,8 @@
 namespace piqp
 {
 
-template class SolverBase<DenseSolver<common::Scalar, common::dense::Preconditioner>, common::Scalar, common::StorageIndex, common::dense::Preconditioner, PIQP_DENSE, KKTMode::KKT_FULL>;
-template class SolverBase<SparseSolver<common::Scalar, common::StorageIndex, KKTMode::KKT_FULL, common::sparse::Preconditioner>, common::Scalar, common::StorageIndex, common::sparse::Preconditioner, PIQP_SPARSE, KKTMode::KKT_FULL>;
+template class SolverBase<common::Scalar, common::StorageIndex, common::dense::Preconditioner, PIQP_DENSE, KKTMode::KKT_FULL>;
+template class SolverBase<common::Scalar, common::StorageIndex, common::sparse::Preconditioner, PIQP_SPARSE, KKTMode::KKT_FULL>;
 
 template class DenseSolver<common::Scalar>;
 template class SparseSolver<common::Scalar>;

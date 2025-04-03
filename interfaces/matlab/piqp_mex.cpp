@@ -272,11 +272,6 @@ mxArray* result_to_mx_struct(const piqp::Result<double>& result)
     mxSetField(mx_result_ptr, 0, "s", eigen_to_mx(result.s));
     mxSetField(mx_result_ptr, 0, "s_lb", eigen_to_mx(result.s_lb));
     mxSetField(mx_result_ptr, 0, "s_ub", eigen_to_mx(result.s_ub));
-    mxSetField(mx_result_ptr, 0, "zeta", eigen_to_mx(result.zeta));
-    mxSetField(mx_result_ptr, 0, "lambda", eigen_to_mx(result.lambda));
-    mxSetField(mx_result_ptr, 0, "nu", eigen_to_mx(result.nu));
-    mxSetField(mx_result_ptr, 0, "nu_lb", eigen_to_mx(result.nu_lb));
-    mxSetField(mx_result_ptr, 0, "nu_ub", eigen_to_mx(result.nu_ub));
     mxSetField(mx_result_ptr, 0, "info", mx_info_ptr);
 
     return mx_result_ptr;

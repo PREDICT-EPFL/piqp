@@ -76,23 +76,23 @@ public:
     }
 
     void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
-               Vec<T>& delta_x, Vec<T>& delta_y, Vec<T>& delta_z) override
+               Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) override
     {
         T delta_inv = T(1) / m_delta;
 
-        delta_x = rhs_x;
+        lhs_x = rhs_x;
         work_z.array() = m_z_reg_inv.array() * rhs_z.array();
-        delta_x.noalias() += data.GT * work_z;
-        delta_x.noalias() += delta_inv * data.AT * rhs_y;
+        lhs_x.noalias() += data.GT * work_z;
+        lhs_x.noalias() += delta_inv * data.AT * rhs_y;
 
-        solve_ldlt_in_place(delta_x);
+        solve_ldlt_in_place(lhs_x);
 
-        delta_y.noalias() = delta_inv * data.AT.transpose() * delta_x;
-        delta_y.noalias() -= delta_inv * rhs_y;
+        lhs_y.noalias() = delta_inv * data.AT.transpose() * lhs_x;
+        lhs_y.noalias() -= delta_inv * rhs_y;
 
-        delta_z.noalias() = data.GT.transpose() * delta_x;
-        delta_z.noalias() -= rhs_z;
-        delta_z.array() *= m_z_reg_inv.array();
+        lhs_z.noalias() = data.GT.transpose() * lhs_x;
+        lhs_z.noalias() -= rhs_z;
+        lhs_z.array() *= m_z_reg_inv.array();
     }
 
     // z = alpha * P * x

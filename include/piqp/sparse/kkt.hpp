@@ -89,7 +89,7 @@ public:
     }
 
     void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
-               Vec<T>& delta_x, Vec<T>& delta_y, Vec<T>& delta_z) override
+               Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) override
     {
         T delta_inv = T(1) / m_delta;
 
@@ -124,37 +124,37 @@ public:
         // we reuse the memory of rhs for the solution
         ordering.template permt<T>(rhs, rhs_perm);
 
-        delta_x.noalias() = rhs.head(data.n);
+        lhs_x.noalias() = rhs.head(data.n);
 
         if (Mode == KKTMode::KKT_FULL)
         {
-            delta_y.noalias() = rhs.segment(data.n, data.p);
+            lhs_y.noalias() = rhs.segment(data.n, data.p);
 
-            delta_z.noalias() = rhs.tail(data.m);
+            lhs_z.noalias() = rhs.tail(data.m);
         }
         else if (Mode == KKTMode::KKT_EQ_ELIMINATED)
         {
-            delta_y.noalias() = delta_inv * data.AT.transpose() * delta_x;
-            delta_y.noalias() -= delta_inv * rhs_y;
+            lhs_y.noalias() = delta_inv * data.AT.transpose() * lhs_x;
+            lhs_y.noalias() -= delta_inv * rhs_y;
 
-            delta_z.noalias() = rhs.tail(data.m);
+            lhs_z.noalias() = rhs.tail(data.m);
         }
         else if (Mode == KKTMode::KKT_INEQ_ELIMINATED)
         {
-            delta_y.noalias() = rhs.tail(data.p);
+            lhs_y.noalias() = rhs.tail(data.p);
 
-            delta_z.noalias() = data.GT.transpose() * delta_x;
-            delta_z.noalias() -= rhs_z;
-            delta_z.array() *= m_z_reg_inv.array();
+            lhs_z.noalias() = data.GT.transpose() * lhs_x;
+            lhs_z.noalias() -= rhs_z;
+            lhs_z.array() *= m_z_reg_inv.array();
         }
         else
         {
-            delta_y.noalias() = delta_inv * data.AT.transpose() * delta_x;
-            delta_y.noalias() -= delta_inv * rhs_y;
+            lhs_y.noalias() = delta_inv * data.AT.transpose() * lhs_x;
+            lhs_y.noalias() -= delta_inv * rhs_y;
 
-            delta_z.noalias() = data.GT.transpose() * delta_x;
-            delta_z.noalias() -= rhs_z;
-            delta_z.array() *= m_z_reg_inv.array();
+            lhs_z.noalias() = data.GT.transpose() * lhs_x;
+            lhs_z.noalias() -= rhs_z;
+            lhs_z.array() *= m_z_reg_inv.array();
         }
     }
 
