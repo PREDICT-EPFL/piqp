@@ -26,6 +26,9 @@ namespace sparse
 template<typename T, typename I>
 class RuizEquilibration
 {
+    static constexpr T min_scaling = 1e-4;
+    static constexpr T max_scaling = 1e4;
+
     isize n = 0;
     isize p = 0;
     isize m = 0;
@@ -34,13 +37,11 @@ class RuizEquilibration
 
     T c = T(1);
     Vec<T> delta;
-    Vec<T> delta_lb;
-    Vec<T> delta_ub;
+    Vec<T> delta_b;
 
     T c_inv = T(1);
     Vec<T> delta_inv;
-    Vec<T> delta_lb_inv;
-    Vec<T> delta_ub_inv;
+    Vec<T> delta_b_inv;
 
 public:
     void init(const Data<T, I>& data)
@@ -48,57 +49,48 @@ public:
         n = data.n;
         p = data.p;
         m = data.m;
-        n_lb = data.n_lb;
-        n_ub = data.n_ub;
 
         delta.resize(n + p + m);
-        delta_lb.resize(n);
-        delta_ub.resize(n);
+        delta_b.resize(n);
         delta_inv.resize(n + p + m);
-        delta_lb_inv.resize(n);
-        delta_ub_inv.resize(n);
+        delta_b_inv.resize(n);
 
         c = T(1);
         delta.setConstant(1);
-        delta_lb.setConstant(1);
-        delta_ub.setConstant(1);
+        delta_b.setConstant(1);
         c_inv = T(1);
         delta_inv.setConstant(1);
-        delta_lb_inv.setConstant(1);
-        delta_ub_inv.setConstant(1);
+        delta_b_inv.setConstant(1);
     }
 
     inline void scale_data(Data<T, I>& data, bool reuse_prev_scaling = false, bool scale_cost = false, isize max_iter = 10, T epsilon = T(1e-3))
     {
         using std::abs;
 
-        n_lb = data.n_lb;
-        n_ub = data.n_ub;
-
         if (!reuse_prev_scaling)
         {
             // init scaling in case max_iter is 0
             c = T(1);
             delta.setConstant(1);
-            delta_lb.setConstant(1);
-            delta_ub.setConstant(1);
+            delta_b.setConstant(1);
 
             Vec<T>& delta_iter = delta_inv; // we use the memory of delta_inv as temporary storage
-            Vec<T>& delta_iter_lb = delta_lb_inv; // we use the memory of delta_lb_inv as temporary storage
-            Vec<T>& delta_iter_ub = delta_ub_inv; // we use the memory of delta_ub_inv as temporary storage
+            Vec<T>& delta_iter_b = delta_b_inv; // we use the memory of delta_lb_inv as temporary storage
             delta_iter.setZero();
+            delta_iter_b.setZero();
             for (isize i = 0; i < max_iter && (std::max)({
                     (1 - delta_iter.array()).matrix().template lpNorm<Eigen::Infinity>(),
-                    (1 - delta_iter_lb.head(n_lb).array()).matrix().template lpNorm<Eigen::Infinity>(),
-                    (1 - delta_iter_ub.head(n_ub).array()).matrix().template lpNorm<Eigen::Infinity>()
+                    (1 - delta_iter_b.array()).matrix().template lpNorm<Eigen::Infinity>()
                 }) > epsilon; i++)
             {
                 delta_iter.setZero();
 
                 // calculate scaling of full KKT matrix
-                // [ P AT GT ]
-                // [ A 0  0  ]
-                // [ G 0  0  ]
+                // [ P AT GT D ]
+                // [ A 0  0  0 ]
+                // [ G 0  0  0 ]
+                // [ D 0  0  0 ]
+                // where D is the diagonal of the bounds scaling
                 for (isize j = 0; j < n; j++)
                 {
                     for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
@@ -110,6 +102,7 @@ public:
                             delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(P_utri_it.value()));
                         }
                     }
+                    delta_iter(j) = (std::max)(delta_iter(j), data.x_b_scaling(j));
                 }
                 for (isize j = 0; j < p; j++)
                 {
@@ -129,24 +122,13 @@ public:
                         delta_iter(n + p + j) = (std::max)(delta_iter(n + p + j), abs(GT_it.value()));
                     }
                 }
-                for (isize j = 0; j < n_lb; j++)
-                {
-                    delta_iter(data.x_lb_idx(j)) = (std::max)(delta_iter(data.x_lb_idx(j)), data.x_lb_scaling(j));
-                    delta_iter_lb(j) = data.x_lb_scaling(j);
-                }
-                for (isize j = 0; j < n_ub; j++)
-                {
-                    delta_iter(data.x_ub_idx(j)) = (std::max)(delta_iter(data.x_ub_idx(j)), data.x_ub_scaling(j));
-                    delta_iter_ub(j) = data.x_ub_scaling(j);
-                }
+                delta_iter_b.array() = data.x_b_scaling.array();
 
                 limit_scaling(delta_iter);
-                limit_scaling(delta_iter_lb);
-                limit_scaling(delta_iter_ub);
+                limit_scaling(delta_iter_b);
 
                 delta_iter.array() = delta_iter.array().sqrt().inverse();
-                delta_iter_lb.array() = delta_iter_lb.array().sqrt().inverse();
-                delta_iter_ub.array() = delta_iter_ub.array().sqrt().inverse();
+                delta_iter_b.array() = delta_iter_b.array().sqrt().inverse();
 
                 // scale cost
                 pre_mult_diagonal<T, I>(data.P_utri, delta_iter.head(n));
@@ -160,25 +142,15 @@ public:
                 post_mult_diagonal<T, I>(data.GT, delta_iter.tail(m));
 
                 // scale box scalings
-                data.x_lb_scaling.head(n_lb).array() *= delta_iter_lb.head(n_lb).array();
-                for (isize j = 0; j < n_lb; j++)
-                {
-                    data.x_lb_scaling(j) *= delta_iter(data.x_lb_idx(j));
-                }
-                data.x_ub_scaling.head(n_ub).array() *= delta_iter_ub.head(n_ub).array();
-                for (isize j = 0; j < n_ub; j++)
-                {
-                    data.x_ub_scaling(j) *= delta_iter(data.x_ub_idx(j));
-                }
+                data.x_b_scaling.array() *= delta_iter_b.array() * delta_iter.head(n).array();
 
                 delta.array() *= delta_iter.array();
-                delta_lb.head(n_lb).array() *= delta_iter_lb.head(n_lb).array();
-                delta_ub.head(n_ub).array() *= delta_iter_ub.head(n_ub).array();
+                delta_b.array() *= delta_iter_b.array();
 
                 if (scale_cost)
                 {
                     // scaling for the cost
-                    Vec<T>& delta_iter_cost = delta_lb_inv; // we use delta_lb_inv as a temporary storage
+                    Vec<T>& delta_iter_cost = delta_b_inv; // we use delta_lb_inv as a temporary storage
                     delta_iter_cost.setZero();
                     for (isize j = 0; j < n; j++)
                     {
@@ -208,8 +180,7 @@ public:
 
             c_inv = T(1) / c;
             delta_inv.array() = delta.array().inverse();
-            delta_lb_inv.head(n_lb).array() = delta_lb.head(n_lb).array().inverse();
-            delta_ub_inv.head(n_ub).array() = delta_ub.head(n_ub).array().inverse();
+            delta_b_inv.array() = delta_b.array().inverse();
         }
         else
         {
@@ -226,23 +197,21 @@ public:
             post_mult_diagonal<T, I>(data.GT, delta.tail(m));
 
             // scale box scalings
-            data.x_lb_scaling.head(n_lb).array() *= delta_lb.head(n_lb).array();
-            for (isize j = 0; j < n_lb; j++)
-            {
-                data.x_lb_scaling(j) *= delta(data.x_lb_idx(j));
-            }
-            data.x_ub_scaling.head(n_ub).array() *= delta_ub.head(n_ub).array();
-            for (isize j = 0; j < n_ub; j++)
-            {
-                data.x_ub_scaling(j) *= delta(data.x_ub_idx(j));
-            }
+            data.x_b_scaling.array() *= delta_b.array() * delta.head(n).array();
         }
 
         // scale bounds
         data.b.array() *= delta.segment(n, p).array();
         data.h.array() *= delta.tail(m).array();
-        data.x_lb_n.head(n_lb).array() *= delta_lb.head(n_lb).array();
-        data.x_ub.head(n_ub).array() *= delta_ub.head(n_ub).array();
+        for (isize i = 0; i < data.n_lb; i++)
+        {
+            data.x_lb_n(i) *= delta_b(data.x_lb_idx(i));
+        }
+
+        for (isize i = 0; i < data.n_ub; i++)
+        {
+            data.x_ub(i) *= delta_b(data.x_ub_idx(i));
+        }
     }
 
     inline void unscale_data(Data<T, I>& data)
@@ -260,22 +229,19 @@ public:
         post_mult_diagonal<T, I>(data.GT, delta_inv.tail(m));
 
         // unscale box scalings
-        data.x_lb_scaling.head(n_lb).array() *= delta_lb_inv.head(n_lb).array();
-        for (isize j = 0; j < n_lb; j++)
-        {
-            data.x_lb_scaling(j) *= delta_inv(data.x_lb_idx(j));
-        }
-        data.x_ub_scaling.head(n_ub).array() *= delta_ub_inv.head(n_ub).array();
-        for (isize j = 0; j < n_ub; j++)
-        {
-            data.x_ub_scaling(j) *= delta_inv(data.x_ub_idx(j));
-        }
+        data.x_b_scaling.array() *= delta_b_inv.array() * delta_inv.head(n).array();
 
         // unscale bounds
         data.b.array() *= delta_inv.segment(n, p).array();
         data.h.array() *= delta_inv.tail(m).array();
-        data.x_lb_n.head(n_lb).array() *= delta_lb_inv.head(n_lb).array();
-        data.x_ub.head(n_ub).array() *= delta_ub_inv.head(n_ub).array();
+        for (isize i = 0; i < data.n_lb; i++)
+        {
+            data.x_lb_n(i) *= delta_b_inv(data.x_lb_idx(i));
+        }
+        for (isize i = 0; i < data.n_ub; i++)
+        {
+            data.x_ub(i) *= delta_b_inv(data.x_ub_idx(i));
+        }
     }
 
     inline T scale_cost(T cost) const
@@ -325,27 +291,25 @@ public:
     }
 
     template<typename Derived>
-    inline auto scale_dual_lb(const Eigen::MatrixBase<Derived>& z_lb) const
+    inline auto scale_dual_b(const Eigen::MatrixBase<Derived>& z_b) const
     {
-        return (z_lb.array() * c * delta_lb_inv.head(n_lb).array()).matrix();
+        return (z_b.array() * c * delta_b_inv.array()).matrix();
     }
 
     template<typename Derived>
-    inline auto unscale_dual_lb(const Eigen::MatrixBase<Derived>& z_lb) const
+    inline auto unscale_dual_b(const Eigen::MatrixBase<Derived>& z_b) const
     {
-        return (z_lb.array() * c_inv * delta_lb.head(n_lb).array()).matrix();
+        return (z_b.array() * c_inv * delta_b.array()).matrix();
     }
 
-    template<typename Derived>
-    inline auto scale_dual_ub(const Eigen::MatrixBase<Derived>& z_ub) const
+    inline auto scale_dual_b_i(const T& z_b_i, Eigen::Index i) const
     {
-        return (z_ub.array() * c * delta_ub_inv.head(n_ub).array()).matrix();
+        return z_b_i * c * delta_b_inv(i);
     }
 
-    template<typename Derived>
-    inline auto unscale_dual_ub(const Eigen::MatrixBase<Derived>& z_ub) const
+    inline auto unscale_dual_b_i(const T& z_b_i, Eigen::Index i) const
     {
-        return (z_ub.array() * c_inv * delta_ub.head(n_ub).array()).matrix();
+        return z_b_i * c_inv * delta_b(i);
     }
 
     template<typename Derived>
@@ -361,27 +325,25 @@ public:
     }
 
     template<typename Derived>
-    inline auto scale_slack_lb(const Eigen::MatrixBase<Derived>& s_lb) const
+    inline auto scale_slack_b(const Eigen::MatrixBase<Derived>& s_b) const
     {
-        return (s_lb.array() * delta_lb.head(n_lb).array()).matrix();
+        return (s_b.array() * delta_b.array()).matrix();
     }
 
     template<typename Derived>
-    inline auto unscale_slack_lb(const Eigen::MatrixBase<Derived>& s_lb) const
+    inline auto unscale_slack_b(const Eigen::MatrixBase<Derived>& s_b) const
     {
-        return (s_lb.array() * delta_lb_inv.head(n_lb).array()).matrix();
+        return (s_b.array() * delta_b_inv.array()).matrix();
     }
 
-    template<typename Derived>
-    inline auto scale_slack_ub(const Eigen::MatrixBase<Derived>& s_ub) const
+    inline auto scale_slack_b_i(const T& s_b_i, Eigen::Index i) const
     {
-        return (s_ub.array() * delta_ub.head(n_ub).array()).matrix();
+        return s_b_i * delta_b(i);
     }
 
-    template<typename Derived>
-    inline auto unscale_slack_ub(const Eigen::MatrixBase<Derived>& s_ub) const
+    inline auto unscale_slack_b_i(const T& s_b_i, Eigen::Index i) const
     {
-        return (s_ub.array() * delta_ub_inv.head(n_ub).array()).matrix();
+        return s_b_i * delta_b_inv(i);
     }
 
     template<typename Derived>
@@ -409,27 +371,25 @@ public:
     }
 
     template<typename Derived>
-    inline auto scale_primal_res_lb(const Eigen::MatrixBase<Derived>& p_res_lb) const
+    inline auto scale_primal_res_b(const Eigen::MatrixBase<Derived>& p_res_b) const
     {
-        return (p_res_lb.array() * delta_lb.head(n_lb).array()).matrix();
+        return (p_res_b.array() * delta_b.array()).matrix();
     }
 
     template<typename Derived>
-    inline auto unscale_primal_res_lb(const Eigen::MatrixBase<Derived>& p_res_lb) const
+    inline auto unscale_primal_res_b(const Eigen::MatrixBase<Derived>& p_res_b) const
     {
-        return (p_res_lb.array() * delta_lb_inv.head(n_lb).array()).matrix();
+        return (p_res_b.array() * delta_b_inv.array()).matrix();
     }
 
-    template<typename Derived>
-    inline auto scale_primal_res_ub(const Eigen::MatrixBase<Derived>& p_res_ub) const
+    inline auto scale_primal_res_b_i(const T& p_res_b_i, Eigen::Index i) const
     {
-        return (p_res_ub.array() * delta_ub.head(n_ub).array()).matrix();
+        return p_res_b_i * delta_b(i);
     }
 
-    template<typename Derived>
-    inline auto unscale_primal_res_ub(const Eigen::MatrixBase<Derived>& p_res_ub) const
+    inline auto unscale_primal_res_b_i(const T& p_res_b_i, Eigen::Index i) const
     {
-        return (p_res_ub.array() * delta_ub_inv.head(n_ub).array()).matrix();
+        return p_res_b_i * delta_b_inv(i);
     }
 
     template<typename Derived>
@@ -445,7 +405,7 @@ public:
     }
 
 protected:
-    inline void limit_scaling(VecRef<T> d) const
+    inline void limit_scaling(Vec<T>& d) const
     {
         isize n_d = d.rows();
         for (int i = 0; i < n_d; i++)
@@ -455,9 +415,6 @@ protected:
     }
     inline void limit_scaling(T& d) const
     {
-        const T min_scaling = 1e-4;
-        const T max_scaling = 1e4;
-
         if (d < min_scaling)
         {
             d = T(1);
@@ -501,16 +458,14 @@ public:
     inline auto& unscale_dual_ineq(const Eigen::MatrixBase<Derived>& z) const { return z; }
 
     template<typename Derived>
-    inline auto& scale_dual_lb(const Eigen::MatrixBase<Derived>& z_lb) const { return z_lb; }
+    inline auto& scale_dual_b(const Eigen::MatrixBase<Derived>& z_b) const { return z_b; }
 
     template<typename Derived>
-    inline auto& unscale_dual_lb(const Eigen::MatrixBase<Derived>& z_lb) const { return z_lb; }
+    inline auto& unscale_dual_b(const Eigen::MatrixBase<Derived>& z_b) const { return z_b; }
 
-    template<typename Derived>
-    inline auto& scale_dual_ub(const Eigen::MatrixBase<Derived>& z_ub) const { return z_ub; }
+    inline auto& scale_dual_b_i(const T& z_b_i, Eigen::Index) const { return z_b_i; }
 
-    template<typename Derived>
-    inline auto& unscale_dual_ub(const Eigen::MatrixBase<Derived>& z_ub) const { return z_ub; }
+    inline auto& unscale_dual_b_i(const T& z_b_i, Eigen::Index) const { return z_b_i; }
 
     template<typename Derived>
     inline auto& scale_slack_ineq(const Eigen::MatrixBase<Derived>& s) const { return s; }
@@ -519,16 +474,14 @@ public:
     inline auto& unscale_slack_ineq(const Eigen::MatrixBase<Derived>& s) const { return s; }
 
     template<typename Derived>
-    inline auto& scale_slack_lb(const Eigen::MatrixBase<Derived>& s_lb) const { return s_lb; }
+    inline auto& scale_slack_b(const Eigen::MatrixBase<Derived>& s_b) const { return s_b; }
 
     template<typename Derived>
-    inline auto& unscale_slack_lb(const Eigen::MatrixBase<Derived>& s_lb) const { return s_lb; }
+    inline auto& unscale_slack_b(const Eigen::MatrixBase<Derived>& s_b) const { return s_b; }
 
-    template<typename Derived>
-    inline auto& scale_slack_ub(const Eigen::MatrixBase<Derived>& s_ub) const { return s_ub; }
+    inline auto& scale_slack_b_i(const T& s_b_i, Eigen::Index) const { return s_b_i; }
 
-    template<typename Derived>
-    inline auto& unscale_slack_ub(const Eigen::MatrixBase<Derived>& s_ub) const { return s_ub; }
+    inline auto& unscale_slack_b_i(const T& s_b_i, Eigen::Index) const { return s_b_i; }
 
     template<typename Derived>
     inline auto& scale_primal_res_eq(const Eigen::MatrixBase<Derived>& p_res_eq) const { return p_res_eq; }
@@ -543,16 +496,14 @@ public:
     inline auto& unscale_primal_res_ineq(const Eigen::MatrixBase<Derived>& p_res_in) const { return p_res_in; }
 
     template<typename Derived>
-    inline auto& scale_primal_res_lb(const Eigen::MatrixBase<Derived>& p_res_lb) const { return p_res_lb; }
+    inline auto& scale_primal_res_b(const Eigen::MatrixBase<Derived>& p_res_b) const { return p_res_b; }
 
     template<typename Derived>
-    inline auto& unscale_primal_res_lb(const Eigen::MatrixBase<Derived>& p_res_lb) const { return p_res_lb; }
+    inline auto& unscale_primal_res_b(const Eigen::MatrixBase<Derived>& p_res_b) const { return p_res_b; }
 
-    template<typename Derived>
-    inline auto& scale_primal_res_ub(const Eigen::MatrixBase<Derived>& p_res_ub) const { return p_res_ub; }
+    inline auto& scale_primal_res_b_i(const T& p_res_b_i, Eigen::Index) const { return p_res_b_i; }
 
-    template<typename Derived>
-    inline auto& unscale_primal_res_ub(const Eigen::MatrixBase<Derived>& p_res_ub) const { return p_res_ub; }
+    inline auto& unscale_primal_res_b_i(const T& p_res_b_i, Eigen::Index) const { return p_res_b_i; }
 
     template<typename Derived>
     inline auto& scale_dual_res(const Eigen::MatrixBase<Derived>& d_res) const { return d_res; }

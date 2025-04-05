@@ -40,8 +40,7 @@ struct Data
     Vec<Eigen::Index> x_lb_idx; // stores the original index of the finite lower bounds
     Vec<Eigen::Index> x_ub_idx; // stores the original index of the finite upper bounds
 
-    Vec<T> x_lb_scaling; // scaling of lb, i.e. x_lb <= x_lb_scaling .* x
-    Vec<T> x_ub_scaling; // scaling of lb, i.e. x_ub_scaling .* x <= x_ub
+    Vec<T> x_b_scaling; // scaling of lb and ub, i.e. x_lb <= x_b_scaling .* x <= x_ub
 
     Vec<T> x_lb_n; // stores negative finite lower bounds in the first n_lb fields
     Vec<T> x_ub;   // stores finite upper bounds in the first n_ub fields
@@ -55,7 +54,7 @@ struct Data
       c(model.c), b(model.b), h(model.h),
       n_lb(0), n_ub(0),
       x_lb_idx(model.P.rows()), x_ub_idx(model.P.rows()),
-      x_lb_scaling(Vec<T>::Constant(model.P.rows(), T(1))), x_ub_scaling(Vec<T>::Constant(model.P.rows(), T(1))),
+      x_b_scaling(Vec<T>::Constant(model.P.rows(), T(1))),
       x_lb_n(model.P.rows()), x_ub(model.P.rows())
     {
         isize i_lb = 0;

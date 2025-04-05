@@ -48,7 +48,6 @@ protected:
     SparseMat<T, I> create_kkt_matrix()
     {
         auto& data = static_cast<Derived*>(this)->data;
-        auto& m_rho = static_cast<Derived*>(this)->m_rho;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
         T delta_inv = T(1) / m_delta;
@@ -56,8 +55,6 @@ protected:
         SparseMat<T, I> diagonal_rho;
         diagonal_rho.resize(data.n, data.n);
         diagonal_rho.setIdentity();
-        // set diagonal to rho
-        Eigen::Map<Vec<T>>(diagonal_rho.valuePtr(), data.n).setConstant(m_rho);
 
         SparseMat<T, I> KKT_top_left_block = data.P_utri + diagonal_rho + delta_inv * AT_A;
 
@@ -152,13 +149,12 @@ protected:
         return KKT;
     }
 
-    void update_kkt_cost_scalings()
+    void update_kkt_cost_scalings(const Vec<T>& x_reg)
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
         auto& ordering = static_cast<Derived*>(this)->ordering;
-        auto& m_rho = static_cast<Derived*>(this)->m_rho;
 
         // set PKPt to zero keeping pattern
         Eigen::Map<Vec<T>>(PKPt.valuePtr(), PKPt.nonZeros()).setZero();
@@ -176,7 +172,7 @@ protected:
         // hence we can directly address the diagonal from the outer index pointer
         for (isize col = 0; col < data.n; col++)
         {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += m_rho;
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += x_reg[col];
         }
     }
 
@@ -195,15 +191,12 @@ protected:
         }
     }
 
-    void update_kkt_inequality_scaling()
+    void update_kkt_inequality_scaling(const Vec<T>& z_reg)
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
         auto& ordering = static_cast<Derived*>(this)->ordering;
-        auto& m_delta = static_cast<Derived*>(this)->m_delta;
-        auto& m_s = static_cast<Derived*>(this)->m_s;
-        auto& m_z_inv = static_cast<Derived*>(this)->m_z_inv;
 
         // copy GT to PKPt
         isize n = data.GT.nonZeros();
@@ -217,7 +210,7 @@ protected:
         isize k = 0;
         for (isize col = data.n; col < n; col++)
         {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] = -m_s(k) * m_z_inv(k) - m_delta;
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] = -z_reg(k);
             k++;
         }
     }

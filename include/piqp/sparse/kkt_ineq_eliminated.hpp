@@ -52,14 +52,11 @@ protected:
     SparseMat<T, I> create_kkt_matrix()
     {
         auto& data = static_cast<Derived*>(this)->data;
-        auto& m_rho = static_cast<Derived*>(this)->m_rho;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
         SparseMat<T, I> diagonal_rho;
         diagonal_rho.resize(data.n, data.n);
         diagonal_rho.setIdentity();
-        // set diagonal to rho
-        Eigen::Map<Vec<T>>(diagonal_rho.valuePtr(), data.n).setConstant(m_rho);
 
         SparseMat<T, I> KKT_top_left_block = data.P_utri + diagonal_rho + GT_W_delta_inv_G;
 
@@ -154,13 +151,12 @@ protected:
         return KKT;
     }
 
-    void update_kkt_cost_scalings()
+    void update_kkt_cost_scalings(const Vec<T>& x_reg)
     {
         auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
         auto& ordering = static_cast<Derived*>(this)->ordering;
-        auto& m_rho = static_cast<Derived*>(this)->m_rho;
 
         // set PKPt to zero keeping pattern
         Eigen::Map<Vec<T>>(PKPt.valuePtr(), PKPt.nonZeros()).setZero();
@@ -178,7 +174,7 @@ protected:
         // hence we can directly address the diagonal from the outer index pointer
         for (isize col = 0; col < data.n; col++)
         {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += m_rho;
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] += x_reg[col];
         }
     }
 
@@ -205,12 +201,12 @@ protected:
         }
     }
 
-    void update_kkt_inequality_scaling()
+    void update_kkt_inequality_scaling(const Vec<T>& z_reg)
     {
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
 
-        update_GT_W_delta_inv_G();
+        update_GT_W_delta_inv_G(z_reg);
 
         // copy GT * (W + delta)^{-1} * G to PKPt
         isize n = GT_W_delta_inv_G.nonZeros();
@@ -230,13 +226,9 @@ protected:
         }
     }
 
-    void update_GT_W_delta_inv_G()
+    void update_GT_W_delta_inv_G(const Vec<T>& z_reg)
     {
         auto& data = static_cast<Derived*>(this)->data;
-        auto& m_delta = static_cast<Derived*>(this)->m_delta;
-
-        auto& m_s = static_cast<Derived*>(this)->m_s;
-        auto& m_z_inv = static_cast<Derived*>(this)->m_z_inv;
 
         // update GT * (W + delta)^{-1} * G
         isize n = G.outerSize();
@@ -248,8 +240,7 @@ protected:
                 for (typename SparseMat<T, I>::InnerIterator GT_i_it(data.GT, k); GT_i_it; ++GT_i_it)
                 {
                     if (GT_i_it.index() > j) continue;
-                    T W_delta_inv = T(1) / (m_s(k) * m_z_inv(k) + m_delta);
-                    tmp_scatter(GT_i_it.index()) += W_delta_inv * Gk_it.value() * GT_i_it.value();
+                    tmp_scatter(GT_i_it.index()) += Gk_it.value() * GT_i_it.value() / z_reg(k);
                 }
             }
 

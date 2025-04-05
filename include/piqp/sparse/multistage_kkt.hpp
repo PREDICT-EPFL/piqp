@@ -18,7 +18,7 @@
 
 #include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
-#include "piqp/kkt_system.hpp"
+#include "piqp/kkt_solver_base.hpp"
 #include "piqp/kkt_fwd.hpp"
 #include "piqp/settings.hpp"
 #include "piqp/sparse/data.hpp"
@@ -37,7 +37,7 @@ namespace sparse
 {
 
 template<typename T, typename I>
-class MultistageKKT : public KKTSystem<T>
+class MultistageKKT : public KKTSolverBase<T>
 {
 protected:
     static_assert(std::is_same<T, double>::value, "sparse_multistage only supports doubles");
@@ -45,18 +45,11 @@ protected:
     const Data<T, I>& data;
     const Settings<T>& settings;
 
-    T m_rho;
     T m_delta;
 
-    Vec<T> m_s;
-    Vec<T> m_s_lb;
-    Vec<T> m_s_ub;
-    Vec<T> m_z_inv;
-    Vec<T> m_z_lb_inv;
-    Vec<T> m_z_ub_inv;
-
-    Vec<T> tmp_x;
-    Vec<T> tmp_z;
+    Vec<T> m_z_reg_inv;
+    Vec<T> work_x;
+    Vec<T> work_z;
 
     std::vector<BlockInfo<I>> block_info;
 
@@ -72,29 +65,22 @@ protected:
 
     BlockKKT kkt_fac;
 
-    BlockVec tmp1_x_block;
-    BlockVec tmp2_x_block;
-    BlockVec tmp1_y_block;
-    BlockVec tmp2_y_block;
-    BlockVec tmp1_z_block;
-    BlockVec tmp2_z_block;
+    BlockVec work_x_block_1;
+    BlockVec work_x_block_2;
+    BlockVec work_y_block_1;
+    BlockVec work_y_block_2;
+    BlockVec work_z_block_1;
+    BlockVec work_z_block_2;
 
 public:
     MultistageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
     {
         // init workspace
-        m_rho = T(1);
         m_delta = T(1);
 
-        m_s.resize(data.m);
-        m_s_lb.resize(data.n);
-        m_s_ub.resize(data.n);
-        m_z_inv.resize(data.m);
-        m_z_lb_inv.resize(data.n);
-        m_z_ub_inv.resize(data.n);
-
-        tmp_x.resize(data.n);
-        tmp_z.resize(data.m);
+        m_z_reg_inv.resize(data.m);
+        work_x.resize(data.n);
+        work_z.resize(data.m);
 
         // prepare kkt factorization
         extract_arrow_structure();
@@ -123,15 +109,15 @@ public:
 
         init_kkt_fac();
 
-        tmp1_x_block = BlockVec(block_info);
-        tmp2_x_block = BlockVec(block_info);
-        tmp1_y_block = BlockVec(AT.block_row_sizes);
-        tmp2_y_block = BlockVec(AT.block_row_sizes);
-        tmp1_z_block = BlockVec(GT.block_row_sizes);
-        tmp2_z_block = BlockVec(GT.block_row_sizes);
+        work_x_block_1 = BlockVec(block_info);
+        work_x_block_2 = BlockVec(block_info);
+        work_y_block_1 = BlockVec(AT.block_row_sizes);
+        work_y_block_2 = BlockVec(AT.block_row_sizes);
+        work_z_block_1 = BlockVec(GT.block_row_sizes);
+        work_z_block_2 = BlockVec(GT.block_row_sizes);
     }
 
-    void update_data(int options)
+    void update_data(int options) override
     {
         std::size_t N = block_info.size();
 
@@ -161,22 +147,10 @@ public:
         }
     }
 
-    bool update_scalings_and_factor(bool iterative_refinement,
-                                    const T& rho, const T& delta,
-                                    const CVecRef<T>& s, const CVecRef<T>& s_lb, const CVecRef<T>& s_ub,
-                                    const CVecRef<T>& z, const CVecRef<T>& z_lb, const CVecRef<T>& z_ub)
+    bool update_scalings_and_factor(const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) override
     {
-        (void) iterative_refinement;
-        assert(!iterative_refinement && "iterative refinement not implemented yet");
-
-        m_rho = rho;
         m_delta = delta;
-        m_s = s;
-        m_s_lb.head(data.n_lb) = s_lb.head(data.n_lb);
-        m_s_ub.head(data.n_ub) = s_ub.head(data.n_ub);
-        m_z_inv.array() = T(1) / z.array();
-        m_z_lb_inv.head(data.n_lb).array() = T(1) / z_lb.head(data.n_lb).array();
-        m_z_ub_inv.head(data.n_ub).array() = T(1) / z_ub.head(data.n_ub).array();
+        m_z_reg_inv.array() = z_reg.array().inverse();
 
         // populate G scaling vector
         Eigen::Index i = 0;
@@ -186,118 +160,32 @@ public:
             for (I inner_idx = 0; inner_idx < block_size; inner_idx++)
             {
                 I perm_idx = GT.perm_inv(i);
-                BLASFEO_DVECEL(G_scaling.x[std::size_t(block_idx)].ref(), inner_idx) = std::sqrt(T(1) / (m_s(perm_idx) * m_z_inv(perm_idx) + m_delta));
+                BLASFEO_DVECEL(G_scaling.x[std::size_t(block_idx)].ref(), inner_idx) = std::sqrt(m_z_reg_inv(perm_idx));
                 i++;
             }
         }
 
         block_gemm_nd(GT, G_scaling, GT_scaled);
         block_syrk_ln_calc(GT_scaled, GT_scaled, GtG);
-        populate_kkt_fac();
+        populate_kkt_fac(x_reg);
         factor_kkt();
 
         return true;
     }
 
-    void multiply(const CVecRef<T>& delta_x, const CVecRef<T>& delta_y,
-                  const CVecRef<T>& delta_z, const CVecRef<T>& delta_z_lb, const CVecRef<T>& delta_z_ub,
-                  const CVecRef<T>& delta_s, const CVecRef<T>& delta_s_lb, const CVecRef<T>& delta_s_ub,
-                  VecRef<T> rhs_x, VecRef<T> rhs_y,
-                  VecRef<T> rhs_z, VecRef<T> rhs_z_lb, VecRef<T> rhs_z_ub,
-                  VecRef<T> rhs_s, VecRef<T> rhs_s_lb, VecRef<T> rhs_s_ub)
+    void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
+               Vec<T>& delta_x, Vec<T>& delta_y, Vec<T>& delta_z) override
     {
-        BlockVec& block_delta_x = tmp1_x_block;
-        BlockVec& block_delta_y = tmp1_y_block;
-        BlockVec& block_delta_z = tmp1_z_block;
-        BlockVec& block_rhs_x = tmp2_x_block;
-        BlockVec& block_rhs_y = tmp2_y_block;
-        BlockVec& block_rhs_z = tmp2_z_block;
-
-        block_delta_x.assign(delta_x);
-        block_delta_y.assign(delta_y, AT.perm_inv);
-        block_delta_z.assign(delta_z, GT.perm_inv);
-
-        // block_rhs_x = P * block_delta_x, P is symmetric and only the lower triangular part of P is accessed
-        block_symv_l(1.0, P, block_delta_x, block_rhs_x);
-        // block_rhs_x += AT * block_delta_y
-        // block_rhs_y = A * block_delta_x
-        block_t_gemv_nt(1.0, 1.0, AT, block_delta_y, block_delta_x, 1.0, 0.0, block_rhs_x, block_rhs_y, block_rhs_x, block_rhs_y);
-        // block_rhs_x += GT * block_delta_z
-        // block_rhs_z = G * block_delta_x
-        block_t_gemv_nt(1.0, 1.0, GT, block_delta_z, block_delta_x, 1.0, 0.0, block_rhs_x, block_rhs_z, block_rhs_x, block_rhs_z);
-
-        block_rhs_x.load(rhs_x);
-        block_rhs_y.load(rhs_y, AT.perm_inv);
-        block_rhs_z.load(rhs_z, GT.perm_inv);
-
-        rhs_x.noalias() += m_rho * delta_x;
-        for (isize i = 0; i < data.n_lb; i++)
-        {
-            rhs_x(data.x_lb_idx(i)) -= data.x_lb_scaling(i) * delta_z_lb(i);
-        }
-        for (isize i = 0; i < data.n_ub; i++)
-        {
-            rhs_x(data.x_ub_idx(i)) += data.x_ub_scaling(i) * delta_z_ub(i);
-        }
-
-        rhs_y.noalias() -= m_delta * delta_y;
-
-        rhs_z.noalias() -= m_delta * delta_z;
-        rhs_z.noalias() += delta_s;
-
-        for (isize i = 0; i < data.n_lb; i++)
-        {
-            rhs_z_lb(i) = -data.x_lb_scaling(i) * delta_x(data.x_lb_idx(i));
-        }
-        rhs_z_lb.head(data.n_lb).noalias() -= m_delta * delta_z_lb.head(data.n_lb);
-        rhs_z_lb.head(data.n_lb).noalias() += delta_s_lb.head(data.n_lb);
-
-        for (isize i = 0; i < data.n_ub; i++)
-        {
-            rhs_z_ub(i) = data.x_ub_scaling(i) * delta_x(data.x_ub_idx(i));
-        }
-        rhs_z_ub.head(data.n_ub).noalias() -= m_delta * delta_z_ub.head(data.n_ub);
-        rhs_z_ub.head(data.n_ub).noalias() += delta_s_ub.head(data.n_ub);
-
-        rhs_s.array() = m_s.array() * delta_z.array() + m_z_inv.array().cwiseInverse() * delta_s.array();
-
-        rhs_s_lb.head(data.n_lb).array() = m_s_lb.head(data.n_lb).array() * delta_z_lb.head(data.n_lb).array();
-        rhs_s_lb.head(data.n_lb).array() += m_z_lb_inv.head(data.n_lb).array().cwiseInverse() * delta_s_lb.head(data.n_lb).array();
-
-        rhs_s_ub.head(data.n_ub).array() = m_s_ub.head(data.n_ub).array() * delta_z_ub.head(data.n_ub).array();
-        rhs_s_ub.head(data.n_ub).array() += m_z_ub_inv.head(data.n_ub).array().cwiseInverse() * delta_s_ub.head(data.n_ub).array();
-    }
-
-    void solve(const CVecRef<T>& rhs_x, const CVecRef<T>& rhs_y,
-               const CVecRef<T>& rhs_z, const CVecRef<T>& rhs_z_lb, const CVecRef<T>& rhs_z_ub,
-               const CVecRef<T>& rhs_s, const CVecRef<T>& rhs_s_lb, const CVecRef<T>& rhs_s_ub,
-               VecRef<T> delta_x, VecRef<T> delta_y,
-               VecRef<T> delta_z, VecRef<T> delta_z_lb, VecRef<T> delta_z_ub,
-               VecRef<T> delta_s, VecRef<T> delta_s_lb, VecRef<T> delta_s_ub)
-    {
-        Vec<T>& rhs = tmp_x;
-        Vec<T>& rhs_z_bar = tmp_z;
-        BlockVec& block_rhs = tmp1_x_block;
-        BlockVec& block_rhs_y = tmp1_y_block;
-        BlockVec& block_rhs_z_bar = tmp1_z_block;
+        Vec<T>& rhs_z_bar = work_z;
+        BlockVec& block_rhs = work_x_block_1;
+        BlockVec& block_rhs_y = work_y_block_1;
+        BlockVec& block_rhs_z_bar = work_z_block_1;
 
         T delta_inv = T(1) / m_delta;
 
-        rhs_z_bar.array() = rhs_z.array() - m_z_inv.array() * rhs_s.array();
-        rhs_z_bar.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
+        rhs_z_bar.array() = m_z_reg_inv.array() * rhs_z.array();
 
-        rhs = rhs_x;
-
-        for (isize i = 0; i < data.n_lb; i++) {
-            rhs(data.x_lb_idx(i)) -= data.x_lb_scaling(i) * (rhs_z_lb(i) - m_z_lb_inv(i) * rhs_s_lb(i))
-                                     / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
-        }
-        for (isize i = 0; i < data.n_ub; i++) {
-            rhs(data.x_ub_idx(i)) += data.x_ub_scaling(i) * (rhs_z_ub(i) - m_z_ub_inv(i) * rhs_s_ub(i))
-                                     / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
-        }
-
-        block_rhs.assign(rhs);
+        block_rhs.assign(rhs_x);
         block_rhs_y.assign(rhs_y, AT.perm_inv);
         block_rhs_z_bar.assign(rhs_z_bar, GT.perm_inv);
 
@@ -309,8 +197,8 @@ public:
         solve_llt_in_place(block_rhs);
 
         BlockVec& block_delta_x = block_rhs;
-        BlockVec& block_delta_y = tmp1_y_block;
-        BlockVec& block_delta_z = tmp1_z_block;
+        BlockVec& block_delta_y = work_y_block_1;
+        BlockVec& block_delta_z = work_z_block_1;
 
         // block_delta_y = delta_inv * A * block_delta_x
         block_t_gemv_t(delta_inv, AT, block_delta_x, 0.0, block_delta_y, block_delta_y);
@@ -323,36 +211,15 @@ public:
 
         delta_y.noalias() -= delta_inv * rhs_y;
 
-        delta_z.array() *= T(1) / (m_s.array() * m_z_inv.array() + m_delta);
-        delta_z.noalias() -= rhs_z_bar;
-
-        for (isize i = 0; i < data.n_lb; i++) {
-            delta_z_lb(i) =
-                    (-data.x_lb_scaling(i) * delta_x(data.x_lb_idx(i)) - rhs_z_lb(i) + m_z_lb_inv(i) * rhs_s_lb(i))
-                    / (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
-        }
-        for (isize i = 0; i < data.n_ub; i++) {
-            delta_z_ub(i) =
-                    (data.x_ub_scaling(i) * delta_x(data.x_ub_idx(i)) - rhs_z_ub(i) + m_z_ub_inv(i) * rhs_s_ub(i))
-                    / (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
-        }
-
-        delta_s.array() = m_z_inv.array() * (rhs_s.array() - m_s.array() * delta_z.array());
-
-        delta_s_lb.head(data.n_lb).array() = m_z_lb_inv.head(data.n_lb).array()
-                                             * (rhs_s_lb.head(data.n_lb).array() -
-                                                m_s_lb.head(data.n_lb).array() * delta_z_lb.head(data.n_lb).array());
-
-        delta_s_ub.head(data.n_ub).array() = m_z_ub_inv.head(data.n_ub).array()
-                                             * (rhs_s_ub.head(data.n_ub).array() -
-                                                m_s_ub.head(data.n_ub).array() * delta_z_ub.head(data.n_ub).array());
+        delta_z.noalias() -= rhs_z;
+        delta_z.array() *= m_z_reg_inv.array();
     }
 
     // z = alpha * P * x
-    void eval_P_x(const T& alpha, const CVecRef<T>& x, VecRef<T> z)
+    void eval_P_x(const T& alpha, const Vec<T>& x, Vec<T>& z) override
     {
-        BlockVec& block_x = tmp1_x_block;
-        BlockVec& block_z = tmp2_x_block;
+        BlockVec& block_x = work_x_block_1;
+        BlockVec& block_z = work_x_block_2;
 
         block_x.assign(x);
 
@@ -363,12 +230,12 @@ public:
     }
 
     // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
-    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt)
+    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
-        BlockVec& block_xn = tmp1_x_block;
-        BlockVec& block_xt = tmp1_y_block;
-        BlockVec& block_zn = tmp2_y_block;
-        BlockVec& block_zt = tmp2_x_block;
+        BlockVec& block_xn = work_x_block_1;
+        BlockVec& block_xt = work_y_block_1;
+        BlockVec& block_zn = work_y_block_2;
+        BlockVec& block_zt = work_x_block_2;
 
         block_xn.assign(xn);
         block_xt.assign(xt, AT.perm_inv);
@@ -382,12 +249,12 @@ public:
     }
 
     // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
-    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const CVecRef<T>& xn, const CVecRef<T>& xt, VecRef<T> zn, VecRef<T> zt)
+    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
-        BlockVec& block_xn = tmp1_x_block;
-        BlockVec& block_xt = tmp1_z_block;
-        BlockVec& block_zn = tmp2_z_block;
-        BlockVec& block_zt = tmp2_x_block;
+        BlockVec& block_xn = work_x_block_1;
+        BlockVec& block_xt = work_z_block_1;
+        BlockVec& block_zn = work_z_block_2;
+        BlockVec& block_zt = work_x_block_2;
 
         block_xn.assign(xn);
         block_xt.assign(xt, GT.perm_inv);
@@ -400,7 +267,7 @@ public:
         block_zt.load(zt);
     }
 
-    void print_info()
+    void print_info() override
     {
         std::size_t N = block_info.size();
         piqp_print("block sizes:");
@@ -998,19 +865,18 @@ protected:
 
     void init_kkt_fac()
     {
-        construct_kkt_fac<true>();
+        construct_kkt_fac<true>(work_x);
     }
 
-    void populate_kkt_fac()
+    void populate_kkt_fac(const Vec<T>& x_reg)
     {
-        construct_kkt_fac<false>();
+        construct_kkt_fac<false>(x_reg);
     }
 
     template<bool allocate>
-    void construct_kkt_fac()
+    void construct_kkt_fac(const Vec<T>& x_reg)
     {
-        Vec<T>& diag = tmp_x;
-        BlockVec& diag_block = tmp1_x_block;
+        BlockVec& x_reg_block = work_x_block_1;
 
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().diag_size;
@@ -1022,19 +888,7 @@ protected:
 
         if (!allocate)
         {
-            diag.setConstant(m_rho);
-
-            for (isize i = 0; i < data.n_lb; i++)
-            {
-                diag(data.x_lb_idx(i)) += data.x_lb_scaling(i) * data.x_lb_scaling(i) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
-            }
-
-            for (isize i = 0; i < data.n_ub; i++)
-            {
-                diag(data.x_ub_idx(i)) += data.x_ub_scaling(i) * data.x_ub_scaling(i) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
-            }
-
-            diag_block.assign(diag);
+            x_reg_block.assign(x_reg);
         }
 
 #ifdef PIQP_HAS_OPENMP
@@ -1088,11 +942,11 @@ protected:
 
                 if (mat_set) {
                     // diag(D_i) += diag
-                    blasfeo_ddiaad(1.0, diag_block.x[i], *kkt_fac.D[i]);
+                    blasfeo_ddiaad(1.0, x_reg_block.x[i], *kkt_fac.D[i]);
                 } else {
                     // D_i = diag
                     kkt_fac.D[i]->setZero();
-                    blasfeo_ddiain(1.0, diag_block.x[i], *kkt_fac.D[i]);
+                    blasfeo_ddiain(1.0, x_reg_block.x[i], *kkt_fac.D[i]);
                 }
             }
         }

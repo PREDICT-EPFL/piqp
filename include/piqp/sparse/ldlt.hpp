@@ -12,14 +12,6 @@
 #include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
 
-// Disable FMA instructions
-#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
-#pragma float_control(push)
-#pragma fp_contract(off)
-#elif defined(__GNUC__) || defined(__clang__)
-#pragma STDC FP_CONTRACT OFF
-#endif
-
 namespace piqp
 {
 
@@ -151,10 +143,14 @@ struct LDLt
                 isize p;
                 for (p = L_cols[i]; p < p2; p++)
                 {
-                    work.y[L_ind[p]] -= L_vals[p] * yi;
+                    // force compiler to not use fma instruction
+                    T tmp = L_vals[p] * yi;
+                    work.y[L_ind[p]] -= tmp;
                 }
                 T l_ki = yi / D[i]; /* the nonzero entry L(k,i) */
-                D[k] -= l_ki * yi;
+                // force compiler to not use fma instruction
+                T tmp = l_ki * yi;
+                D[k] -= tmp;
                 L_ind[p] = I(k);    /* store L(k,i) in column form of L */
                 L_vals[p] = l_ki;
                 L_nnz[i]++;         /* increment count of nonzeros in col i */
@@ -167,7 +163,7 @@ struct LDLt
         return n; /* success, diagonal of D is all nonzero */
     }
 
-    void lsolve(VecRef<T> x)
+    void lsolve(Vec<T>& x)
     {
         isize n = x.rows();
         eigen_assert(n == L_cols.rows() - 1 && "vector dimension missmatch!");
@@ -181,14 +177,14 @@ struct LDLt
         }
     }
 
-    void dsolve(VecRef<T> x)
+    void dsolve(Vec<T>& x)
     {
         PIQP_MAYBE_UNUSED isize n = x.rows();
         eigen_assert(n == D_inv.rows() && "vector dimension missmatch!");
         x.array() *= D_inv.array();
     }
 
-    void ltsolve(VecRef<T> x)
+    void ltsolve(Vec<T>& x)
     {
         isize n = x.rows();
         eigen_assert(n == L_cols.rows() - 1 && "vector dimension missmatch!");
@@ -202,7 +198,7 @@ struct LDLt
         }
     }
 
-    void solve_inplace(VecRef<T> x)
+    void solve_inplace(Vec<T>& x)
     {
         lsolve(x);
         dsolve(x);
@@ -213,12 +209,6 @@ struct LDLt
 } // namespace sparse
 
 } // namespace piqp
-
-#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
-#pragma float_control(pop)
-#elif defined(__GNUC__) || defined(__clang__)
-#pragma STDC FP_CONTRACT DEFAULT
-#endif
 
 #ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
 #include "piqp/sparse/ldlt.tpp"
