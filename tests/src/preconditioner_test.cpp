@@ -50,10 +50,11 @@ TEST(RuizEquilibration, DenseScaleUnscale)
     EXPECT_TRUE(data.GT.isApprox(data_orig.GT, 1e-8));
     EXPECT_TRUE(data.c.isApprox(data_orig.c, 1e-8));
     EXPECT_TRUE(data.b.isApprox(data_orig.b, 1e-8));
-    EXPECT_TRUE(data.h.isApprox(data_orig.h, 1e-8));
+    EXPECT_TRUE(data.h_l.isApprox(data_orig.h_l, 1e-8));
+    EXPECT_TRUE(data.h_u.isApprox(data_orig.h_u, 1e-8));
     EXPECT_TRUE(data.x_b_scaling.isApprox(data_orig.x_b_scaling, 1e-8));
-    EXPECT_TRUE(data.x_lb.head(data.n_lb).isApprox(data_orig.x_lb.head(data.n_lb), 1e-8));
-    EXPECT_TRUE(data.x_ub.head(data.n_ub).isApprox(data_orig.x_ub.head(data.n_ub), 1e-8));
+    EXPECT_TRUE(data.x_l.head(data.n_x_l).isApprox(data_orig.x_l.head(data.n_x_l), 1e-8));
+    EXPECT_TRUE(data.x_u.head(data.n_x_u).isApprox(data_orig.x_u.head(data.n_x_u), 1e-8));
 
     // scale, unscale data using previous scaling
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
@@ -68,10 +69,11 @@ TEST(RuizEquilibration, DenseScaleUnscale)
     EXPECT_TRUE(data.GT.isApprox(data_orig.GT, 1e-8));
     EXPECT_TRUE(data.c.isApprox(data_orig.c, 1e-8));
     EXPECT_TRUE(data.b.isApprox(data_orig.b, 1e-8));
-    EXPECT_TRUE(data.h.isApprox(data_orig.h, 1e-8));
+    EXPECT_TRUE(data.h_l.isApprox(data_orig.h_l, 1e-8));
+    EXPECT_TRUE(data.h_u.isApprox(data_orig.h_u, 1e-8));
     EXPECT_TRUE(data.x_b_scaling.isApprox(data_orig.x_b_scaling, 1e-8));
-    EXPECT_TRUE(data.x_lb.head(data.n_lb).isApprox(data_orig.x_lb.head(data.n_lb), 1e-8));
-    EXPECT_TRUE(data.x_ub.head(data.n_ub).isApprox(data_orig.x_ub.head(data.n_ub), 1e-8));
+    EXPECT_TRUE(data.x_l.head(data.n_x_l).isApprox(data_orig.x_l.head(data.n_x_l), 1e-8));
+    EXPECT_TRUE(data.x_u.head(data.n_x_u).isApprox(data_orig.x_u.head(data.n_x_u), 1e-8));
 }
 
 TEST(RuizEquilibration, SparseScaleUnscale)
@@ -106,10 +108,11 @@ TEST(RuizEquilibration, SparseScaleUnscale)
     EXPECT_TRUE(data.GT.isApprox(data_orig.GT, 1e-8));
     EXPECT_TRUE(data.c.isApprox(data_orig.c, 1e-8));
     EXPECT_TRUE(data.b.isApprox(data_orig.b, 1e-8));
-    EXPECT_TRUE(data.h.isApprox(data_orig.h, 1e-8));
-    EXPECT_TRUE(data.x_b_scaling.head(data.n_lb).isApprox(data_orig.x_b_scaling.head(data.n_lb), 1e-8));
-    EXPECT_TRUE(data.x_lb.head(data.n_lb).isApprox(data_orig.x_lb.head(data.n_lb), 1e-8));
-    EXPECT_TRUE(data.x_ub.head(data.n_ub).isApprox(data_orig.x_ub.head(data.n_ub), 1e-8));
+    EXPECT_TRUE(data.h_l.isApprox(data_orig.h_l, 1e-8));
+    EXPECT_TRUE(data.h_u.isApprox(data_orig.h_u, 1e-8));
+    EXPECT_TRUE(data.x_b_scaling.head(data.n_x_l).isApprox(data_orig.x_b_scaling.head(data.n_x_l), 1e-8));
+    EXPECT_TRUE(data.x_l.head(data.n_x_l).isApprox(data_orig.x_l.head(data.n_x_l), 1e-8));
+    EXPECT_TRUE(data.x_u.head(data.n_x_u).isApprox(data_orig.x_u.head(data.n_x_u), 1e-8));
 
     // scale, unscale data using previous scaling
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
@@ -122,10 +125,11 @@ TEST(RuizEquilibration, SparseScaleUnscale)
     EXPECT_TRUE(data.GT.isApprox(data_orig.GT, 1e-8));
     EXPECT_TRUE(data.c.isApprox(data_orig.c, 1e-8));
     EXPECT_TRUE(data.b.isApprox(data_orig.b, 1e-8));
-    EXPECT_TRUE(data.h.isApprox(data_orig.h, 1e-8));
-    EXPECT_TRUE(data.x_b_scaling.head(data.n_lb).isApprox(data_orig.x_b_scaling.head(data.n_lb), 1e-8));
-    EXPECT_TRUE(data.x_lb.head(data.n_lb).isApprox(data_orig.x_lb.head(data.n_lb), 1e-8));
-    EXPECT_TRUE(data.x_ub.head(data.n_ub).isApprox(data_orig.x_ub.head(data.n_ub), 1e-8));
+    EXPECT_TRUE(data.h_l.isApprox(data_orig.h_l, 1e-8));
+    EXPECT_TRUE(data.h_u.isApprox(data_orig.h_u, 1e-8));
+    EXPECT_TRUE(data.x_b_scaling.head(data.n_x_l).isApprox(data_orig.x_b_scaling.head(data.n_x_l), 1e-8));
+    EXPECT_TRUE(data.x_l.head(data.n_x_l).isApprox(data_orig.x_l.head(data.n_x_l), 1e-8));
+    EXPECT_TRUE(data.x_u.head(data.n_x_u).isApprox(data_orig.x_u.head(data.n_x_u), 1e-8));
 }
 
 // TEST(RuizEquilibration, DenseSameIneqScaling)
@@ -241,10 +245,11 @@ TEST(RuizEquilibration, DenseSparseCompare)
     EXPECT_TRUE(Mat<T>(data_sparse.GT).isApprox(data_dense.GT, 1e-8));
     EXPECT_TRUE(data_sparse.c.isApprox(data_dense.c, 1e-8));
     EXPECT_TRUE(data_sparse.b.isApprox(data_dense.b, 1e-8));
-    EXPECT_TRUE(data_sparse.h.isApprox(data_dense.h, 1e-8));
+    EXPECT_TRUE(data_sparse.h_l.isApprox(data_dense.h_l, 1e-8));
+    EXPECT_TRUE(data_sparse.h_u.isApprox(data_dense.h_u, 1e-8));
     EXPECT_TRUE(data_sparse.x_b_scaling.isApprox(data_dense.x_b_scaling, 1e-8));
-    EXPECT_TRUE(data_sparse.x_lb.head(data_sparse.n_lb).isApprox(data_dense.x_lb.head(data_dense.n_lb), 1e-8));
-    EXPECT_TRUE(data_sparse.x_ub.head(data_sparse.n_ub).isApprox(data_dense.x_ub.head(data_dense.n_ub), 1e-8));
+    EXPECT_TRUE(data_sparse.x_l.head(data_sparse.n_x_l).isApprox(data_dense.x_l.head(data_dense.n_x_l), 1e-8));
+    EXPECT_TRUE(data_sparse.x_u.head(data_sparse.n_x_u).isApprox(data_dense.x_u.head(data_dense.n_x_u), 1e-8));
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     preconditioner_sparse.unscale_data(data_sparse);
@@ -259,8 +264,9 @@ TEST(RuizEquilibration, DenseSparseCompare)
     EXPECT_TRUE(Mat<T>(data_sparse.GT).isApprox(data_dense.GT, 1e-8));
     EXPECT_TRUE(data_sparse.c.isApprox(data_dense.c, 1e-8));
     EXPECT_TRUE(data_sparse.b.isApprox(data_dense.b, 1e-8));
-    EXPECT_TRUE(data_sparse.h.isApprox(data_dense.h, 1e-8));
+    EXPECT_TRUE(data_sparse.h_l.isApprox(data_dense.h_l, 1e-8));
+    EXPECT_TRUE(data_sparse.h_u.isApprox(data_dense.h_u, 1e-8));
     EXPECT_TRUE(data_sparse.x_b_scaling.isApprox(data_dense.x_b_scaling, 1e-8));
-    EXPECT_TRUE(data_sparse.x_lb.head(data_sparse.n_lb).isApprox(data_dense.x_lb.head(data_dense.n_lb), 1e-8));
-    EXPECT_TRUE(data_sparse.x_ub.head(data_sparse.n_ub).isApprox(data_dense.x_ub.head(data_dense.n_ub), 1e-8));
+    EXPECT_TRUE(data_sparse.x_l.head(data_sparse.n_x_l).isApprox(data_dense.x_l.head(data_dense.n_x_l), 1e-8));
+    EXPECT_TRUE(data_sparse.x_u.head(data_sparse.n_x_u).isApprox(data_dense.x_u.head(data_dense.n_x_u), 1e-8));
 }

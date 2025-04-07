@@ -36,9 +36,10 @@ TEST(IOUtils, DenseImportExportTest)
     ASSERT_EQ(qp_model.G, loaded_qp_model.G);
     ASSERT_EQ(qp_model.c, loaded_qp_model.c);
     ASSERT_EQ(qp_model.b, loaded_qp_model.b);
-    ASSERT_EQ(qp_model.h, loaded_qp_model.h);
-    ASSERT_EQ(qp_model.x_lb, loaded_qp_model.x_lb);
-    ASSERT_EQ(qp_model.x_ub, loaded_qp_model.x_ub);
+    ASSERT_EQ(qp_model.h_l, loaded_qp_model.h_l);
+    ASSERT_EQ(qp_model.h_u, loaded_qp_model.h_u);
+    ASSERT_EQ(qp_model.x_l, loaded_qp_model.x_l);
+    ASSERT_EQ(qp_model.x_u, loaded_qp_model.x_u);
 }
 
 TEST(IOUtils, SparseImportExportTest)
@@ -60,7 +61,8 @@ TEST(IOUtils, SparseImportExportTest)
     assert_sparse_matrices_equal(qp_model.G, loaded_qp_model.G);
     ASSERT_EQ(qp_model.c, loaded_qp_model.c);
     ASSERT_EQ(qp_model.b, loaded_qp_model.b);
-    ASSERT_EQ(qp_model.h, loaded_qp_model.h);
-    ASSERT_EQ(qp_model.x_lb, loaded_qp_model.x_lb);
-    ASSERT_EQ(qp_model.x_ub, loaded_qp_model.x_ub);
+    ASSERT_EQ(qp_model.h_l, loaded_qp_model.h_l);
+    ASSERT_EQ(qp_model.h_u, loaded_qp_model.h_u);
+    ASSERT_EQ(qp_model.x_l, loaded_qp_model.x_l);
+    ASSERT_EQ(qp_model.x_u, loaded_qp_model.x_u);
 }
