@@ -59,19 +59,21 @@ TYPED_TEST(SparseSolverTest, SimpleQPWithUpdate)
     A.makeCompressed();
     Vec<T> b(1); b << 0;
 
-    SparseMat<T, I> G(2, 2);
+    SparseMat<T, I> G(3, 2);
     G.insert(0, 0) = 1;
-    G.insert(1, 0) = -1;
+    G.insert(1, 0) = 1;
+    G.insert(2, 0) = 1;
     G.makeCompressed();
-    Vec<T> h(2); h << 1, 1;
+    Vec<T> h_l(3); h_l << -1, -std::numeric_limits<T>::infinity(), -2;
+    Vec<T> h_u(3); h_u << std::numeric_limits<T>::infinity(), 1, 2;
 
-    Vec<T> x_lb(2); x_lb << -std::numeric_limits<T>::infinity(), -1;
-    Vec<T> x_ub(2); x_ub << std::numeric_limits<T>::infinity(), 1;
+    Vec<T> x_l(2); x_l << -std::numeric_limits<T>::infinity(), -1;
+    Vec<T> x_u(2); x_u << std::numeric_limits<T>::infinity(), 1;
 
     SparseSolver<T, I, TypeParam::Mode> solver;
     solver.settings().kkt_solver = TypeParam().backend;
     solver.settings().verbose = true;
-    solver.setup(P, c, A, b, G, h, x_lb, x_ub);
+    solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -81,20 +83,24 @@ TYPED_TEST(SparseSolverTest, SimpleQPWithUpdate)
     ASSERT_NEAR(solver.result().x(0), 0.4285714, 1e-6);
     ASSERT_NEAR(solver.result().x(1), 0.2142857, 1e-6);
     ASSERT_NEAR(solver.result().y(0), -1.5714286, 1e-6);
-    ASSERT_NEAR(solver.result().z(0), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z(1), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z_lb(0), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z_lb(1), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z_ub(0), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z_ub(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_l(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_l(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_l(2), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_u(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_u(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_u(2), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_bl(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_bl(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_bu(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_bu(1), 0, 1e-6);
 
     P.coeffRef(0, 0) = 8;
     A.coeffRef(0, 1) = -3;
-    h(0) = 2;
-    x_ub(1) = 2;
+    h_u(0) = 2;
+    x_u(1) = 2;
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    solver.update(P, c, A, b, nullopt, h, nullopt, x_ub);
+    solver.update(P, c, A, b, nullopt, nullopt, h_u, nullopt, x_u);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
@@ -105,12 +111,16 @@ TYPED_TEST(SparseSolverTest, SimpleQPWithUpdate)
     ASSERT_NEAR(solver.result().x(0), 0.2763157, 1e-6);
     ASSERT_NEAR(solver.result().x(1), 0.0921056, 1e-6);
     ASSERT_NEAR(solver.result().y(0), -1.2105263, 1e-6);
-    ASSERT_NEAR(solver.result().z(0), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z(1), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z_lb(0), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z_lb(1), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z_ub(0), 0, 1e-6);
-    ASSERT_NEAR(solver.result().z_ub(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_l(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_l(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_l(2), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_u(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_u(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_u(2), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_bl(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_bl(1), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_bu(0), 0, 1e-6);
+    ASSERT_NEAR(solver.result().z_bu(1), 0, 1e-6);
 }
 
 /*
@@ -142,7 +152,7 @@ TYPED_TEST(SparseSolverTest, PrimalInfeasibleQP)
     SparseSolver<T, I, TypeParam::Mode> solver;
     solver.settings().kkt_solver = TypeParam().backend;
     solver.settings().verbose = true;
-    solver.setup(P, c, A, b, G, h, nullopt, nullopt);
+    solver.setup(P, c, A, b, G, nullopt, h, nullopt, nullopt);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -173,7 +183,7 @@ TYPED_TEST(SparseSolverTest, DualInfeasibleQP)
     SparseSolver<T, I, TypeParam::Mode> solver;
     solver.settings().kkt_solver = TypeParam().backend;
     solver.settings().verbose = true;
-    solver.setup(P, c, A, b, G, h, nullopt, nullopt);
+    solver.setup(P, c, A, b, G, nullopt, h, nullopt, nullopt);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -195,7 +205,7 @@ TYPED_TEST(SparseSolverTest, DualInfeasibleQP)
 //
 //    SparseSolver<T, I, TypeParam::Mode> solver;
 //    solver.settings().verbose = true;
-//    solver.setup(P.sparseView(), c, A, b, G.sparseView(), h, nullopt, nullopt);
+//    solver.setup(P.sparseView(), c, A, b, G.sparseView(), nullopt, h, nullopt, nullopt);
 //
 //    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
 //    Status status = solver.solve();
@@ -216,7 +226,7 @@ TYPED_TEST(SparseSolverTest, StronglyConvexWithEqualityAndInequalities)
     SparseSolver<T, I, TypeParam::Mode> solver;
     solver.settings().kkt_solver = TypeParam().backend;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -237,7 +247,7 @@ TYPED_TEST(SparseSolverTest, NonStronglyConvexWithEqualityAndInequalities)
     SparseSolver<T, I, TypeParam::Mode> solver;
     solver.settings().kkt_solver = TypeParam().backend;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -259,13 +269,13 @@ TYPED_TEST(SparseSolverTest, SameResultWithRuizPreconditioner)
     solver_no_precon.settings().kkt_solver = TypeParam().backend;
     solver_no_precon.settings().eps_rel = 0;
     solver_no_precon.settings().verbose = true;
-    solver_no_precon.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
+    solver_no_precon.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
     SparseSolver<T, I, TypeParam::Mode, sparse::RuizEquilibration<T, I>> solver_ruiz;
     solver_ruiz.settings().kkt_solver = TypeParam().backend;
     solver_ruiz.settings().eps_rel = 0;
     solver_ruiz.settings().verbose = true;
-    solver_ruiz.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
+    solver_ruiz.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver_no_precon.solve();
@@ -307,7 +317,7 @@ TYPED_TEST(SparseSolverTest, StronglyConvexOnlyEqualities)
     SparseSolver<T, I, TypeParam::Mode> solver;
     solver.settings().kkt_solver = TypeParam().backend;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -328,7 +338,7 @@ TYPED_TEST(SparseSolverTest, StronglyConvexOnlyInequalities)
     SparseSolver<T, I, TypeParam::Mode> solver;
     solver.settings().kkt_solver = TypeParam().backend;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -349,7 +359,7 @@ TYPED_TEST(SparseSolverTest, StronglyConvexNoConstraints)
     SparseSolver<T, I, TypeParam::Mode> solver;
     solver.settings().kkt_solver = TypeParam().backend;
     solver.settings().verbose = true;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();
@@ -386,7 +396,7 @@ TYPED_TEST(SparseSolverTest, InfinityBounds)
     SparseSolver<T, I, TypeParam::Mode> solver;
     solver.settings().kkt_solver = TypeParam().backend;
     solver.settings().verbose = true;
-    solver.setup(P, c, piqp::nullopt, piqp::nullopt, G, h);
+    solver.setup(P, c, piqp::nullopt, piqp::nullopt, G, piqp::nullopt, h);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     Status status = solver.solve();

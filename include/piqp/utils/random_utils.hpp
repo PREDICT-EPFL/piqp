@@ -217,18 +217,40 @@ sparse::Model<T, I> sparse_strongly_convex_qp(isize dim, isize n_eq, isize n_ine
 
     Vec<T> x_sol = vector_rand<T>(dim);
 
-    Vec<T> delta(n_ineq);
-    delta.setZero();
+    Vec<T> delta_u(n_ineq);
+    Vec<T> delta_l(n_ineq);
+    delta_u.setZero();
+    delta_l.setZero();
     for (isize i = 0; i < n_ineq; i++) {
         // 30% of ineq constraints are inactive
         if (uniform_dist(gen) < 0.3) {
-            delta(i) = uniform_dist(gen);
+            delta_u(i) = uniform_dist(gen);
+        }
+        if (uniform_dist(gen) < 0.3) {
+            delta_l(i) = uniform_dist(gen);
         }
     }
 
     Vec<T> c = vector_rand<T>(dim);
     Vec<T> b = A * x_sol;
-    Vec<T> h = G * x_sol + delta;
+
+    Vec<T> h_l(n_ineq);
+    Vec<T> h_u(n_ineq);
+    if (n_ineq > 0) {
+        h_l = G * x_sol - delta_l;
+        h_u = G * x_sol + delta_u;
+    }
+    for (isize i = 0; i < n_ineq; i++) {
+        double rand = uniform_dist(gen);
+        // 33% only have lower bounds
+        if (rand < 0.33) {
+            h_l(i) = -std::numeric_limits<T>::infinity();
+        }
+        // 33% only have upper bounds
+        else if (rand < 0.66) {
+            h_u(i) = std::numeric_limits<T>::infinity();
+        }
+    }
 
     Vec<T> x_lb = Vec<T>::Constant(dim, -std::numeric_limits<T>::infinity());
     Vec<T> x_ub = Vec<T>::Constant(dim, std::numeric_limits<T>::infinity());
@@ -260,7 +282,7 @@ sparse::Model<T, I> sparse_strongly_convex_qp(isize dim, isize n_eq, isize n_ine
         }
     }
 
-    return sparse::Model<T, I>(P, c, A, b, G, h, x_lb, x_ub);
+    return sparse::Model<T, I>(P, c, A, b, G, h_l, h_u, x_lb, x_ub);
 }
 
 } // namespace rand

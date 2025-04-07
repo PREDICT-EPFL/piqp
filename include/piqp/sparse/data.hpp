@@ -51,7 +51,7 @@ struct Data
     Vec<Eigen::Index> x_l_idx;
     Vec<Eigen::Index> x_u_idx;
 
-    Vec<T> x_b_scaling; // scaling of lb and u, i.e. x_l <= x_b_scaling .* x <= x_u
+    Vec<T> x_b_scaling; // scaling of x_l and x_u, i.e. x_l <= x_b_scaling .* x <= x_u
 
     Data() = default;
 
@@ -97,6 +97,7 @@ struct Data
         x_u_idx.resize(n);
 
         x_b_scaling.resize(n);
+        x_b_scaling.setConstant(T(1));
     }
 
     void set_h_l(const optional<CVecRef<T>>& h_l)

@@ -48,7 +48,7 @@ struct Data
     Vec<Eigen::Index> x_l_idx;
     Vec<Eigen::Index> x_u_idx;
 
-    Vec<T> x_b_scaling; // scaling of lb and ub, i.e. x_l <= x_b_scaling .* x <= x_u
+    Vec<T> x_b_scaling; // scaling of x_l and x_u, i.e. x_l <= x_b_scaling .* x <= x_u
 
     Data() = default;
 

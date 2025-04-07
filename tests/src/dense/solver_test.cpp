@@ -166,7 +166,7 @@ TEST(DenseSolverTest, DualInfeasibleQP)
 //
 //    DenseSolver<T> solver;
 //    solver.settings().verbose = true;
-//    solver.setup(P, c, A, b, G, h, nullopt, nullopt);
+//    solver.setup(P, c, A, b, G, nullopt, h, nullopt, nullopt);
 //
 //    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
 //    Status status = solver.solve();
