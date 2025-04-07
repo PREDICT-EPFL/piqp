@@ -27,12 +27,14 @@ void test_solve_multiply(Data<T, I>& data, KKT1& kkt1, KKT2& kkt2)
     Variables<T> rhs;
     rhs.x = rand::vector_rand<T>(data.n);
     rhs.y = rand::vector_rand<T>(data.p);
-    rhs.z = rand::vector_rand<T>(data.m);
-    rhs.z_lb = rand::vector_rand<T>(data.n);
-    rhs.z_ub = rand::vector_rand<T>(data.n);
-    rhs.s = rand::vector_rand<T>(data.m);
-    rhs.s_lb = rand::vector_rand<T>(data.n);
-    rhs.s_ub = rand::vector_rand<T>(data.n);
+    rhs.z_l = rand::vector_rand<T>(data.m);
+    rhs.z_u = rand::vector_rand<T>(data.m);
+    rhs.z_bl = rand::vector_rand<T>(data.n);
+    rhs.z_bu = rand::vector_rand<T>(data.n);
+    rhs.s_l = rand::vector_rand<T>(data.m);
+    rhs.s_u = rand::vector_rand<T>(data.m);
+    rhs.s_bl = rand::vector_rand<T>(data.n);
+    rhs.s_bu = rand::vector_rand<T>(data.n);
 
     Variables<T> lhs_1;
     lhs_1.resize(data.n, data.p, data.m);
@@ -47,12 +49,22 @@ void test_solve_multiply(Data<T, I>& data, KKT1& kkt1, KKT2& kkt2)
 
     ASSERT_TRUE(lhs_1.x.isApprox(lhs_2.x, 1e-8));
     ASSERT_TRUE(lhs_1.y.isApprox(lhs_2.y, 1e-8));
-    ASSERT_TRUE(lhs_1.z.isApprox(lhs_2.z, 1e-8));
-    ASSERT_TRUE(lhs_1.z_lb.head(data.n_lb).isApprox(lhs_2.z_lb.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(lhs_1.z_ub.head(data.n_ub).isApprox(lhs_2.z_ub.head(data.n_ub), 1e-8));
-    ASSERT_TRUE(lhs_1.s.isApprox(lhs_2.s, 1e-8));
-    ASSERT_TRUE(lhs_1.s_lb.head(data.n_lb).isApprox(lhs_2.s_lb.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(lhs_1.s_ub.head(data.n_ub).isApprox(lhs_2.s_ub.head(data.n_ub), 1e-8));
+    ASSERT_TRUE(lhs_1.z_bl.head(data.n_x_l).isApprox(lhs_2.z_bl.head(data.n_x_l), 1e-8));
+    ASSERT_TRUE(lhs_1.z_bu.head(data.n_x_u).isApprox(lhs_2.z_bu.head(data.n_x_u), 1e-8));
+    ASSERT_TRUE(lhs_1.s_bl.head(data.n_x_l).isApprox(lhs_2.s_bl.head(data.n_x_l), 1e-8));
+    ASSERT_TRUE(lhs_1.s_bu.head(data.n_x_u).isApprox(lhs_2.s_bu.head(data.n_x_u), 1e-8));
+    for (isize i = 0; i < data.n_h_l; i++)
+    {
+        Eigen::Index idx = data.h_l_idx(i);
+        ASSERT_NEAR(lhs_1.z_l(idx), lhs_2.z_l(idx), 1e-8);
+        ASSERT_NEAR(lhs_1.s_l(idx), lhs_2.s_l(idx), 1e-8);
+    }
+    for (isize i = 0; i < data.n_h_u; i++)
+    {
+        Eigen::Index idx = data.h_u_idx(i);
+        ASSERT_NEAR(lhs_1.z_u(idx), lhs_2.z_u(idx), 1e-8);
+        ASSERT_NEAR(lhs_1.s_u(idx), lhs_2.s_u(idx), 1e-8);
+    }
 
     Variables<T> rhs_sol_1;
     rhs_sol_1.resize(data.n, data.p, data.m);
@@ -67,12 +79,22 @@ void test_solve_multiply(Data<T, I>& data, KKT1& kkt1, KKT2& kkt2)
 
     ASSERT_TRUE(rhs_sol_1.x.isApprox(rhs_sol_2.x, 1e-8));
     ASSERT_TRUE(rhs_sol_1.y.isApprox(rhs_sol_2.y, 1e-8));
-    ASSERT_TRUE(rhs_sol_1.z.isApprox(rhs_sol_2.z, 1e-8));
-    ASSERT_TRUE(rhs_sol_1.z_lb.head(data.n_lb).isApprox(rhs_sol_2.z_lb.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(rhs_sol_1.z_ub.head(data.n_ub).isApprox(rhs_sol_2.z_ub.head(data.n_ub), 1e-8));
-    ASSERT_TRUE(rhs_sol_1.s.isApprox(rhs_sol_2.s, 1e-8));
-    ASSERT_TRUE(rhs_sol_1.s_lb.head(data.n_lb).isApprox(rhs_sol_2.s_lb.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(rhs_sol_1.s_ub.head(data.n_ub).isApprox(rhs_sol_2.s_ub.head(data.n_ub), 1e-8));
+    ASSERT_TRUE(rhs_sol_1.z_bl.head(data.n_x_l).isApprox(rhs_sol_2.z_bl.head(data.n_x_l), 1e-8));
+    ASSERT_TRUE(rhs_sol_1.z_bu.head(data.n_x_u).isApprox(rhs_sol_2.z_bu.head(data.n_x_u), 1e-8));
+    ASSERT_TRUE(rhs_sol_1.s_bl.head(data.n_x_l).isApprox(rhs_sol_2.s_bl.head(data.n_x_l), 1e-8));
+    ASSERT_TRUE(rhs_sol_1.s_bu.head(data.n_x_u).isApprox(rhs_sol_2.s_bu.head(data.n_x_u), 1e-8));
+    for (isize i = 0; i < data.n_h_l; i++)
+    {
+        Eigen::Index idx = data.h_l_idx(i);
+        ASSERT_NEAR(rhs_sol_1.z_l(idx), rhs_sol_2.z_l(idx), 1e-8);
+        ASSERT_NEAR(rhs_sol_1.s_l(idx), rhs_sol_2.s_l(idx), 1e-8);
+    }
+    for (isize i = 0; i < data.n_h_u; i++)
+    {
+        Eigen::Index idx = data.h_u_idx(i);
+        ASSERT_NEAR(rhs_sol_1.z_u(idx), rhs_sol_2.z_u(idx), 1e-8);
+        ASSERT_NEAR(rhs_sol_1.s_u(idx), rhs_sol_2.s_u(idx), 1e-8);
+    }
 }
 
 TEST(BlocksparseStageKKTTest, UpdateData)
@@ -83,8 +105,8 @@ TEST(BlocksparseStageKKTTest, UpdateData)
     T sparsity_factor = 0.2;
 
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
-    qp_model.x_lb.setConstant(-std::numeric_limits<T>::infinity());
-    qp_model.x_ub.setConstant(std::numeric_limits<T>::infinity());
+    qp_model.x_l.setConstant(-std::numeric_limits<T>::infinity());
+    qp_model.x_u.setConstant(std::numeric_limits<T>::infinity());
     Data<T, I> data(qp_model);
 
     Settings<T> settings_multistage;
@@ -96,12 +118,14 @@ TEST(BlocksparseStageKKTTest, UpdateData)
     T rho = 0.9;
     T delta = 1.2;
     Variables<T> scaling; scaling.resize(dim, n_eq, n_ineq);
-    scaling.s.setConstant(1);
-    scaling.s_lb.setConstant(1);
-    scaling.s_ub.setConstant(1);
-    scaling.z.setConstant(1);
-    scaling.z_lb.setConstant(1);
-    scaling.z_ub.setConstant(1);
+    scaling.s_l.setConstant(1);
+    scaling.s_u.setConstant(1);
+    scaling.s_bl.setConstant(1);
+    scaling.s_bu.setConstant(1);
+    scaling.z_l.setConstant(1);
+    scaling.z_u.setConstant(1);
+    scaling.z_bl.setConstant(1);
+    scaling.z_bu.setConstant(1);
 
     KKTSystem<T, I, PIQP_SPARSE> kkt_multistage(data, settings_multistage);
     kkt_multistage.init();
@@ -160,12 +184,14 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
     T rho = 0.9;
     T delta = 1.2;
     Variables<T> scaling; scaling.resize(data.n, data.p, data.m);
-    scaling.s.setConstant(1);
-    scaling.s_lb.setConstant(1);
-    scaling.s_ub.setConstant(1);
-    scaling.z.setConstant(1);
-    scaling.z_lb.setConstant(1);
-    scaling.z_ub.setConstant(1);
+    scaling.s_l.setConstant(1);
+    scaling.s_u.setConstant(1);
+    scaling.s_bl.setConstant(1);
+    scaling.s_bu.setConstant(1);
+    scaling.z_l.setConstant(1);
+    scaling.z_u.setConstant(1);
+    scaling.z_bl.setConstant(1);
+    scaling.z_bu.setConstant(1);
 
     KKTSystem<T, I, PIQP_SPARSE> kkt_multistage(data, settings_multistage);
     kkt_multistage.init();

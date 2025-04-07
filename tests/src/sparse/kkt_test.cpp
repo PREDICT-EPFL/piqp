@@ -100,12 +100,14 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
     T rho = 0.9;
     T delta = 1.2;
     Variables<T> scaling; scaling.resize(dim, n_eq, n_ineq);
-    scaling.s.setConstant(1);
-    scaling.s_lb.setConstant(1);
-    scaling.s_ub.setConstant(1);
-    scaling.z.setConstant(1);
-    scaling.z_lb.setConstant(1);
-    scaling.z_ub.setConstant(1);
+    scaling.s_l.setConstant(1);
+    scaling.s_u.setConstant(1);
+    scaling.s_bl.setConstant(1);
+    scaling.s_bu.setConstant(1);
+    scaling.z_l.setConstant(1);
+    scaling.z_u.setConstant(1);
+    scaling.z_bl.setConstant(1);
+    scaling.z_bu.setConstant(1);
 
     KKTSystem<T, I, PIQP_SPARSE, TypeParam::Mode> kkt(data, settings);
     kkt.init();
@@ -116,12 +118,14 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
     Variables<T> rhs;
     rhs.x = rand::vector_rand<T>(dim);
     rhs.y = rand::vector_rand<T>(n_eq);
-    rhs.z = rand::vector_rand<T>(n_ineq);
-    rhs.z_lb = rand::vector_rand<T>(dim);
-    rhs.z_ub = rand::vector_rand<T>(dim);
-    rhs.s = rand::vector_rand<T>(n_ineq);
-    rhs.s_lb = rand::vector_rand<T>(dim);
-    rhs.s_ub = rand::vector_rand<T>(dim);
+    rhs.z_l = rand::vector_rand<T>(n_ineq);
+    rhs.z_u = rand::vector_rand<T>(n_ineq);
+    rhs.z_bl = rand::vector_rand<T>(dim);
+    rhs.z_bu = rand::vector_rand<T>(dim);
+    rhs.s_l = rand::vector_rand<T>(n_ineq);
+    rhs.s_u = rand::vector_rand<T>(n_ineq);
+    rhs.s_bl = rand::vector_rand<T>(dim);
+    rhs.s_bu = rand::vector_rand<T>(dim);
 
     Variables<T> lhs;
     lhs.resize(dim, n_eq, n_ineq);
@@ -139,10 +143,20 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
 
     ASSERT_TRUE(rhs.x.isApprox(rhs_sol.x, 1e-8));
     ASSERT_TRUE(rhs.y.isApprox(rhs_sol.y, 1e-8));
-    ASSERT_TRUE(rhs.z.isApprox(rhs_sol.z, 1e-8));
-    ASSERT_TRUE(rhs.z_lb.head(data.n_lb).isApprox(rhs_sol.z_lb.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(rhs.z_ub.head(data.n_ub).isApprox(rhs_sol.z_ub.head(data.n_ub), 1e-8));
-    ASSERT_TRUE(rhs.s.isApprox(rhs_sol.s, 1e-8));
-    ASSERT_TRUE(rhs.s_lb.head(data.n_lb).isApprox(rhs_sol.s_lb.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(rhs.s_ub.head(data.n_ub).isApprox(rhs_sol.s_ub.head(data.n_ub), 1e-8));
+    ASSERT_TRUE(rhs.z_bl.head(data.n_x_l).isApprox(rhs_sol.z_bl.head(data.n_x_l), 1e-8));
+    ASSERT_TRUE(rhs.z_bu.head(data.n_x_u).isApprox(rhs_sol.z_bu.head(data.n_x_u), 1e-8));
+    ASSERT_TRUE(rhs.s_bl.head(data.n_x_l).isApprox(rhs_sol.s_bl.head(data.n_x_l), 1e-8));
+    ASSERT_TRUE(rhs.s_bu.head(data.n_x_u).isApprox(rhs_sol.s_bu.head(data.n_x_u), 1e-8));
+    for (isize i = 0; i < data.n_h_l; i++)
+    {
+        Eigen::Index idx = data.h_l_idx(i);
+        ASSERT_NEAR(rhs.z_l(idx), rhs_sol.z_l(idx), 1e-8);
+        ASSERT_NEAR(rhs.s_l(idx), rhs_sol.s_l(idx), 1e-8);
+    }
+    for (isize i = 0; i < data.n_h_u; i++)
+    {
+        Eigen::Index idx = data.h_u_idx(i);
+        ASSERT_NEAR(rhs.z_u(idx), rhs_sol.z_u(idx), 1e-8);
+        ASSERT_NEAR(rhs.s_u(idx), rhs_sol.s_u(idx), 1e-8);
+    }
 }

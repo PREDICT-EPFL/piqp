@@ -333,11 +333,14 @@ public:
 		eval_A_xn_and_AT_xt(T(1), T(1), lhs.x, lhs.y, rhs.y, work_x);
 		rhs.x.array() += work_x.array();
 		rhs.y.array() -= m_delta * lhs.y.array();
-		eval_G_xn_and_GT_xt(T(1), T(1), lhs.x, lhs.z, rhs.z, work_x);
+		rhs.s_l.noalias() = lhs.z_u - lhs.z_l; // use rhs.s_l as temporary
+		eval_G_xn_and_GT_xt(T(1), T(1), lhs.x, rhs.s_l, rhs.z_u, work_x);
+		rhs.z_l.noalias() = -rhs.z_u;
 		rhs.x.array() += work_x.array();
 		rhs.z_l.array() += lhs.s_l.array() - m_delta * lhs.z_l.array();
 		rhs.z_u.array() += lhs.s_u.array() - m_delta * lhs.z_u.array();
 		rhs.s_l.array() = m_s_l.array() * lhs.z_l.array() + lhs.s_l.array() / m_z_l_inv.array();
+		rhs.s_u.array() = m_s_u.array() * lhs.z_u.array() + lhs.s_u.array() / m_z_u_inv.array();
 
 		for (isize i = 0; i < data.n_x_l; i++)
 		{
@@ -350,7 +353,7 @@ public:
 
 		for (isize i = 0; i < data.n_x_u; i++)
 		{
-			Eigen::Index idx = data.x_bu_idx(i);
+			Eigen::Index idx = data.x_u_idx(i);
 			rhs.x(idx) += data.x_b_scaling(idx) * lhs.z_bu(i);
 			rhs.z_bu(i) = data.x_b_scaling(idx) * lhs.x(idx) - m_delta * lhs.z_bu(i) + lhs.s_bu(i);
 		}
