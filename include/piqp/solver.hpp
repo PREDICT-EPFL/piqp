@@ -405,6 +405,7 @@ protected:
         prox_vars.x = m_result.x;
         prox_vars.y = m_result.y;
         prox_vars.z_l = m_result.z_l;
+        prox_vars.z_u = m_result.z_u;
         nu_bl = z_bl;
         nu_bu = z_bu;
 
@@ -433,6 +434,7 @@ protected:
                     static_cast<double>(m_result.info.primal_step),
                     static_cast<double>(m_result.info.dual_step)
                 );
+                fflush(stdout);
             }
 
             if (m_result.info.primal_inf < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf &&
@@ -449,19 +451,6 @@ protected:
             res.z_u = res_nr.z_u - m_result.info.delta * (prox_vars.z_u - m_result.z_u);
             res.z_bl.head(m_data.n_x_l) = res_nr.z_bl.head(m_data.n_x_l) - m_result.info.delta * (nu_bl.head(m_data.n_x_l) - z_bl.head(m_data.n_x_l));
             res.z_bu.head(m_data.n_x_u) = res_nr.z_bu.head(m_data.n_x_u) - m_result.info.delta * (nu_bu.head(m_data.n_x_u) - z_bu.head(m_data.n_x_u));
-
-            // std::cout << "x: " << m_result.x.transpose() << std::endl;
-            // std::cout << "y: " << m_result.y.transpose() << std::endl;
-            // std::cout << "z_l: " << m_result.z_l.transpose() << std::endl;
-            // std::cout << "z_u: " << m_result.z_u.transpose() << std::endl;
-            // std::cout << "s_l: " << m_result.s_l.transpose() << std::endl;
-            // std::cout << "s_u: " << m_result.s_u.transpose() << std::endl;
-            // std::cout << "nrz_l: " << res_nr.z_l.transpose() << std::endl;
-            // std::cout << "nrz_u: " << res_nr.z_u.transpose() << std::endl;
-            // std::cout << "rz_l: " << res.z_l.transpose() << std::endl;
-            // std::cout << "rz_u: " << res.z_u.transpose() << std::endl;
-            // std::cout << "rs_l: " << res.s_l.transpose() << std::endl;
-            // std::cout << "rs_u: " << res.s_u.transpose() << std::endl;
 
             if (m_result.info.no_dual_update > (std::min)(static_cast<isize>(5), m_settings.reg_finetune_dual_update_threshold) &&
                 primal_prox_inf() > 1e12 &&
