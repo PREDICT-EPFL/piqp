@@ -32,8 +32,6 @@ class RuizEquilibration
     isize n = 0;
     isize p = 0;
     isize m = 0;
-    isize n_lb = 0;
-    isize n_ub = 0;
 
     T c = T(1);
     Vec<T> delta;
@@ -75,7 +73,7 @@ public:
             delta_b.setConstant(1);
 
             Vec<T>& delta_iter = delta_inv; // we use the memory of delta_inv as temporary storage
-            Vec<T>& delta_iter_b = delta_b_inv; // we use the memory of delta_lb_inv as temporary storage
+            Vec<T>& delta_iter_b = delta_b_inv; // we use the memory of delta_b_inv as temporary storage
             delta_iter.setZero();
             delta_iter_b.setZero();
             for (isize i = 0; i < max_iter && (std::max)({
@@ -150,7 +148,7 @@ public:
                 if (scale_cost)
                 {
                     // scaling for the cost
-                    Vec<T>& delta_iter_cost = delta_b_inv; // we use delta_lb_inv as a temporary storage
+                    Vec<T>& delta_iter_cost = delta_b_inv; // we use delta_l_inv as a temporary storage
                     delta_iter_cost.setZero();
                     for (isize j = 0; j < n; j++)
                     {
@@ -202,15 +200,16 @@ public:
 
         // scale bounds
         data.b.array() *= delta.segment(n, p).array();
-        data.h.array() *= delta.tail(m).array();
-        for (isize i = 0; i < data.n_lb; i++)
+        data.h_l.array() *= delta.tail(m).array();
+        data.h_u.array() *= delta.tail(m).array();
+        for (isize i = 0; i < data.n_x_l; i++)
         {
-            data.x_lb(i) *= delta_b(data.x_lb_idx(i));
+            data.x_l(i) *= delta_b(data.x_l_idx(i));
         }
 
-        for (isize i = 0; i < data.n_ub; i++)
+        for (isize i = 0; i < data.n_x_u; i++)
         {
-            data.x_ub(i) *= delta_b(data.x_ub_idx(i));
+            data.x_u(i) *= delta_b(data.x_u_idx(i));
         }
     }
 
@@ -233,14 +232,15 @@ public:
 
         // unscale bounds
         data.b.array() *= delta_inv.segment(n, p).array();
-        data.h.array() *= delta_inv.tail(m).array();
-        for (isize i = 0; i < data.n_lb; i++)
+        data.h_l.array() *= delta_inv.tail(m).array();
+        data.h_u.array() *= delta_inv.tail(m).array();
+        for (isize i = 0; i < data.n_x_l; i++)
         {
-            data.x_lb(i) *= delta_b_inv(data.x_lb_idx(i));
+            data.x_l(i) *= delta_b_inv(data.x_l_idx(i));
         }
-        for (isize i = 0; i < data.n_ub; i++)
+        for (isize i = 0; i < data.n_x_u; i++)
         {
-            data.x_ub(i) *= delta_b_inv(data.x_ub_idx(i));
+            data.x_u(i) *= delta_b_inv(data.x_u_idx(i));
         }
     }
 

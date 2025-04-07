@@ -36,20 +36,32 @@ protected:
 
 	Vec<T> P_diag;
 
-	Vec<T> m_s;
-	Vec<T> m_s_lb;
-	Vec<T> m_s_ub;
-	Vec<T> m_z_inv;
-	Vec<T> m_z_lb_inv;
-	Vec<T> m_z_ub_inv;
+	Vec<T> m_s_l;
+	Vec<T> m_s_u;
+	Vec<T> m_s_bl;
+	Vec<T> m_s_bu;
+	Vec<T> m_z_l_inv;
+	Vec<T> m_z_u_inv;
+	Vec<T> m_z_bl_inv;
+	Vec<T> m_z_bu_inv;
+
+	Vec<T> m_x_reg;
+	Vec<T> m_z_reg;
+
+	Vec<T> rhs_x_bar;
+	Vec<T> rhs_z_bar;
 
 	// working variables
 	Vec<T> work_x;
 	Vec<T> work_z;
 
 	// iterative refinement variables
-	Variables<T> ref_err;
-	Variables<T> ref_lhs;
+	Vec<T> ref_err_x;
+	Vec<T> ref_err_y;
+	Vec<T> ref_err_z;
+	Vec<T> ref_lhs_x;
+	Vec<T> ref_lhs_y;
+	Vec<T> ref_lhs_z;
 
 	bool use_iterative_refinement;
 	std::unique_ptr<KKTSolverBase<T>> kkt_solver;
@@ -63,18 +75,30 @@ public:
 		P_diag.resize(data.n);
 		P_diag.setZero();
 
-		m_s.resize(data.m);
-		m_s_lb.resize(data.n);
-		m_s_ub.resize(data.n);
-		m_z_inv.resize(data.m);
-		m_z_lb_inv.resize(data.n);
-		m_z_ub_inv.resize(data.n);
+		m_s_l.resize(data.m);
+		m_s_u.resize(data.m);
+		m_s_bl.resize(data.n);
+		m_s_bu.resize(data.n);
+		m_z_l_inv.resize(data.m);
+		m_z_u_inv.resize(data.m);
+		m_z_bl_inv.resize(data.n);
+		m_z_bu_inv.resize(data.n);
+
+		m_x_reg.resize(data.n);
+		m_z_reg.resize(data.m);
+
+		rhs_x_bar.resize(data.n);
+		rhs_z_bar.resize(data.m);
 
 		work_x.resize(data.n);
 		work_z.resize(data.m);
 
-		ref_err.resize(data.n, data.p, data.m);
-		ref_lhs.resize(data.n, data.p, data.m);
+		ref_err_x.resize(data.n);
+		ref_err_y.resize(data.p);
+		ref_err_z.resize(data.m);
+		ref_lhs_x.resize(data.n);
+		ref_lhs_y.resize(data.p);
+		ref_lhs_z.resize(data.m);
 
 		extract_P_diag();
 
@@ -92,57 +116,101 @@ public:
 
 	bool update_scalings_and_factor(bool iterative_refinement, const T& rho, const T& delta, const Variables<T>& vars)
     {
-		Vec<T>& m_x_reg = work_x;
-		Vec<T>& m_z_reg = work_z;
+		Vec<T>& m_z_reg_iter_ref = work_z;
 
 		m_rho = rho;
 		m_delta = delta;
-		m_s = vars.s;
-		m_s_lb.head(data.n_lb) = vars.s_lb.head(data.n_lb);
-		m_s_ub.head(data.n_ub) = vars.s_ub.head(data.n_ub);
-		m_z_inv.array() = vars.z.array().inverse();
-		m_z_lb_inv.head(data.n_lb).array() = vars.z_lb.head(data.n_lb).array().inverse();
-		m_z_ub_inv.head(data.n_ub).array() = vars.z_ub.head(data.n_ub).array().inverse();
+		m_s_l = vars.s_l;
+		m_s_u = vars.s_u;
+		m_s_bl.head(data.n_x_l) = vars.s_bl.head(data.n_x_l);
+		m_s_bu.head(data.n_x_u) = vars.s_bu.head(data.n_x_u);
+		m_z_l_inv.array() = vars.z_l.array().inverse();
+		m_z_u_inv.array() = vars.z_u.array().inverse();
+		m_z_bl_inv.head(data.n_x_l).array() = vars.z_bl.head(data.n_x_l).array().inverse();
+		m_z_bu_inv.head(data.n_x_u).array() = vars.z_bu.head(data.n_x_u).array().inverse();
 
 		m_x_reg.setConstant(rho);
-		for (isize i = 0; i < data.n_lb; i++)
+		for (isize i = 0; i < data.n_x_l; i++)
 		{
-			Eigen::Index idx = data.x_lb_idx(i);
-			m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_lb_inv(i) * m_s_lb(i) + m_delta);
+			Eigen::Index idx = data.x_l_idx(i);
+			m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_bl_inv(i) * m_s_bl(i) + m_delta);
 		}
-		for (isize i = 0; i < data.n_ub; i++)
+		for (isize i = 0; i < data.n_x_u; i++)
 		{
-			Eigen::Index idx = data.x_ub_idx(i);
-			m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_ub_inv(i) * m_s_ub(i) + m_delta);
+			Eigen::Index idx = data.x_u_idx(i);
+			m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_bu_inv(i) * m_s_bu(i) + m_delta);
 		}
 
-		m_z_reg.array() = m_s.array() * m_z_inv.array() + delta;
+		m_z_reg.setZero();
+		for (isize i = 0; i < data.n_h_l; i++)
+		{
+			Eigen::Index idx = data.h_l_idx(i);
+			m_z_reg(idx) += T(1) / (m_z_l_inv(idx) * m_s_l(idx) + delta);
+		}
+		for (isize i = 0; i < data.n_h_u; i++)
+		{
+			Eigen::Index idx = data.h_u_idx(i);
+			m_z_reg(idx) += T(1) / (m_z_u_inv(idx) * m_s_u(idx) + delta);
+		}
+		m_z_reg.array() = m_z_reg.array().inverse();
+		m_z_reg_iter_ref.array() = m_z_reg.array();
 
 		if (iterative_refinement)
 		{
 			T max_diag = (P_diag + m_x_reg).template lpNorm<Eigen::Infinity>();
-			max_diag = (std::max)(max_diag, m_z_reg.template lpNorm<Eigen::Infinity>());
+			max_diag = (std::max)(max_diag, m_z_reg_iter_ref.template lpNorm<Eigen::Infinity>());
 
 			T reg = settings.iterative_refinement_static_regularization_eps
 				    + settings.iterative_refinement_static_regularization_rel * max_diag;
 
 			m_x_reg.array() += reg;
-			m_z_reg.array() += reg;
+			m_z_reg_iter_ref.array() += reg;
 		}
 
 		use_iterative_refinement = iterative_refinement;
-		return kkt_solver->update_scalings_and_factor(delta, m_x_reg, m_z_reg);
+		return kkt_solver->update_scalings_and_factor(delta, m_x_reg, m_z_reg_iter_ref);
     }
 
 	bool solve(const Variables<T>& rhs, Variables<T>& lhs)
 	{
-		solve_internal(rhs, lhs);
+		Vec<T>& lhs_z = work_z;
+
+		rhs_z_bar.setZero();
+		for (isize i = 0; i < data.n_h_l; i++)
+		{
+			Eigen::Index idx = data.h_l_idx(i);
+			rhs_z_bar(idx) -= T(1) / (m_z_l_inv(idx) * m_s_l(idx) + m_delta) * (rhs.z_l(idx) - m_z_l_inv(idx) * rhs.s_l(idx));
+		}
+		for (isize i = 0; i < data.n_h_u; i++)
+		{
+			Eigen::Index idx = data.h_u_idx(i);
+			rhs_z_bar(idx) += T(1) / (m_z_u_inv(idx) * m_s_u(idx) + m_delta) * (rhs.z_u(idx) - m_z_u_inv(idx) * rhs.s_u(idx));
+		}
+		rhs_z_bar.array() *= m_z_reg.array();
+
+		rhs_x_bar = rhs.x;
+		for (isize i = 0; i < data.n_x_l; i++)
+		{
+			Eigen::Index idx = data.x_l_idx(i);
+			rhs_x_bar(idx) -= data.x_b_scaling(idx) * (rhs.z_bl(i) - m_z_bl_inv(i) * rhs.s_bl(i))
+				/ (m_s_bl(i) * m_z_bl_inv(i) + m_delta);
+		}
+		for (isize i = 0; i < data.n_x_u; i++)
+		{
+			Eigen::Index idx = data.x_u_idx(i);
+			rhs_x_bar(idx) += data.x_b_scaling(idx) * (rhs.z_bu(i) - m_z_bu_inv(i) * rhs.s_bu(i))
+				/ (m_s_bu(i) * m_z_bu_inv(i) + m_delta);
+		}
+
+		kkt_solver->solve(rhs_x_bar, rhs.y, rhs_z_bar, lhs.x, lhs.y, lhs_z);
 
 		if (use_iterative_refinement) {
 
-			T rhs_norm = inf_norm(rhs);
+			T rhs_norm = inf_norm(rhs_x_bar, rhs.y, rhs_z_bar);
 
-			T refine_error = get_refine_error(lhs, rhs, ref_err);
+			T refine_error = get_refine_error(lhs.x, lhs.y, lhs_z,
+				                            rhs_x_bar, rhs.y, rhs_z_bar,
+				                            ref_err_x, ref_err_y, ref_err_z);
 
 			if (!std::isfinite(refine_error)) return false;
 
@@ -153,31 +221,89 @@ public:
 				}
 				T prev_refine_error = refine_error;
 
-				solve_internal(ref_err, ref_lhs);
+				kkt_solver->solve(ref_err_x, ref_err_y, ref_err_z, ref_lhs_x, ref_lhs_y, ref_lhs_z);
 
 				// use ref_lhs to store refined solution
-				ref_lhs += lhs;
+				ref_lhs_x += lhs.x;
+				ref_lhs_y += lhs.y;
+				ref_lhs_z += lhs_z;
 
-				refine_error = get_refine_error(ref_lhs, rhs, ref_err);
+				refine_error = get_refine_error(ref_lhs_x, ref_lhs_y, ref_lhs_z,
+											  rhs_x_bar, rhs.y, rhs_z_bar,
+											  ref_err_x, ref_err_y, ref_err_z);
 
 				if (!std::isfinite(refine_error)) return false;
 
 				T improvement_rate = prev_refine_error / refine_error;
 				if (improvement_rate < settings.iterative_refinement_min_improvement_rate) {
 					if (improvement_rate > T(1)) {
-						std::swap(lhs, ref_lhs);
+						std::swap(lhs.x, ref_lhs_x);
+						std::swap(lhs.y, ref_lhs_y);
+						std::swap(lhs_z, ref_lhs_z);
 					}
 					break;
 				}
-				std::swap(lhs, ref_lhs);
+				std::swap(lhs.x, ref_lhs_x);
+				std::swap(lhs.y, ref_lhs_y);
+				std::swap(lhs_z, ref_lhs_z);
 			}
 
 		} else {
 
-			if (!lhs.allFinite()) {
+			if (!lhs.x.allFinite() || !lhs.y.allFinite() || !lhs_z.allFinite()) {
 				return false;
 			}
 		}
+
+		isize i_l = 0;
+		isize i_u = 0;
+		for (isize i = 0; i < data.m; i++) {
+			Eigen::Index idx_l = i_l < data.n_h_l ? data.h_l_idx(i_l) : -1;
+			while (idx_l < i && i_l < data.n_h_l) { idx_l = data.h_l_idx(++i_l); }
+			Eigen::Index idx_u = i_u < data.n_h_u ? data.h_u_idx(i_u) : -1;
+			while (idx_u < i && i_u < data.n_h_u) { idx_u = data.h_u_idx(++i_u); }
+
+			if (idx_l == i && idx_u == i) {
+				T rz_l_bar = rhs.z_l(i) - m_z_l_inv(i) * rhs.s_l(i);
+				T W_l_inv = T(1) / (m_z_l_inv(i) * m_s_l(i) + m_delta);
+				T rz_u_bar = rhs.z_u(i) - m_z_u_inv(i) * rhs.s_u(i);
+				T W_u_inv = T(1) / (m_z_u_inv(i) * m_s_u(i) + m_delta);
+				T r_sum = W_l_inv * W_u_inv * (rz_l_bar + rz_u_bar);
+				lhs.z_l(i) = -m_z_reg(i) * (r_sum + W_l_inv * lhs_z(i));
+				lhs.z_u(i) = -m_z_reg(i) * (r_sum - W_u_inv * lhs_z(i));
+				lhs.s_l(i) = m_z_l_inv(i) * (rhs.s_l(i) - m_s_l(i) * lhs.z_l(i));
+				lhs.s_u(i) = m_z_u_inv(i) * (rhs.s_u(i) - m_s_u(i) * lhs.z_u(i));
+			} else if (idx_l == i) {
+				lhs.z_l(i) = -lhs_z(i);
+				lhs.z_u(i) = T(0);
+				lhs.s_l(i) = m_z_l_inv(i) * (rhs.s_l(i) - m_s_l(i) * lhs.z_l(i));
+				lhs.s_u(i) = T(0);
+			} else if (idx_u == i) {
+				lhs.z_l(i) = T(0);
+				lhs.z_u(i) = lhs_z(i);
+				lhs.s_l(i) = T(0);
+				lhs.s_u(i) = m_z_u_inv(i) * (rhs.s_u(i) - m_s_u(i) * lhs.z_u(i));
+			} else {
+				assert(false && "This should be unreachable...");
+			}
+		}
+
+		for (isize i = 0; i < data.n_x_l; i++) {
+			Eigen::Index idx = data.x_l_idx(i);
+			lhs.z_bl(i) = (-data.x_b_scaling(idx) * lhs.x(idx) - rhs.z_bl(i) + m_z_bl_inv(i) * rhs.s_bl(i))
+				/ (m_s_bl(i) * m_z_bl_inv(i) + m_delta);
+		}
+		for (isize i = 0; i < data.n_x_u; i++) {
+			Eigen::Index idx = data.x_u_idx(i);
+			lhs.z_bu(i) = (data.x_b_scaling(idx) * lhs.x(idx) - rhs.z_bu(i) + m_z_bu_inv(i) * rhs.s_bu(i))
+				/ (m_s_bu(i) * m_z_bu_inv(i) + m_delta);
+		}
+
+		lhs.s_bl.head(data.n_x_l).array() = m_z_bl_inv.head(data.n_x_l).array()
+			* (rhs.s_bl.head(data.n_x_l).array() - m_s_bl.head(data.n_x_l).array() * lhs.z_bl.head(data.n_x_l).array());
+
+		lhs.s_bu.head(data.n_x_u).array() = m_z_bu_inv.head(data.n_x_u).array()
+			* (rhs.s_bu.head(data.n_x_u).array() - m_s_bu.head(data.n_x_u).array() * lhs.z_bu.head(data.n_x_u).array());
 
 		return true;
 	}
@@ -209,26 +335,27 @@ public:
 		rhs.y.array() -= m_delta * lhs.y.array();
 		eval_G_xn_and_GT_xt(T(1), T(1), lhs.x, lhs.z, rhs.z, work_x);
 		rhs.x.array() += work_x.array();
-		rhs.z.array() += lhs.s.array() - m_delta * lhs.z.array();
-		rhs.s.array() = m_s.array() * lhs.z.array() + lhs.s.array() / m_z_inv.array();
+		rhs.z_l.array() += lhs.s_l.array() - m_delta * lhs.z_l.array();
+		rhs.z_u.array() += lhs.s_u.array() - m_delta * lhs.z_u.array();
+		rhs.s_l.array() = m_s_l.array() * lhs.z_l.array() + lhs.s_l.array() / m_z_l_inv.array();
 
-		for (isize i = 0; i < data.n_lb; i++)
+		for (isize i = 0; i < data.n_x_l; i++)
 		{
-			Eigen::Index idx = data.x_lb_idx(i);
-			rhs.x(idx) -= data.x_b_scaling(idx) * lhs.z_lb(i);
-			rhs.z_lb(i) = -data.x_b_scaling(idx) * lhs.x(idx) - m_delta * lhs.z_lb(i) + lhs.s_lb(i);
+			Eigen::Index idx = data.x_l_idx(i);
+			rhs.x(idx) -= data.x_b_scaling(idx) * lhs.z_bl(i);
+			rhs.z_bl(i) = -data.x_b_scaling(idx) * lhs.x(idx) - m_delta * lhs.z_bl(i) + lhs.s_bl(i);
 		}
-		rhs.s_lb.head(data.n_lb).array() = m_s_lb.head(data.n_lb).array() * lhs.z_lb.head(data.n_lb).array()
-			+ lhs.s_lb.head(data.n_lb).array() / m_z_lb_inv.head(data.n_lb).array();
+		rhs.s_bl.head(data.n_x_l).array() = m_s_bl.head(data.n_x_l).array() * lhs.z_bl.head(data.n_x_l).array()
+			+ lhs.s_bl.head(data.n_x_l).array() / m_z_bl_inv.head(data.n_x_l).array();
 
-		for (isize i = 0; i < data.n_ub; i++)
+		for (isize i = 0; i < data.n_x_u; i++)
 		{
-			Eigen::Index idx = data.x_ub_idx(i);
-			rhs.x(idx) += data.x_b_scaling(idx) * lhs.z_ub(i);
-			rhs.z_ub(i) = data.x_b_scaling(idx) * lhs.x(idx) - m_delta * lhs.z_ub(i) + lhs.s_ub(i);
+			Eigen::Index idx = data.x_bu_idx(i);
+			rhs.x(idx) += data.x_b_scaling(idx) * lhs.z_bu(i);
+			rhs.z_bu(i) = data.x_b_scaling(idx) * lhs.x(idx) - m_delta * lhs.z_bu(i) + lhs.s_bu(i);
 		}
-		rhs.s_ub.head(data.n_ub).array() = m_s_ub.head(data.n_ub).array() * lhs.z_ub.head(data.n_ub).array()
-			+ lhs.s_ub.head(data.n_ub).array() / m_z_ub_inv.head(data.n_ub).array();
+		rhs.s_bu.head(data.n_x_u).array() = m_s_bu.head(data.n_x_u).array() * lhs.z_bu.head(data.n_x_u).array()
+			+ lhs.s_bu.head(data.n_x_u).array() / m_z_bu_inv.head(data.n_x_u).array();
 	}
 
 	void print_info() { kkt_solver->print_info(); }
@@ -294,76 +421,39 @@ protected:
 		return true;
 	}
 
-	void solve_internal(const Variables<T>& rhs, Variables<T>& lhs)
+	T inf_norm(const Vec<T>& x, const Vec<T>& y, const Vec<T>& z)
 	{
-		Vec<T>& rhs_x_bar = work_x;
-		Vec<T>& rhs_z_bar = work_z;
-
-		rhs_z_bar.array() = rhs.z.array() - m_z_inv.array() * rhs.s.array();
-
-		rhs_x_bar = rhs.x;
-		for (isize i = 0; i < data.n_lb; i++)
-		{
-			Eigen::Index idx = data.x_lb_idx(i);
-			rhs_x_bar(idx) -= data.x_b_scaling(idx) * (rhs.z_lb(i) - m_z_lb_inv(i) * rhs.s_lb(i))
-				/ (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
-		}
-		for (isize i = 0; i < data.n_ub; i++)
-		{
-			Eigen::Index idx = data.x_ub_idx(i);
-			rhs_x_bar(idx) += data.x_b_scaling(idx) * (rhs.z_ub(i) - m_z_ub_inv(i) * rhs.s_ub(i))
-				/ (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
-		}
-
-		kkt_solver->solve(rhs_x_bar, rhs.y, rhs_z_bar, lhs.x, lhs.y, lhs.z);
-
-		for (isize i = 0; i < data.n_lb; i++) {
-			Eigen::Index idx = data.x_lb_idx(i);
-			lhs.z_lb(i) = (-data.x_b_scaling(idx) * lhs.x(idx) - rhs.z_lb(i) + m_z_lb_inv(i) * rhs.s_lb(i))
-				/ (m_s_lb(i) * m_z_lb_inv(i) + m_delta);
-		}
-		for (isize i = 0; i < data.n_ub; i++) {
-			Eigen::Index idx = data.x_ub_idx(i);
-			lhs.z_ub(i) = (data.x_b_scaling(idx) * lhs.x(idx) - rhs.z_ub(i) + m_z_ub_inv(i) * rhs.s_ub(i))
-				/ (m_s_ub(i) * m_z_ub_inv(i) + m_delta);
-		}
-
-		lhs.s.array() = m_z_inv.array() * (rhs.s.array() - m_s.array() * lhs.z.array());
-
-		lhs.s_lb.head(data.n_lb).array() = m_z_lb_inv.head(data.n_lb).array()
-			* (rhs.s_lb.head(data.n_lb).array() - m_s_lb.head(data.n_lb).array() * lhs.z_lb.head(data.n_lb).array());
-
-		lhs.s_ub.head(data.n_ub).array() = m_z_ub_inv.head(data.n_ub).array()
-			* (rhs.s_ub.head(data.n_ub).array() - m_s_ub.head(data.n_ub).array() * lhs.z_ub.head(data.n_ub).array());
-	}
-
-	T inf_norm(const Variables<T>& vars)
-	{
-		T norm = vars.x.template lpNorm<Eigen::Infinity>();
-		norm = (std::max)(norm, vars.y.template lpNorm<Eigen::Infinity>());
-		norm = (std::max)(norm, vars.z.template lpNorm<Eigen::Infinity>());
-		norm = (std::max)(norm, vars.z_lb.head(data.n_lb).template lpNorm<Eigen::Infinity>());
-		norm = (std::max)(norm, vars.z_ub.head(data.n_ub).template lpNorm<Eigen::Infinity>());
-		norm = (std::max)(norm, vars.s.template lpNorm<Eigen::Infinity>());
-		norm = (std::max)(norm, vars.s_lb.head(data.n_lb).template lpNorm<Eigen::Infinity>());
-		norm = (std::max)(norm, vars.s_ub.head(data.n_ub).template lpNorm<Eigen::Infinity>());
+		T norm = x.template lpNorm<Eigen::Infinity>();
+		norm = (std::max)(norm, y.template lpNorm<Eigen::Infinity>());
+		norm = (std::max)(norm, z.template lpNorm<Eigen::Infinity>());
 		return norm;
 	}
 
-	// err = rhs - KKT * lhs
-	T get_refine_error(const Variables<T>& lhs, const Variables<T>& rhs, Variables<T>& err)
+	void mul_condensed_kkt(const Vec<T>& lhs_x, const Vec<T>& lhs_y, const Vec<T>& lhs_z,
+						   Vec<T>& rhs_x, Vec<T>& rhs_y, Vec<T>& rhs_z)
 	{
-		mul(lhs, err);
-		err.x.array() = rhs.x.array() - err.x.array();
-		err.y.array() = rhs.y.array() - err.y.array();
-		err.z.array() = rhs.z.array() - err.z.array();
-		err.z_lb.head(data.n_lb).array() = rhs.z_lb.head(data.n_lb).array() - err.z_lb.head(data.n_lb).array();
-		err.z_ub.head(data.n_ub).array() = rhs.z_ub.head(data.n_ub).array() - err.z_ub.head(data.n_ub).array();
-		err.s.array() = rhs.s.array() - err.s.array();
-		err.s_lb.head(data.n_lb).array() = rhs.s_lb.head(data.n_lb).array() - err.s_lb.head(data.n_lb).array();
-		err.s_ub.head(data.n_ub).array() = rhs.s_ub.head(data.n_ub).array() - err.s_ub.head(data.n_ub).array();
+		eval_P_x(T(1), lhs_x, rhs_x);
+		rhs_x.array() += m_x_reg.array() * lhs_x.array();
+		eval_A_xn_and_AT_xt(T(1), T(1), lhs_x, lhs_y, rhs_y, work_x);
+		rhs_x.array() += work_x.array();
+		rhs_y.array() -= m_delta * lhs_y.array();
+		eval_G_xn_and_GT_xt(T(1), T(1), lhs_x, lhs_z, rhs_z, work_x);
+		rhs_x.array() += work_x.array();
+		rhs_z.array() -= m_z_reg.array() * lhs_z.array();
+	}
 
-		return inf_norm(err);
+	// err = rhs - KKT * lhs
+	T get_refine_error(const Vec<T>& lhs_x, const Vec<T>& lhs_y, const Vec<T>& lhs_z,
+		              const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
+		              Vec<T>& err_x, Vec<T>& err_y, Vec<T>& err_z)
+	{
+		mul_condensed_kkt(lhs_x, lhs_y, lhs_z, err_x, err_y, err_z);
+
+		err_x.array() = rhs_x.array() - err_x.array();
+		err_y.array() = rhs_y.array() - err_y.array();
+		err_z.array() = rhs_z.array() - err_z.array();
+
+		return inf_norm(err_x, err_y, err_z);
 	}
 };
 

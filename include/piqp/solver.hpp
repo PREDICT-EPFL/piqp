@@ -89,8 +89,10 @@ public:
                 piqp_print("equality constraints p = %zd, nnz(A) = %zd\n", m_data.p, m_data.non_zeros_A());
                 piqp_print("inequality constraints m = %zd, nnz(G) = %zd\n", m_data.m, m_data.non_zeros_G());
             }
-            piqp_print("variable lower bounds n_lb = %zd\n", m_data.n_lb);
-            piqp_print("variable upper bounds n_ub = %zd\n", m_data.n_ub);
+            piqp_print("inequality lower bounds n_h_l = %zd\n", m_data.n_h_l);
+            piqp_print("inequality upper bounds n_h_u = %zd\n", m_data.n_h_u);
+            piqp_print("variable lower bounds n_x_l = %zd\n", m_data.n_x_l);
+            piqp_print("variable upper bounds n_x_u = %zd\n", m_data.n_x_u);
             m_kkt_system.print_info();
             piqp_print("\n");
             piqp_print("iter  prim_obj       dual_obj       duality_gap   prim_inf      dual_inf      rho         delta       mu          p_step   d_step\n");
@@ -104,7 +106,7 @@ public:
         Status status = solve_impl();
 
         unscale_results();
-        restore_box_dual();
+        restore_dual();
 
         if (m_settings.compute_timings)
         {
@@ -122,16 +124,16 @@ public:
             piqp_print("\n");
             piqp_print("status:               %s\n", status_to_string(status));
             piqp_print("number of iterations: %zd\n", m_result.info.iter);
-            piqp_print("objective:            %.5e\n", (double) m_result.info.primal_obj);
+            piqp_print("objective:            %.5e\n", static_cast<double>(m_result.info.primal_obj));
             if (m_settings.compute_timings)
             {
-                piqp_print("total run time:       %.3es\n", (double) m_result.info.run_time);
+                piqp_print("total run time:       %.3es\n", static_cast<double>(m_result.info.run_time));
                 if (m_first_run) {
-                    piqp_print("  setup time:         %.3es\n", (double) m_result.info.setup_time);
+                    piqp_print("  setup time:         %.3es\n", static_cast<double>(m_result.info.setup_time));
                 } else {
-                    piqp_print("  update time:        %.3es\n", (double) m_result.info.update_time);
+                    piqp_print("  update time:        %.3es\n", static_cast<double>(m_result.info.update_time));
                 }
-                piqp_print("  solve time:         %.3es\n", (double) m_result.info.solve_time);
+                piqp_print("  solve time:         %.3es\n", static_cast<double>(m_result.info.solve_time));
             }
         }
 
@@ -146,56 +148,40 @@ protected:
                     const optional<CMatRefType>& A,
                     const optional<CVecRef<T>>& b,
                     const optional<CMatRefType>& G,
-                    const optional<CVecRef<T>>& h,
-                    const optional<CVecRef<T>>& x_lb,
-                    const optional<CVecRef<T>>& x_ub)
+                    const optional<CVecRef<T>>& h_l,
+                    const optional<CVecRef<T>>& h_u,
+                    const optional<CVecRef<T>>& x_l,
+                    const optional<CVecRef<T>>& x_u)
     {
         if (m_settings.compute_timings)
         {
             m_timer.start();
         }
 
-        m_data.n = P.rows();
-        m_data.p = A.has_value() ? A->rows() : 0;
-        m_data.m = G.has_value() ? G->rows() : 0;
+        m_data.resize(P.rows(), A.has_value() ? A->rows() : 0, G.has_value() ? G->rows() : 0);
 
         if (P.rows() != m_data.n || P.cols() != m_data.n) { piqp_eprint("P must be square\n"); return; }
         if (A.has_value() && (A->rows() != m_data.p || A->cols() != m_data.n)) { piqp_eprint("A must have correct dimensions\n"); return; }
         if (G.has_value() && (G->rows() != m_data.m || G->cols() != m_data.n)) { piqp_eprint("G must have correct dimensions\n"); return; }
         if (c.size() != m_data.n) { piqp_eprint("c must have correct dimensions\n"); return; }
         if ((b.has_value() && b->size() != m_data.p) || (!b.has_value() && m_data.p > 0)) { piqp_eprint("b must have correct dimensions\n"); return; }
-        if ((h.has_value() && h->size() != m_data.m) || (!h.has_value() && m_data.m > 0)) { piqp_eprint("h must have correct dimensions\n"); return; }
-        if (x_lb.has_value() && x_lb->size() != m_data.n) { piqp_eprint("x_lb must have correct dimensions\n"); return; }
-        if (x_ub.has_value() && x_ub->size() != m_data.n) { piqp_eprint("x_ub must have correct dimensions\n"); return; }
+        if (h_l.has_value() && h_l->size() != m_data.m) { piqp_eprint("h_l must have correct dimensions\n"); return; }
+        if (h_u.has_value() && h_u->size() != m_data.m) { piqp_eprint("h_u must have correct dimensions\n"); return; }
+        if (!h_l.has_value() && !h_u.has_value() && m_data.m > 0) { piqp_eprint("h_l or h_u should be provided\n"); return; }
+        if (x_l.has_value() && x_l->size() != m_data.n) { piqp_eprint("x_l must have correct dimensions\n"); return; }
+        if (x_u.has_value() && x_u->size() != m_data.n) { piqp_eprint("x_u must have correct dimensions\n"); return; }
 
         m_data.P_utri = P.template triangularView<Eigen::Upper>();
-        if (A.has_value()) {
-            m_data.AT = A->transpose();
-        } else {
-            m_data.AT.resize(m_data.n, 0);
-        }
-        if (G.has_value()) {
-            m_data.GT = G->transpose();
-        } else {
-            m_data.GT.resize(m_data.n, 0);
-        }
+        if (A.has_value()) { m_data.AT = A->transpose(); }
+        if (G.has_value()) { m_data.GT = G->transpose(); }
+
         m_data.c = c;
-        m_data.b = b.has_value() ? *b : Vec<T>::Zero(0);
-        if (h.has_value()) {
-            m_data.h = *h;
-            disable_inf_constraints();
-        } else {
-            m_data.h.resize(0);
-        }
-
-        m_data.x_lb_idx.resize(m_data.n);
-        m_data.x_ub_idx.resize(m_data.n);
-        m_data.x_b_scaling = Vec<T>::Constant(m_data.n, T(1));
-        m_data.x_lb.resize(m_data.n);
-        m_data.x_ub.resize(m_data.n);
-
-        setup_lb_data(x_lb);
-        setup_ub_data(x_ub);
+        if (b.has_value()) { m_data.b = *b; }
+        m_data.set_h_l(h_l);
+        m_data.set_h_u(h_u);
+        m_data.disable_inf_constraints();
+        m_data.set_x_l(x_l);
+        m_data.set_x_u(x_u);
 
         init_workspace();
 
@@ -219,65 +205,6 @@ protected:
             T setup_time = m_timer.stop();
             m_result.info.setup_time = setup_time;
         }
-    }
-
-    void disable_inf_constraints()
-    {
-        if (m_data.m > 0 && (m_data.h.maxCoeff() > PIQP_INF || m_data.h.minCoeff() < -PIQP_INF))
-        {
-            piqp_eprint("h contains values which are close to +/- infinity.\n");
-            piqp_eprint("PIQP is setting the corresponding rows in G to zero (sparsity preserving).\n");
-            piqp_eprint("Consider removing the corresponding constraints for faster solves.\n");
-
-            for (int i = 0; i < m_data.h.rows(); i++)
-            {
-                if (m_data.h(i) > PIQP_INF || m_data.h(i) < -PIQP_INF)
-                {
-                    m_data.set_G_row_zero(i);
-                    m_data.h(i) = T(1);
-                }
-            }
-        }
-    }
-
-    void setup_lb_data(const optional<CVecRef<T>>& x_lb)
-    {
-        isize n_lb = 0;
-        if (x_lb.has_value())
-        {
-            isize i_lb = 0;
-            for (isize i = 0; i < m_data.n; i++)
-            {
-                if ((*x_lb)(i) > -PIQP_INF)
-                {
-                    n_lb += 1;
-                    m_data.x_lb(i_lb) = (*x_lb)(i);
-                    m_data.x_lb_idx(i_lb) = i;
-                    i_lb++;
-                }
-            }
-        }
-        m_data.n_lb = n_lb;
-    }
-
-    void setup_ub_data(const optional<CVecRef<T>>& x_ub)
-    {
-        isize n_ub = 0;
-        if (x_ub.has_value())
-        {
-            isize i_ub = 0;
-            for (isize i = 0; i < m_data.n; i++)
-            {
-                if ((*x_ub)(i) < PIQP_INF)
-                {
-                    n_ub += 1;
-                    m_data.x_ub(i_ub) = (*x_ub)(i);
-                    m_data.x_ub_idx(i_ub) = i;
-                    i_ub++;
-                }
-            }
-        }
-        m_data.n_ub = n_ub;
     }
 
     void init_workspace()
@@ -323,12 +250,34 @@ protected:
         m_result.info.rho = m_settings.rho_init;
         m_result.info.delta = m_settings.delta_init;
 
-        m_result.s.setConstant(1);
-        m_result.s_lb.setConstant(1);
-        m_result.s_ub.setConstant(1);
-        m_result.z.setConstant(1);
-        m_result.z_lb.setConstant(1);
-        m_result.z_ub.setConstant(1);
+        // Infinite bounds have never active constraints.
+        // Note that we set for all inactive constraints
+        // z = 0 as well as s = 0. To be correct, we should
+        // have s = Inf. But keeping it zero, simplifies calculations
+        // down the road (e.g. norm calculations).
+        // We are correcting this at the end when we restore the solution.
+        m_result.s_l.setZero();
+        m_result.s_u.setZero();
+        m_result.z_l.setZero();
+        m_result.z_u.setZero();
+        for (isize i = 0; i < m_data.n_h_l; i++)
+        {
+            Eigen::Index idx = m_data.h_l_idx(i);
+            m_result.s_l(idx) = T(1);
+            m_result.z_l(idx) = T(1);
+        }
+        for (isize i = 0; i < m_data.n_h_u; i++)
+        {
+            Eigen::Index idx = m_data.h_u_idx(i);
+            m_result.s_u(idx) = T(1);
+            m_result.z_u(idx) = T(1);
+        }
+
+        // all finite bounds are stored in the head
+        m_result.s_bl.head(m_data.n_x_l).setConstant(T(1));
+        m_result.s_bu.head(m_data.n_x_u).setConstant(T(1));
+        m_result.z_bl.head(m_data.n_x_l).setConstant(T(1));
+        m_result.z_bu.head(m_data.n_x_u).setConstant(T(1));
 
         m_enable_iterative_refinement = m_settings.iterative_refinement_always_enabled;
 
@@ -355,70 +304,109 @@ protected:
 
         res.x = -m_data.c;
         res.y = m_data.b;
-        res.z = m_data.h;
-        res.z_lb = -m_data.x_lb;
-        res.z_ub = m_data.x_ub;
-        res.s.setZero();
-        res.s_lb.setZero();
-        res.s_ub.setZero();
+        res.z_l = -m_data.h_l;
+        res.z_u = m_data.h_u;
+        res.z_bl = -m_data.x_l;
+        res.z_bu = m_data.x_u;
+        res.s_l.setZero();
+        res.s_u.setZero();
+        res.s_bl.setZero();
+        res.s_bu.setZero();
         m_kkt_system.solve(res, m_result);
 
         // We make an Eigen expression for convince. Note that we are doing it after
         // the first solve since m_kkt_system.solve might swap internal pointers in m_result
         // which can invalidate the reference in the Eigen expression.
-        auto s_lb = m_result.s_lb.head(m_data.n_lb);
-        auto s_ub = m_result.s_ub.head(m_data.n_ub);
-        auto z_lb = m_result.z_lb.head(m_data.n_lb);
-        auto z_ub = m_result.z_ub.head(m_data.n_ub);
-        auto nu_lb = prox_vars.z_lb.head(m_data.n_lb);
-        auto nu_ub = prox_vars.z_ub.head(m_data.n_ub);
+        auto s_bl = m_result.s_bl.head(m_data.n_x_l);
+        auto s_bu = m_result.s_bu.head(m_data.n_x_u);
+        auto z_bl = m_result.z_bl.head(m_data.n_x_l);
+        auto z_bu = m_result.z_bu.head(m_data.n_x_u);
+        auto nu_bl = prox_vars.z_bl.head(m_data.n_x_l);
+        auto nu_bu = prox_vars.z_bu.head(m_data.n_x_u);
 
-        if (m_data.m + m_data.n_lb + m_data.n_ub > 0)
+        if (m_data.m + m_data.n_x_l + m_data.n_x_u > 0)
         {
             T s_norm = T(0);
-            s_norm = (std::max)(s_norm, m_result.s.template lpNorm<Eigen::Infinity>());
-            s_norm = (std::max)(s_norm, s_lb.template lpNorm<Eigen::Infinity>());
-            s_norm = (std::max)(s_norm, s_ub.template lpNorm<Eigen::Infinity>());
+            s_norm = (std::max)(s_norm, m_result.s_l.template lpNorm<Eigen::Infinity>());
+            s_norm = (std::max)(s_norm, m_result.s_u.template lpNorm<Eigen::Infinity>());
+            s_norm = (std::max)(s_norm, s_bl.template lpNorm<Eigen::Infinity>());
+            s_norm = (std::max)(s_norm, s_bl.template lpNorm<Eigen::Infinity>());
             if (s_norm <= 1e-4)
             {
                 // 0.1 is arbitrary
-                m_result.s.setConstant(0.1);
-                s_lb.setConstant(0.1);
-                s_ub.setConstant(0.1);
-                m_result.z.setConstant(0.1);
-                z_lb.setConstant(0.1);
-                z_ub.setConstant(0.1);
+                for (isize i = 0; i < m_data.n_h_l; i++)
+                {
+                    Eigen::Index idx = m_data.h_l_idx(i);
+                    m_result.s_l(idx) = T(0.1);
+                    m_result.z_l(idx) = T(0.1);
+                }
+                for (isize i = 0; i < m_data.n_h_u; i++)
+                {
+                    Eigen::Index idx = m_data.h_u_idx(i);
+                    m_result.s_u(idx) = T(0.1);
+                    m_result.z_u(idx) = T(0.1);
+                }
+                s_bl.setConstant(T(0.1));
+                s_bu.setConstant(T(0.1));
+                z_bl.setConstant(T(0.1));
+                z_bu.setConstant(T(0.1));
             }
 
             T delta_s = T(0);
-            if (m_data.m > 0) delta_s = (std::max)(delta_s, -T(1.5) * m_result.s.minCoeff());
-            if (m_data.n_lb > 0) delta_s = (std::max)(delta_s, -T(1.5) * s_lb.minCoeff());
-            if (m_data.n_ub > 0) delta_s = (std::max)(delta_s, -T(1.5) * s_ub.minCoeff());
+            if (m_data.m > 0) {
+                delta_s = (std::max)(delta_s, -T(1.5) * m_result.s_l.minCoeff());
+                delta_s = (std::max)(delta_s, -T(1.5) * m_result.s_u.minCoeff());
+            }
+            if (m_data.n_x_l > 0) delta_s = (std::max)(delta_s, -T(1.5) * s_bl.minCoeff());
+            if (m_data.n_x_u > 0) delta_s = (std::max)(delta_s, -T(1.5) * s_bu.minCoeff());
             T delta_z = T(0);
-            if (m_data.m > 0) delta_z = (std::max)(delta_z, -T(1.5) * m_result.z.minCoeff());
-            if (m_data.n_lb > 0) delta_z = (std::max)(delta_z, -T(1.5) * z_lb.minCoeff());
-            if (m_data.n_ub > 0) delta_z = (std::max)(delta_z, -T(1.5) * z_ub.minCoeff());
-            T tmp_prod = (m_result.s.array() + delta_s).matrix().dot((m_result.z.array() + delta_z).matrix());
-            tmp_prod += (s_lb.array() + delta_s).matrix().dot((z_lb.array() + delta_z).matrix());
-            tmp_prod += (s_ub.array() + delta_s).matrix().dot((z_ub.array() + delta_z).matrix());
-            T delta_s_bar = delta_s + (T(0.5) * tmp_prod) / (m_result.z.sum() + z_lb.sum() + z_ub.sum() + T(m_data.m + m_data.n_lb + m_data.n_ub) * delta_z);
-            T delta_z_bar = delta_z + (T(0.5) * tmp_prod) / (m_result.s.sum() + s_lb.sum() + s_ub.sum() + T(m_data.m + m_data.n_lb + m_data.n_ub) * delta_s);
+            if (m_data.m > 0) {
+                delta_z = (std::max)(delta_z, -T(1.5) * m_result.z_l.minCoeff());
+                delta_z = (std::max)(delta_z, -T(1.5) * m_result.z_u.minCoeff());
+            }
+            if (m_data.n_x_l > 0) delta_z = (std::max)(delta_z, -T(1.5) * z_bl.minCoeff());
+            if (m_data.n_x_u > 0) delta_z = (std::max)(delta_z, -T(1.5) * z_bu.minCoeff());
+            T dot_prod = T(0);
+            for (isize i = 0; i < m_data.n_h_l; i++)
+            {
+                Eigen::Index idx = m_data.h_l_idx(i);
+                dot_prod += (m_result.s_l(idx) + delta_s) * (m_result.z_l(idx) + delta_z);
+            }
+            for (isize i = 0; i < m_data.n_h_u; i++)
+            {
+                Eigen::Index idx = m_data.h_u_idx(i);
+                dot_prod += (m_result.s_u(idx) + delta_s) * (m_result.z_u(idx) + delta_z);
+            }
+            dot_prod += (s_bl.array() + delta_s).matrix().dot((z_bl.array() + delta_z).matrix());
+            dot_prod += (s_bu.array() + delta_s).matrix().dot((z_bu.array() + delta_z).matrix());
+            T delta_s_bar = delta_s + T(0.5) * dot_prod / (m_result.z_l.sum() + m_result.z_u.sum() + z_bl.sum() + z_bu.sum() + T(m_data.n_h_l + m_data.n_h_u + m_data.n_x_l + m_data.n_x_u) * delta_z);
+            T delta_z_bar = delta_z + T(0.5) * dot_prod / (m_result.s_l.sum() + m_result.s_u.sum() + s_bl.sum() + s_bu.sum() + T(m_data.n_h_l + m_data.n_h_u + m_data.n_x_l + m_data.n_x_u) * delta_s);
 
-            m_result.s.array() += delta_s_bar;
-            s_lb.array() += delta_s_bar;
-            s_ub.array() += delta_s_bar;
-            m_result.z.array() += delta_z_bar;
-            z_lb.array() += delta_z_bar;
-            z_ub.array() += delta_z_bar;
+            for (isize i = 0; i < m_data.n_h_l; i++)
+            {
+                Eigen::Index idx = m_data.h_l_idx(i);
+                m_result.s_l(idx) += delta_s_bar;
+                m_result.z_l(idx) += delta_z_bar;
+            }
+            for (isize i = 0; i < m_data.n_h_u; i++)
+            {
+                Eigen::Index idx = m_data.h_u_idx(i);
+                m_result.s_u(idx) += delta_s_bar;
+                m_result.z_u(idx) += delta_z_bar;
+            }
+            s_bl.array() += delta_s_bar;
+            s_bu.array() += delta_s_bar;
+            z_bl.array() += delta_z_bar;
+            z_bu.array() += delta_z_bar;
 
-            m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / T(m_data.m + m_data.n_lb + m_data.n_ub);
+            m_result.info.mu = calculate_mu();
         }
 
         prox_vars.x = m_result.x;
         prox_vars.y = m_result.y;
-        prox_vars.z = m_result.z;
-        nu_lb = z_lb;
-        nu_ub = z_ub;
+        prox_vars.z_l = m_result.z_l;
+        nu_bl = z_bl;
+        nu_bu = z_bu;
 
         while (m_result.info.iter < m_settings.max_iter)
         {
@@ -433,18 +421,18 @@ protected:
             if (m_settings.verbose)
             {
                 piqp_print("%3zd   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.4f   %.4f\n",
-                        m_result.info.iter,
-                        (double) m_result.info.primal_obj,
-                        (double) m_result.info.dual_obj,
-                        (double) m_result.info.duality_gap,
-                        (double) m_result.info.primal_inf,
-                        (double) m_result.info.dual_inf,
-                        (double) m_result.info.rho,
-                        (double) m_result.info.delta,
-                        (double) m_result.info.mu,
-                        (double) m_result.info.primal_step,
-                        (double) m_result.info.dual_step);
-                fflush(stdout);
+                    m_result.info.iter,
+                    static_cast<double>(m_result.info.primal_obj),
+                    static_cast<double>(m_result.info.dual_obj),
+                    static_cast<double>(m_result.info.duality_gap),
+                    static_cast<double>(m_result.info.primal_inf),
+                    static_cast<double>(m_result.info.dual_inf),
+                    static_cast<double>(m_result.info.rho),
+                    static_cast<double>(m_result.info.delta),
+                    static_cast<double>(m_result.info.mu),
+                    static_cast<double>(m_result.info.primal_step),
+                    static_cast<double>(m_result.info.dual_step)
+                );
             }
 
             if (m_result.info.primal_inf < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf &&
@@ -457,11 +445,25 @@ protected:
 
             res.x = res_nr.x - m_result.info.rho * (m_result.x - prox_vars.x);
             res.y = res_nr.y - m_result.info.delta * (prox_vars.y - m_result.y);
-            res.z = res_nr.z - m_result.info.delta * (prox_vars.z - m_result.z);
-            res.z_lb.head(m_data.n_lb) = res_nr.z_lb.head(m_data.n_lb) - m_result.info.delta * (nu_lb.head(m_data.n_lb) - z_lb.head(m_data.n_lb));
-            res.z_ub.head(m_data.n_ub) = res_nr.z_ub.head(m_data.n_ub) - m_result.info.delta * (nu_ub.head(m_data.n_ub) - z_ub.head(m_data.n_ub));
+            res.z_l = res_nr.z_l - m_result.info.delta * (prox_vars.z_l - m_result.z_l);
+            res.z_u = res_nr.z_u - m_result.info.delta * (prox_vars.z_u - m_result.z_u);
+            res.z_bl.head(m_data.n_x_l) = res_nr.z_bl.head(m_data.n_x_l) - m_result.info.delta * (nu_bl.head(m_data.n_x_l) - z_bl.head(m_data.n_x_l));
+            res.z_bu.head(m_data.n_x_u) = res_nr.z_bu.head(m_data.n_x_u) - m_result.info.delta * (nu_bu.head(m_data.n_x_u) - z_bu.head(m_data.n_x_u));
 
-            if (m_result.info.no_dual_update > (std::min)(isize(5), m_settings.reg_finetune_dual_update_threshold) &&
+            // std::cout << "x: " << m_result.x.transpose() << std::endl;
+            // std::cout << "y: " << m_result.y.transpose() << std::endl;
+            // std::cout << "z_l: " << m_result.z_l.transpose() << std::endl;
+            // std::cout << "z_u: " << m_result.z_u.transpose() << std::endl;
+            // std::cout << "s_l: " << m_result.s_l.transpose() << std::endl;
+            // std::cout << "s_u: " << m_result.s_u.transpose() << std::endl;
+            // std::cout << "nrz_l: " << res_nr.z_l.transpose() << std::endl;
+            // std::cout << "nrz_u: " << res_nr.z_u.transpose() << std::endl;
+            // std::cout << "rz_l: " << res.z_l.transpose() << std::endl;
+            // std::cout << "rz_u: " << res.z_u.transpose() << std::endl;
+            // std::cout << "rs_l: " << res.s_l.transpose() << std::endl;
+            // std::cout << "rs_u: " << res.s_u.transpose() << std::endl;
+
+            if (m_result.info.no_dual_update > (std::min)(static_cast<isize>(5), m_settings.reg_finetune_dual_update_threshold) &&
                 primal_prox_inf() > 1e12 &&
                 primal_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf)
             {
@@ -469,7 +471,7 @@ protected:
                 return m_result.info.status;
             }
 
-            if (m_result.info.no_primal_update > (std::min)(isize(5), m_settings.reg_finetune_primal_update_threshold) &&
+            if (m_result.info.no_primal_update > (std::min)(static_cast<isize>(5), m_settings.reg_finetune_primal_update_threshold) &&
                 dual_prox_inf() > 1e12 &&
                 dual_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.dual_rel_inf)
             {
@@ -482,24 +484,35 @@ protected:
             // avoid getting to close to boundary which can result in a division by zero
             bool boundary_shifted = false;
             T epsilon = std::numeric_limits<T>::epsilon();
-            if (m_data.m > 0 && m_result.z.minCoeff() < epsilon)
+            for (isize i = 0; i < m_data.n_h_l; i++)
             {
-                m_result.z.array() += epsilon;
+                Eigen::Index idx = m_data.h_l_idx(i);
+                if (m_result.z_l(idx) < epsilon) {
+                    m_result.z_l(idx) += epsilon;
+                    boundary_shifted = true;
+                }
+            }
+            for (isize i = 0; i < m_data.n_h_u; i++)
+            {
+                Eigen::Index idx = m_data.h_u_idx(i);
+                if (m_result.z_u(idx) < epsilon) {
+                    m_result.z_u(idx) += epsilon;
+                    boundary_shifted = true;
+                }
+            }
+            if (m_data.n_x_l > 0 && z_bl.minCoeff() < epsilon)
+            {
+                z_bl.array() += epsilon;
                 boundary_shifted = true;
             }
-            if (m_data.n_lb > 0 && z_lb.minCoeff() < epsilon)
+            if (m_data.n_x_u > 0 && z_bu.minCoeff() < epsilon)
             {
-                z_lb.array() += epsilon;
-                boundary_shifted = true;
-            }
-            if (m_data.n_ub > 0 && z_ub.minCoeff() < epsilon)
-            {
-                z_ub.array() += epsilon;
+                z_bu.array() += epsilon;
                 boundary_shifted = true;
             }
             if (boundary_shifted)
             {
-                m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / T(m_data.m + m_data.n_lb + m_data.n_ub);
+                m_result.info.mu = calculate_mu();
             }
 
             // avoid possibility of converging to a local minimum -> decrease the minimum regularization value
@@ -537,105 +550,43 @@ protected:
             }
             m_result.info.factor_retires = 0;
 
-            if (m_data.m + m_data.n_lb + m_data.n_ub > 0)
+            if (m_data.m + m_data.n_x_l + m_data.n_x_u > 0)
             {
                 // ------------------ predictor step ------------------
-                res.s.array() = -m_result.s.array() * m_result.z.array();
-                res.s_lb.head(m_data.n_lb).array() = -s_lb.array() * z_lb.array();
-                res.s_ub.head(m_data.n_ub).array() = -s_ub.array() * z_ub.array();
+                res.s_l.array() = -m_result.s_l.array() * m_result.z_l.array();
+                res.s_u.array() = -m_result.s_u.array() * m_result.z_u.array();
+                res.s_bl.head(m_data.n_x_l).array() = -s_bl.array() * z_bl.array();
+                res.s_bu.head(m_data.n_x_u).array() = -s_bu.array() * z_bu.array();
 
                 m_kkt_system.solve(res, step);
 
                 // step in the non-negative orthant
-                T alpha_s = T(1);
-                T alpha_z = T(1);
-                for (isize i = 0; i < m_data.m; i++)
-                {
-                    if (step.s(i) < 0)
-                    {
-                        alpha_s = (std::min)(alpha_s, -m_result.s(i) / step.s(i));
-                    }
-                    if (step.z(i) < 0)
-                    {
-                        alpha_z = (std::min)(alpha_z, -m_result.z(i) / step.z(i));
-                    }
-                }
-                for (isize i = 0; i < m_data.n_lb; i++)
-                {
-                    if (step.s_lb(i) < 0)
-                    {
-                        alpha_s = (std::min)(alpha_s, -m_result.s_lb(i) / step.s_lb(i));
-                    }
-                    if (step.z_lb(i) < 0)
-                    {
-                        alpha_z = (std::min)(alpha_z, -m_result.z_lb(i) / step.z_lb(i));
-                    }
-                }
-                for (isize i = 0; i < m_data.n_ub; i++)
-                {
-                    if (step.s_ub(i) < 0)
-                    {
-                        alpha_s = (std::min)(alpha_s, -m_result.s_ub(i) / step.s_ub(i));
-                    }
-                    if (step.z_ub(i) < 0)
-                    {
-                        alpha_z = (std::min)(alpha_z, -m_result.z_ub(i) / step.z_ub(i));
-                    }
-                }
+                T alpha_s, alpha_z;
+                calculate_step(alpha_s, alpha_z);
+
                 // avoid getting to close to the boundary
                 alpha_s *= m_settings.tau;
                 alpha_z *= m_settings.tau;
 
-                m_result.info.sigma = (m_result.s + alpha_s * step.s).dot(m_result.z + alpha_z * step.z);
-                m_result.info.sigma += (s_lb + alpha_s * step.s_lb.head(m_data.n_lb)).dot(z_lb + alpha_z * step.z_lb.head(m_data.n_lb));
-                m_result.info.sigma += (s_ub + alpha_s * step.s_ub.head(m_data.n_ub)).dot(z_ub + alpha_z * step.z_ub.head(m_data.n_ub));
-                m_result.info.sigma /= (m_result.info.mu * T(m_data.m + m_data.n_lb + m_data.n_ub));
+                m_result.info.sigma = (m_result.s_l + alpha_s * step.s_l).dot(m_result.z_l + alpha_z * step.z_l);
+                m_result.info.sigma += (m_result.s_u + alpha_s * step.s_u).dot(m_result.z_u + alpha_z * step.z_u);
+                m_result.info.sigma += (s_bl + alpha_s * step.s_bl.head(m_data.n_x_l)).dot(z_bl + alpha_z * step.z_bl.head(m_data.n_x_l));
+                m_result.info.sigma += (s_bu + alpha_s * step.s_bu.head(m_data.n_x_u)).dot(z_bu + alpha_z * step.z_bu.head(m_data.n_x_u));
+                m_result.info.sigma /= (m_result.info.mu * T(m_data.n_h_l + m_data.n_h_u + m_data.n_x_l + m_data.n_x_u));
                 m_result.info.sigma = (std::max)(T(0), (std::min)(T(1), m_result.info.sigma));
                 m_result.info.sigma = m_result.info.sigma * m_result.info.sigma * m_result.info.sigma;
 
                 // ------------------ corrector step ------------------
-                res.s.array() += -step.s.array() * step.z.array() + m_result.info.sigma * m_result.info.mu;
-                res.s_lb.head(m_data.n_lb).array() += -step.s_lb.head(m_data.n_lb).array() * step.z_lb.head(m_data.n_lb).array() + m_result.info.sigma * m_result.info.mu;
-                res.s_ub.head(m_data.n_ub).array() += -step.s_ub.head(m_data.n_ub).array() * step.z_ub.head(m_data.n_ub).array() + m_result.info.sigma * m_result.info.mu;
+                res.s_l.array() += -step.s_l.array() * step.z_l.array() + m_result.info.sigma * m_result.info.mu;
+                res.s_u.array() += -step.s_u.array() * step.z_u.array() + m_result.info.sigma * m_result.info.mu;
+                res.s_bl.head(m_data.n_x_l).array() += -step.s_bl.head(m_data.n_x_l).array() * step.z_bl.head(m_data.n_x_l).array() + m_result.info.sigma * m_result.info.mu;
+                res.s_bu.head(m_data.n_x_u).array() += -step.s_bu.head(m_data.n_x_u).array() * step.z_bu.head(m_data.n_x_u).array() + m_result.info.sigma * m_result.info.mu;
 
                 m_kkt_system.solve(res, step);
 
                 // step in the non-negative orthant
-                alpha_s = T(1);
-                alpha_z = T(1);
-                for (isize i = 0; i < m_data.m; i++)
-                {
-                    if (step.s(i) < 0)
-                    {
-                        alpha_s = (std::min)(alpha_s, -m_result.s(i) / step.s(i));
-                    }
-                    if (step.z(i) < 0)
-                    {
-                        alpha_z = (std::min)(alpha_z, -m_result.z(i) / step.z(i));
-                    }
-                }
-                for (isize i = 0; i < m_data.n_lb; i++)
-                {
-                    if (step.s_lb(i) < 0)
-                    {
-                        alpha_s = (std::min)(alpha_s, -m_result.s_lb(i) / step.s_lb(i));
-                    }
-                    if (step.z_lb(i) < 0)
-                    {
-                        alpha_z = (std::min)(alpha_z, -m_result.z_lb(i) / step.z_lb(i));
-                    }
-                }
-                for (isize i = 0; i < m_data.n_ub; i++)
-                {
-                    if (step.s_ub(i) < 0)
-                    {
-                        alpha_s = (std::min)(alpha_s, -m_result.s_ub(i) / step.s_ub(i));
-                    }
-                    if (step.z_ub(i) < 0)
-                    {
-                        alpha_z = (std::min)(alpha_z, -m_result.z_ub(i) / step.z_ub(i));
-                    }
-                }
+                calculate_step(alpha_s, alpha_z);
+
                 // avoid getting to close to the boundary
                 m_result.info.primal_step = alpha_s * m_settings.tau;
                 m_result.info.dual_step = alpha_z * m_settings.tau;
@@ -643,15 +594,17 @@ protected:
                 // ------------------ update ------------------
                 m_result.x += m_result.info.primal_step * step.x;
                 m_result.y += m_result.info.dual_step * step.y;
-                m_result.z += m_result.info.dual_step * step.z;
-                z_lb += m_result.info.dual_step * step.z_lb.head(m_data.n_lb);
-                z_ub += m_result.info.dual_step * step.z_ub.head(m_data.n_ub);
-                m_result.s += m_result.info.primal_step * step.s;
-                s_lb += m_result.info.primal_step * step.s_lb.head(m_data.n_lb);
-                s_ub += m_result.info.primal_step * step.s_ub.head(m_data.n_ub);
+                m_result.z_l += m_result.info.dual_step * step.z_l;
+                m_result.z_u += m_result.info.dual_step * step.z_u;
+                z_bl += m_result.info.dual_step * step.z_bl.head(m_data.n_x_l);
+                z_bu += m_result.info.dual_step * step.z_bu.head(m_data.n_x_u);
+                m_result.s_l += m_result.info.primal_step * step.s_l;
+                m_result.s_u += m_result.info.primal_step * step.s_u;
+                s_bl += m_result.info.primal_step * step.s_bl.head(m_data.n_x_l);
+                s_bu += m_result.info.primal_step * step.s_bu.head(m_data.n_x_u);
 
                 T mu_prev = m_result.info.mu;
-                m_result.info.mu = (m_result.s.dot(m_result.z) + s_lb.dot(z_lb) + s_ub.dot(z_ub) ) / T(m_data.m + m_data.n_lb + m_data.n_ub);
+                m_result.info.mu = calculate_mu();
                 T mu_rate = (std::max)(T(0), (mu_prev - m_result.info.mu) / mu_prev);
 
                 // ------------------ update regularization ------------------
@@ -671,9 +624,10 @@ protected:
                 if (primal_inf_nr() < 0.95 * m_result.info.primal_inf || (m_result.info.delta == m_settings.reg_finetune_lower_limit && primal_prox_inf() < 1e2))
                 {
                     prox_vars.y = m_result.y;
-                    prox_vars.z = m_result.z;
-                    nu_lb = z_lb;
-                    nu_ub = z_ub;
+                    prox_vars.z_l = m_result.z_l;
+                    prox_vars.z_u = m_result.z_u;
+                    nu_bl = z_bl;
+                    nu_bu = z_bu;
                     m_result.info.delta = (std::max)(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.delta);
                 }
                 else
@@ -723,21 +677,81 @@ protected:
         return m_result.info.status;
     }
 
+    T calculate_mu()
+    {
+        return (m_result.s_l.dot(m_result.z_l)
+                + m_result.s_u.dot(m_result.z_u)
+                + m_result.s_bl.head(m_data.n_x_l).dot(m_result.z_bl.head(m_data.n_x_l))
+                + m_result.s_bu.head(m_data.n_x_u).dot(m_result.z_bu.head(m_data.n_x_u)))
+            / T(m_data.n_h_l + m_data.n_h_u + m_data.n_x_l + m_data.n_x_u);
+    }
+
+    void calculate_step(T& alpha_s, T& alpha_z)
+    {
+        alpha_s = T(1);
+        alpha_z = T(1);
+        for (isize i = 0; i < m_data.m; i++)
+        {
+            if (step.s_l(i) < 0)
+            {
+                alpha_s = (std::min)(alpha_s, -m_result.s_l(i) / step.s_l(i));
+            }
+            if (step.s_u(i) < 0)
+            {
+                alpha_s = (std::min)(alpha_s, -m_result.s_u(i) / step.s_u(i));
+            }
+            if (step.z_l(i) < 0)
+            {
+                alpha_z = (std::min)(alpha_z, -m_result.z_l(i) / step.z_l(i));
+            }
+            if (step.z_u(i) < 0)
+            {
+                alpha_z = (std::min)(alpha_z, -m_result.z_u(i) / step.z_u(i));
+            }
+        }
+        for (isize i = 0; i < m_data.n_x_l; i++)
+        {
+            if (step.s_bl(i) < 0)
+            {
+                alpha_s = (std::min)(alpha_s, -m_result.s_bl(i) / step.s_bl(i));
+            }
+            if (step.z_bl(i) < 0)
+            {
+                alpha_z = (std::min)(alpha_z, -m_result.z_bl(i) / step.z_bl(i));
+            }
+        }
+        for (isize i = 0; i < m_data.n_x_u; i++)
+        {
+            if (step.s_bu(i) < 0)
+            {
+                alpha_s = (std::min)(alpha_s, -m_result.s_bu(i) / step.s_bu(i));
+            }
+            if (step.z_bu(i) < 0)
+            {
+                alpha_z = (std::min)(alpha_z, -m_result.z_bu(i) / step.z_bu(i));
+            }
+        }
+    }
+
     void update_nr_residuals()
     {
         using std::abs;
 
         // step is not used and we can use it as temporary storage
         Vec<T>& work_x = step.x;
+        Vec<T>& work_z = step.z_l;
 
         // we calculate these term here first to be able to reuse temporary vectors
         // res_nr.y = -A * x
         // work_x = A^T * y
         m_kkt_system.eval_A_xn_and_AT_xt(T(-1), T(1), m_result.x, m_result.y, res_nr.y, work_x);
-        // res_nr.z = -G * x
-        // work_x += G^T * z
-        Vec<T>& work_x_2 = res_nr.x; // use res_nr.z as temporary, get overwritten later anyway
-        m_kkt_system.eval_G_xn_and_GT_xt(T(-1), T(1), m_result.x, m_result.z, res_nr.z, work_x_2);
+        // res_nr.z_u = -G * x
+        // res_nr.z_l = G * x
+        // work_x += G^T * (z_u - z_l)
+        work_z.noalias() = m_result.z_u - m_result.z_l;
+        Vec<T>& work_x_2 = res_nr.x; // use res_nr.x as temporary, gets overwritten in the next section
+        m_kkt_system.eval_G_xn_and_GT_xt(T(1), T(1), m_result.x, work_z, res_nr.z_l, work_x_2);
+        res_nr.z_u.noalias() = -res_nr.z_l;
         work_x.noalias() += work_x_2;
 
         // first part of dual residual and infeasibility calculation (used in cost calculation)
@@ -755,13 +769,16 @@ protected:
         tmp = m_data.b.dot(m_result.y);
         m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
-        tmp = m_data.h.dot(m_result.z);
+        tmp = -m_data.h_l.dot(m_result.z_l);
         m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
-        tmp = -m_data.x_lb.head(m_data.n_lb).dot(m_result.z_lb.head(m_data.n_lb));
+        tmp = m_data.h_u.dot(m_result.z_u);
         m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
-        tmp = m_data.x_ub.head(m_data.n_ub).dot(m_result.z_ub.head(m_data.n_ub));
+        tmp = -m_data.x_l.head(m_data.n_x_l).dot(m_result.z_bl.head(m_data.n_x_l));
+        m_result.info.dual_obj -= tmp;
+        m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
+        tmp = m_data.x_u.head(m_data.n_x_u).dot(m_result.z_bu.head(m_data.n_x_u));
         m_result.info.dual_obj -= tmp;
         m_result.info.duality_gap_rel = (std::max)(m_result.info.duality_gap_rel, m_preconditioner.unscale_cost(abs(tmp)));
 
@@ -774,15 +791,15 @@ protected:
         // dual residual and infeasibility calculation
         res_nr.x.noalias() -= m_data.c;
         m_result.info.dual_rel_inf = (std::max)(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(m_data.c).template lpNorm<Eigen::Infinity>());
-        for (isize i = 0; i < m_data.n_lb; i++)
+        for (isize i = 0; i < m_data.n_x_l; i++)
         {
-            Eigen::Index idx = m_data.x_lb_idx(i);
-            work_x(idx) -= m_data.x_b_scaling(idx) * m_result.z_lb(i);
+            Eigen::Index idx = m_data.x_l_idx(i);
+            work_x(idx) -= m_data.x_b_scaling(idx) * m_result.z_bl(i);
         }
-        for (isize i = 0; i < m_data.n_ub; i++)
+        for (isize i = 0; i < m_data.n_x_u; i++)
         {
-            Eigen::Index idx = m_data.x_ub_idx(i);
-            work_x(idx) += m_data.x_b_scaling(idx) * m_result.z_ub(i);
+            Eigen::Index idx = m_data.x_u_idx(i);
+            work_x(idx) += m_data.x_b_scaling(idx) * m_result.z_bu(i);
         }
         m_result.info.dual_rel_inf = (std::max)(m_result.info.dual_rel_inf, m_preconditioner.unscale_dual_res(work_x).template lpNorm<Eigen::Infinity>());
         res_nr.x.noalias() -= work_x;
@@ -792,43 +809,77 @@ protected:
         res_nr.y.noalias() += m_data.b;
         m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_eq(m_data.b).template lpNorm<Eigen::Infinity>());
 
-        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(res_nr.z).template lpNorm<Eigen::Infinity>());
-        res_nr.z.noalias() += m_data.h - m_result.s;
-        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_data.h).template lpNorm<Eigen::Infinity>());
-        m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_result.s).template lpNorm<Eigen::Infinity>());
-
-        for (isize i = 0; i < m_data.n_lb; i++)
+        isize i = 0;
+        for (isize ii = 0; ii < m_data.n_h_l; ii++)
         {
-            Eigen::Index idx = m_data.x_lb_idx(i);
-            res_nr.z_lb(i) = m_data.x_b_scaling(idx) * m_result.x(idx);
-            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_lb(i), idx));
-            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_data.x_lb(i), idx));
-            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_result.s_lb(i), idx));
+            Eigen::Index idx = m_data.h_l_idx(ii);
+            // zero out residuals corresponding to infinite bounds
+            while (i < idx) {
+                res_nr.z_l(i++) = T(0);
+            }
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(res_nr.z_l)(i));
+            res_nr.z_l(i) += -m_data.h_l(i) - m_result.s_l(i);
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_data.h_l)(i));
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_result.s_l)(i));
+            i++;
         }
-        res_nr.z_lb.head(m_data.n_lb).noalias() += -m_data.x_lb.head(m_data.n_lb) - m_result.s_lb.head(m_data.n_lb);
+        // zero out remaining residuals corresponding to infinite bounds
+        while (i < m_data.m) {
+            res_nr.z_l(i++) = T(0);
+        }
 
-        for (isize i = 0; i < m_data.n_ub; i++)
+        i = 0;
+        for (isize ii = 0; ii < m_data.n_h_u; ii++)
         {
-            Eigen::Index idx = m_data.x_ub_idx(i);
-            res_nr.z_ub(i) = -m_data.x_b_scaling(idx) * m_result.x(idx);
-            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_ub(i), idx));
-            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_data.x_ub(i), idx));
-            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_result.s_ub(i), idx));
+            Eigen::Index idx = m_data.h_u_idx(ii);
+            // zero out residuals corresponding to infinite bounds
+            while (i < idx) {
+                res_nr.z_u(i++) = T(0);
+            }
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(res_nr.z_u)(i));
+            res_nr.z_u(i) += m_data.h_u(i) - m_result.s_u(i);
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_data.h_u)(i));
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_ineq(m_result.s_u)(i));
+            i++;
         }
-        res_nr.z_ub.head(m_data.n_ub).noalias() += m_data.x_ub.head(m_data.n_ub) - m_result.s_ub.head(m_data.n_ub);
+        // zero out remaining residuals corresponding to infinite bounds
+        while (i < m_data.m) {
+            res_nr.z_u(i++) = T(0);
+        }
+
+        for (i = 0; i < m_data.n_x_l; i++)
+        {
+            Eigen::Index idx = m_data.x_l_idx(i);
+            res_nr.z_bl(i) = m_data.x_b_scaling(idx) * m_result.x(idx);
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_bl(i), idx));
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_data.x_l(i), idx));
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_result.s_bl(i), idx));
+        }
+        res_nr.z_bl.head(m_data.n_x_l).noalias() += -m_data.x_l.head(m_data.n_x_l) - m_result.s_bl.head(m_data.n_x_l);
+
+        for (i = 0; i < m_data.n_x_u; i++)
+        {
+            Eigen::Index idx = m_data.x_u_idx(i);
+            res_nr.z_bu(i) = -m_data.x_b_scaling(idx) * m_result.x(idx);
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_bu(i), idx));
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_data.x_u(i), idx));
+            m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_result.s_bu(i), idx));
+        }
+        res_nr.z_bu.head(m_data.n_x_u).noalias() += m_data.x_u.head(m_data.n_x_u) - m_result.s_bu.head(m_data.n_x_u);
     }
 
     T primal_inf_nr()
     {
         T inf = m_preconditioner.unscale_primal_res_eq(res_nr.y).template lpNorm<Eigen::Infinity>();
-        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res_nr.z).template lpNorm<Eigen::Infinity>());
-        for (isize i = 0; i < m_data.n_lb; i++)
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res_nr.z_l).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res_nr.z_u).template lpNorm<Eigen::Infinity>());
+        for (isize i = 0; i < m_data.n_x_l; i++)
         {
-            inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_lb(i), m_data.x_lb_idx(i)));
+            inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_bl(i), m_data.x_l_idx(i)));
         }
-        for (isize i = 0; i < m_data.n_ub; i++)
+        for (isize i = 0; i < m_data.n_x_u; i++)
         {
-            inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_ub(i), m_data.x_ub_idx(i)));
+            inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_bu(i), m_data.x_u_idx(i)));
         }
         return inf;
     }
@@ -836,14 +887,15 @@ protected:
     T primal_inf_r()
     {
         T inf = m_preconditioner.unscale_primal_res_eq(res.y).template lpNorm<Eigen::Infinity>();
-        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res.z).template lpNorm<Eigen::Infinity>());
-        for (isize i = 0; i < m_data.n_lb; i++)
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res.z_l).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res.z_u).template lpNorm<Eigen::Infinity>());
+        for (isize i = 0; i < m_data.n_x_l; i++)
         {
-            inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res.z_lb(i), m_data.x_lb_idx(i)));
+            inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res.z_bl(i), m_data.x_l_idx(i)));
         }
-        for (isize i = 0; i < m_data.n_ub; i++)
+        for (isize i = 0; i < m_data.n_x_u; i++)
         {
-            inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res.z_ub(i), m_data.x_ub_idx(i)));
+            inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res.z_bu(i), m_data.x_u_idx(i)));
         }
         return inf;
     }
@@ -851,14 +903,15 @@ protected:
     T primal_prox_inf()
     {
         T inf = m_preconditioner.unscale_dual_eq(prox_vars.y - m_result.y).template lpNorm<Eigen::Infinity>();
-        inf = (std::max)(inf, m_preconditioner.unscale_dual_ineq(prox_vars.z - m_result.z).template lpNorm<Eigen::Infinity>());
-        for (isize i = 0; i < m_data.n_lb; i++)
+        inf = (std::max)(inf, m_preconditioner.unscale_dual_ineq(prox_vars.z_l - m_result.z_l).template lpNorm<Eigen::Infinity>());
+        inf = (std::max)(inf, m_preconditioner.unscale_dual_ineq(prox_vars.z_u - m_result.z_u).template lpNorm<Eigen::Infinity>());
+        for (isize i = 0; i < m_data.n_x_l; i++)
         {
-            inf = (std::max)(inf, m_preconditioner.unscale_dual_b_i(prox_vars.z_lb(i) - m_result.z_lb(i), m_data.x_lb_idx(i)));
+            inf = (std::max)(inf, m_preconditioner.unscale_dual_b_i(prox_vars.z_bl(i) - m_result.z_bl(i), m_data.x_l_idx(i)));
         }
-        for (isize i = 0; i < m_data.n_ub; i++)
+        for (isize i = 0; i < m_data.n_x_u; i++)
         {
-            inf = (std::max)(inf, m_preconditioner.unscale_dual_b_i(prox_vars.z_ub(i) - m_result.z_ub(i), m_data.x_ub_idx(i)));
+            inf = (std::max)(inf, m_preconditioner.unscale_dual_b_i(prox_vars.z_bu(i) - m_result.z_bu(i), m_data.x_u_idx(i)));
         }
         return inf;
     }
@@ -878,43 +931,55 @@ protected:
         return m_preconditioner.unscale_primal(m_result.x - prox_vars.x).template lpNorm<Eigen::Infinity>();
     }
 
-    void restore_box_dual()
-    {
-        m_result.z_lb.tail(m_data.n - m_data.n_lb).setZero();
-        m_result.z_ub.tail(m_data.n - m_data.n_ub).setZero();
-        m_result.s_lb.tail(m_data.n - m_data.n_lb).array() = std::numeric_limits<T>::infinity();
-        m_result.s_ub.tail(m_data.n - m_data.n_ub).array() = std::numeric_limits<T>::infinity();
-        for (isize i = m_data.n_lb - 1; i >= 0; i--)
-        {
-            Eigen::Index idx = m_data.x_lb_idx(i);
-            std::swap(m_result.z_lb(i), m_result.z_lb(idx));
-            std::swap(m_result.s_lb(i), m_result.s_lb(idx));
-        }
-        for (isize i = m_data.n_ub - 1; i >= 0; i--)
-        {
-            Eigen::Index idx = m_data.x_ub_idx(i);
-            std::swap(m_result.z_ub(i), m_result.z_ub(idx));
-            std::swap(m_result.s_ub(i), m_result.s_ub(idx));
-        }
-    }
-
     void unscale_results()
     {
         m_result.x = m_preconditioner.unscale_primal(m_result.x);
         m_result.y = m_preconditioner.unscale_dual_eq(m_result.y);
-        m_result.z = m_preconditioner.unscale_dual_ineq(m_result.z);
-        m_result.s = m_preconditioner.unscale_slack_ineq(m_result.s);
-        for (isize i = 0; i < m_data.n_lb; i++)
+        m_result.z_l = m_preconditioner.unscale_dual_ineq(m_result.z_l);
+        m_result.z_u = m_preconditioner.unscale_dual_ineq(m_result.z_u);
+        m_result.s_l = m_preconditioner.unscale_slack_ineq(m_result.s_l);
+        m_result.s_u = m_preconditioner.unscale_slack_ineq(m_result.s_u);
+        for (isize i = 0; i < m_data.n_x_l; i++)
         {
-            Eigen::Index idx = m_data.x_lb_idx(i);
-            m_result.z_lb(i) = m_preconditioner.unscale_dual_b_i(m_result.z_lb(i), idx);
-            m_result.s_lb(i) = m_preconditioner.unscale_slack_b_i(m_result.s_lb(i), idx);
+            Eigen::Index idx = m_data.x_l_idx(i);
+            m_result.z_bl(i) = m_preconditioner.unscale_dual_b_i(m_result.z_bl(i), idx);
+            m_result.s_bl(i) = m_preconditioner.unscale_slack_b_i(m_result.s_bl(i), idx);
         }
-        for (isize i = 0; i < m_data.n_ub; i++)
+        for (isize i = 0; i < m_data.n_x_u; i++)
         {
-            Eigen::Index idx = m_data.x_ub_idx(i);
-            m_result.z_ub(i) = m_preconditioner.unscale_dual_b_i(m_result.z_ub(i), idx);
-            m_result.s_ub(i) = m_preconditioner.unscale_slack_b_i(m_result.s_ub(i), idx);
+            Eigen::Index idx = m_data.x_u_idx(i);
+            m_result.z_bu(i) = m_preconditioner.unscale_dual_b_i(m_result.z_bu(i), idx);
+            m_result.s_bu(i) = m_preconditioner.unscale_slack_b_i(m_result.s_bu(i), idx);
+        }
+    }
+
+    void restore_dual()
+    {
+        for (isize i = 0; i < m_data.m; i++)
+        {
+            if (m_result.z_l(i) == 0) {
+                m_result.s_l(i) = PIQP_INF;
+            }
+            if (m_result.z_u(i) == 0) {
+                m_result.s_u(i) = PIQP_INF;
+            }
+        }
+
+        m_result.z_bl.tail(m_data.n - m_data.n_x_l).setZero();
+        m_result.z_bu.tail(m_data.n - m_data.n_x_u).setZero();
+        m_result.s_bl.tail(m_data.n - m_data.n_x_l).array() = PIQP_INF;;
+        m_result.s_bu.tail(m_data.n - m_data.n_x_u).array() = PIQP_INF;;
+        for (isize i = m_data.n_x_l - 1; i >= 0; i--)
+        {
+            Eigen::Index idx = m_data.x_l_idx(i);
+            std::swap(m_result.z_bl(i), m_result.z_bl(idx));
+            std::swap(m_result.s_bl(i), m_result.s_bl(idx));
+        }
+        for (isize i = m_data.n_x_u - 1; i >= 0; i--)
+        {
+            Eigen::Index idx = m_data.x_u_idx(i);
+            std::swap(m_result.z_bu(i), m_result.z_bu(idx));
+            std::swap(m_result.s_bu(i), m_result.s_bu(idx));
         }
     }
 };
@@ -928,11 +993,12 @@ public:
                const optional<CMatRef<T>>& A = nullopt,
                const optional<CVecRef<T>>& b = nullopt,
                const optional<CMatRef<T>>& G = nullopt,
-               const optional<CVecRef<T>>& h = nullopt,
-               const optional<CVecRef<T>>& x_lb = nullopt,
-               const optional<CVecRef<T>>& x_ub = nullopt)
+               const optional<CVecRef<T>>& h_l = nullopt,
+               const optional<CVecRef<T>>& h_u = nullopt,
+               const optional<CVecRef<T>>& x_l = nullopt,
+               const optional<CVecRef<T>>& x_u = nullopt)
     {
-        this->setup_impl(P, c, A, b, G, h, x_lb, x_ub);
+        this->setup_impl(P, c, A, b, G, h_l, h_u, x_l, x_u);
     }
 
     void update(const optional<CMatRef<T>>& P = nullopt,
@@ -940,9 +1006,10 @@ public:
                 const optional<CMatRef<T>>& A = nullopt,
                 const optional<CVecRef<T>>& b = nullopt,
                 const optional<CMatRef<T>>& G = nullopt,
-                const optional<CVecRef<T>>& h = nullopt,
-                const optional<CVecRef<T>>& x_lb = nullopt,
-                const optional<CVecRef<T>>& x_ub = nullopt,
+                const optional<CVecRef<T>>& h_l = nullopt,
+                const optional<CVecRef<T>>& h_u = nullopt,
+                const optional<CVecRef<T>>& x_l = nullopt,
+                const optional<CVecRef<T>>& x_u = nullopt,
                 bool reuse_preconditioner = false)
     {
         if (!this->m_setup_done)
@@ -996,17 +1063,16 @@ public:
             this->m_data.b = *b;
         }
 
-        if (h.has_value())
-        {
-            if (h->size() != this->m_data.m) { piqp_eprint("h has wrong dimensions\n"); return; }
-            this->m_data.h = *h;
-            this->disable_inf_constraints();
-        }
+        if (h_l.has_value() && h_l->size() != this->m_data.m) { piqp_eprint("h_l has wrong dimensions\n"); return; }
+        if (h_u.has_value() && h_u->size() != this->m_data.m) { piqp_eprint("h_u has wrong dimensions\n"); return; }
+        if (h_l.has_value()) { this->m_data.set_h_l(h_l); }
+        if (h_u.has_value()) { this->m_data.set_h_u(h_u); }
+        if (h_l.has_value() || h_u.has_value()) { this->m_data.disable_inf_constraints(); }
 
-        if (x_lb.has_value() && x_lb->size() != this->m_data.n) { piqp_eprint("x_lb has wrong dimensions\n"); return; }
-        if (x_ub.has_value() && x_ub->size() != this->m_data.n) { piqp_eprint("x_ub has wrong dimensions\n"); return; }
-        if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
-        if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
+        if (x_l.has_value() && x_l->size() != this->m_data.n) { piqp_eprint("x_l has wrong dimensions\n"); return; }
+        if (x_u.has_value() && x_u->size() != this->m_data.n) { piqp_eprint("x_u has wrong dimensions\n"); return; }
+        if (x_l.has_value()) { this->m_data.set_x_l(x_l); }
+        if (x_u.has_value()) { this->m_data.set_x_u(x_u); }
 
         if (update_options == KKTUpdateOptions::KKT_UPDATE_NONE)
         {
@@ -1037,11 +1103,12 @@ public:
                const optional<CSparseMatRef<T, I>>& A = nullopt,
                const optional<CVecRef<T>>& b = nullopt,
                const optional<CSparseMatRef<T, I>>& G = nullopt,
-               const optional<CVecRef<T>>& h = nullopt,
-               const optional<CVecRef<T>>& x_lb = nullopt,
-               const optional<CVecRef<T>>& x_ub = nullopt)
+               const optional<CVecRef<T>>& h_l = nullopt,
+               const optional<CVecRef<T>>& h_u = nullopt,
+               const optional<CVecRef<T>>& x_l = nullopt,
+               const optional<CVecRef<T>>& x_u = nullopt)
     {
-        this->setup_impl(P, c, A, b, G, h, x_lb, x_ub);
+        this->setup_impl(P, c, A, b, G, h_l, h_u, x_l, x_u);
     }
 
     void update(const optional<CSparseMatRef<T, I>>& P = nullopt,
@@ -1049,9 +1116,10 @@ public:
                 const optional<CSparseMatRef<T, I>>& A = nullopt,
                 const optional<CVecRef<T>>& b = nullopt,
                 const optional<CSparseMatRef<T, I>>& G = nullopt,
-                const optional<CVecRef<T>>& h = nullopt,
-                const optional<CVecRef<T>>& x_lb = nullopt,
-                const optional<CVecRef<T>>& x_ub = nullopt,
+                const optional<CVecRef<T>>& h_l = nullopt,
+                const optional<CVecRef<T>>& h_u = nullopt,
+                const optional<CVecRef<T>>& x_l = nullopt,
+                const optional<CVecRef<T>>& x_u = nullopt,
                 bool reuse_preconditioner = false)
     {
         if (!this->m_setup_done)
@@ -1114,17 +1182,16 @@ public:
             this->m_data.b = *b;
         }
 
-        if (h.has_value())
-        {
-            if (h->size() != this->m_data.m) { piqp_eprint("h has wrong dimensions\n"); return; }
-            this->m_data.h = *h;
-            this->disable_inf_constraints();
-        }
+        if (h_l.has_value() && h_l->size() != this->m_data.m) { piqp_eprint("h_l has wrong dimensions\n"); return; }
+        if (h_u.has_value() && h_u->size() != this->m_data.m) { piqp_eprint("h_u has wrong dimensions\n"); return; }
+        if (h_l.has_value()) { this->m_data.set_h_l(h_l); }
+        if (h_u.has_value()) { this->m_data.set_h_u(h_u); }
+        if (h_l.has_value() || h_u.has_value()) { this->m_data.disable_inf_constraints(); }
 
-        if (x_lb.has_value() && x_lb->size() != this->m_data.n) { piqp_eprint("x_lb has wrong dimensions\n"); return; }
-        if (x_ub.has_value() && x_ub->size() != this->m_data.n) { piqp_eprint("x_ub has wrong dimensions\n"); return; }
-        if (x_lb.has_value()) { this->setup_lb_data(x_lb); }
-        if (x_ub.has_value()) { this->setup_ub_data(x_ub); }
+        if (x_l.has_value() && x_l->size() != this->m_data.n) { piqp_eprint("x_l has wrong dimensions\n"); return; }
+        if (x_u.has_value() && x_u->size() != this->m_data.n) { piqp_eprint("x_u has wrong dimensions\n"); return; }
+        if (x_l.has_value()) { this->m_data.set_x_l(x_l); }
+        if (x_u.has_value()) { this->m_data.set_x_u(x_u); }
 
         if (update_options == KKTUpdateOptions::KKT_UPDATE_NONE)
         {

@@ -18,31 +18,35 @@ struct BasicVariables
 {
     Vec<T> x;
     Vec<T> y;
-    Vec<T> z;
-    Vec<T> z_lb;
-    Vec<T> z_ub;
+    Vec<T> z_l;
+    Vec<T> z_u;
+    Vec<T> z_bl;
+    Vec<T> z_bu;
 
     void resize(isize n, isize p, isize m)
     {
         x.resize(n);
         y.resize(p);
-        z.resize(m);
-        z_lb.resize(n);
-        z_ub.resize(n);
+        z_l.resize(m);
+        z_u.resize(m);
+        z_bl.resize(n);
+        z_bu.resize(n);
     }
 
     bool allFinite()
     {
-        return x.allFinite() && y.allFinite() && z.allFinite() && z_lb.allFinite() && z_ub.allFinite();
+        return x.allFinite() && y.allFinite() && z_l.allFinite() && z_u.allFinite()
+            && z_bl.allFinite() && z_bu.allFinite();
     }
 
     BasicVariables& operator+=(const BasicVariables& rhs)
     {
         x.array() += rhs.x.array();
         y.array() += rhs.y.array();
-        z.array() += rhs.z.array();
-        z_lb.array() += rhs.z_lb.array();
-        z_ub.array() += rhs.z_ub.array();
+        z_l.array() += rhs.z_l.array();
+        z_u.array() += rhs.z_u.array();
+        z_bl.array() += rhs.z_l.array();
+        z_bu.array() += rhs.z_u.array();
         return *this;
     }
 
@@ -50,47 +54,53 @@ struct BasicVariables
     {
         std::swap(a.x, b.x);
         std::swap(a.y, b.y);
-        std::swap(a.z, b.z);
-        std::swap(a.z_lb, b.z_lb);
-        std::swap(a.z_ub, b.z_ub);
+        std::swap(a.z_l, b.z_l);
+        std::swap(a.z_u, b.z_u);
+        std::swap(a.z_bl, b.z_bl);
+        std::swap(a.z_bu, b.z_bu);
     }
 };
 
 template<typename T>
 struct Variables : BasicVariables<T>
 {
-    Vec<T> s;
-    Vec<T> s_lb;
-    Vec<T> s_ub;
+    Vec<T> s_l;
+    Vec<T> s_u;
+    Vec<T> s_bl;
+    Vec<T> s_bu;
 
     void resize(isize n, isize p, isize m)
     {
         BasicVariables<T>::resize(n, p, m);
-        s.resize(m);
-        s_lb.resize(n);
-        s_ub.resize(n);
+        s_l.resize(m);
+        s_u.resize(m);
+        s_bl.resize(n);
+        s_bu.resize(n);
     }
 
     bool allFinite()
     {
-        return BasicVariables<T>::allFinite() && s.allFinite() && s_lb.allFinite() && s_ub.allFinite();
+        return BasicVariables<T>::allFinite()
+            && s_l.allFinite() && s_u.allFinite() && s_bl.allFinite() && s_bu.allFinite();
     }
 
     Variables& operator+=(const Variables& rhs)
     {
         BasicVariables<T>::operator+=(rhs);
-        s.array() += rhs.s.array();
-        s_lb.array() += rhs.s_lb.array();
-        s_ub.array() += rhs.s_ub.array();
+        s_l.array() += rhs.s_l.array();
+        s_u.array() += rhs.s_u.array();
+        s_bl.array() += rhs.s_bl.array();
+        s_bu.array() += rhs.s_bu.array();
         return *this;
     }
 
     friend void swap(Variables& a, Variables& b) noexcept
     {
         std::swap(static_cast<BasicVariables<T>&>(a), static_cast<BasicVariables<T>&>(b));
-        std::swap(a.s, b.s);
-        std::swap(a.s_lb, b.s_lb);
-        std::swap(a.s_ub, b.s_ub);
+        std::swap(a.s_l, b.s_l);
+        std::swap(a.s_u, b.s_u);
+        std::swap(a.s_bl, b.s_bl);
+        std::swap(a.s_bu, b.s_bu);
     }
 };
 
