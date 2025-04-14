@@ -207,6 +207,146 @@ protected:
         }
     }
 
+    void update_impl(const optional<CMatRefType>& P,
+                     const optional<CVecRef<T>>& c,
+                     const optional<CMatRefType>& A,
+                     const optional<CVecRef<T>>& b,
+                     const optional<CMatRefType>& G,
+                     const optional<CVecRef<T>>& h_l,
+                     const optional<CVecRef<T>>& h_u,
+                     const optional<CVecRef<T>>& x_l,
+                     const optional<CVecRef<T>>& x_u,
+                     bool reuse_preconditioner)
+    {
+        if (!this->m_setup_done)
+        {
+            piqp_eprint("Solver not setup yet\n");
+            return;
+        }
+
+        if (this->m_settings.compute_timings)
+        {
+            this->m_timer.start();
+        }
+
+        this->m_preconditioner.unscale_data(this->m_data);
+
+        int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
+
+        if (P.has_value())
+        {
+            if (P->rows() != this->m_data.n || P->cols() != this->m_data.n) { piqp_eprint("P has wrong dimensions\n"); return; }
+            if (!update_P(*P)) { return; }
+            update_options |= KKTUpdateOptions::KKT_UPDATE_P;
+        }
+
+        if (A.has_value())
+        {
+            if (A->rows() != this->m_data.p || A->cols() != this->m_data.n) { piqp_eprint("A has wrong dimensions\n"); return; }
+            if (!update_A(*A)) { return; }
+            update_options |= KKTUpdateOptions::KKT_UPDATE_A;
+        }
+
+        if (G.has_value())
+        {
+            if (G->rows() != this->m_data.m || G->cols() != this->m_data.n) { piqp_eprint("G has wrong dimensions\n"); return; }
+            if (!update_G(*G)) { return; }
+            update_options |= KKTUpdateOptions::KKT_UPDATE_G;
+        }
+
+        if (c.has_value())
+        {
+            if (c->size() != this->m_data.n) { piqp_eprint("c has wrong dimensions\n"); return; }
+            this->m_data.c = *c;
+        }
+
+        if (b.has_value())
+        {
+            if (b->size() != this->m_data.p) { piqp_eprint("b has wrong dimensions\n"); return; }
+            this->m_data.b = *b;
+        }
+
+        if (h_l.has_value() && h_l->size() != this->m_data.m) { piqp_eprint("h_l has wrong dimensions\n"); return; }
+        if (h_u.has_value() && h_u->size() != this->m_data.m) { piqp_eprint("h_u has wrong dimensions\n"); return; }
+        if (h_l.has_value()) { this->m_data.set_h_l(h_l); }
+        if (h_u.has_value()) { this->m_data.set_h_u(h_u); }
+        if (h_l.has_value() || h_u.has_value()) { this->m_data.disable_inf_constraints(); }
+
+        if (x_l.has_value() && x_l->size() != this->m_data.n) { piqp_eprint("x_l has wrong dimensions\n"); return; }
+        if (x_u.has_value() && x_u->size() != this->m_data.n) { piqp_eprint("x_u has wrong dimensions\n"); return; }
+        if (x_l.has_value()) { this->m_data.set_x_l(x_l); }
+        if (x_u.has_value()) { this->m_data.set_x_u(x_u); }
+
+        if (update_options == KKTUpdateOptions::KKT_UPDATE_NONE)
+        {
+            reuse_preconditioner = true;
+        }
+
+        this->m_preconditioner.scale_data(this->m_data,
+                                          reuse_preconditioner,
+                                          this->m_settings.preconditioner_scale_cost,
+                                          this->m_settings.preconditioner_iter);
+
+        this->m_kkt_system.update_data(update_options);
+
+        if (this->m_settings.compute_timings)
+        {
+            T update_time = this->m_timer.stop();
+            this->m_result.info.update_time = update_time;
+        }
+    }
+
+    template<int MatrixTypeT = MatrixType>
+    std::enable_if_t<MatrixTypeT == PIQP_DENSE, bool> update_P(const CMatRefType& P)
+    {
+        m_data.P_utri = P.template triangularView<Eigen::Upper>();
+        return true;
+    }
+
+    template<int MatrixTypeT = MatrixType>
+    std::enable_if_t<MatrixTypeT == PIQP_SPARSE, bool> update_P(const CMatRefType& P)
+    {
+        isize n = P.outerSize();
+        for (isize j = 0; j < n; j++)
+        {
+            isize P_col_nnz = P.outerIndexPtr()[j + 1] - P.outerIndexPtr()[j];
+            isize P_utri_col_nnz = m_data.P_utri.outerIndexPtr()[j + 1] - m_data.P_utri.outerIndexPtr()[j];
+            if (P_col_nnz < P_utri_col_nnz) { piqp_eprint("P nonzeros missmatch\n"); return false; }
+            Eigen::Map<Vec<T>>(m_data.P_utri.valuePtr() + m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P.valuePtr() + P.outerIndexPtr()[j], P_utri_col_nnz);
+        }
+        return true;
+    }
+
+    template<int MatrixTypeT = MatrixType>
+    std::enable_if_t<MatrixTypeT == PIQP_DENSE, bool> update_A(const CMatRefType& A)
+    {
+        m_data.AT = A.transpose();
+        return true;
+    }
+
+    template<int MatrixTypeT = MatrixType>
+    std::enable_if_t<MatrixTypeT == PIQP_SPARSE, bool> update_A(const CMatRefType& A)
+    {
+        if (A.nonZeros() != m_data.AT.nonZeros()) { piqp_eprint("A nonzeros missmatch\n"); return false; }
+        sparse::transpose_no_allocation(A, m_data.AT);
+        return true;
+    }
+
+    template<int MatrixTypeT = MatrixType>
+    std::enable_if_t<MatrixTypeT == PIQP_DENSE, bool> update_G(const CMatRefType& G)
+    {
+        m_data.GT = G.transpose();
+        return true;
+    }
+
+    template<int MatrixTypeT = MatrixType>
+    std::enable_if_t<MatrixTypeT == PIQP_SPARSE, bool> update_G(const CMatRefType& G)
+    {
+        if (G.nonZeros() != m_data.GT.nonZeros()) { piqp_eprint("G nonzeros missmatch\n"); return false; }
+        sparse::transpose_no_allocation(G, m_data.GT);
+        return true;
+    }
+
     void init_workspace()
     {
         m_result.resize(m_data.n, m_data.p, m_data.m);
@@ -1001,85 +1141,7 @@ public:
                 const optional<CVecRef<T>>& x_u = nullopt,
                 bool reuse_preconditioner = false)
     {
-        if (!this->m_setup_done)
-        {
-            piqp_eprint("Solver not setup yet\n");
-            return;
-        }
-
-        if (this->m_settings.compute_timings)
-        {
-            this->m_timer.start();
-        }
-
-        this->m_preconditioner.unscale_data(this->m_data);
-
-        int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
-
-        if (P.has_value())
-        {
-            if (P->rows() != this->m_data.n || P->cols() != this->m_data.n) { piqp_eprint("P has wrong dimensions\n"); return; }
-            this->m_data.P_utri = P->template triangularView<Eigen::Upper>();
-
-            update_options |= KKTUpdateOptions::KKT_UPDATE_P;
-        }
-
-        if (A.has_value())
-        {
-            if (A->rows() != this->m_data.p || A->cols() != this->m_data.n) { piqp_eprint("A has wrong dimensions\n"); return; }
-            this->m_data.AT = A->transpose();
-
-            update_options |= KKTUpdateOptions::KKT_UPDATE_A;
-        }
-
-        if (G.has_value())
-        {
-            if (G->rows() != this->m_data.m || G->cols() != this->m_data.n) { piqp_eprint("G has wrong dimensions\n"); return; }
-            this->m_data.GT = G->transpose();
-
-            update_options |= KKTUpdateOptions::KKT_UPDATE_G;
-        }
-
-        if (c.has_value())
-        {
-            if (c->size() != this->m_data.n) { piqp_eprint("c has wrong dimensions\n"); return; }
-            this->m_data.c = *c;
-        }
-
-        if (b.has_value())
-        {
-            if (b->size() != this->m_data.p) { piqp_eprint("b has wrong dimensions\n"); return; }
-            this->m_data.b = *b;
-        }
-
-        if (h_l.has_value() && h_l->size() != this->m_data.m) { piqp_eprint("h_l has wrong dimensions\n"); return; }
-        if (h_u.has_value() && h_u->size() != this->m_data.m) { piqp_eprint("h_u has wrong dimensions\n"); return; }
-        if (h_l.has_value()) { this->m_data.set_h_l(h_l); }
-        if (h_u.has_value()) { this->m_data.set_h_u(h_u); }
-        if (h_l.has_value() || h_u.has_value()) { this->m_data.disable_inf_constraints(); }
-
-        if (x_l.has_value() && x_l->size() != this->m_data.n) { piqp_eprint("x_l has wrong dimensions\n"); return; }
-        if (x_u.has_value() && x_u->size() != this->m_data.n) { piqp_eprint("x_u has wrong dimensions\n"); return; }
-        if (x_l.has_value()) { this->m_data.set_x_l(x_l); }
-        if (x_u.has_value()) { this->m_data.set_x_u(x_u); }
-
-        if (update_options == KKTUpdateOptions::KKT_UPDATE_NONE)
-        {
-            reuse_preconditioner = true;
-        }
-
-        this->m_preconditioner.scale_data(this->m_data,
-                                          reuse_preconditioner,
-                                          this->m_settings.preconditioner_scale_cost,
-                                          this->m_settings.preconditioner_iter);
-
-        this->m_kkt_system.update_data(update_options);
-
-        if (this->m_settings.compute_timings)
-        {
-            T update_time = this->m_timer.stop();
-            this->m_result.info.update_time = update_time;
-        }
+        this->update_impl(P, c, A, b, G, h_l, h_u, x_l, x_u, reuse_preconditioner);
     }
 };
 
@@ -1111,94 +1173,7 @@ public:
                 const optional<CVecRef<T>>& x_u = nullopt,
                 bool reuse_preconditioner = false)
     {
-        if (!this->m_setup_done)
-        {
-            piqp_eprint("Solver not setup yet\n");
-            return;
-        }
-
-        if (this->m_settings.compute_timings)
-        {
-            this->m_timer.start();
-        }
-
-        this->m_preconditioner.unscale_data(this->m_data);
-
-        int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
-
-        if (P.has_value())
-        {
-            if (P->rows() != this->m_data.n || P->cols() != this->m_data.n) { piqp_eprint("P has wrong dimensions\n"); return; }
-            isize n = P->outerSize();
-            for (isize j = 0; j < n; j++)
-            {
-                isize P_col_nnz = P->outerIndexPtr()[j + 1] - P->outerIndexPtr()[j];
-                isize P_utri_col_nnz = this->m_data.P_utri.outerIndexPtr()[j + 1] - this->m_data.P_utri.outerIndexPtr()[j];
-                if (P_col_nnz < P_utri_col_nnz) { piqp_eprint("P nonzeros missmatch\n"); return; }
-                Eigen::Map<Vec<T>>(this->m_data.P_utri.valuePtr() + this->m_data.P_utri.outerIndexPtr()[j], P_utri_col_nnz) = Eigen::Map<const Vec<T>>(P->valuePtr() + P->outerIndexPtr()[j], P_utri_col_nnz);
-            }
-
-            update_options |= KKTUpdateOptions::KKT_UPDATE_P;
-        }
-
-        if (A.has_value())
-        {
-            if (A->rows() != this->m_data.p || A->cols() != this->m_data.n) { piqp_eprint("A has wrong dimensions\n"); return; }
-            if (A->nonZeros() != this->m_data.AT.nonZeros()) { piqp_eprint("A nonzeros missmatch\n"); return; }
-            sparse::transpose_no_allocation(*A, this->m_data.AT);
-
-            update_options |= KKTUpdateOptions::KKT_UPDATE_A;
-        }
-
-        if (G.has_value())
-        {
-            if (G->rows() != this->m_data.m || G->cols() != this->m_data.n) { piqp_eprint("G has wrong dimensions\n"); return; }
-            if (G->nonZeros() != this->m_data.GT.nonZeros()) { piqp_eprint("G nonzeros missmatch\n"); return; }
-            sparse::transpose_no_allocation(*G, this->m_data.GT);
-
-            update_options |= KKTUpdateOptions::KKT_UPDATE_G;
-        }
-
-        if (c.has_value())
-        {
-            if (c->size() != this->m_data.n) { piqp_eprint("c has wrong dimensions\n"); return; }
-            this->m_data.c = *c;
-        }
-
-        if (b.has_value())
-        {
-            if (b->size() != this->m_data.p) { piqp_eprint("b has wrong dimensions\n"); return; }
-            this->m_data.b = *b;
-        }
-
-        if (h_l.has_value() && h_l->size() != this->m_data.m) { piqp_eprint("h_l has wrong dimensions\n"); return; }
-        if (h_u.has_value() && h_u->size() != this->m_data.m) { piqp_eprint("h_u has wrong dimensions\n"); return; }
-        if (h_l.has_value()) { this->m_data.set_h_l(h_l); }
-        if (h_u.has_value()) { this->m_data.set_h_u(h_u); }
-        if (h_l.has_value() || h_u.has_value()) { this->m_data.disable_inf_constraints(); }
-
-        if (x_l.has_value() && x_l->size() != this->m_data.n) { piqp_eprint("x_l has wrong dimensions\n"); return; }
-        if (x_u.has_value() && x_u->size() != this->m_data.n) { piqp_eprint("x_u has wrong dimensions\n"); return; }
-        if (x_l.has_value()) { this->m_data.set_x_l(x_l); }
-        if (x_u.has_value()) { this->m_data.set_x_u(x_u); }
-
-        if (update_options == KKTUpdateOptions::KKT_UPDATE_NONE)
-        {
-            reuse_preconditioner = true;
-        }
-
-        this->m_preconditioner.scale_data(this->m_data,
-                                          reuse_preconditioner,
-                                          this->m_settings.preconditioner_scale_cost,
-                                          this->m_settings.preconditioner_iter);
-
-        this->m_kkt_system.update_data(update_options);
-
-        if (this->m_settings.compute_timings)
-        {
-            T update_time = this->m_timer.stop();
-            this->m_result.info.update_time = update_time;
-        }
+        this->update_impl(P, c, A, b, G, h_l, h_u, x_l, x_u, reuse_preconditioner);
     }
 };
 
