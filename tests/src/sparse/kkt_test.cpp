@@ -20,18 +20,19 @@ using namespace piqp::sparse;
 using T = double;
 using I = int;
 
-template<int Mode_>
+template<int Mode_, KKTSolver solver_>
 struct KKTModeWrapper
 {
     enum {
         Mode = Mode_
     };
+    KKTSolver solver = solver_;
 };
 
-using kkt_types = testing::Types<KKTModeWrapper<KKTMode::KKT_FULL>,
-                                 KKTModeWrapper<KKTMode::KKT_EQ_ELIMINATED>,
-                                 KKTModeWrapper<KKTMode::KKT_INEQ_ELIMINATED>,
-                                 KKTModeWrapper<KKTMode::KKT_ALL_ELIMINATED>>;
+using kkt_types = testing::Types<KKTModeWrapper<KKTMode::KKT_FULL, KKTSolver::sparse_ldlt>,
+                                 KKTModeWrapper<KKTMode::KKT_EQ_ELIMINATED, KKTSolver::sparse_ldlt_eq_cond>,
+                                 KKTModeWrapper<KKTMode::KKT_INEQ_ELIMINATED, KKTSolver::sparse_ldlt_ineq_cond>,
+                                 KKTModeWrapper<KKTMode::KKT_ALL_ELIMINATED, KKTSolver::sparse_ldlt_cond>>;
 template <typename T>
 class SparseKKTTest : public ::testing::Test {};
 TYPED_TEST_SUITE(SparseKKTTest, kkt_types);
@@ -95,7 +96,7 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
     Data<T, I> data(qp_model);
     Settings<T> settings;
-    settings.kkt_solver = KKTSolver::sparse_ldlt;
+    settings.kkt_solver = TypeParam().solver;
 
     T rho = 0.9;
     T delta = 1.2;
@@ -109,7 +110,7 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
     scaling.z_bl.setConstant(1);
     scaling.z_bu.setConstant(1);
 
-    KKTSystem<T, I, PIQP_SPARSE, TypeParam::Mode> kkt(data, settings);
+    KKTSystem<T, I, PIQP_SPARSE> kkt(data, settings);
     kkt.init();
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt.update_scalings_and_factor(false, rho, delta, scaling);

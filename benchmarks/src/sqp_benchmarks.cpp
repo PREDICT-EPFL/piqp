@@ -17,12 +17,13 @@ static void BM_CHAIN_MASS_SQP_KKT_FULL(benchmark::State& state)
 {
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
 
-    piqp::SparseSolver<T, I, piqp::KKTMode::KKT_FULL> solver;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+    piqp::SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = piqp::KKTSolver::sparse_ldlt;
+    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
 
     for (auto _ : state)
     {
-        solver.update(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+        solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
         solver.solve();
     }
 }
@@ -31,12 +32,13 @@ static void BM_CHAIN_MASS_SQP_KKT_ALL_ELIMINATED(benchmark::State& state)
 {
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
 
-    piqp::SparseSolver<T, I, piqp::KKTMode::KKT_ALL_ELIMINATED> solver;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+    piqp::SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = piqp::KKTSolver::sparse_ldlt_cond;
+    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
 
     for (auto _ : state)
     {
-        solver.update(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+        solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
         solver.solve();
     }
 }
@@ -47,11 +49,11 @@ static void BM_CHAIN_MASS_SQP_MULTISTAGE_KKT(benchmark::State& state)
 
     piqp::SparseSolver<T, I> solver;
     solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
 
     for (auto _ : state)
     {
-        solver.update(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+        solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
         solver.solve();
     }
 }
@@ -60,14 +62,15 @@ static void BM_ROBOT_ARM_SQP_KKT_FULL(benchmark::State& state)
 {
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/robot_arm_sqp.mat");
 
-    piqp::SparseSolver<T, I, piqp::KKTMode::KKT_FULL> solver;
+    piqp::SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = piqp::KKTSolver::sparse_ldlt;
     solver.settings().reg_lower_limit = 1e-8;
     solver.settings().reg_finetune_lower_limit = 1e-8;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
 
     for (auto _ : state)
     {
-        solver.update(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+        solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
         solver.solve();
     }
 }
@@ -76,14 +79,15 @@ static void BM_ROBOT_ARM_SQP_KKT_ALL_ELIMINATED(benchmark::State& state)
 {
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/robot_arm_sqp.mat");
 
-    piqp::SparseSolver<T, I, piqp::KKTMode::KKT_ALL_ELIMINATED> solver;
+    piqp::SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = piqp::KKTSolver::sparse_ldlt_cond;
     solver.settings().reg_lower_limit = 1e-8;
     solver.settings().reg_finetune_lower_limit = 1e-8;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
 
     for (auto _ : state)
     {
-        solver.update(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+        solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
         solver.solve();
     }
 }
@@ -96,11 +100,11 @@ static void BM_ROBOT_ARM_SQP_MULTISTAGE_KKT(benchmark::State& state)
     solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage;
     solver.settings().reg_lower_limit = 1e-8;
     solver.settings().reg_finetune_lower_limit = 1e-8;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
 
     for (auto _ : state)
     {
-        solver.update(model.P, model.c, model.A, model.b, model.G, model.h, model.x_lb, model.x_ub);
+        solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
         solver.solve();
     }
 }

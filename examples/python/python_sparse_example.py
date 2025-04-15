@@ -14,14 +14,14 @@ c = np.array([-1, -4], dtype=np.float64)
 A = sparse.csc_matrix([[1, -2]], dtype=np.float64)
 b = np.array([1], dtype=np.float64)
 G = sparse.csc_matrix([[1, -1], [2, 0]], dtype=np.float64)
-h = np.array([0.2, -1], dtype=np.float64)
-x_lb = np.array([-1, -np.inf], dtype=np.float64)
-x_ub = np.array([1, np.inf], dtype=np.float64)
+h_u = np.array([0.2, -1], dtype=np.float64)
+x_l = np.array([-1, -np.inf], dtype=np.float64)
+x_u = np.array([1, np.inf], dtype=np.float64)
 
 solver = piqp.SparseSolver()
 solver.settings.verbose = True
 solver.settings.compute_timings = True
-solver.setup(P, c, A, b, G, h, x_lb, x_ub)
+solver.setup(P, c, A, b, G, None, h_u, x_l, x_u)
 status = solver.solve()
 
 print(f'status = {status}')

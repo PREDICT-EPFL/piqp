@@ -32,51 +32,51 @@ enable_testing()
 # copy data
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-add_library(pipq-test INTERFACE)
-target_include_directories(pipq-test INTERFACE include)
-target_compile_options(pipq-test INTERFACE ${compiler_flags})
+add_library(piqp-test INTERFACE)
+target_include_directories(piqp-test INTERFACE include)
+target_compile_options(piqp-test INTERFACE ${compiler_flags})
 if(${CMAKE_CXX_COMPILER_ID} IN_LIST gcc_like_cxx)
-    target_compile_options(pipq-test INTERFACE -Wno-gnu-zero-variadic-macro-arguments)
+    target_compile_options(piqp-test INTERFACE -Wno-gnu-zero-variadic-macro-arguments)
 endif()
-target_link_options(pipq-test INTERFACE ${compiler_flags})
-target_link_libraries(pipq-test INTERFACE piqp gtest_main gtest)
+target_link_options(piqp-test INTERFACE ${compiler_flags})
+target_link_libraries(piqp-test INTERFACE piqp gtest_main gtest)
 
 add_executable(dense_ldlt_test src/dense/ldlt_test.cpp)
-target_link_libraries(dense_ldlt_test PRIVATE pipq-test)
+target_link_libraries(dense_ldlt_test PRIVATE piqp-test)
 
 add_executable(dense_kkt_test src/dense/kkt_test.cpp)
-target_link_libraries(dense_kkt_test PRIVATE pipq-test)
+target_link_libraries(dense_kkt_test PRIVATE piqp-test)
 
 add_executable(dense_solver_test src/dense/solver_test.cpp)
-target_link_libraries(dense_solver_test PRIVATE pipq-test)
+target_link_libraries(dense_solver_test PRIVATE piqp-test)
 
 add_executable(multistage_kkt_test src/sparse/multistage_kkt_test.cpp)
-target_link_libraries(multistage_kkt_test PRIVATE pipq-test Matio::Matio)
+target_link_libraries(multistage_kkt_test PRIVATE piqp-test Matio::Matio)
 
 add_executable(sparse_kkt_test src/sparse/kkt_test.cpp)
-target_link_libraries(sparse_kkt_test PRIVATE pipq-test)
+target_link_libraries(sparse_kkt_test PRIVATE piqp-test)
 
 add_executable(sparse_ldlt_test src/sparse/ldlt_test.cpp)
-target_link_libraries(sparse_ldlt_test PRIVATE pipq-test)
+target_link_libraries(sparse_ldlt_test PRIVATE piqp-test)
 
 add_executable(sparse_utils_test src/sparse/utils_test.cpp)
-target_link_libraries(sparse_utils_test PRIVATE pipq-test)
+target_link_libraries(sparse_utils_test PRIVATE piqp-test)
 
 add_executable(sparse_solver_test src/sparse/solver_test.cpp)
-target_link_libraries(sparse_solver_test PRIVATE pipq-test)
+target_link_libraries(sparse_solver_test PRIVATE piqp-test)
 
 add_executable(io_utils_test src/io_utils_test.cpp)
-target_link_libraries(io_utils_test PRIVATE pipq-test Matio::Matio)
+target_link_libraries(io_utils_test PRIVATE piqp-test Matio::Matio)
 
 add_executable(preconditioner_test src/preconditioner_test.cpp)
-target_link_libraries(preconditioner_test PRIVATE pipq-test)
+target_link_libraries(preconditioner_test PRIVATE piqp-test)
 
 if (BUILD_MAROS_MESZAROS_TEST)
     add_executable(dense_maros_meszaros_tests src/dense/maros_meszaros_tests.cpp)
-    target_link_libraries(dense_maros_meszaros_tests PRIVATE pipq-test Matio::Matio)
+    target_link_libraries(dense_maros_meszaros_tests PRIVATE piqp-test Matio::Matio)
 
     add_executable(sparse_maros_meszaros_tests src/sparse/maros_meszaros_tests.cpp)
-    target_link_libraries(sparse_maros_meszaros_tests PRIVATE pipq-test Matio::Matio)
+    target_link_libraries(sparse_maros_meszaros_tests PRIVATE piqp-test Matio::Matio)
 endif()
 
 fix_test_dll(dense_ldlt_test)

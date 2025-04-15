@@ -18,23 +18,7 @@ using namespace piqp;
 using T = double;
 using I = int;
 
-template<int Mode_, KKTSolver backend_>
-struct KKTModeBackendWrapper
-{
-    enum {
-        Mode = Mode_
-    };
-    KKTSolver backend = backend_;
-};
-
-using solver_types = testing::Types<KKTModeBackendWrapper<KKTMode::KKT_FULL, KKTSolver::sparse_ldlt>,
-                                    KKTModeBackendWrapper<KKTMode::KKT_FULL, KKTSolver::sparse_multistage>,
-                                    KKTModeBackendWrapper<KKTMode::KKT_EQ_ELIMINATED, KKTSolver::sparse_ldlt>,
-                                    KKTModeBackendWrapper<KKTMode::KKT_INEQ_ELIMINATED, KKTSolver::sparse_ldlt>,
-                                    KKTModeBackendWrapper<KKTMode::KKT_ALL_ELIMINATED, KKTSolver::sparse_ldlt>>;
-template <typename T>
-class SparseSolverTest : public ::testing::Test {};
-TYPED_TEST_SUITE(SparseSolverTest, solver_types);
+class SparseSolverTest : public testing::TestWithParam<KKTSolver> {};
 
 /*
  * first QP:
@@ -45,7 +29,7 @@ TYPED_TEST_SUITE(SparseSolverTest, solver_types);
  * min 4 x1^2 + 2 x2^2 - x1 - 4 x2
  * s.t. -1 <= x <= 2, x1 = 3 x2
 */
-TYPED_TEST(SparseSolverTest, SimpleQPWithUpdate)
+TEST_P(SparseSolverTest, SimpleQPWithUpdate)
 {
     SparseMat<T, I> P(2, 2);
     P.insert(0, 0) = 6;
@@ -70,8 +54,8 @@ TYPED_TEST(SparseSolverTest, SimpleQPWithUpdate)
     Vec<T> x_l(2); x_l << -std::numeric_limits<T>::infinity(), -1;
     Vec<T> x_u(2); x_u << std::numeric_limits<T>::infinity(), 1;
 
-    SparseSolver<T, I, TypeParam::Mode> solver;
-    solver.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = GetParam();
     solver.settings().verbose = true;
     solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
 
@@ -127,7 +111,7 @@ TYPED_TEST(SparseSolverTest, SimpleQPWithUpdate)
  * min 3 x1^2 + 2 x2^2 - x1 - 4 x2
  * s.t. -1 <= x1 <= 0, 1 <= x2 <= 2,  x1 = 2 x2
 */
-TYPED_TEST(SparseSolverTest, PrimalInfeasibleQP)
+TEST_P(SparseSolverTest, PrimalInfeasibleQP)
 {
     SparseMat<T, I> P(2, 2);
     P.insert(0, 0) = 6;
@@ -149,8 +133,8 @@ TYPED_TEST(SparseSolverTest, PrimalInfeasibleQP)
     G.makeCompressed();
     Vec<T> h(4); h << 0, 2, 1, -1;
 
-    SparseSolver<T, I, TypeParam::Mode> solver;
-    solver.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = GetParam();
     solver.settings().verbose = true;
     solver.setup(P, c, A, b, G, nullopt, h, nullopt, nullopt);
 
@@ -165,7 +149,7 @@ TYPED_TEST(SparseSolverTest, PrimalInfeasibleQP)
  * min -x1 - x2
  * s.t. 0 <= x
 */
-TYPED_TEST(SparseSolverTest, DualInfeasibleQP)
+TEST_P(SparseSolverTest, DualInfeasibleQP)
 {
     SparseMat<T, I> P(2, 2);
     P.setZero();
@@ -180,8 +164,8 @@ TYPED_TEST(SparseSolverTest, DualInfeasibleQP)
     G.makeCompressed();
     Vec<T> h(2); h << 0, 0;
 
-    SparseSolver<T, I, TypeParam::Mode> solver;
-    solver.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = GetParam();
     solver.settings().verbose = true;
     solver.setup(P, c, A, b, G, nullopt, h, nullopt, nullopt);
 
@@ -192,7 +176,7 @@ TYPED_TEST(SparseSolverTest, DualInfeasibleQP)
     ASSERT_EQ(status, Status::PIQP_DUAL_INFEASIBLE);
 }
 
-//TYPED_TEST(SparseSolverTest, NonConvexQP)
+//TEST_P(SparseSolverTest, NonConvexQP)
 //{
 //    Mat<T> P(2, 2); P << 2, 5, 5, 1;
 //    Vec<T> c(2); c << 3, 4;
@@ -214,7 +198,7 @@ TYPED_TEST(SparseSolverTest, DualInfeasibleQP)
 //    ASSERT_EQ(status, Status::PIQP_NON_CONVEX);
 //}
 
-TYPED_TEST(SparseSolverTest, StronglyConvexWithEqualityAndInequalities)
+TEST_P(SparseSolverTest, StronglyConvexWithEqualityAndInequalities)
 {
     isize dim = 20;
     isize n_eq = 10;
@@ -223,8 +207,8 @@ TYPED_TEST(SparseSolverTest, StronglyConvexWithEqualityAndInequalities)
 
     sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
-    SparseSolver<T, I, TypeParam::Mode> solver;
-    solver.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = GetParam();
     solver.settings().verbose = true;
     solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
@@ -235,7 +219,7 @@ TYPED_TEST(SparseSolverTest, StronglyConvexWithEqualityAndInequalities)
     ASSERT_EQ(status, Status::PIQP_SOLVED);
 }
 
-TYPED_TEST(SparseSolverTest, NonStronglyConvexWithEqualityAndInequalities)
+TEST_P(SparseSolverTest, NonStronglyConvexWithEqualityAndInequalities)
 {
     isize dim = 20;
     isize n_eq = 10;
@@ -244,8 +228,8 @@ TYPED_TEST(SparseSolverTest, NonStronglyConvexWithEqualityAndInequalities)
 
     sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor, 0.5, 0.0);
 
-    SparseSolver<T, I, TypeParam::Mode> solver;
-    solver.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = GetParam();
     solver.settings().verbose = true;
     solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
@@ -256,7 +240,7 @@ TYPED_TEST(SparseSolverTest, NonStronglyConvexWithEqualityAndInequalities)
     ASSERT_EQ(status, Status::PIQP_SOLVED);
 }
 
-TYPED_TEST(SparseSolverTest, SameResultWithRuizPreconditioner)
+TEST_P(SparseSolverTest, SameResultWithRuizPreconditioner)
 {
     isize dim = 20;
     isize n_eq = 10;
@@ -265,14 +249,14 @@ TYPED_TEST(SparseSolverTest, SameResultWithRuizPreconditioner)
 
     sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor, 0.5, 0.0);
 
-    SparseSolver<T, I, TypeParam::Mode, sparse::IdentityPreconditioner<T, I>> solver_no_precon;
-    solver_no_precon.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I, sparse::IdentityPreconditioner<T, I>> solver_no_precon;
+    solver_no_precon.settings().kkt_solver = GetParam();
     solver_no_precon.settings().eps_rel = 0;
     solver_no_precon.settings().verbose = true;
     solver_no_precon.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
-    SparseSolver<T, I, TypeParam::Mode, sparse::RuizEquilibration<T, I>> solver_ruiz;
-    solver_ruiz.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I, sparse::RuizEquilibration<T, I>> solver_ruiz;
+    solver_ruiz.settings().kkt_solver = GetParam();
     solver_ruiz.settings().eps_rel = 0;
     solver_ruiz.settings().verbose = true;
     solver_ruiz.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
@@ -305,7 +289,7 @@ TYPED_TEST(SparseSolverTest, SameResultWithRuizPreconditioner)
 //    ASSERT_LT((solver_no_precon.result().nu_ub - solver_ruiz.result().nu_ub).norm(), 1e-6);
 }
 
-TYPED_TEST(SparseSolverTest, StronglyConvexOnlyEqualities)
+TEST_P(SparseSolverTest, StronglyConvexOnlyEqualities)
 {
     isize dim = 20;
     isize n_eq = 10;
@@ -314,8 +298,8 @@ TYPED_TEST(SparseSolverTest, StronglyConvexOnlyEqualities)
 
     sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor, 0.0);
 
-    SparseSolver<T, I, TypeParam::Mode> solver;
-    solver.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = GetParam();
     solver.settings().verbose = true;
     solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
@@ -326,7 +310,7 @@ TYPED_TEST(SparseSolverTest, StronglyConvexOnlyEqualities)
     ASSERT_EQ(status, Status::PIQP_SOLVED);
 }
 
-TYPED_TEST(SparseSolverTest, StronglyConvexOnlyInequalities)
+TEST_P(SparseSolverTest, StronglyConvexOnlyInequalities)
 {
     isize dim = 20;
     isize n_eq = 0;
@@ -335,8 +319,8 @@ TYPED_TEST(SparseSolverTest, StronglyConvexOnlyInequalities)
 
     sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
-    SparseSolver<T, I, TypeParam::Mode> solver;
-    solver.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = GetParam();
     solver.settings().verbose = true;
     solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
@@ -347,7 +331,7 @@ TYPED_TEST(SparseSolverTest, StronglyConvexOnlyInequalities)
     ASSERT_EQ(status, Status::PIQP_SOLVED);
 }
 
-TYPED_TEST(SparseSolverTest, StronglyConvexNoConstraints)
+TEST_P(SparseSolverTest, StronglyConvexNoConstraints)
 {
     isize dim = 20;
     isize n_eq = 0;
@@ -356,8 +340,8 @@ TYPED_TEST(SparseSolverTest, StronglyConvexNoConstraints)
 
     sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor, 0.0);
 
-    SparseSolver<T, I, TypeParam::Mode> solver;
-    solver.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = GetParam();
     solver.settings().verbose = true;
     solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
@@ -368,7 +352,7 @@ TYPED_TEST(SparseSolverTest, StronglyConvexNoConstraints)
     ASSERT_EQ(status, Status::PIQP_SOLVED);
 }
 
-TYPED_TEST(SparseSolverTest, InfinityBounds)
+TEST_P(SparseSolverTest, InfinityBounds)
 {
     SparseMat<T, I> P(4, 4);
     P.insert(0, 0) = 1;
@@ -393,8 +377,8 @@ TYPED_TEST(SparseSolverTest, InfinityBounds)
     T inf = std::numeric_limits<T>::infinity();
     Vec<T> h(6); h << 1, 1, 1, 1, inf, inf;
 
-    SparseSolver<T, I, TypeParam::Mode> solver;
-    solver.settings().kkt_solver = TypeParam().backend;
+    SparseSolver<T, I> solver;
+    solver.settings().kkt_solver = GetParam();
     solver.settings().verbose = true;
     solver.setup(P, c, piqp::nullopt, piqp::nullopt, G, piqp::nullopt, h);
 
@@ -408,3 +392,13 @@ TYPED_TEST(SparseSolverTest, InfinityBounds)
     ASSERT_NEAR(solver.result().x(2), -0.5, 1e-6);
     ASSERT_NEAR(solver.result().x(3), -1.0, 1e-6);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    KKTSolver,
+    SparseSolverTest,
+    ::testing::Values(KKTSolver::sparse_ldlt,
+                      KKTSolver::sparse_ldlt_eq_cond,
+                      KKTSolver::sparse_ldlt_ineq_cond,
+                      KKTSolver::sparse_ldlt_cond,
+                      KKTSolver::sparse_multistage)
+);

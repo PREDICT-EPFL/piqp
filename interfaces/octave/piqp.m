@@ -99,10 +99,10 @@ classdef piqp < handle
         end
 
         %%
-        function setup(this, P, c, A, b, G, h, x_lb, x_ub, varargin)
+        function setup(this, P, c, A, b, G, h_l, h_u, x_l, x_u, varargin)
             % SETUP Configure solver with problem data.
             %
-            %   setup(P,c,A,b,G,h,x_lb,x_ub,options)
+            %   setup(P,c,A,b,G,h_l,h_u,x_l,x_u,options)
 
             % Get number of variables n
             if ~isempty(P)
@@ -195,26 +195,28 @@ classdef piqp < handle
                 else
                     G = sparse(this.m, this.n);
                 end
-                h = Inf(this.m, 1);
+                h_l = -Inf(this.m, 1);
+                h_u = Inf(this.m, 1);
             else
                 if this.isDense
                     G = full(G);
                 else
                     G = sparse(G);
                 end
-                h  = full(h(:));
+                h_l  = full(h_l(:));
+                h_u  = full(h_u(:));
             end
 
-            if isempty(x_lb)
-                x_lb = -Inf(this.n, 1);
+            if isempty(x_l)
+                x_l = -Inf(this.n, 1);
             else
-                x_lb = full(x_lb(:));
+                x_l = full(x_l(:));
             end
 
-            if isempty(x_ub)
-                x_ub = Inf(this.n, 1);
+            if isempty(x_u)
+                x_u = Inf(this.n, 1);
             else
-                x_ub = full(x_ub(:));
+                x_u = full(x_u(:));
             end
 
             %
@@ -222,14 +224,15 @@ classdef piqp < handle
             %
             assert(length(c) == this.n, 'Incorrect dimension of c');
             assert(length(b) == this.p, 'Incorrect dimension of b');
-            assert(length(h) == this.m, 'Incorrect dimension of h');
-            assert(length(x_lb) == this.n, 'Incorrect dimension of x_lb');
-            assert(length(x_ub) == this.n, 'Incorrect dimension of x_ub');
+            assert(length(h_l) == this.m, 'Incorrect dimension of h_l');
+            assert(length(h_u) == this.m, 'Incorrect dimension of h_u');
+            assert(length(x_l) == this.n, 'Incorrect dimension of x_l');
+            assert(length(x_u) == this.n, 'Incorrect dimension of x_u');
 
             %make a settings structure from the remainder of the arguments.
             settings = validateSettings(this, varargin{:});
 
-            piqp_oct('setup',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h,x_lb,x_ub,settings);
+            piqp_oct('setup',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h_l,h_u,x_l,x_u,settings);
         end
 
         %%
@@ -245,7 +248,7 @@ classdef piqp < handle
 
             assert(this.n ~= 0, 'Problem is not initialized.')
 
-            allowedFields = {'P','c','A','b','G','h','x_lb', 'x_ub'};
+            allowedFields = {'P','c','A','b','G','h_l','h_u','x_l','x_u'};
 
             if isempty(varargin)
                 return;
@@ -271,9 +274,10 @@ classdef piqp < handle
             if isfield(newData, 'A'); A = newData.A; else; A = []; end
             if isfield(newData, 'b'); b = newData.b; else; b = []; end
             if isfield(newData, 'G'); G = newData.G; else; G = []; end
-            if isfield(newData, 'h'); h = newData.h; else; h = []; end
-            if isfield(newData, 'x_lb'); x_lb = newData.x_lb; else; x_lb = []; end
-            if isfield(newData, 'x_ub'); x_ub = newData.x_ub; else; x_ub = []; end
+            if isfield(newData, 'h_l'); h_l = newData.h_l; else; h_l = []; end
+            if isfield(newData, 'h_u'); h_u = newData.h_u; else; h_u = []; end
+            if isfield(newData, 'x_l'); x_l = newData.x_l; else; x_l = []; end
+            if isfield(newData, 'x_u'); x_u = newData.x_u; else; x_u = []; end
 
             if ~isempty(P)
                 if this.isDense
@@ -312,22 +316,27 @@ classdef piqp < handle
                 assert(size(G, 1) == this.m && size(G, 2) == this.n, 'Incorrect dimension of G')
             end
 
-            if ~isempty(h)
-                h = full(h(:));
-                assert(length(h) == this.m, 'Incorrect dimension of h');
+            if ~isempty(h_l)
+                h_l = full(h_l(:));
+                assert(length(h_l) == this.m, 'Incorrect dimension of h_l');
             end
 
-            if ~isempty(x_lb)
-                x_lb = full(x_lb(:));
-                assert(length(x_lb) == this.n, 'Incorrect dimension of x_lb');
+            if ~isempty(h_u)
+                h_u = full(h_u(:));
+                assert(length(h_u) == this.m, 'Incorrect dimension of h_u');
             end
 
-            if ~isempty(x_ub)
-                x_ub = full(x_ub(:));
-                assert(length(x_ub) == this.n, 'Incorrect dimension of x_ub');
+            if ~isempty(x_l)
+                x_l = full(x_l(:));
+                assert(length(x_l) == this.n, 'Incorrect dimension of x_l');
             end
 
-            piqp_oct('update',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h,x_lb,x_ub);
+            if ~isempty(x_u)
+                x_u = full(x_u(:));
+                assert(length(x_u) == this.n, 'Incorrect dimension of x_u');
+            end
+
+            piqp_oct('update',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h_l,h_u,x_l,x_u);
         end
     end
 end

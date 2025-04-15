@@ -31,10 +31,10 @@ int main()
     piqp_int G_nnz = 3;
     piqp_int G_p[3] = {0, 2, 3};
     piqp_int G_i[4] = {0, 1, 0};
-    piqp_float h[2] = {0.2, -1};
+    piqp_float h_u[2] = {0.2, -1};
 
-    piqp_float x_lb[2] = {-1, -PIQP_INF};
-    piqp_float x_ub[2] = {1, PIQP_INF};
+    piqp_float x_l[2] = {-1, -PIQP_INF};
+    piqp_float x_u[2] = {1, PIQP_INF};
 
     piqp_workspace* work;
     piqp_settings* settings = (piqp_settings*) malloc(sizeof(piqp_settings));
@@ -52,9 +52,10 @@ int main()
     data->A = piqp_csc_matrix(data->p, data->n, A_nnz, A_p, A_i, A_x);
     data->b = b;
     data->G = piqp_csc_matrix(data->m, data->n, G_nnz, G_p, G_i, G_x);
-    data->h = h;
-    data->x_lb = x_lb;
-    data->x_ub = x_ub;
+    data->h_l = NULL;
+    data->h_u = h_u;
+    data->x_l = x_l;
+    data->x_u = x_u;
 
     piqp_setup_sparse(&work, data, settings);
     piqp_status status = piqp_solve(work);

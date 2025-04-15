@@ -18,17 +18,17 @@ def test_main():
     A = sparse.csc_matrix([[1, 1]], dtype=np.float64)
     b = np.array([1], dtype=np.float64)
     G = sparse.csc_matrix([[1, 0], [-1, 0]], dtype=np.float64)
-    h = np.array([0.7, 0], dtype=np.float64)
-    x_lb = np.array([-np.inf, 0], dtype=np.float64)
-    x_ub = np.array([np.inf, 0.7], dtype=np.float64)
+    h_u = np.array([0.7, 0], dtype=np.float64)
+    x_l = np.array([-np.inf, 0], dtype=np.float64)
+    x_u = np.array([np.inf, 0.7], dtype=np.float64)
 
     start_time = time.time()
 
     solver = piqp.SparseSolver()
     solver.settings.verbose = True
     solver.settings.compute_timings = True
-    solver.setup(P, c, A, b, G, h, x_lb, x_ub)
-    solver.update(None, c, A, None, G, h, None, x_ub)
+    solver.setup(P, c, A, b, G, None, h_u, x_l, x_u)
+    solver.update(None, c, A, None, G, None, h_u, None, x_u)
     solver.solve()
 
     end_time = time.time()
@@ -43,8 +43,8 @@ def test_main():
     solver = piqp.DenseSolver()
     solver.settings.verbose = True
     solver.settings.compute_timings = True
-    solver.setup(P, c, A, b, G, h, x_lb, x_ub)
-    solver.update(None, c, A, None, G, h, None, x_ub)
+    solver.setup(P, c, A, b, G, None, h_u, x_l, x_u)
+    solver.update(None, c, A, None, G, None, h_u, None, x_u)
     solver.solve()
 
     end_time = time.time()
