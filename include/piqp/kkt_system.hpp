@@ -22,7 +22,7 @@
 namespace piqp
 {
 
-template<typename T, typename I, int MatrixType, int Mode = KKT_FULL>
+template<typename T, typename I, int MatrixType>
 class KKTSystem
 {
 protected:
@@ -410,7 +410,16 @@ protected:
 	{
 		switch (settings.kkt_solver) {
 			case KKTSolver::sparse_ldlt:
-				kkt_solver = std::make_unique<sparse::KKT<T, I, Mode>>(data, settings);
+				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_FULL>>(data, settings);
+				break;
+			case KKTSolver::sparse_ldlt_eq_cond:
+				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_EQ_ELIMINATED>>(data, settings);
+				break;
+			case KKTSolver::sparse_ldlt_ineq_cond:
+				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_INEQ_ELIMINATED>>(data, settings);
+				break;
+			case KKTSolver::sparse_ldlt_cond:
+				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_ALL_ELIMINATED>>(data, settings);
 				break;
 #ifdef PIQP_HAS_BLASFEO
 			case KKTSolver::sparse_multistage:

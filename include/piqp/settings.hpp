@@ -19,6 +19,9 @@ enum class KKTSolver
 {
     dense_cholesky,
     sparse_ldlt,
+    sparse_ldlt_eq_cond,
+    sparse_ldlt_ineq_cond,
+    sparse_ldlt_cond,
     sparse_multistage
 };
 
@@ -28,6 +31,9 @@ constexpr const char* kkt_solver_to_string(KKTSolver kkt_solver)
     {
         case KKTSolver::dense_cholesky: return "dense_cholesky";
         case KKTSolver::sparse_ldlt: return "sparse_ldlt";
+        case KKTSolver::sparse_ldlt_eq_cond: return "sparse_ldlt_eq_cond";
+        case KKTSolver::sparse_ldlt_ineq_cond: return "sparse_ldlt_ineq_cond";
+        case KKTSolver::sparse_ldlt_cond: return "sparse_ldlt_cond";
         case KKTSolver::sparse_multistage: return "sparse_multistage";
         default: return "unknown";
     }
@@ -55,6 +61,7 @@ struct Settings
     isize max_factor_retires = 10;
 
     bool preconditioner_scale_cost = false;
+    bool preconditioner_reuse_on_update = false;
     isize preconditioner_iter = 10;
 
     T tau = 0.99;

@@ -14,8 +14,8 @@
 namespace piqp
 {
 
-extern template class SolverBase<common::Scalar, common::StorageIndex, common::dense::Preconditioner, PIQP_DENSE, KKTMode::KKT_FULL>;
-extern template class SolverBase<common::Scalar, common::StorageIndex, common::sparse::Preconditioner, PIQP_SPARSE, KKTMode::KKT_FULL>;
+extern template class SolverBase<common::Scalar, common::StorageIndex, common::dense::Preconditioner, PIQP_DENSE>;
+extern template class SolverBase<common::Scalar, common::StorageIndex, common::sparse::Preconditioner, PIQP_SPARSE>;
 
 extern template class DenseSolver<common::Scalar>;
 extern template class SparseSolver<common::Scalar>;

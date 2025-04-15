@@ -29,7 +29,7 @@
 namespace piqp
 {
 
-template<typename T, typename I, typename Preconditioner, int MatrixType, int Mode>
+template<typename T, typename I, typename Preconditioner, int MatrixType>
 class SolverBase
 {
 protected:
@@ -41,7 +41,7 @@ protected:
     Settings<T> m_settings;
     DataType m_data;
     Preconditioner m_preconditioner;
-    KKTSystem<T, I, MatrixType, Mode> m_kkt_system;
+    KKTSystem<T, I, MatrixType> m_kkt_system;
 
     bool m_first_run = true;
     bool m_setup_done = false;
@@ -215,84 +215,84 @@ protected:
                      const optional<CVecRef<T>>& h_l,
                      const optional<CVecRef<T>>& h_u,
                      const optional<CVecRef<T>>& x_l,
-                     const optional<CVecRef<T>>& x_u,
-                     bool reuse_preconditioner)
+                     const optional<CVecRef<T>>& x_u)
     {
-        if (!this->m_setup_done)
+        if (!m_setup_done)
         {
             piqp_eprint("Solver not setup yet\n");
             return;
         }
 
-        if (this->m_settings.compute_timings)
+        if (m_settings.compute_timings)
         {
-            this->m_timer.start();
+            m_timer.start();
         }
 
-        this->m_preconditioner.unscale_data(this->m_data);
+        m_preconditioner.unscale_data(m_data);
 
         int update_options = KKTUpdateOptions::KKT_UPDATE_NONE;
 
         if (P.has_value())
         {
-            if (P->rows() != this->m_data.n || P->cols() != this->m_data.n) { piqp_eprint("P has wrong dimensions\n"); return; }
+            if (P->rows() != m_data.n || P->cols() != m_data.n) { piqp_eprint("P has wrong dimensions\n"); return; }
             if (!update_P(*P)) { return; }
             update_options |= KKTUpdateOptions::KKT_UPDATE_P;
         }
 
         if (A.has_value())
         {
-            if (A->rows() != this->m_data.p || A->cols() != this->m_data.n) { piqp_eprint("A has wrong dimensions\n"); return; }
+            if (A->rows() != m_data.p || A->cols() != m_data.n) { piqp_eprint("A has wrong dimensions\n"); return; }
             if (!update_A(*A)) { return; }
             update_options |= KKTUpdateOptions::KKT_UPDATE_A;
         }
 
         if (G.has_value())
         {
-            if (G->rows() != this->m_data.m || G->cols() != this->m_data.n) { piqp_eprint("G has wrong dimensions\n"); return; }
+            if (G->rows() != m_data.m || G->cols() != m_data.n) { piqp_eprint("G has wrong dimensions\n"); return; }
             if (!update_G(*G)) { return; }
             update_options |= KKTUpdateOptions::KKT_UPDATE_G;
         }
 
         if (c.has_value())
         {
-            if (c->size() != this->m_data.n) { piqp_eprint("c has wrong dimensions\n"); return; }
-            this->m_data.c = *c;
+            if (c->size() != m_data.n) { piqp_eprint("c has wrong dimensions\n"); return; }
+            m_data.c = *c;
         }
 
         if (b.has_value())
         {
-            if (b->size() != this->m_data.p) { piqp_eprint("b has wrong dimensions\n"); return; }
-            this->m_data.b = *b;
+            if (b->size() != m_data.p) { piqp_eprint("b has wrong dimensions\n"); return; }
+            m_data.b = *b;
         }
 
-        if (h_l.has_value() && h_l->size() != this->m_data.m) { piqp_eprint("h_l has wrong dimensions\n"); return; }
-        if (h_u.has_value() && h_u->size() != this->m_data.m) { piqp_eprint("h_u has wrong dimensions\n"); return; }
-        if (h_l.has_value()) { this->m_data.set_h_l(h_l); }
-        if (h_u.has_value()) { this->m_data.set_h_u(h_u); }
-        if (h_l.has_value() || h_u.has_value()) { this->m_data.disable_inf_constraints(); }
+        if (h_l.has_value() && h_l->size() != m_data.m) { piqp_eprint("h_l has wrong dimensions\n"); return; }
+        if (h_u.has_value() && h_u->size() != m_data.m) { piqp_eprint("h_u has wrong dimensions\n"); return; }
+        if (h_l.has_value()) { m_data.set_h_l(h_l); }
+        if (h_u.has_value()) { m_data.set_h_u(h_u); }
+        if (h_l.has_value() || h_u.has_value()) { m_data.disable_inf_constraints(); }
 
-        if (x_l.has_value() && x_l->size() != this->m_data.n) { piqp_eprint("x_l has wrong dimensions\n"); return; }
-        if (x_u.has_value() && x_u->size() != this->m_data.n) { piqp_eprint("x_u has wrong dimensions\n"); return; }
-        if (x_l.has_value()) { this->m_data.set_x_l(x_l); }
-        if (x_u.has_value()) { this->m_data.set_x_u(x_u); }
+        if (x_l.has_value() && x_l->size() != m_data.n) { piqp_eprint("x_l has wrong dimensions\n"); return; }
+        if (x_u.has_value() && x_u->size() != m_data.n) { piqp_eprint("x_u has wrong dimensions\n"); return; }
+        if (x_l.has_value()) { m_data.set_x_l(x_l); }
+        if (x_u.has_value()) { m_data.set_x_u(x_u); }
 
+        bool reuse_preconditioner = m_settings.preconditioner_reuse_on_update;
         if (update_options == KKTUpdateOptions::KKT_UPDATE_NONE)
         {
             reuse_preconditioner = true;
         }
 
-        this->m_preconditioner.scale_data(this->m_data,
-                                          reuse_preconditioner,
-                                          this->m_settings.preconditioner_scale_cost,
-                                          this->m_settings.preconditioner_iter);
+        m_preconditioner.scale_data(m_data,
+                                    reuse_preconditioner,
+                                    m_settings.preconditioner_scale_cost,
+                                    m_settings.preconditioner_iter);
 
-        this->m_kkt_system.update_data(update_options);
+        m_kkt_system.update_data(update_options);
 
-        if (this->m_settings.compute_timings)
+        if (m_settings.compute_timings)
         {
-            T update_time = this->m_timer.stop();
-            this->m_result.info.update_time = update_time;
+            T update_time = m_timer.stop();
+            m_result.info.update_time = update_time;
         }
     }
 
@@ -1114,7 +1114,7 @@ protected:
 };
 
 template<typename T, typename Preconditioner = dense::RuizEquilibration<T>>
-class DenseSolver : public SolverBase<T, int, Preconditioner, PIQP_DENSE, KKTMode::KKT_FULL>
+class DenseSolver : public SolverBase<T, int, Preconditioner, PIQP_DENSE>
 {
 public:
     void setup(const CMatRef<T>& P,
@@ -1138,15 +1138,14 @@ public:
                 const optional<CVecRef<T>>& h_l = nullopt,
                 const optional<CVecRef<T>>& h_u = nullopt,
                 const optional<CVecRef<T>>& x_l = nullopt,
-                const optional<CVecRef<T>>& x_u = nullopt,
-                bool reuse_preconditioner = false)
+                const optional<CVecRef<T>>& x_u = nullopt)
     {
-        this->update_impl(P, c, A, b, G, h_l, h_u, x_l, x_u, reuse_preconditioner);
+        this->update_impl(P, c, A, b, G, h_l, h_u, x_l, x_u);
     }
 };
 
-template<typename T, typename I = int, int Mode = KKTMode::KKT_FULL, typename Preconditioner = sparse::RuizEquilibration<T, I>>
-class SparseSolver : public SolverBase<T, I, Preconditioner, PIQP_SPARSE, Mode>
+template<typename T, typename I = int, typename Preconditioner = sparse::RuizEquilibration<T, I>>
+class SparseSolver : public SolverBase<T, I, Preconditioner, PIQP_SPARSE>
 {
 public:
     void setup(const CSparseMatRef<T, I>& P,
@@ -1170,10 +1169,9 @@ public:
                 const optional<CVecRef<T>>& h_l = nullopt,
                 const optional<CVecRef<T>>& h_u = nullopt,
                 const optional<CVecRef<T>>& x_l = nullopt,
-                const optional<CVecRef<T>>& x_u = nullopt,
-                bool reuse_preconditioner = false)
+                const optional<CVecRef<T>>& x_u = nullopt)
     {
-        this->update_impl(P, c, A, b, G, h_l, h_u, x_l, x_u, reuse_preconditioner);
+        this->update_impl(P, c, A, b, G, h_l, h_u, x_l, x_u);
     }
 };
 
