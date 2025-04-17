@@ -8,6 +8,8 @@
 #ifndef PIQP_KKT_SOLVER_BASE_HPP
 #define PIQP_KKT_SOLVER_BASE_HPP
 
+#include <memory>
+
 #include "piqp/typedefs.hpp"
 #include "piqp/dense/data.hpp"
 #include "piqp/sparse/data.hpp"
