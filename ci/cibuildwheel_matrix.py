@@ -8,7 +8,7 @@ platforms = [
     ('macos', 'macos-13', 'x86_64'),
     ('macos', 'macos-14', 'arm64'),
     ('windows', 'windows-2022', 'AMD64'),
-    ('windows', 'windows-11-arm', 'ARM64')
+#    ('windows', 'windows-11-arm', 'ARM64')
 ]
 
 targets = []

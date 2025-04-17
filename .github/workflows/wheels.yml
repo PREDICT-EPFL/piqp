@@ -63,7 +63,7 @@ jobs:
         env:
           CIBW_ENVIRONMENT_LINUX: ${{ matrix.target.arch == 'x86_64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || (matrix.target.arch == 'aarch64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
           CIBW_ENVIRONMENT_MACOS: ${{ matrix.target.arch == 'x86_64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || (matrix.target.arch == 'arm64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
-          CIBW_ENVIRONMENT_WINDOWS: ${{ matrix.target.arch == 'AMD64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=c:/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=c:/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=c:/opt/blasfeo_x64_avx512"' || (matrix.target.arch == 'ARM64' && 'CMAKE_ARGS="-A arm64 -DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=c:/opt/blasfeo_arm64"' || '') }}
+          CIBW_ENVIRONMENT_WINDOWS: ${{ matrix.target.arch == 'AMD64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=c:/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=c:/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=c:/opt/blasfeo_x64_avx512"' || (matrix.target.arch == 'ARM64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=c:/opt/blasfeo_arm64"' || '') }}
           CIBW_ARCHS_LINUX: ${{ matrix.target.arch }}
           CIBW_BEFORE_ALL_LINUX: bash ci/install_all_deps_linux.sh
           CIBW_BEFORE_ALL_WINDOWS: bash ci/install_all_deps_windows.sh
