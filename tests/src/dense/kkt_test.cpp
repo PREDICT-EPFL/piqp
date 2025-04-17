@@ -29,7 +29,6 @@ TEST(DenseKKTTest, UpdateData)
 
     Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
     Data<T> data(qp_model);
-    Settings<T> settings;
 
     // make sure P_utri has not complete diagonal filled
     data.P_utri(1, 1) = 0;
@@ -39,9 +38,9 @@ TEST(DenseKKTTest, UpdateData)
     Vec<T> x_reg(dim); x_reg.setConstant(rho);
     Vec<T> z_reg(n_ineq); z_reg.setConstant(1 + delta);
 
-    KKT<T> kkt(data, settings);
+    KKT<T> kkt(data);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings_and_factor(delta, x_reg, z_reg);
+    kkt.update_scalings_and_factor(data, delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // update data
@@ -52,13 +51,13 @@ TEST(DenseKKTTest, UpdateData)
     int update_options = KKTUpdateOptions::KKT_UPDATE_P | KKTUpdateOptions::KKT_UPDATE_A | KKTUpdateOptions::KKT_UPDATE_G;
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_data(update_options);
-    kkt.update_scalings_and_factor(delta, x_reg, z_reg);
+    kkt.update_data(data, update_options);
+    kkt.update_scalings_and_factor(data, delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    KKT<T> kkt2(data, settings);
+    KKT<T> kkt2(data);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt2.update_scalings_and_factor(delta, x_reg, z_reg);
+    kkt2.update_scalings_and_factor(data, delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
@@ -87,10 +86,10 @@ TEST(DenseKKTTest, FactorizeSolve)
     scaling.z_bl.setConstant(1);
     scaling.z_bu.setConstant(1);
 
-    KKTSystem<T, int, PIQP_DENSE> kkt(data, settings);
-    kkt.init();
+    KKTSystem<T, int, PIQP_DENSE> kkt;
+    kkt.init(data, settings);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings_and_factor(false, rho, delta, scaling);
+    kkt.update_scalings_and_factor(data, settings, false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Variables<T> rhs;
@@ -109,14 +108,14 @@ TEST(DenseKKTTest, FactorizeSolve)
     lhs.resize(dim, n_eq, n_ineq);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.solve(rhs, lhs);
+    kkt.solve(data, settings, rhs, lhs);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Variables<T> rhs_sol;
     rhs_sol.resize(dim, n_eq, n_ineq);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.mul(lhs, rhs_sol);
+    kkt.mul(data, lhs, rhs_sol);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     ASSERT_TRUE(rhs.x.isApprox(rhs_sol.x, 1e-8));

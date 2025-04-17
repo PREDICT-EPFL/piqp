@@ -28,9 +28,6 @@ class KKTSystem
 protected:
 	using DataType = std::conditional_t<MatrixType == PIQP_DENSE, dense::Data<T>, sparse::Data<T, I>>;
 
-	const DataType& data;
-	const Settings<T>& settings;
-
 	T m_rho;
 	T m_delta;
 
@@ -63,14 +60,40 @@ protected:
 	Vec<T> ref_lhs_y;
 	Vec<T> ref_lhs_z;
 
-	bool use_iterative_refinement;
-	std::unique_ptr<KKTSolverBase<T>> kkt_solver;
+	bool use_iterative_refinement = false;
+	std::unique_ptr<KKTSolverBase<T, I, MatrixType>> kkt_solver;
 
 public:
-	KKTSystem(const DataType& data, const Settings<T>& settings) : data(data), settings(settings),
-	                                                               use_iterative_refinement(false) {}
+	KKTSystem() = default;
 
-	bool init()
+	KKTSystem(const KKTSystem& other) :
+		m_rho(other.m_rho),
+		m_delta(other.m_delta),
+		P_diag(other.P_diag),
+		m_s_l(other.m_s_l),
+		m_s_u(other.m_s_u),
+		m_s_bl(other.m_s_bl),
+		m_s_bu(other.m_s_bu),
+		m_z_l_inv(other.m_z_l_inv),
+		m_z_u_inv(other.m_z_u_inv),
+		m_z_bl_inv(other.m_z_bl_inv),
+		m_z_bu_inv(other.m_z_bu_inv),
+		m_x_reg(other.m_x_reg),
+		m_z_reg(other.m_z_reg),
+		rhs_x_bar(other.rhs_x_bar),
+		rhs_z_bar(other.rhs_z_bar),
+		work_x(other.work_x.rows()),
+		work_z(other.work_z.rows()),
+		ref_err_x(other.ref_err_x.rows()),
+		ref_err_y(other.ref_err_y.rows()),
+		ref_err_z(other.ref_err_z.rows()),
+		ref_lhs_x(other.ref_lhs_x.rows()),
+		ref_lhs_y(other.ref_lhs_y.rows()),
+		ref_lhs_z(other.ref_lhs_z.rows()),
+		use_iterative_refinement(other.use_iterative_refinement),
+		kkt_solver(other.kkt_solver ? other.kkt_solver->clone() : nullptr) {}
+
+	bool init(const DataType& data, const Settings<T>& settings)
 	{
 		P_diag.resize(data.n);
 		P_diag.setZero();
@@ -100,21 +123,22 @@ public:
 		ref_lhs_y.resize(data.p);
 		ref_lhs_z.resize(data.m);
 
-		extract_P_diag();
+		extract_P_diag(data);
 
-		return init_kkt_solver<MatrixType>();
+		return init_kkt_solver<MatrixType>(data, settings);
 	}
 
-	void update_data(int options)
+	void update_data(const DataType& data, int options)
 	{
 		if (options & KKTUpdateOptions::KKT_UPDATE_P) {
-			extract_P_diag();
+			extract_P_diag(data);
 		}
 
-		kkt_solver->update_data(options);
+		kkt_solver->update_data(data, options);
 	}
 
-	bool update_scalings_and_factor(bool iterative_refinement, const T& rho, const T& delta, const Variables<T>& vars)
+	bool update_scalings_and_factor(const DataType& data, const Settings<T>& settings, bool iterative_refinement,
+		                            const T& rho, const T& delta, const Variables<T>& vars)
     {
 		Vec<T>& m_z_reg_iter_ref = work_z;
 
@@ -168,10 +192,10 @@ public:
 		}
 
 		use_iterative_refinement = iterative_refinement;
-		return kkt_solver->update_scalings_and_factor(delta, m_x_reg, m_z_reg_iter_ref);
+		return kkt_solver->update_scalings_and_factor(data, delta, m_x_reg, m_z_reg_iter_ref);
     }
 
-	bool solve(const Variables<T>& rhs, Variables<T>& lhs)
+	bool solve(const DataType& data, const Settings<T>& settings, const Variables<T>& rhs, Variables<T>& lhs)
 	{
 		Vec<T>& lhs_z = work_z;
 
@@ -202,13 +226,14 @@ public:
 				/ (m_s_bu(i) * m_z_bu_inv(i) + m_delta);
 		}
 
-		kkt_solver->solve(rhs_x_bar, rhs.y, rhs_z_bar, lhs.x, lhs.y, lhs_z);
+		kkt_solver->solve(data, rhs_x_bar, rhs.y, rhs_z_bar, lhs.x, lhs.y, lhs_z);
 
 		if (use_iterative_refinement) {
 
 			T rhs_norm = inf_norm(rhs_x_bar, rhs.y, rhs_z_bar);
 
-			T refine_error = get_refine_error(lhs.x, lhs.y, lhs_z,
+			T refine_error = get_refine_error(data,
+										    lhs.x, lhs.y, lhs_z,
 				                            rhs_x_bar, rhs.y, rhs_z_bar,
 				                            ref_err_x, ref_err_y, ref_err_z);
 
@@ -221,14 +246,15 @@ public:
 				}
 				T prev_refine_error = refine_error;
 
-				kkt_solver->solve(ref_err_x, ref_err_y, ref_err_z, ref_lhs_x, ref_lhs_y, ref_lhs_z);
+				kkt_solver->solve(data, ref_err_x, ref_err_y, ref_err_z, ref_lhs_x, ref_lhs_y, ref_lhs_z);
 
 				// use ref_lhs to store refined solution
 				ref_lhs_x += lhs.x;
 				ref_lhs_y += lhs.y;
 				ref_lhs_z += lhs_z;
 
-				refine_error = get_refine_error(ref_lhs_x, ref_lhs_y, ref_lhs_z,
+				refine_error = get_refine_error(data,
+					                          ref_lhs_x, ref_lhs_y, ref_lhs_z,
 											  rhs_x_bar, rhs.y, rhs_z_bar,
 											  ref_err_x, ref_err_y, ref_err_z);
 
@@ -309,32 +335,32 @@ public:
 	}
 
 	// z = alpha * P * x
-	void eval_P_x(const T& alpha, const Vec<T>& x, Vec<T>& z)
+	void eval_P_x(const DataType& data, const T& alpha, const Vec<T>& x, Vec<T>& z)
 	{
-		kkt_solver->eval_P_x(alpha, x, z);
+		kkt_solver->eval_P_x(data, alpha, x, z);
 	}
 
 	// zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
-	void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt)
+	void eval_A_xn_and_AT_xt(const DataType& data, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt)
 	{
-		kkt_solver->eval_A_xn_and_AT_xt(alpha_n, alpha_t, xn, xt, zn, zt);
+		kkt_solver->eval_A_xn_and_AT_xt(data, alpha_n, alpha_t, xn, xt, zn, zt);
 	}
 
 	// zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
-	void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt)
+	void eval_G_xn_and_GT_xt(const DataType& data, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt)
 	{
-		kkt_solver->eval_G_xn_and_GT_xt(alpha_n, alpha_t, xn, xt, zn, zt);
+		kkt_solver->eval_G_xn_and_GT_xt(data, alpha_n, alpha_t, xn, xt, zn, zt);
 	}
 
-	void mul(const Variables<T>& lhs, Variables<T>& rhs)
+	void mul(const DataType& data, const Variables<T>& lhs, Variables<T>& rhs)
 	{
-		eval_P_x(T(1), lhs.x, rhs.x);
+		eval_P_x(data, T(1), lhs.x, rhs.x);
 		rhs.x.array() += m_rho * lhs.x.array();
-		eval_A_xn_and_AT_xt(T(1), T(1), lhs.x, lhs.y, rhs.y, work_x);
+		eval_A_xn_and_AT_xt(data, T(1), T(1), lhs.x, lhs.y, rhs.y, work_x);
 		rhs.x.array() += work_x.array();
 		rhs.y.array() -= m_delta * lhs.y.array();
 		rhs.s_l.noalias() = lhs.z_u - lhs.z_l; // use rhs.s_l as temporary
-		eval_G_xn_and_GT_xt(T(1), T(1), lhs.x, rhs.s_l, rhs.z_u, work_x);
+		eval_G_xn_and_GT_xt(data, T(1), T(1), lhs.x, rhs.s_l, rhs.z_u, work_x);
 		rhs.z_l.noalias() = -rhs.z_u;
 		rhs.x.array() += work_x.array();
 		rhs.z_l.array() += lhs.s_l.array() - m_delta * lhs.z_l.array();
@@ -366,14 +392,14 @@ public:
 protected:
 	template<int MatrixTypeT = MatrixType>
 	std::enable_if_t<MatrixTypeT == PIQP_DENSE>
-	extract_P_diag()
+	extract_P_diag(const DataType& data)
 	{
 		P_diag.noalias() = data.P_utri.diagonal();
 	}
 
 	template<int MatrixTypeT = MatrixType>
 	std::enable_if_t<MatrixTypeT == PIQP_SPARSE>
-	extract_P_diag()
+	extract_P_diag(const DataType& data)
 	{
 		isize jj = data.P_utri.outerSize();
 		for (isize j = 0; j < jj; j++)
@@ -391,11 +417,11 @@ protected:
 
 	template<int MatrixTypeT = MatrixType>
 	std::enable_if_t<MatrixTypeT == PIQP_DENSE, bool>
-	init_kkt_solver()
+	init_kkt_solver(const DataType& data, const Settings<T>& settings)
 	{
 		switch (settings.kkt_solver) {
 			case KKTSolver::dense_cholesky:
-				kkt_solver = std::make_unique<dense::KKT<T>>(data, settings);
+				kkt_solver = std::make_unique<dense::KKT<T>>(data);
 			break;
 			default:
 				piqp_eprint("kkt solver not supported\n");
@@ -406,24 +432,24 @@ protected:
 
 	template<int MatrixTypeT = MatrixType>
 	std::enable_if_t<MatrixTypeT == PIQP_SPARSE, bool>
-	init_kkt_solver()
+	init_kkt_solver(const DataType& data, const Settings<T>& settings)
 	{
 		switch (settings.kkt_solver) {
 			case KKTSolver::sparse_ldlt:
-				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_FULL>>(data, settings);
+				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_FULL>>(data);
 				break;
 			case KKTSolver::sparse_ldlt_eq_cond:
-				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_EQ_ELIMINATED>>(data, settings);
+				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_EQ_ELIMINATED>>(data);
 				break;
 			case KKTSolver::sparse_ldlt_ineq_cond:
-				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_INEQ_ELIMINATED>>(data, settings);
+				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_INEQ_ELIMINATED>>(data);
 				break;
 			case KKTSolver::sparse_ldlt_cond:
-				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_ALL_ELIMINATED>>(data, settings);
+				kkt_solver = std::make_unique<sparse::KKT<T, I, KKT_ALL_ELIMINATED>>(data);
 				break;
 #ifdef PIQP_HAS_BLASFEO
 			case KKTSolver::sparse_multistage:
-				kkt_solver = std::make_unique<sparse::MultistageKKT<T, I>>(data, settings);
+				kkt_solver = std::make_unique<sparse::MultistageKKT<T, I>>(data);
 				break;
 #endif
 			default:
@@ -441,25 +467,27 @@ protected:
 		return norm;
 	}
 
-	void mul_condensed_kkt(const Vec<T>& lhs_x, const Vec<T>& lhs_y, const Vec<T>& lhs_z,
+	void mul_condensed_kkt(const DataType& data,
+                           const Vec<T>& lhs_x, const Vec<T>& lhs_y, const Vec<T>& lhs_z,
 						   Vec<T>& rhs_x, Vec<T>& rhs_y, Vec<T>& rhs_z)
 	{
-		eval_P_x(T(1), lhs_x, rhs_x);
+		eval_P_x(data, T(1), lhs_x, rhs_x);
 		rhs_x.array() += m_x_reg.array() * lhs_x.array();
-		eval_A_xn_and_AT_xt(T(1), T(1), lhs_x, lhs_y, rhs_y, work_x);
+		eval_A_xn_and_AT_xt(data, T(1), T(1), lhs_x, lhs_y, rhs_y, work_x);
 		rhs_x.array() += work_x.array();
 		rhs_y.array() -= m_delta * lhs_y.array();
-		eval_G_xn_and_GT_xt(T(1), T(1), lhs_x, lhs_z, rhs_z, work_x);
+		eval_G_xn_and_GT_xt(data, T(1), T(1), lhs_x, lhs_z, rhs_z, work_x);
 		rhs_x.array() += work_x.array();
 		rhs_z.array() -= m_z_reg.array() * lhs_z.array();
 	}
 
 	// err = rhs - KKT * lhs
-	T get_refine_error(const Vec<T>& lhs_x, const Vec<T>& lhs_y, const Vec<T>& lhs_z,
+	T get_refine_error(const DataType& data,
+		              const Vec<T>& lhs_x, const Vec<T>& lhs_y, const Vec<T>& lhs_z,
 		              const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
 		              Vec<T>& err_x, Vec<T>& err_y, Vec<T>& err_z)
 	{
-		mul_condensed_kkt(lhs_x, lhs_y, lhs_z, err_x, err_y, err_z);
+		mul_condensed_kkt(data, lhs_x, lhs_y, lhs_z, err_x, err_y, err_z);
 
 		err_x.array() = rhs_x.array() - err_x.array();
 		err_y.array() = rhs_y.array() - err_y.array();

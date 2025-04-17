@@ -46,7 +46,6 @@ TYPED_TEST(SparseKKTTest, UpdateData)
 
     Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
     Data<T, I> data(qp_model);
-    Settings<T> settings;
 
     // make sure P_utri has not complete diagonal filled
     data.P_utri.coeffRef(1, 1) = 0;
@@ -57,9 +56,9 @@ TYPED_TEST(SparseKKTTest, UpdateData)
     Vec<T> x_reg(dim); x_reg.setConstant(rho);
     Vec<T> z_reg(n_ineq); z_reg.setConstant(1 + delta);
 
-    KKT<T, I, TypeParam::Mode> kkt(data, settings);
+    KKT<T, I, TypeParam::Mode> kkt(data);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings_and_factor(delta, x_reg, z_reg);
+    kkt.update_scalings_and_factor(data, delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // update data
@@ -69,17 +68,17 @@ TYPED_TEST(SparseKKTTest, UpdateData)
     int update_options = KKTUpdateOptions::KKT_UPDATE_P | KKTUpdateOptions::KKT_UPDATE_A | KKTUpdateOptions::KKT_UPDATE_G;
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_data(update_options);
-    kkt.update_scalings_and_factor(delta, x_reg, z_reg);
+    kkt.update_data(data, update_options);
+    kkt.update_scalings_and_factor(data, delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert PKPt matrix is upper triangular
     SparseMat<T, I> PKPt_upper = kkt.internal_kkt_mat().template triangularView<Eigen::Upper>();
     assert_sparse_matrices_equal(kkt.internal_kkt_mat(), PKPt_upper);
 
-    KKT<T, I, TypeParam::Mode> kkt2(data, settings);
+    KKT<T, I, TypeParam::Mode> kkt2(data);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt2.update_scalings_and_factor(delta, x_reg, z_reg);
+    kkt2.update_scalings_and_factor(data, delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
@@ -110,10 +109,10 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
     scaling.z_bl.setConstant(1);
     scaling.z_bu.setConstant(1);
 
-    KKTSystem<T, I, PIQP_SPARSE> kkt(data, settings);
-    kkt.init();
+    KKTSystem<T, I, PIQP_SPARSE> kkt;
+    kkt.init(data, settings);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings_and_factor(false, rho, delta, scaling);
+    kkt.update_scalings_and_factor(data, settings, false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Variables<T> rhs;
@@ -132,14 +131,14 @@ TYPED_TEST(SparseKKTTest, FactorizeSolve)
     lhs.resize(dim, n_eq, n_ineq);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.solve(rhs, lhs);
+    kkt.solve(data, settings, rhs, lhs);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     Variables<T> rhs_sol;
     rhs_sol.resize(dim, n_eq, n_ineq);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.mul(lhs, rhs_sol);
+    kkt.mul(data, lhs, rhs_sol);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     ASSERT_TRUE(rhs.x.isApprox(rhs_sol.x, 1e-8));

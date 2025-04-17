@@ -37,13 +37,10 @@ namespace sparse
 {
 
 template<typename T, typename I>
-class MultistageKKT : public KKTSolverBase<T>
+class MultistageKKT : public KKTSolverBase<T, I, PIQP_SPARSE>
 {
 protected:
     static_assert(std::is_same<T, double>::value, "sparse_multistage only supports doubles");
-
-    const Data<T, I>& data;
-    const Settings<T>& settings;
 
     T m_delta;
 
@@ -73,7 +70,7 @@ protected:
     BlockVec work_z_block_2;
 
 public:
-    MultistageKKT(const Data<T, I>& data, const Settings<T>& settings) : data(data), settings(settings)
+    MultistageKKT(const Data<T, I>& data)
     {
         // init workspace
         m_delta = T(1);
@@ -83,7 +80,7 @@ public:
         work_z.resize(data.m);
 
         // prepare kkt factorization
-        extract_arrow_structure();
+        extract_arrow_structure(data);
         std::size_t N = block_info.size();
 
         utri_to_kkt(data.P_utri, P);
@@ -117,7 +114,12 @@ public:
         work_z_block_2 = BlockVec(GT.block_row_sizes);
     }
 
-    void update_data(int options) override
+    std::unique_ptr<KKTSolverBase<T, I, PIQP_SPARSE>> clone() const override
+    {
+        return std::make_unique<MultistageKKT>(*this);
+    }
+
+    void update_data(const Data<T, I>& data, int options) override
     {
         std::size_t N = block_info.size();
 
@@ -147,7 +149,7 @@ public:
         }
     }
 
-    bool update_scalings_and_factor(const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) override
+    bool update_scalings_and_factor(const Data<T, I>&, const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) override
     {
         m_delta = delta;
         m_z_reg_inv.array() = z_reg.array().inverse();
@@ -173,8 +175,7 @@ public:
         return true;
     }
 
-    void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
-               Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) override
+    void solve(const Data<T, I>&, const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z, Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) override
     {
         Vec<T>& rhs_z_bar = work_z;
         BlockVec& block_rhs = work_x_block_1;
@@ -216,7 +217,7 @@ public:
     }
 
     // z = alpha * P * x
-    void eval_P_x(const T& alpha, const Vec<T>& x, Vec<T>& z) override
+    void eval_P_x(const Data<T, I>&, const T& alpha, const Vec<T>& x, Vec<T>& z) override
     {
         BlockVec& block_x = work_x_block_1;
         BlockVec& block_z = work_x_block_2;
@@ -230,7 +231,7 @@ public:
     }
 
     // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
-    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
+    void eval_A_xn_and_AT_xt(const Data<T, I>&, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
         BlockVec& block_xn = work_x_block_1;
         BlockVec& block_xt = work_y_block_1;
@@ -249,7 +250,7 @@ public:
     }
 
     // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
-    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
+    void eval_G_xn_and_GT_xt(const Data<T, I>&, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
         BlockVec& block_xn = work_x_block_1;
         BlockVec& block_xt = work_z_block_1;
@@ -302,7 +303,7 @@ protected:
         return n * n * n / 3;
     }
 
-    void extract_arrow_structure()
+    void extract_arrow_structure(const Data<T, I>& data)
     {
         // build condensed KKT structure for analysis
         SparseMat<T, I> P_ltri = data.P_utri.transpose();

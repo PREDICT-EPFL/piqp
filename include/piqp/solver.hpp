@@ -53,7 +53,7 @@ protected:
     BasicVariables<T> prox_vars; // proximal variables (xi, lambda, nu)
 
 public:
-    SolverBase() : m_kkt_system(m_data, m_settings)
+    SolverBase()
     {
         if (MatrixType == PIQP_DENSE) {
             m_settings.kkt_solver = KKTSolver::dense_cholesky;
@@ -191,11 +191,11 @@ protected:
                                     m_settings.preconditioner_scale_cost,
                                     m_settings.preconditioner_iter);
 
-        if (!m_kkt_system.init())
+        if (!m_kkt_system.init(m_data, m_settings))
         {
             m_setup_done = false;
             return;
-        };
+        }
 
         m_first_run = true;
         m_setup_done = true;
@@ -287,7 +287,7 @@ protected:
                                     m_settings.preconditioner_scale_cost,
                                     m_settings.preconditioner_iter);
 
-        m_kkt_system.update_data(update_options);
+        m_kkt_system.update_data(m_data, update_options);
 
         if (m_settings.compute_timings)
         {
@@ -421,7 +421,8 @@ protected:
 
         m_enable_iterative_refinement = m_settings.iterative_refinement_always_enabled;
 
-        while (!m_kkt_system.update_scalings_and_factor(m_enable_iterative_refinement, m_result.info.rho, m_result.info.delta, m_result))
+        while (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
+                                                        m_result.info.rho, m_result.info.delta, m_result))
         {
             if (!m_enable_iterative_refinement)
             {
@@ -452,7 +453,7 @@ protected:
         res.s_u.setZero();
         res.s_bl.setZero();
         res.s_bu.setZero();
-        m_kkt_system.solve(res, m_result);
+        m_kkt_system.solve(m_data, m_settings, res, m_result);
 
         // We make an Eigen expression for convince. Note that we are doing it after
         // the first solve since m_kkt_system.solve might swap internal pointers in m_result
@@ -657,7 +658,8 @@ protected:
                 m_result.info.no_dual_update = 0;
             }
 
-            if (!m_kkt_system.update_scalings_and_factor(m_enable_iterative_refinement, m_result.info.rho, m_result.info.delta, m_result))
+            if (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
+                                                         m_result.info.rho, m_result.info.delta, m_result))
             {
                 if (!m_enable_iterative_refinement)
                 {
@@ -687,7 +689,7 @@ protected:
                 res.s_bl.head(m_data.n_x_l).array() = -s_bl.array() * z_bl.array();
                 res.s_bu.head(m_data.n_x_u).array() = -s_bu.array() * z_bu.array();
 
-                m_kkt_system.solve(res, step);
+                m_kkt_system.solve(m_data, m_settings, res, step);
 
                 // step in the non-negative orthant
                 T alpha_s, alpha_z;
@@ -711,7 +713,7 @@ protected:
                 res.s_bl.head(m_data.n_x_l).array() += -step.s_bl.head(m_data.n_x_l).array() * step.z_bl.head(m_data.n_x_l).array() + m_result.info.sigma * m_result.info.mu;
                 res.s_bu.head(m_data.n_x_u).array() += -step.s_bu.head(m_data.n_x_u).array() * step.z_bu.head(m_data.n_x_u).array() + m_result.info.sigma * m_result.info.mu;
 
-                m_kkt_system.solve(res, step);
+                m_kkt_system.solve(m_data, m_settings, res, step);
 
                 // step in the non-negative orthant
                 calculate_step(alpha_s, alpha_z);
@@ -768,7 +770,7 @@ protected:
             else
             {
                 // since there are no inequalities we can take full steps
-                m_kkt_system.solve(res, step);
+                m_kkt_system.solve(m_data, m_settings, res, step);
 
                 m_result.info.primal_step = T(1);
                 m_result.info.dual_step = T(1);
@@ -873,18 +875,18 @@ protected:
         // we calculate these term here first to be able to reuse temporary vectors
         // res_nr.y = -A * x
         // work_x = A^T * y
-        m_kkt_system.eval_A_xn_and_AT_xt(T(-1), T(1), m_result.x, m_result.y, res_nr.y, work_x);
+        m_kkt_system.eval_A_xn_and_AT_xt(m_data, T(-1), T(1), m_result.x, m_result.y, res_nr.y, work_x);
         // res_nr.z_u = -G * x
         // res_nr.z_l = G * x
         // work_x += G^T * (z_u - z_l)
         work_z.noalias() = m_result.z_u - m_result.z_l;
         Vec<T>& work_x_2 = res_nr.x; // use res_nr.x as temporary, gets overwritten in the next section
-        m_kkt_system.eval_G_xn_and_GT_xt(T(1), T(1), m_result.x, work_z, res_nr.z_l, work_x_2);
+        m_kkt_system.eval_G_xn_and_GT_xt(m_data, T(1), T(1), m_result.x, work_z, res_nr.z_l, work_x_2);
         res_nr.z_u.noalias() = -res_nr.z_l;
         work_x.noalias() += work_x_2;
 
         // first part of dual residual and infeasibility calculation (used in cost calculation)
-        m_kkt_system.eval_P_x(T(-1), m_result.x, res_nr.x);
+        m_kkt_system.eval_P_x(m_data, T(-1), m_result.x, res_nr.x);
         m_result.info.dual_rel_inf = m_preconditioner.unscale_dual_res(res_nr.x).template lpNorm<Eigen::Infinity>();
 
         // calculate primal cost, dual cost, and duality gap

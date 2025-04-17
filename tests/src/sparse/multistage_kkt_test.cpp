@@ -22,7 +22,7 @@ using namespace piqp::sparse;
 class BlocksparseStageKKTTest : public testing::TestWithParam<std::string> {};
 
 template<typename KKT1, typename KKT2>
-void test_solve_multiply(Data<T, I>& data, KKT1& kkt1, KKT2& kkt2)
+void test_solve_multiply(Data<T, I>& data, Settings<T> settings1, Settings<T> settings2, KKT1& kkt1, KKT2& kkt2)
 {
     Variables<T> rhs;
     rhs.x = rand::vector_rand<T>(data.n);
@@ -43,8 +43,8 @@ void test_solve_multiply(Data<T, I>& data, KKT1& kkt1, KKT2& kkt2)
     lhs_2.resize(data.n, data.p, data.m);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt1.solve(rhs, lhs_1);
-    kkt2.solve(rhs, lhs_2);
+    kkt1.solve(data, settings1, rhs, lhs_1);
+    kkt2.solve(data, settings2, rhs, lhs_2);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     ASSERT_TRUE(lhs_1.x.isApprox(lhs_2.x, 1e-8));
@@ -73,8 +73,8 @@ void test_solve_multiply(Data<T, I>& data, KKT1& kkt1, KKT2& kkt2)
     rhs_sol_2.resize(data.n, data.p, data.m);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt1.mul(lhs_1, rhs_sol_1);
-    kkt1.mul(lhs_2, rhs_sol_2);
+    kkt1.mul(data, lhs_1, rhs_sol_1);
+    kkt1.mul(data, lhs_2, rhs_sol_2);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     ASSERT_TRUE(rhs_sol_1.x.isApprox(rhs_sol_2.x, 1e-8));
@@ -127,16 +127,16 @@ TEST(BlocksparseStageKKTTest, UpdateData)
     scaling.z_bl.setConstant(1);
     scaling.z_bu.setConstant(1);
 
-    KKTSystem<T, I, PIQP_SPARSE> kkt_multistage(data, settings_multistage);
-    kkt_multistage.init();
-    KKTSystem<T, I, PIQP_SPARSE> kkt_sparse(data, settings_sparse);
-    kkt_sparse.init();
+    KKTSystem<T, I, PIQP_SPARSE> kkt_multistage;
+    kkt_multistage.init(data, settings_multistage);
+    KKTSystem<T, I, PIQP_SPARSE> kkt_sparse;
+    kkt_sparse.init(data, settings_sparse);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt_multistage.update_scalings_and_factor(false, rho, delta, scaling);
-    kkt_sparse.update_scalings_and_factor(false, rho, delta, scaling);
+    kkt_multistage.update_scalings_and_factor(data, settings_multistage, false, rho, delta, scaling);
+    kkt_sparse.update_scalings_and_factor(data, settings_sparse, false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    test_solve_multiply(data, kkt_multistage, kkt_sparse);
+    test_solve_multiply(data, settings_multistage, settings_sparse, kkt_multistage, kkt_sparse);
 
     // update data
     Eigen::Map<Vec<T>>(data.P_utri.valuePtr(), data.P_utri.nonZeros()) = rand::vector_rand<T>(data.P_utri.nonZeros());
@@ -160,13 +160,13 @@ TEST(BlocksparseStageKKTTest, UpdateData)
     int update_options = KKTUpdateOptions::KKT_UPDATE_P | KKTUpdateOptions::KKT_UPDATE_A | KKTUpdateOptions::KKT_UPDATE_G;
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt_multistage.update_data(update_options);
-    kkt_multistage.update_scalings_and_factor(false, rho, delta, scaling);
-    kkt_sparse.update_data(update_options);
-    kkt_sparse.update_scalings_and_factor(false, rho, delta, scaling);
+    kkt_multistage.update_data(data, update_options);
+    kkt_multistage.update_scalings_and_factor(data, settings_multistage, false, rho, delta, scaling);
+    kkt_sparse.update_data(data, update_options);
+    kkt_sparse.update_scalings_and_factor(data, settings_sparse, false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    test_solve_multiply(data, kkt_multistage, kkt_sparse);
+    test_solve_multiply(data, settings_multistage, settings_sparse, kkt_multistage, kkt_sparse);
 }
 
 TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
@@ -193,16 +193,16 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
     scaling.z_bl.setConstant(1);
     scaling.z_bu.setConstant(1);
 
-    KKTSystem<T, I, PIQP_SPARSE> kkt_multistage(data, settings_multistage);
-    kkt_multistage.init();
-    KKTSystem<T, I, PIQP_SPARSE> kkt_sparse(data, settings_sparse);
-    kkt_sparse.init();
+    KKTSystem<T, I, PIQP_SPARSE> kkt_multistage;
+    kkt_multistage.init(data, settings_multistage);
+    KKTSystem<T, I, PIQP_SPARSE> kkt_sparse;
+    kkt_sparse.init(data, settings_sparse);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt_multistage.update_scalings_and_factor(false, rho, delta, scaling);
-    kkt_sparse.update_scalings_and_factor(false, rho, delta, scaling);
+    kkt_multistage.update_scalings_and_factor(data, settings_multistage, false, rho, delta, scaling);
+    kkt_sparse.update_scalings_and_factor(data, settings_sparse, false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    test_solve_multiply(data, kkt_multistage, kkt_sparse);
+    test_solve_multiply(data, settings_multistage, settings_sparse, kkt_multistage, kkt_sparse);
 }
 
 INSTANTIATE_TEST_SUITE_P(FromFolder, BlocksparseStageKKTTest,

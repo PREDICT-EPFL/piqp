@@ -11,6 +11,7 @@
 
 #include "piqp/typedefs.hpp"
 #include "piqp/kkt_fwd.hpp"
+#include "piqp/sparse/data.hpp"
 
 namespace piqp
 {
@@ -30,10 +31,8 @@ protected:
     Vec<I> AT_A_to_Ki;   // mapping from AT_A row indices to KKT matrix
     Vec<I> GT_to_Ki;     // mapping from GT row indices to KKT matrix
 
-    void init_workspace()
+    void init_workspace(const Data<T, I>& data)
     {
-        auto& data = static_cast<Derived*>(this)->data;
-
         A = data.AT.transpose();
         AT_A = (data.AT * A).template triangularView<Eigen::Upper>();
 
@@ -45,9 +44,8 @@ protected:
         GT_to_Ki.resize(data.GT.nonZeros());
     }
 
-    SparseMat<T, I> create_kkt_matrix()
+    SparseMat<T, I> create_kkt_matrix(const Data<T, I>& data)
     {
-        auto& data = static_cast<Derived*>(this)->data;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
         T delta_inv = T(1) / m_delta;
@@ -149,9 +147,8 @@ protected:
         return KKT;
     }
 
-    void update_kkt_cost_scalings(const Vec<T>& x_reg)
+    void update_kkt_cost_scalings(const Data<T, I>& data, const Vec<T>& x_reg)
     {
-        auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
         auto& ordering = static_cast<Derived*>(this)->ordering;
@@ -176,7 +173,7 @@ protected:
         }
     }
 
-    void update_kkt_equality_scalings()
+    void update_kkt_equality_scalings(const Data<T, I>&)
     {
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
@@ -191,9 +188,8 @@ protected:
         }
     }
 
-    void update_kkt_inequality_scaling(const Vec<T>& z_reg)
+    void update_kkt_inequality_scaling(const Data<T, I>& data, const Vec<T>& z_reg)
     {
-        auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
         auto& ordering = static_cast<Derived*>(this)->ordering;
@@ -215,21 +211,17 @@ protected:
         }
     }
 
-    void update_data_impl(int options)
+    void update_data_impl(const Data<T, I>& data, int options)
     {
-        auto& data = static_cast<Derived*>(this)->data;
-
         if (options & KKTUpdateOptions::KKT_UPDATE_A)
         {
             transpose_no_allocation<T, I>(data.AT, A);
-            update_AT_A();
+            update_AT_A(data);
         }
     }
 
-    void update_AT_A()
+    void update_AT_A(const Data<T, I>& data)
     {
-        auto& data = static_cast<Derived*>(this)->data;
-
         // update AT * A
         isize n = A.outerSize();
         for (isize j = 0; j < n; j++)

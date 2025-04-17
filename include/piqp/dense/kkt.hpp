@@ -9,7 +9,6 @@
 #ifndef PIQP_DENSE_KKT_HPP
 #define PIQP_DENSE_KKT_HPP
 
-#include "piqp/settings.hpp"
 #include "piqp/kkt_solver_base.hpp"
 #include "piqp/kkt_fwd.hpp"
 #include "piqp/dense/data.hpp"
@@ -22,11 +21,8 @@ namespace dense
 {
 
 template<typename T>
-class KKT : public KKTSolverBase<T> {
+class KKT : public KKTSolverBase<T, int, PIQP_DENSE> {
 protected:
-    const Data<T>& data;
-    const Settings<T>& settings;
-
     T m_delta;
 
     Vec<T> m_z_reg_inv;
@@ -39,7 +35,7 @@ protected:
     Vec<T> work_z; // working variable
 
 public:
-    KKT(const Data<T>& data, const Settings<T>& settings) : data(data), settings(settings)
+    explicit KKT(const Data<T>& data)
     {
         // init workspace
         m_z_reg_inv.resize(data.m);
@@ -55,7 +51,12 @@ public:
         }
     }
 
-    void update_data(int options) override
+    std::unique_ptr<KKTSolverBase<T, int, PIQP_DENSE>> clone() const override
+    {
+        return std::make_unique<KKT>(*this);
+    }
+
+    void update_data(const Data<T>& data, int options) override
     {
         if (options & KKTUpdateOptions::KKT_UPDATE_A) {
             if (data.p > 0) {
@@ -64,19 +65,18 @@ public:
         }
     }
 
-    bool update_scalings_and_factor(const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) override
+    bool update_scalings_and_factor(const Data<T>& data, const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) override
     {
         m_delta = delta;
         m_z_reg_inv.array() = z_reg.array().inverse();
 
-        update_kkt(x_reg);
+        update_kkt(data, x_reg);
 
         llt.compute(kkt_mat);
         return llt.info() == Eigen::Success;
     }
 
-    void solve(const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
-               Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) override
+    void solve(const Data<T>& data, const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z, Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) override
     {
         T delta_inv = T(1) / m_delta;
 
@@ -96,21 +96,21 @@ public:
     }
 
     // z = alpha * P * x
-    void eval_P_x(const T& alpha, const Vec<T>& x, Vec<T>& z) override
+    void eval_P_x(const Data<T>& data, const T& alpha, const Vec<T>& x, Vec<T>& z) override
     {
         z.noalias() = alpha * data.P_utri * x;
         z.noalias() += data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * (alpha * x);
     }
 
     // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
-    void eval_A_xn_and_AT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
+    void eval_A_xn_and_AT_xt(const Data<T>& data, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
         zn.noalias() = alpha_n * data.AT.transpose() * xn;
         zt.noalias() = alpha_t * data.AT * xt;
     }
 
     // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
-    void eval_G_xn_and_GT_xt(const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
+    void eval_G_xn_and_GT_xt(const Data<T>& data, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
         zn.noalias() = alpha_n * data.GT.transpose() * xn;
         zt.noalias() = alpha_t * data.GT * xt;
@@ -122,7 +122,7 @@ public:
     }
 
 protected:
-    void update_kkt(const Vec<T>& x_reg)
+    void update_kkt(const Data<T>& data, const Vec<T>& x_reg)
     {
         kkt_mat.template triangularView<Eigen::Lower>() = data.P_utri.transpose();
         kkt_mat.diagonal() += x_reg;

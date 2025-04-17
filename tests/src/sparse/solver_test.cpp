@@ -393,6 +393,53 @@ TEST_P(SparseSolverTest, InfinityBounds)
     ASSERT_NEAR(solver.result().x(3), -1.0, 1e-6);
 }
 
+TEST_P(SparseSolverTest, CopyConstructor)
+{
+    isize dim = 20;
+    isize n_eq = 10;
+    isize n_ineq = 12;
+    T sparsity_factor = 0.2;
+
+    sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
+
+    SparseSolver<T, I> solver1;
+    solver1.settings().verbose = true;
+    solver1.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+
+    SparseSolver<T, I> solver2(solver1);
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    Status status1 = solver1.solve();
+    Status status2 = solver2.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(status1, Status::PIQP_SOLVED);
+    ASSERT_EQ(status2, Status::PIQP_SOLVED);
+    ASSERT_EQ(solver1.result().x, solver2.result().x);
+}
+
+TEST_P(SparseSolverTest, MoveConstructor)
+{
+    isize dim = 20;
+    isize n_eq = 10;
+    isize n_ineq = 12;
+    T sparsity_factor = 0.2;
+
+    sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
+
+    SparseSolver<T, I> solver1;
+    solver1.settings().verbose = true;
+    solver1.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+
+    SparseSolver<T, I> solver2(std::move(solver1));
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    Status status2 = solver2.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(status2, Status::PIQP_SOLVED);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     KKTSolver,
     SparseSolverTest,
