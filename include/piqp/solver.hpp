@@ -455,7 +455,7 @@ protected:
         res.s_bu.setZero();
         m_kkt_system.solve(m_data, m_settings, res, m_result);
 
-        // We make an Eigen expression for convince. Note that we are doing it after
+        // We make an Eigen expression for convenience. Note that we are doing it after
         // the first solve since m_kkt_system.solve might swap internal pointers in m_result
         // which can invalidate the reference in the Eigen expression.
         auto s_bl = m_result.s_bl.head(m_data.n_x_l);
@@ -467,78 +467,68 @@ protected:
 
         if (m_data.m + m_data.n_x_l + m_data.n_x_u > 0)
         {
-            T s_norm = T(0);
-            s_norm = (std::max)(s_norm, m_result.s_l.template lpNorm<Eigen::Infinity>());
-            s_norm = (std::max)(s_norm, m_result.s_u.template lpNorm<Eigen::Infinity>());
-            s_norm = (std::max)(s_norm, s_bl.template lpNorm<Eigen::Infinity>());
-            s_norm = (std::max)(s_norm, s_bl.template lpNorm<Eigen::Infinity>());
-            if (s_norm <= 1e-4)
-            {
-                // 0.1 is arbitrary
-                for (isize i = 0; i < m_data.n_h_l; i++)
-                {
-                    Eigen::Index idx = m_data.h_l_idx(i);
-                    m_result.s_l(idx) = T(0.1);
-                    m_result.z_l(idx) = T(0.1);
-                }
-                for (isize i = 0; i < m_data.n_h_u; i++)
-                {
-                    Eigen::Index idx = m_data.h_u_idx(i);
-                    m_result.s_u(idx) = T(0.1);
-                    m_result.z_u(idx) = T(0.1);
-                }
-                s_bl.setConstant(T(0.1));
-                s_bu.setConstant(T(0.1));
-                z_bl.setConstant(T(0.1));
-                z_bu.setConstant(T(0.1));
-            }
-
             T delta_s = T(0);
             if (m_data.m > 0) {
-                delta_s = (std::max)(delta_s, -T(1.5) * m_result.s_l.minCoeff());
-                delta_s = (std::max)(delta_s, -T(1.5) * m_result.s_u.minCoeff());
+                delta_s = (std::max)(delta_s, -m_result.s_l.minCoeff());
+                delta_s = (std::max)(delta_s, -m_result.s_u.minCoeff());
             }
-            if (m_data.n_x_l > 0) delta_s = (std::max)(delta_s, -T(1.5) * s_bl.minCoeff());
-            if (m_data.n_x_u > 0) delta_s = (std::max)(delta_s, -T(1.5) * s_bu.minCoeff());
+            if (m_data.n_x_l > 0) delta_s = (std::max)(delta_s, -s_bl.minCoeff());
+            if (m_data.n_x_u > 0) delta_s = (std::max)(delta_s, -s_bu.minCoeff());
             T delta_z = T(0);
             if (m_data.m > 0) {
-                delta_z = (std::max)(delta_z, -T(1.5) * m_result.z_l.minCoeff());
-                delta_z = (std::max)(delta_z, -T(1.5) * m_result.z_u.minCoeff());
+                delta_z = (std::max)(delta_z, -m_result.z_l.minCoeff());
+                delta_z = (std::max)(delta_z, -m_result.z_u.minCoeff());
             }
-            if (m_data.n_x_l > 0) delta_z = (std::max)(delta_z, -T(1.5) * z_bl.minCoeff());
-            if (m_data.n_x_u > 0) delta_z = (std::max)(delta_z, -T(1.5) * z_bu.minCoeff());
-            T dot_prod = T(0);
-            for (isize i = 0; i < m_data.n_h_l; i++)
-            {
-                Eigen::Index idx = m_data.h_l_idx(i);
-                dot_prod += (m_result.s_l(idx) + delta_s) * (m_result.z_l(idx) + delta_z);
-            }
-            for (isize i = 0; i < m_data.n_h_u; i++)
-            {
-                Eigen::Index idx = m_data.h_u_idx(i);
-                dot_prod += (m_result.s_u(idx) + delta_s) * (m_result.z_u(idx) + delta_z);
-            }
-            dot_prod += (s_bl.array() + delta_s).matrix().dot((z_bl.array() + delta_z).matrix());
-            dot_prod += (s_bu.array() + delta_s).matrix().dot((z_bu.array() + delta_z).matrix());
-            T delta_s_bar = delta_s + T(0.5) * dot_prod / (m_result.z_l.sum() + m_result.z_u.sum() + z_bl.sum() + z_bu.sum() + T(m_data.n_h_l + m_data.n_h_u + m_data.n_x_l + m_data.n_x_u) * delta_z);
-            T delta_z_bar = delta_z + T(0.5) * dot_prod / (m_result.s_l.sum() + m_result.s_u.sum() + s_bl.sum() + s_bu.sum() + T(m_data.n_h_l + m_data.n_h_u + m_data.n_x_l + m_data.n_x_u) * delta_s);
+            if (m_data.n_x_l > 0) delta_z = (std::max)(delta_z, -z_bl.minCoeff());
+            if (m_data.n_x_u > 0) delta_z = (std::max)(delta_z, -z_bu.minCoeff());
 
             for (isize i = 0; i < m_data.n_h_l; i++)
             {
                 Eigen::Index idx = m_data.h_l_idx(i);
-                m_result.s_l(idx) += delta_s_bar;
-                m_result.z_l(idx) += delta_z_bar;
+                m_result.s_l(idx) += delta_s;
+                m_result.z_l(idx) += delta_z;
             }
             for (isize i = 0; i < m_data.n_h_u; i++)
             {
                 Eigen::Index idx = m_data.h_u_idx(i);
-                m_result.s_u(idx) += delta_s_bar;
-                m_result.z_u(idx) += delta_z_bar;
+                m_result.s_u(idx) += delta_s;
+                m_result.z_u(idx) += delta_z;
             }
-            s_bl.array() += delta_s_bar;
-            s_bu.array() += delta_s_bar;
-            z_bl.array() += delta_z_bar;
-            z_bu.array() += delta_z_bar;
+            s_bl.array() += delta_s;
+            s_bu.array() += delta_s;
+            z_bl.array() += delta_z;
+            z_bu.array() += delta_z;
+
+            m_result.info.mu = (std::max)(calculate_mu(), T(1e-10));
+
+            for (isize i = 0; i < m_data.n_h_l; i++)
+            {
+                Eigen::Index idx = m_data.h_l_idx(i);
+
+                T c = m_result.z_l(idx) - delta_z;
+                m_result.z_l(idx) = (c + std::sqrt(c * c + 4 * m_result.info.mu)) / 2;
+                m_result.s_l(idx) = m_result.z_l(idx) - c;
+            }
+            for (isize i = 0; i < m_data.n_h_u; i++)
+            {
+                Eigen::Index idx = m_data.h_u_idx(i);
+
+                T c = m_result.z_u(idx) - delta_z;
+                m_result.z_u(idx) = (c + std::sqrt(c * c + 4 * m_result.info.mu)) / 2;
+                m_result.s_u(idx) = m_result.z_u(idx) - c;
+            }
+            for (isize i = 0; i < m_data.n_x_l; i++)
+            {
+                T c = m_result.z_bl(i) - delta_z;
+                m_result.z_bl(i) = (c + std::sqrt(c * c + 4 * m_result.info.mu)) / 2;
+                m_result.s_bl(i) = m_result.z_bl(i) - c;
+            }
+            for (isize i = 0; i < m_data.n_x_u; i++)
+            {
+                T c = m_result.z_bu(i) - delta_z;
+                m_result.z_bu(i) = (c + std::sqrt(c * c + 4 * m_result.info.mu)) / 2;
+                m_result.s_bu(i) = m_result.z_bu(i) - c;
+            }
 
             m_result.info.mu = calculate_mu();
         }
