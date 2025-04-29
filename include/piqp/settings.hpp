@@ -52,6 +52,8 @@ struct Settings
     T eps_duality_gap_abs = 1e-8;
     T eps_duality_gap_rel = 1e-9;
 
+    T infeasibility_threshold = 0.9;
+
     T reg_lower_limit = 1e-10;
     T reg_finetune_lower_limit = 1e-13;
     isize reg_finetune_primal_update_threshold = 7;
@@ -73,7 +75,7 @@ struct Settings
     T iterative_refinement_eps_rel = 1e-12;
     isize iterative_refinement_max_iter = 10;
     T iterative_refinement_min_improvement_rate = 5.0;
-    T iterative_refinement_static_regularization_eps = 1e-7;
+    T iterative_refinement_static_regularization_eps = 1e-8;
     T iterative_refinement_static_regularization_rel = std::numeric_limits<T>::epsilon() * std::numeric_limits<T>::epsilon();
 
     bool verbose = false;
@@ -87,6 +89,7 @@ struct Settings
                eps_rel >= 0 &&
                eps_duality_gap_abs > 0 &&
                eps_duality_gap_rel >= 0 &&
+               infeasibility_threshold >= 0 &&
                reg_lower_limit > 0 &&
                reg_finetune_primal_update_threshold >= 0 &&
                reg_finetune_dual_update_threshold >= 0 &&

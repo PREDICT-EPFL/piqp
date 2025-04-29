@@ -179,6 +179,7 @@ public:
 		m_z_reg.array() = m_z_reg.array().inverse();
 		m_z_reg_iter_ref.array() = m_z_reg.array();
 
+		T delta_reg = delta;
 		if (iterative_refinement)
 		{
 			T max_diag = (P_diag + m_x_reg).template lpNorm<Eigen::Infinity>();
@@ -187,12 +188,13 @@ public:
 			T reg = settings.iterative_refinement_static_regularization_eps
 				    + settings.iterative_refinement_static_regularization_rel * max_diag;
 
+			delta_reg += reg;
 			m_x_reg.array() += reg;
 			m_z_reg_iter_ref.array() += reg;
 		}
 
 		use_iterative_refinement = iterative_refinement;
-		return kkt_solver->update_scalings_and_factor(data, delta, m_x_reg, m_z_reg_iter_ref);
+		return kkt_solver->update_scalings_and_factor(data, delta_reg, m_x_reg, m_z_reg_iter_ref);
     }
 
 	bool solve(const DataType& data, const Settings<T>& settings, const Variables<T>& rhs, Variables<T>& lhs)

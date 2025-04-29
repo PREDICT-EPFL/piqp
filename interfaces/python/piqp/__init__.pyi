@@ -25,9 +25,12 @@ class DenseSolver:
         ...
 class Info:
     delta: float
-    dual_inf: float
     dual_obj: float
-    dual_rel_inf: float
+    dual_prox_inf: float
+    dual_res: float
+    dual_res_reg: float
+    dual_res_reg_rel: float
+    dual_res_rel: float
     dual_step: float
     duality_gap: float
     duality_gap_rel: float
@@ -36,9 +39,14 @@ class Info:
     mu: float
     no_dual_update: int
     no_primal_update: int
-    primal_inf: float
+    prev_dual_res: float
+    prev_primal_res: float
     primal_obj: float
-    primal_rel_inf: float
+    primal_prox_inf: float
+    primal_res: float
+    primal_res_reg: float
+    primal_res_reg_rel: float
+    primal_res_rel: float
     primal_step: float
     reg_limit: float
     rho: float
