@@ -54,10 +54,21 @@ struct Info
     T primal_step;
     T dual_step;
 
-    T primal_inf;
-    T primal_rel_inf;
-    T dual_inf;
-    T dual_rel_inf;
+    T primal_res;
+    T primal_res_rel;
+    T dual_res;
+    T dual_res_rel;
+
+    T primal_res_reg;
+    T primal_res_reg_rel;
+    T dual_res_reg;
+    T dual_res_reg_rel;
+
+    T primal_prox_inf;
+    T dual_prox_inf;
+
+    T prev_primal_res;
+    T prev_dual_res;
 
     T primal_obj;
     T dual_obj;

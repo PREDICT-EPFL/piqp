@@ -52,6 +52,8 @@ struct Settings
     T eps_duality_gap_abs = 1e-8;
     T eps_duality_gap_rel = 1e-9;
 
+    T infeasibility_threshold = 0.9;
+
     T reg_lower_limit = 1e-10;
     T reg_finetune_lower_limit = 1e-13;
     isize reg_finetune_primal_update_threshold = 7;
@@ -87,6 +89,7 @@ struct Settings
                eps_rel >= 0 &&
                eps_duality_gap_abs > 0 &&
                eps_duality_gap_rel >= 0 &&
+               infeasibility_threshold >= 0 &&
                reg_lower_limit > 0 &&
                reg_finetune_primal_update_threshold >= 0 &&
                reg_finetune_dual_update_threshold >= 0 &&
