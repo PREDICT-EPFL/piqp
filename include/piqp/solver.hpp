@@ -731,7 +731,7 @@ protected:
                 // ------------------ update regularization ------------------
                 update_nr_residuals();
 
-                if (dual_inf_nr() < 0.95 * m_result.info.dual_inf || (m_result.info.rho == m_settings.reg_finetune_lower_limit && dual_prox_inf() < 1e2))
+                if (dual_inf_nr() < 0.95 * m_result.info.dual_inf || (m_result.info.rho == m_settings.reg_finetune_lower_limit && dual_prox_inf() * m_result.info.rho < 0.5))
                 {
                     prox_vars.x = m_result.x;
                     m_result.info.rho = (std::max)(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.rho);
@@ -742,7 +742,7 @@ protected:
                     m_result.info.rho = (std::max)(m_result.info.reg_limit, (T(1) - T(0.666) * mu_rate) * m_result.info.rho);
                 }
 
-                if (primal_inf_nr() < 0.95 * m_result.info.primal_inf || (m_result.info.delta == m_settings.reg_finetune_lower_limit && primal_prox_inf() < 1e2))
+                if (primal_inf_nr() < 0.95 * m_result.info.primal_inf || (m_result.info.delta == m_settings.reg_finetune_lower_limit && primal_prox_inf() * m_result.info.delta < 0.5))
                 {
                     prox_vars.y = m_result.y;
                     prox_vars.z_l = m_result.z_l;
