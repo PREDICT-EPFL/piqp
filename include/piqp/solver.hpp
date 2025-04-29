@@ -576,15 +576,10 @@ protected:
                 return m_result.info.status;
             }
 
-            res.x = res_nr.x - m_result.info.rho * (m_result.x - prox_vars.x);
-            res.y = res_nr.y - m_result.info.delta * (prox_vars.y - m_result.y);
-            res.z_l = res_nr.z_l - m_result.info.delta * (prox_vars.z_l - m_result.z_l);
-            res.z_u = res_nr.z_u - m_result.info.delta * (prox_vars.z_u - m_result.z_u);
-            res.z_bl.head(m_data.n_x_l) = res_nr.z_bl.head(m_data.n_x_l) - m_result.info.delta * (nu_bl.head(m_data.n_x_l) - z_bl.head(m_data.n_x_l));
-            res.z_bu.head(m_data.n_x_u) = res_nr.z_bu.head(m_data.n_x_u) - m_result.info.delta * (nu_bu.head(m_data.n_x_u) - z_bu.head(m_data.n_x_u));
+            update_r_residuals();
 
             if (m_result.info.no_dual_update > (std::min)(static_cast<isize>(5), m_settings.reg_finetune_dual_update_threshold) &&
-                primal_prox_inf() > 1e12 &&
+                primal_prox_inf() * m_result.info.delta > 0.5 &&
                 primal_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.primal_rel_inf)
             {
                 m_result.info.status = Status::PIQP_PRIMAL_INFEASIBLE;
@@ -592,7 +587,7 @@ protected:
             }
 
             if (m_result.info.no_primal_update > (std::min)(static_cast<isize>(5), m_settings.reg_finetune_primal_update_threshold) &&
-                dual_prox_inf() > 1e12 &&
+                dual_prox_inf() * m_result.info.rho > 0.5 &&
                 dual_inf_r() < m_settings.eps_abs + m_settings.eps_rel * m_result.info.dual_rel_inf)
             {
                 m_result.info.status = Status::PIQP_DUAL_INFEASIBLE;
@@ -648,8 +643,9 @@ protected:
                 m_result.info.no_dual_update = 0;
             }
 
-            if (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
-                                                         m_result.info.rho, m_result.info.delta, m_result))
+            bool regularization_changed = false;
+            while (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
+                                                            m_result.info.rho, m_result.info.delta, m_result))
             {
                 if (!m_enable_iterative_refinement)
                 {
@@ -660,9 +656,9 @@ protected:
                 {
                     m_result.info.delta *= 100;
                     m_result.info.rho *= 100;
-                    m_result.info.iter--;
                     m_result.info.factor_retires++;
                     m_result.info.reg_limit = (std::min)(10 * m_result.info.reg_limit, m_settings.eps_abs);
+                    regularization_changed = true;
                     continue;
                 }
 
@@ -670,6 +666,10 @@ protected:
                 return m_result.info.status;
             }
             m_result.info.factor_retires = 0;
+
+            if (regularization_changed) {
+                update_r_residuals();
+            }
 
             if (m_data.m + m_data.n_x_l + m_data.n_x_u > 0)
             {
@@ -987,6 +987,16 @@ protected:
             m_result.info.primal_rel_inf = (std::max)(m_result.info.primal_rel_inf, m_preconditioner.unscale_primal_res_b_i(m_result.s_bu(i), idx));
         }
         res_nr.z_bu.head(m_data.n_x_u).noalias() += m_data.x_u.head(m_data.n_x_u) - m_result.s_bu.head(m_data.n_x_u);
+    }
+
+    void update_r_residuals()
+    {
+        res.x = res_nr.x - m_result.info.rho * (m_result.x - prox_vars.x);
+        res.y = res_nr.y - m_result.info.delta * (prox_vars.y - m_result.y);
+        res.z_l = res_nr.z_l - m_result.info.delta * (prox_vars.z_l - m_result.z_l);
+        res.z_u = res_nr.z_u - m_result.info.delta * (prox_vars.z_u - m_result.z_u);
+        res.z_bl.head(m_data.n_x_l) = res_nr.z_bl.head(m_data.n_x_l) - m_result.info.delta * (prox_vars.z_bl.head(m_data.n_x_l) - m_result.z_bl.head(m_data.n_x_l));
+        res.z_bu.head(m_data.n_x_u) = res_nr.z_bu.head(m_data.n_x_u) - m_result.info.delta * (prox_vars.z_bu.head(m_data.n_x_u) - m_result.z_bu.head(m_data.n_x_u));
     }
 
     T primal_inf_nr()

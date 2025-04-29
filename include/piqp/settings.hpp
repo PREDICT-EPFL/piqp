@@ -73,7 +73,7 @@ struct Settings
     T iterative_refinement_eps_rel = 1e-12;
     isize iterative_refinement_max_iter = 10;
     T iterative_refinement_min_improvement_rate = 5.0;
-    T iterative_refinement_static_regularization_eps = 1e-7;
+    T iterative_refinement_static_regularization_eps = 1e-8;
     T iterative_refinement_static_regularization_rel = std::numeric_limits<T>::epsilon() * std::numeric_limits<T>::epsilon();
 
     bool verbose = false;
