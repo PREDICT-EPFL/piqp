@@ -23,7 +23,7 @@ static void BM_DENSE_SOLVER(benchmark::State& state)
     dense::Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
 
     DenseSolver<T> solver;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
     for (auto _ : state)
     {
@@ -42,7 +42,7 @@ static void BM_SPARSE_SOLVER(benchmark::State& state)
     sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
 
     SparseSolver<T, I> solver;
-    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h, qp_model.x_lb, qp_model.x_ub);
+    solver.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
     for (auto _ : state)
     {

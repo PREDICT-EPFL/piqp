@@ -11,6 +11,7 @@
 
 #include "piqp/typedefs.hpp"
 #include "piqp/kkt_fwd.hpp"
+#include "piqp/sparse/data.hpp"
 
 namespace piqp
 {
@@ -27,20 +28,16 @@ protected:
     Vec<I> AT_to_Ki;     // mapping from AT row indices to KKT matrix
     Vec<I> GT_to_Ki;     // mapping from GT row indices to KKT matrix
 
-    void init_workspace()
+    void init_workspace(const Data<T, I>& data)
     {
-        auto& data = static_cast<Derived*>(this)->data;
-
         P_utri_to_Ki.resize(data.P_utri.nonZeros());
         P_diagonal.resize(data.n); P_diagonal.setZero();
         AT_to_Ki.resize(data.AT.nonZeros());
         GT_to_Ki.resize(data.GT.nonZeros());
     }
 
-    SparseMat<T, I> create_kkt_matrix()
+    SparseMat<T, I> create_kkt_matrix(const Data<T, I>& data)
     {
-        auto& data = static_cast<Derived*>(this)->data;
-        auto& m_rho = static_cast<Derived*>(this)->m_rho;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
 
         isize n_kkt = data.n + data.p + data.m;
@@ -104,12 +101,12 @@ protected:
             if (kkt_col_nnz > col_nnz)
             {
                 KKT.innerIndexPtr()[k_kkt + kkt_col_nnz - 1] = I(j_kkt);
-                KKT.valuePtr()[k_kkt + kkt_col_nnz - 1] = m_rho;
+                KKT.valuePtr()[k_kkt + kkt_col_nnz - 1] = T(1); // dummy value for rho
             }
             else
             {
                 P_diagonal[j] = data.P_utri.valuePtr()[data.P_utri.outerIndexPtr()[j + 1] - 1];
-                KKT.valuePtr()[k_kkt + kkt_col_nnz - 1] += m_rho;
+                KKT.valuePtr()[k_kkt + kkt_col_nnz - 1] += T(1); // dummy value for rho
             }
 
             isize i = 0;
@@ -172,24 +169,21 @@ protected:
         return KKT;
     }
 
-    void update_kkt_cost_scalings()
+    void update_kkt_cost_scalings(const Data<T, I>& data, const CVecRef<T>& x_reg)
     {
-        auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& ordering = static_cast<Derived*>(this)->ordering;
-        auto& m_rho = static_cast<Derived*>(this)->m_rho;
 
         // we assume that PKPt is upper triangular and diagonal is set
         // hence we can directly address the diagonal from the outer index pointer
         for (isize col = 0; col < data.n; col++)
         {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] = P_diagonal[col] + m_rho;
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] = P_diagonal[col] + x_reg[col];
         }
     }
 
-    void update_kkt_equality_scalings()
+    void update_kkt_equality_scalings(const Data<T, I>& data)
     {
-        auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& ordering = static_cast<Derived*>(this)->ordering;
         auto& m_delta = static_cast<Derived*>(this)->m_delta;
@@ -201,27 +195,22 @@ protected:
         }
     }
 
-    void update_kkt_inequality_scaling()
+    void update_kkt_inequality_scaling(const Data<T, I>& data, const CVecRef<T>& z_reg)
     {
-        auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& ordering = static_cast<Derived*>(this)->ordering;
-        auto& m_delta = static_cast<Derived*>(this)->m_delta;
-        auto& m_s = static_cast<Derived*>(this)->m_s;
-        auto& m_z_inv = static_cast<Derived*>(this)->m_z_inv;
 
         isize n = data.n + data.p + data.m;
         isize k = 0;
         for (isize col = data.n + data.p; col < n; col++)
         {
-            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] = -m_s(k) * m_z_inv(k) - m_delta;
+            PKPt.valuePtr()[PKPt.outerIndexPtr()[ordering.inv(col) + 1] - 1] = -z_reg(k);
             k++;
         }
     }
 
-    void update_data_impl(int options)
+    void update_data_impl(const Data<T, I>& data, int options)
     {
-        auto& data = static_cast<Derived*>(this)->data;
         auto& PKPt = static_cast<Derived*>(this)->PKPt;
         auto& PKi = static_cast<Derived*>(this)->PKi;
 

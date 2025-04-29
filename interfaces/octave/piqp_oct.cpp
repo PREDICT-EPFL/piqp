@@ -81,6 +81,9 @@ piqp::KKTSolver kkt_solver_from_string(const std::string& kkt_solver, bool is_de
 {
     if (kkt_solver == "dense_cholesky") return piqp::KKTSolver::dense_cholesky;
     if (kkt_solver == "sparse_ldlt") return piqp::KKTSolver::sparse_ldlt;
+    if (kkt_solver == "sparse_ldlt_eq_cond") return piqp::KKTSolver::sparse_ldlt_eq_cond;
+    if (kkt_solver == "sparse_ldlt_ineq_cond") return piqp::KKTSolver::sparse_ldlt_ineq_cond;
+    if (kkt_solver == "sparse_ldlt_cond") return piqp::KKTSolver::sparse_ldlt_cond;
     if (kkt_solver == "sparse_multistage") return piqp::KKTSolver::sparse_multistage;
     if (is_dense) {
         warning("Unknown kkt_solver, using dense_cholesky as a fallback.");
@@ -108,6 +111,7 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     ov_struct.assign("max_iter", octave_value(settings.max_iter));
     ov_struct.assign("max_factor_retires", octave_value(settings.max_factor_retires));
     ov_struct.assign("preconditioner_scale_cost", octave_value(settings.preconditioner_scale_cost));
+    ov_struct.assign("preconditioner_reuse_on_update", octave_value(settings.preconditioner_reuse_on_update));
     ov_struct.assign("preconditioner_iter", octave_value(settings.preconditioner_iter));
     ov_struct.assign("tau", octave_value(settings.tau));
     ov_struct.assign("kkt_solver", octave_value(piqp::kkt_solver_to_string(settings.kkt_solver)));
@@ -140,6 +144,7 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
     settings.max_iter = ov_struct.getfield("max_iter").int_value();
     settings.max_factor_retires = ov_struct.getfield("max_factor_retires").int_value();
     settings.preconditioner_scale_cost = ov_struct.getfield("preconditioner_scale_cost").bool_value();
+    settings.preconditioner_reuse_on_update = ov_struct.getfield("preconditioner_reuse_on_update").bool_value();
     settings.preconditioner_iter = ov_struct.getfield("preconditioner_iter").int_value();
     settings.tau = ov_struct.getfield("tau").double_value();
     settings.kkt_solver = kkt_solver_from_string(ov_struct.getfield("kkt_solver").string_value(), is_dense);
@@ -188,17 +193,14 @@ octave_value result_to_ov_struct(const piqp::Result<double>& result)
 
     ov_result_struct.assign("x", eigen_to_ov(result.x));
     ov_result_struct.assign("y", eigen_to_ov(result.y));
-    ov_result_struct.assign("z", eigen_to_ov(result.z));
-    ov_result_struct.assign("z_lb", eigen_to_ov(result.z_lb));
-    ov_result_struct.assign("z_ub", eigen_to_ov(result.z_ub));
-    ov_result_struct.assign("s", eigen_to_ov(result.s));
-    ov_result_struct.assign("s_lb", eigen_to_ov(result.s_lb));
-    ov_result_struct.assign("s_ub", eigen_to_ov(result.s_ub));
-    ov_result_struct.assign("zeta", eigen_to_ov(result.zeta));
-    ov_result_struct.assign("lambda", eigen_to_ov(result.lambda));
-    ov_result_struct.assign("nu", eigen_to_ov(result.nu));
-    ov_result_struct.assign("nu_lb", eigen_to_ov(result.nu_lb));
-    ov_result_struct.assign("nu_ub", eigen_to_ov(result.nu_ub));
+    ov_result_struct.assign("z_l", eigen_to_ov(result.z_l));
+    ov_result_struct.assign("z_u", eigen_to_ov(result.z_u));
+    ov_result_struct.assign("z_bl", eigen_to_ov(result.z_bl));
+    ov_result_struct.assign("z_bu", eigen_to_ov(result.z_bu));
+    ov_result_struct.assign("s_l", eigen_to_ov(result.s_l));
+    ov_result_struct.assign("s_u", eigen_to_ov(result.s_u));
+    ov_result_struct.assign("s_bl", eigen_to_ov(result.s_bl));
+    ov_result_struct.assign("s_bu", eigen_to_ov(result.s_bu));
     ov_result_struct.assign("info", octave_value(ov_info_struct));
 
     return octave_value(ov_result_struct);
@@ -289,13 +291,13 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
             octave_value_list ret;
             ret.append(octave_value(oct_handle->as_dense_ptr()->result().x.rows()));
             ret.append(octave_value(oct_handle->as_dense_ptr()->result().y.rows()));
-            ret.append(octave_value(oct_handle->as_dense_ptr()->result().z.rows()));
+            ret.append(octave_value(oct_handle->as_dense_ptr()->result().z_l.rows()));
             return ret;
         } else {
             octave_value_list ret;
             ret.append(octave_value(oct_handle->as_sparse_ptr()->result().x.rows()));
             ret.append(octave_value(oct_handle->as_sparse_ptr()->result().y.rows()));
-            ret.append(octave_value(oct_handle->as_sparse_ptr()->result().z.rows()));
+            ret.append(octave_value(oct_handle->as_sparse_ptr()->result().z_u.rows()));
             return ret;
         }
         return {};
@@ -311,24 +313,27 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
         const octave_value& A_ref = args(7);
         const octave_value& b_ref = args(8);
         const octave_value& G_ref = args(9);
-        const octave_value& h_ref = args(10);
-        const octave_value& x_lb_ref = args(11);
-        const octave_value& x_ub_ref = args(12);
+        const octave_value& h_l_ref = args(10);
+        const octave_value& h_u_ref = args(11);
+        const octave_value& x_l_ref = args(12);
+        const octave_value& x_u_ref = args(13);
 
         double c_value = c_ref.is_scalar_type() ? c_ref.double_value() : 0;
         double b_value = b_ref.is_scalar_type() ? b_ref.double_value() : 0;
-        double h_value = h_ref.is_scalar_type() ? h_ref.double_value() : 0;
-        double x_lb_value = x_lb_ref.is_scalar_type() ? x_lb_ref.double_value() : 0;
-        double x_ub_value = x_ub_ref.is_scalar_type() ? x_ub_ref.double_value() : 0;
+        double h_l_value = h_l_ref.is_scalar_type() ? h_l_ref.double_value() : 0;
+        double h_u_value = h_u_ref.is_scalar_type() ? h_u_ref.double_value() : 0;
+        double x_l_value = x_l_ref.is_scalar_type() ? x_l_ref.double_value() : 0;
+        double x_u_value = x_u_ref.is_scalar_type() ? x_u_ref.double_value() : 0;
 
         Eigen::Map<const Vec> c(c_ref.is_scalar_type() ? &c_value : c_ref.vector_value().data(), n);
         Eigen::Map<const Vec> b(b_ref.is_scalar_type() ? &b_value : b_ref.vector_value().data(), p);
-        Eigen::Map<const Vec> h(h_ref.is_scalar_type() ? &h_value : h_ref.vector_value().data(), m);
-        Eigen::Map<const Vec> x_lb(x_lb_ref.is_scalar_type() ? &x_lb_value : x_lb_ref.vector_value().data(), n);
-        Eigen::Map<const Vec> x_ub(x_ub_ref.is_scalar_type() ? &x_ub_value : x_ub_ref.vector_value().data(), n);
+        Eigen::Map<const Vec> h_l(h_l_ref.is_scalar_type() ? &h_l_value : h_l_ref.vector_value().data(), m);
+        Eigen::Map<const Vec> h_u(h_u_ref.is_scalar_type() ? &h_u_value : h_u_ref.vector_value().data(), m);
+        Eigen::Map<const Vec> x_l(x_l_ref.is_scalar_type() ? &x_l_value : x_l_ref.vector_value().data(), n);
+        Eigen::Map<const Vec> x_u(x_u_ref.is_scalar_type() ? &x_u_value : x_u_ref.vector_value().data(), n);
 
         if (oct_handle->isDense()) {
-            copy_ov_struct_to_settings(args(13).scalar_map_value(), oct_handle->as_dense_ptr()->settings(), oct_handle->isDense());
+            copy_ov_struct_to_settings(args(14).scalar_map_value(), oct_handle->as_dense_ptr()->settings(), oct_handle->isDense());
 
             double P_value = P_ref.is_scalar_type() ? P_ref.double_value() : 0;
             double A_value = A_ref.is_scalar_type() ? A_ref.double_value() : 0;
@@ -338,9 +343,9 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
             Eigen::Map<const Mat> A(A_ref.is_scalar_type() ? &A_value : A_ref.matrix_value().data(), p, n);
             Eigen::Map<const Mat> G(G_ref.is_scalar_type() ? &G_value : G_ref.matrix_value().data(), m, n);
 
-            oct_handle->as_dense_ptr()->setup(P, c, A, b, G, h, x_lb, x_ub);
+            oct_handle->as_dense_ptr()->setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
         } else {
-            copy_ov_struct_to_settings(args(13).scalar_map_value(), oct_handle->as_sparse_ptr()->settings(), oct_handle->isDense());
+            copy_ov_struct_to_settings(args(14).scalar_map_value(), oct_handle->as_sparse_ptr()->settings(), oct_handle->isDense());
 
             IVec Pp = to_int_vec(P_ref.sparse_matrix_value().xcidx(), n + 1);
             IVec Pi = to_int_vec(P_ref.sparse_matrix_value().xridx(), Pp(n));
@@ -354,7 +359,7 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
             IVec Gi = to_int_vec(G_ref.sparse_matrix_value().xridx(), Gp(n));
             Eigen::Map<SparseMat> G(m, n, (Eigen::Index) G_ref.nnz(), Gp.data(), Gi.data(), G_ref.sparse_matrix_value().xdata());
 
-            oct_handle->as_sparse_ptr()->setup(P, c, A, b, G, h, x_lb, x_ub);
+            oct_handle->as_sparse_ptr()->setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
         }
 
         return {};
@@ -382,27 +387,31 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
         const octave_value& A_ref = args(7);
         const octave_value& b_ref = args(8);
         const octave_value& G_ref = args(9);
-        const octave_value& h_ref = args(10);
-        const octave_value& x_lb_ref = args(11);
-        const octave_value& x_ub_ref = args(12);
+        const octave_value& h_l_ref = args(10);
+        const octave_value& h_u_ref = args(11);
+        const octave_value& x_l_ref = args(12);
+        const octave_value& x_u_ref = args(13);
 
         piqp::optional<Eigen::Map<const Vec>> c;
         piqp::optional<Eigen::Map<const Vec>> b;
-        piqp::optional<Eigen::Map<const Vec>> h;
-        piqp::optional<Eigen::Map<const Vec>> x_lb;
-        piqp::optional<Eigen::Map<const Vec>> x_ub;
+        piqp::optional<Eigen::Map<const Vec>> h_l;
+        piqp::optional<Eigen::Map<const Vec>> h_u;
+        piqp::optional<Eigen::Map<const Vec>> x_l;
+        piqp::optional<Eigen::Map<const Vec>> x_u;
 
         double c_value = c_ref.is_scalar_type() ? c_ref.double_value() : 0;
         double b_value = b_ref.is_scalar_type() ? b_ref.double_value() : 0;
-        double h_value = h_ref.is_scalar_type() ? h_ref.double_value() : 0;
-        double x_lb_value = x_lb_ref.is_scalar_type() ? x_lb_ref.double_value() : 0;
-        double x_ub_value = x_ub_ref.is_scalar_type() ? x_ub_ref.double_value() : 0;
+        double h_l_value = h_l_ref.is_scalar_type() ? h_l_ref.double_value() : 0;
+        double h_u_value = h_u_ref.is_scalar_type() ? h_u_ref.double_value() : 0;
+        double x_l_value = x_l_ref.is_scalar_type() ? x_l_ref.double_value() : 0;
+        double x_u_value = x_u_ref.is_scalar_type() ? x_u_ref.double_value() : 0;
 
         if (!c_ref.isempty()) { c.emplace(c_ref.is_scalar_type() ? &c_value : c_ref.vector_value().data(), n); }
         if (!b_ref.isempty()) { b.emplace(b_ref.is_scalar_type() ? &b_value : b_ref.vector_value().data(), p); }
-        if (!h_ref.isempty()) { h.emplace(h_ref.is_scalar_type() ? &h_value : h_ref.vector_value().data(), m); }
-        if (!x_lb_ref.isempty()) { x_lb.emplace(x_lb_ref.is_scalar_type() ? &x_lb_value : x_lb_ref.vector_value().data(), n); }
-        if (!x_ub_ref.isempty()) { x_ub.emplace(x_ub_ref.is_scalar_type() ? &x_ub_value : x_ub_ref.vector_value().data(), n); }
+        if (!h_l_ref.isempty()) { h_l.emplace(h_l_ref.is_scalar_type() ? &h_l_value : h_l_ref.vector_value().data(), m); }
+        if (!h_u_ref.isempty()) { h_u.emplace(h_u_ref.is_scalar_type() ? &h_u_value : h_u_ref.vector_value().data(), m); }
+        if (!x_l_ref.isempty()) { x_l.emplace(x_l_ref.is_scalar_type() ? &x_l_value : x_l_ref.vector_value().data(), n); }
+        if (!x_u_ref.isempty()) { x_u.emplace(x_u_ref.is_scalar_type() ? &x_u_value : x_u_ref.vector_value().data(), n); }
 
         if (oct_handle->isDense()) {
             piqp::optional<Eigen::Map<const Mat>> P;
@@ -417,7 +426,7 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
             if (!A_ref.isempty()) { A.emplace(A_ref.is_scalar_type() ? &A_value : A_ref.matrix_value().data(), p, n); }
             if (!G_ref.isempty()) { G.emplace(G_ref.is_scalar_type() ? &G_value : G_ref.matrix_value().data(), m, n); }
 
-            oct_handle->as_dense_ptr()->update(P, c, A, b, G, h, x_lb, x_ub);
+            oct_handle->as_dense_ptr()->update(P, c, A, b, G, h_l, h_u, x_l, x_u);
         } else {
             piqp::optional<Eigen::Map<SparseMat>> P;
             IVec Pp;
@@ -446,7 +455,7 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
                 G = Eigen::Map<SparseMat>(m, n, (Eigen::Index) G_ref.nnz(), Gp.data(), Gi.data(), G_ref.sparse_matrix_value().xdata());
             }
 
-            oct_handle->as_sparse_ptr()->update(P, c, A, b, G, h, x_lb, x_ub);
+            oct_handle->as_sparse_ptr()->update(P, c, A, b, G, h_l, h_u, x_l, x_u);
         }
 
         return {};

@@ -1,18 +1,18 @@
-# Generated using pybind11-stubgen 2.5.1
+# Generated using pybind11-stubgen 2.5.3
 from __future__ import annotations
 import numpy
 import piqp
 import scipy.sparse
 import typing
-__all__ = ['DenseSolver', 'Info', 'KKTSolver', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseSolver', 'Status', 'sparse_multistage', 'dense_cholesky', 'sparse_ldlt']
+__all__ = ['DenseSolver', 'Info', 'KKTSolver', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseSolver', 'Status', 'dense_cholesky', 'sparse_ldlt', 'sparse_ldlt_cond', 'sparse_ldlt_eq_cond', 'sparse_ldlt_ineq_cond', 'sparse_multistage']
 class DenseSolver:
     def __init__(self: piqp.DenseSolver) -> None:
         ...
-    def setup(self: piqp.DenseSolver, P: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous], c: numpy.ndarray[numpy.float64[m, 1]], A: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, h: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_lb: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_ub: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
+    def setup(self: piqp.DenseSolver, P: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous], c: numpy.ndarray[numpy.float64[m, 1]], A: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, h_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, h_u: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_u: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
         ...
     def solve(self: piqp.DenseSolver) -> piqp.Status:
         ...
-    def update(self: piqp.DenseSolver, P: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, c: numpy.ndarray[numpy.float64[m, 1]] | None = None, A: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, h: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_lb: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_ub: numpy.ndarray[numpy.float64[m, 1]] | None = None, reuse_preconditioner: bool = True) -> None:
+    def update(self: piqp.DenseSolver, P: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, c: numpy.ndarray[numpy.float64[m, 1]] | None = None, A: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, h_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, h_u: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_u: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
         ...
     @property
     def result(self) -> piqp.Result:
@@ -58,13 +58,22 @@ class KKTSolver:
 
       sparse_ldlt
 
+      sparse_ldlt_eq_cond
+
+      sparse_ldlt_ineq_cond
+
+      sparse_ldlt_cond
+
       sparse_multistage
     """
-    __members__: typing.ClassVar[dict[str, piqp.KKTSolver]]  # value = {'dense_cholesky': <KKTSolver.dense_cholesky: 0>, 'sparse_ldlt': <KKTSolver.sparse_ldlt: 1>, 'sparse_multistage': <KKTSolver.sparse_multistage: 2>}
+    __members__: typing.ClassVar[dict[str, piqp.KKTSolver]]  # value = {'dense_cholesky': <KKTSolver.dense_cholesky: 0>, 'sparse_ldlt': <KKTSolver.sparse_ldlt: 1>, 'sparse_ldlt_eq_cond': <KKTSolver.sparse_ldlt_eq_cond: 2>, 'sparse_ldlt_ineq_cond': <KKTSolver.sparse_ldlt_ineq_cond: 3>, 'sparse_ldlt_cond': <KKTSolver.sparse_ldlt_cond: 4>, 'sparse_multistage': <KKTSolver.sparse_multistage: 5>}
     dense_cholesky: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.dense_cholesky: 0>
     sparse_ldlt: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_ldlt: 1>
-    sparse_multistage: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_multistage: 2>
-def __eq__(self, other: typing.Any) -> bool:
+    sparse_ldlt_cond: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_ldlt_cond: 4>
+    sparse_ldlt_eq_cond: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_ldlt_eq_cond: 2>
+    sparse_ldlt_ineq_cond: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_ldlt_ineq_cond: 3>
+    sparse_multistage: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_multistage: 5>
+    def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
         ...
@@ -92,19 +101,16 @@ def __eq__(self, other: typing.Any) -> bool:
         ...
 class Result:
     info: piqp.Info
-    lambda: numpy.ndarray[numpy.float64[m, 1]]
-    nu: numpy.ndarray[numpy.float64[m, 1]]
-    nu_lb: numpy.ndarray[numpy.float64[m, 1]]
-    nu_ub: numpy.ndarray[numpy.float64[m, 1]]
-    s: numpy.ndarray[numpy.float64[m, 1]]
-    s_lb: numpy.ndarray[numpy.float64[m, 1]]
-    s_ub: numpy.ndarray[numpy.float64[m, 1]]
+    s_bl: numpy.ndarray[numpy.float64[m, 1]]
+    s_bu: numpy.ndarray[numpy.float64[m, 1]]
+    s_l: numpy.ndarray[numpy.float64[m, 1]]
+    s_u: numpy.ndarray[numpy.float64[m, 1]]
     x: numpy.ndarray[numpy.float64[m, 1]]
     y: numpy.ndarray[numpy.float64[m, 1]]
-    z: numpy.ndarray[numpy.float64[m, 1]]
-    z_lb: numpy.ndarray[numpy.float64[m, 1]]
-    z_ub: numpy.ndarray[numpy.float64[m, 1]]
-    zeta: numpy.ndarray[numpy.float64[m, 1]]
+    z_bl: numpy.ndarray[numpy.float64[m, 1]]
+    z_bu: numpy.ndarray[numpy.float64[m, 1]]
+    z_l: numpy.ndarray[numpy.float64[m, 1]]
+    z_u: numpy.ndarray[numpy.float64[m, 1]]
 class Settings:
     check_duality_gap: bool
     compute_timings: bool
@@ -124,6 +130,7 @@ class Settings:
     max_factor_retires: int
     max_iter: int
     preconditioner_iter: int
+    preconditioner_reuse_on_update: bool
     preconditioner_scale_cost: bool
     reg_finetune_dual_update_threshold: int
     reg_finetune_lower_limit: float
@@ -135,11 +142,11 @@ class Settings:
 class SparseSolver:
     def __init__(self: piqp.SparseSolver) -> None:
         ...
-    def setup(self: piqp.SparseSolver, P: scipy.sparse.csc_matrix, c: numpy.ndarray[numpy.float64[m, 1]], A: scipy.sparse.csc_matrix | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: scipy.sparse.csc_matrix | None = None, h: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_lb: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_ub: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
+    def setup(self: piqp.SparseSolver, P: scipy.sparse.csc_matrix, c: numpy.ndarray[numpy.float64[m, 1]], A: scipy.sparse.csc_matrix | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: scipy.sparse.csc_matrix | None = None, h_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, h_u: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_u: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
         ...
     def solve(self: piqp.SparseSolver) -> piqp.Status:
         ...
-    def update(self: piqp.SparseSolver, P: scipy.sparse.csc_matrix | None = None, c: numpy.ndarray[numpy.float64[m, 1]] | None = None, A: scipy.sparse.csc_matrix | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: scipy.sparse.csc_matrix | None = None, h: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_lb: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_ub: numpy.ndarray[numpy.float64[m, 1]] | None = None, reuse_preconditioner: bool = True) -> None:
+    def update(self: piqp.SparseSolver, P: scipy.sparse.csc_matrix | None = None, c: numpy.ndarray[numpy.float64[m, 1]] | None = None, A: scipy.sparse.csc_matrix | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: scipy.sparse.csc_matrix | None = None, h_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, h_u: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_u: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
         ...
     @property
     def result(self) -> piqp.Result:
@@ -212,4 +219,7 @@ PIQP_UNSOLVED: piqp.Status  # value = <Status.PIQP_UNSOLVED: -9>
 __version__: str = '0.5.0'
 dense_cholesky: piqp.KKTSolver  # value = <KKTSolver.dense_cholesky: 0>
 sparse_ldlt: piqp.KKTSolver  # value = <KKTSolver.sparse_ldlt: 1>
-sparse_multistage: piqp.KKTSolver  # value = <KKTSolver.sparse_multistage: 2>
+sparse_ldlt_cond: piqp.KKTSolver  # value = <KKTSolver.sparse_ldlt_cond: 4>
+sparse_ldlt_eq_cond: piqp.KKTSolver  # value = <KKTSolver.sparse_ldlt_eq_cond: 2>
+sparse_ldlt_ineq_cond: piqp.KKTSolver  # value = <KKTSolver.sparse_ldlt_ineq_cond: 3>
+sparse_multistage: piqp.KKTSolver  # value = <KKTSolver.sparse_multistage: 5>

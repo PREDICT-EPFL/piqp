@@ -6,10 +6,11 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#define PIQP_EIGEN_CHECK_MALLOC
+// #define PIQP_EIGEN_CHECK_MALLOC
 
 #include "piqp/piqp.hpp"
 #include "piqp/dense/kkt.hpp"
+#include "piqp/kkt_system.hpp"
 #include "piqp/utils/random_utils.hpp"
 
 #include "gtest/gtest.h"
@@ -28,23 +29,18 @@ TEST(DenseKKTTest, UpdateData)
 
     Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
     Data<T> data(qp_model);
-    Settings<T> settings;
 
     // make sure P_utri has not complete diagonal filled
     data.P_utri(1, 1) = 0;
 
     T rho = 0.9;
     T delta = 1.2;
-    Vec<T> s(n_ineq); s.setConstant(1);
-    Vec<T> s_lb(dim); s_lb.setConstant(1);
-    Vec<T> s_ub(dim); s_ub.setConstant(1);
-    Vec<T> z(n_ineq); z.setConstant(1);
-    Vec<T> z_lb(dim); z_lb.setConstant(1);
-    Vec<T> z_ub(dim); z_ub.setConstant(1);
+    Vec<T> x_reg(dim); x_reg.setConstant(rho);
+    Vec<T> z_reg(n_ineq); z_reg.setConstant(1 + delta);
 
-    KKT<T> kkt(data, settings);
+    KKT<T> kkt(data);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt.update_scalings_and_factor(data, delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // update data
@@ -55,13 +51,13 @@ TEST(DenseKKTTest, UpdateData)
     int update_options = KKTUpdateOptions::KKT_UPDATE_P | KKTUpdateOptions::KKT_UPDATE_A | KKTUpdateOptions::KKT_UPDATE_G;
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_data(update_options);
-    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt.update_data(data, update_options);
+    kkt.update_scalings_and_factor(data, delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    KKT<T> kkt2(data, settings);
+    KKT<T> kkt2(data);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt2.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt2.update_scalings_and_factor(data, delta, x_reg, z_reg);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     // assert update was correct, i.e. it's the same as a freshly initialized one
@@ -80,61 +76,64 @@ TEST(DenseKKTTest, FactorizeSolve)
 
     T rho = 0.9;
     T delta = 1.2;
-    Vec<T> s(n_ineq); s.setConstant(1);
-    Vec<T> s_lb(dim); s_lb.setConstant(1);
-    Vec<T> s_ub(dim); s_ub.setConstant(1);
-    Vec<T> z(n_ineq); z.setConstant(1);
-    Vec<T> z_lb(dim); z_lb.setConstant(1);
-    Vec<T> z_ub(dim); z_ub.setConstant(1);
+    Variables<T> scaling; scaling.resize(dim, n_eq, n_ineq);
+    scaling.s_l.setConstant(1);
+    scaling.s_u.setConstant(1);
+    scaling.s_bl.setConstant(1);
+    scaling.s_bu.setConstant(1);
+    scaling.z_l.setConstant(1);
+    scaling.z_u.setConstant(1);
+    scaling.z_bl.setConstant(1);
+    scaling.z_bu.setConstant(1);
 
-    KKT<T> kkt(data, settings);
+    KKTSystem<T, int, PIQP_DENSE> kkt;
+    kkt.init(data, settings);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.update_scalings_and_factor(false, rho, delta, s, s_lb, s_ub, z, z_lb, z_ub);
+    kkt.update_scalings_and_factor(data, settings, false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    Vec<T> rhs_x = rand::vector_rand<T>(dim);
-    Vec<T> rhs_y = rand::vector_rand<T>(n_eq);
-    Vec<T> rhs_z = rand::vector_rand<T>(n_ineq);
-    Vec<T> rhs_z_lb = rand::vector_rand<T>(dim);
-    Vec<T> rhs_z_ub = rand::vector_rand<T>(dim);
-    Vec<T> rhs_s = rand::vector_rand<T>(n_ineq);
-    Vec<T> rhs_s_lb = rand::vector_rand<T>(dim);
-    Vec<T> rhs_s_ub = rand::vector_rand<T>(dim);
+    Variables<T> rhs;
+    rhs.x = rand::vector_rand<T>(dim);
+    rhs.y = rand::vector_rand<T>(n_eq);
+    rhs.z_l = rand::vector_rand<T>(n_ineq);
+    rhs.z_u = rand::vector_rand<T>(n_ineq);
+    rhs.z_bl = rand::vector_rand<T>(dim);
+    rhs.z_bu = rand::vector_rand<T>(dim);
+    rhs.s_l = rand::vector_rand<T>(n_ineq);
+    rhs.s_u = rand::vector_rand<T>(n_ineq);
+    rhs.s_bl = rand::vector_rand<T>(dim);
+    rhs.s_bu = rand::vector_rand<T>(dim);
 
-    Vec<T> delta_x(dim);
-    Vec<T> delta_y(n_eq);
-    Vec<T> delta_z(n_ineq);
-    Vec<T> delta_z_lb(dim);
-    Vec<T> delta_z_ub(dim);
-    Vec<T> delta_s(n_ineq);
-    Vec<T> delta_s_lb(dim);
-    Vec<T> delta_s_ub(dim);
+    Variables<T> lhs;
+    lhs.resize(dim, n_eq, n_ineq);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.solve(rhs_x, rhs_y, rhs_z, rhs_z_lb, rhs_z_ub, rhs_s, rhs_s_lb, rhs_s_ub,
-              delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub);
+    kkt.solve(data, settings, rhs, lhs);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    Vec<T> rhs_x_sol(dim);
-    Vec<T> rhs_y_sol(n_eq);
-    Vec<T> rhs_z_sol(n_ineq);
-    Vec<T> rhs_z_lb_sol(dim);
-    Vec<T> rhs_z_ub_sol(dim);
-    Vec<T> rhs_s_sol(n_ineq);
-    Vec<T> rhs_s_lb_sol(dim);
-    Vec<T> rhs_s_ub_sol(dim);
+    Variables<T> rhs_sol;
+    rhs_sol.resize(dim, n_eq, n_ineq);
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    kkt.multiply(delta_x, delta_y, delta_z, delta_z_lb, delta_z_ub, delta_s, delta_s_lb, delta_s_ub,
-                 rhs_x_sol, rhs_y_sol, rhs_z_sol, rhs_z_lb_sol, rhs_z_ub_sol, rhs_s_sol, rhs_s_lb_sol, rhs_s_ub_sol);
+    kkt.mul(data, lhs, rhs_sol);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    ASSERT_TRUE(rhs_x.isApprox(rhs_x_sol, 1e-8));
-    ASSERT_TRUE(rhs_y.isApprox(rhs_y_sol, 1e-8));
-    ASSERT_TRUE(rhs_z.isApprox(rhs_z_sol, 1e-8));
-    ASSERT_TRUE(rhs_z_lb.head(data.n_lb).isApprox(rhs_z_lb_sol.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(rhs_z_ub.head(data.n_ub).isApprox(rhs_z_ub_sol.head(data.n_ub), 1e-8));
-    ASSERT_TRUE(rhs_s.isApprox(rhs_s_sol, 1e-8));
-    ASSERT_TRUE(rhs_s_lb.head(data.n_lb).isApprox(rhs_s_lb_sol.head(data.n_lb), 1e-8));
-    ASSERT_TRUE(rhs_s_ub.head(data.n_ub).isApprox(rhs_s_ub_sol.head(data.n_ub), 1e-8));
+    ASSERT_TRUE(rhs.x.isApprox(rhs_sol.x, 1e-8));
+    ASSERT_TRUE(rhs.y.isApprox(rhs_sol.y, 1e-8));
+    ASSERT_TRUE(rhs.z_bl.head(data.n_x_l).isApprox(rhs_sol.z_bl.head(data.n_x_l), 1e-8));
+    ASSERT_TRUE(rhs.z_bu.head(data.n_x_u).isApprox(rhs_sol.z_bu.head(data.n_x_u), 1e-8));
+    ASSERT_TRUE(rhs.s_bl.head(data.n_x_l).isApprox(rhs_sol.s_bl.head(data.n_x_l), 1e-8));
+    ASSERT_TRUE(rhs.s_bu.head(data.n_x_u).isApprox(rhs_sol.s_bu.head(data.n_x_u), 1e-8));
+    for (isize i = 0; i < data.n_h_l; i++)
+    {
+        Eigen::Index idx = data.h_l_idx(i);
+        ASSERT_NEAR(rhs.z_l(idx), rhs_sol.z_l(idx), 1e-8);
+        ASSERT_NEAR(rhs.s_l(idx), rhs_sol.s_l(idx), 1e-8);
+    }
+    for (isize i = 0; i < data.n_h_u; i++)
+    {
+        Eigen::Index idx = data.h_u_idx(i);
+        ASSERT_NEAR(rhs.z_u(idx), rhs_sol.z_u(idx), 1e-8);
+        ASSERT_NEAR(rhs.s_u(idx), rhs_sol.s_u(idx), 1e-8);
+    }
 }

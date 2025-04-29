@@ -10,6 +10,7 @@
 #define PIQP_RESULTS_HPP
 
 #include "piqp/typedefs.hpp"
+#include "piqp/variables.hpp"
 
 namespace piqp
 {
@@ -75,23 +76,8 @@ struct Info
 };
 
 template<typename T>
-struct Result
+struct Result : Variables<T>
 {
-    Vec<T> x;
-    Vec<T> y;
-    Vec<T> z;
-    Vec<T> z_lb;
-    Vec<T> z_ub;
-    Vec<T> s;
-    Vec<T> s_lb;
-    Vec<T> s_ub;
-
-    Vec<T> zeta;
-    Vec<T> lambda;
-    Vec<T> nu;
-    Vec<T> nu_lb;
-    Vec<T> nu_ub;
-
     Info<T> info;
 };
 

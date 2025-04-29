@@ -22,10 +22,10 @@ int main()
     piqp_float b[1] = {1};
 
     piqp_float G[4] = {1, -1, 2, 0};
-    piqp_float h[2] = {0.2, -1};
+    piqp_float h_u[2] = {0.2, -1};
 
-    piqp_float x_lb[2] = {-1, -PIQP_INF};
-    piqp_float x_ub[2] = {1, PIQP_INF};
+    piqp_float x_l[2] = {-1, -PIQP_INF};
+    piqp_float x_u[2] = {1, PIQP_INF};
 
     piqp_workspace* work;
     piqp_settings* settings = (piqp_settings*) malloc(sizeof(piqp_settings));
@@ -43,9 +43,10 @@ int main()
     data->A = A;
     data->b = b;
     data->G = G;
-    data->h = h;
-    data->x_lb = x_lb;
-    data->x_ub = x_ub;
+    data->h_l = NULL;
+    data->h_u = h_u;
+    data->x_l = x_l;
+    data->x_u = x_u;
 
     piqp_setup_dense(&work, data, settings);
     piqp_status status = piqp_solve(work);

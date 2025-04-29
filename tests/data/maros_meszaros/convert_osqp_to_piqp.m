@@ -18,8 +18,8 @@ for file = files'
     l(l < -9e19) = -inf;
     u(u < -9e19) = -inf;
 
-    x_lb = l(end-n+1:end);
-    x_ub = u(end-n+1:end);
+    x_l = l(end-n+1:end);
+    x_u = u(end-n+1:end);
     
     C = A(1:end-n,:);
     cl = l(1:end-n);
@@ -28,14 +28,20 @@ for file = files'
     eq_bounds = cu == cl;
     ineq_bounds = ~eq_bounds;
 
-    A = C(eq_bounds, :);
+    A = C(eq_bounds, :)'';
     b = cu(eq_bounds);
+    if numel(b) == 0, b = zeros(0, 1); end
 
-    G = [C(ineq_bounds, :); -C(ineq_bounds, :)];
-    h = [cu(ineq_bounds); -cl(ineq_bounds)];
+    G = C(ineq_bounds, :);
+    h_u = cu(ineq_bounds);
+    h_l = cl(ineq_bounds);
 
-    G = G(h < inf, :);
-    h = h(h < inf);
+    finite_bounds = (h_l > -inf) | (h_u < inf);
+    G = G(finite_bounds, :)'';
+    h_u = h_u(finite_bounds);
+    h_l = h_l(finite_bounds);
+    if numel(h_u) == 0, h_u = zeros(0, 1); end
+    if numel(h_l) == 0, h_l = zeros(0, 1); end
 
-    save(file.name, "P", "c", "A", "b", "G", "h", "x_lb", "x_ub");
+    save(file.name, "P", "c", "A", "b", "G", "h_l", "h_u", "x_l", "x_u");
 end

@@ -107,8 +107,10 @@ public:
 
     void setZero() const
     {
-        // zero out matrix
-        std::memset(mat.mem, 0, static_cast<std::size_t>(mat.memsize));
+        if (mat.mem) {
+            // zero out matrix
+            std::memset(mat.mem, 0, static_cast<std::size_t>(mat.memsize));
+        }
     }
 
     blasfeo_dmat* ref() { return &mat; }

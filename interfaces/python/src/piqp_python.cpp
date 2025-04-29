@@ -68,22 +68,22 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     py::class_<piqp::Result<T>>(m, "Result", py::module_local())
         .def_readwrite("x", &piqp::Result<T>::x)
         .def_readwrite("y", &piqp::Result<T>::y)
-        .def_readwrite("z", &piqp::Result<T>::z)
-        .def_readwrite("z_lb", &piqp::Result<T>::z_lb)
-        .def_readwrite("z_ub", &piqp::Result<T>::z_ub)
-        .def_readwrite("s", &piqp::Result<T>::s)
-        .def_readwrite("s_lb", &piqp::Result<T>::s_lb)
-        .def_readwrite("s_ub", &piqp::Result<T>::s_ub)
-        .def_readwrite("zeta", &piqp::Result<T>::zeta)
-        .def_readwrite("lambda", &piqp::Result<T>::lambda)
-        .def_readwrite("nu", &piqp::Result<T>::nu)
-        .def_readwrite("nu_lb", &piqp::Result<T>::nu_lb)
-        .def_readwrite("nu_ub", &piqp::Result<T>::nu_ub)
+        .def_readwrite("z_l", &piqp::Result<T>::z_l)
+        .def_readwrite("z_u", &piqp::Result<T>::z_u)
+        .def_readwrite("z_bl", &piqp::Result<T>::z_bl)
+        .def_readwrite("z_bu", &piqp::Result<T>::z_bu)
+        .def_readwrite("s_l", &piqp::Result<T>::s_l)
+        .def_readwrite("s_u", &piqp::Result<T>::s_u)
+        .def_readwrite("s_bl", &piqp::Result<T>::s_bl)
+        .def_readwrite("s_bu", &piqp::Result<T>::s_bu)
         .def_readwrite("info", &piqp::Result<T>::info);
 
     py::enum_<piqp::KKTSolver>(m, "KKTSolver", py::module_local())
             .value("dense_cholesky", piqp::KKTSolver::dense_cholesky)
             .value("sparse_ldlt", piqp::KKTSolver::sparse_ldlt)
+            .value("sparse_ldlt_eq_cond", piqp::KKTSolver::sparse_ldlt_eq_cond)
+            .value("sparse_ldlt_ineq_cond", piqp::KKTSolver::sparse_ldlt_ineq_cond)
+            .value("sparse_ldlt_cond", piqp::KKTSolver::sparse_ldlt_cond)
             .value("sparse_multistage", piqp::KKTSolver::sparse_multistage)
             .export_values();
 
@@ -102,6 +102,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("max_iter", &piqp::Settings<T>::max_iter)
         .def_readwrite("max_factor_retires", &piqp::Settings<T>::max_factor_retires)
         .def_readwrite("preconditioner_scale_cost", &piqp::Settings<T>::preconditioner_scale_cost)
+        .def_readwrite("preconditioner_reuse_on_update", &piqp::Settings<T>::preconditioner_reuse_on_update)
         .def_readwrite("preconditioner_iter", &piqp::Settings<T>::preconditioner_iter)
         .def_readwrite("tau", &piqp::Settings<T>::tau)
         .def_readwrite("kkt_solver", &piqp::Settings<T>::kkt_solver)
@@ -115,7 +116,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("verbose", &piqp::Settings<T>::verbose)
         .def_readwrite("compute_timings", &piqp::Settings<T>::compute_timings);
 
-    using SparseSolver = piqp::SparseSolver<T, I, piqp::KKTMode::KKT_FULL>;
+    using SparseSolver = piqp::SparseSolver<T, I>;
     py::class_<SparseSolver>(m, "SparseSolver", py::module_local())
         .def(py::init<>())
         .def_property("settings", &SparseSolver::settings, &SparseSolver::settings)
@@ -127,16 +128,17 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
                 const piqp::optional<piqp::SparseMat<T, I>>& A = piqp::nullopt,
                 const piqp::optional<piqp::CVecRef<T>>& b = piqp::nullopt,
                 const piqp::optional<piqp::SparseMat<T, I>>& G = piqp::nullopt,
-                const piqp::optional<piqp::CVecRef<T>>& h = piqp::nullopt,
-                const piqp::optional<piqp::CVecRef<T>>& x_lb = piqp::nullopt,
-                const piqp::optional<piqp::CVecRef<T>>& x_ub = piqp::nullopt)
+                const piqp::optional<piqp::CVecRef<T>>& h_l = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& h_u = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& x_l = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& x_u = piqp::nullopt)
              {
-                 solver.setup(P, c, A, b, G, h, x_lb, x_ub);
+                 solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
              },
              py::arg("P"), py::arg("c"),
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
-             py::arg("G") = piqp::nullopt, py::arg("h") = piqp::nullopt,
-             py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt)
+             py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
+             py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
         .def("update",
              [](SparseSolver &solver,
                 const piqp::optional<piqp::SparseMat<T, I>>& P = piqp::nullopt,
@@ -144,18 +146,17 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
                 const piqp::optional<piqp::SparseMat<T, I>>& A = piqp::nullopt,
                 const piqp::optional<piqp::CVecRef<T>>& b = piqp::nullopt,
                 const piqp::optional<piqp::SparseMat<T, I>>& G = piqp::nullopt,
-                const piqp::optional<piqp::CVecRef<T>>& h = piqp::nullopt,
-                const piqp::optional<piqp::CVecRef<T>>& x_lb = piqp::nullopt,
-                const piqp::optional<piqp::CVecRef<T>>& x_ub = piqp::nullopt,
-                bool reuse_preconditioner = true)
+                const piqp::optional<piqp::CVecRef<T>>& h_l = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& h_u = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& x_l = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& x_u = piqp::nullopt)
              {
-                 solver.update(P, c, A, b, G, h, x_lb, x_ub, reuse_preconditioner);
+                 solver.update(P, c, A, b, G, h_l, h_u, x_l, x_u);
              },
              py::arg("P") = piqp::nullopt, py::arg("c") = piqp::nullopt,
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
-             py::arg("G") = piqp::nullopt, py::arg("h") = piqp::nullopt,
-             py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt,
-             py::arg("reuse_preconditioner") = true)
+             py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
+             py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
         .def("solve", &SparseSolver::solve);
 
     using DenseSolver = piqp::DenseSolver<T>;
@@ -166,14 +167,13 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def("setup", &DenseSolver::setup,
              py::arg("P"), py::arg("c"),
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
-             py::arg("G") = piqp::nullopt, py::arg("h") = piqp::nullopt,
-             py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt)
+             py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
+             py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
         .def("update", &DenseSolver::update,
              py::arg("P") = piqp::nullopt, py::arg("c") = piqp::nullopt,
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
-             py::arg("G") = piqp::nullopt, py::arg("h") = piqp::nullopt,
-             py::arg("x_lb") = piqp::nullopt, py::arg("x_ub") = piqp::nullopt,
-             py::arg("reuse_preconditioner") = true)
+             py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
+             py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
         .def("solve", &DenseSolver::solve);
 
 #ifdef VERSION_INFO

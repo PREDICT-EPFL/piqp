@@ -40,6 +40,7 @@ const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "max_iter",
                                       "max_factor_retires",
                                       "preconditioner_scale_cost",
+                                      "preconditioner_reuse_on_update",
                                       "preconditioner_iter",
                                       "tau",
                                       "kkt_solver",
@@ -81,17 +82,14 @@ const char* PIQP_INFO_FIELDS[] = {"status",
 
 const char* PIQP_RESULT_FIELDS[] = {"x",
                                     "y",
-                                    "z",
-                                    "z_lb",
-                                    "z_ub",
-                                    "s",
-                                    "s_lb",
-                                    "s_ub",
-                                    "zeta",
-                                    "lambda",
-                                    "nu",
-                                    "nu_lb",
-                                    "nu_ub",
+                                    "z_l",
+                                    "z_u",
+                                    "z_bl",
+                                    "z_bu",
+                                    "s_l",
+                                    "s_u",
+                                    "s_bl",
+                                    "s_bu",
                                     "info"};
 
 class piqp_mex_handle
@@ -154,6 +152,9 @@ piqp::KKTSolver kkt_solver_from_string(const char* kkt_solver, bool is_dense)
     std::string kkt_solver_str(kkt_solver);
     if (kkt_solver_str == "dense_cholesky") return piqp::KKTSolver::dense_cholesky;
     if (kkt_solver_str == "sparse_ldlt") return piqp::KKTSolver::sparse_ldlt;
+    if (kkt_solver_str == "sparse_ldlt_eq_cond") return piqp::KKTSolver::sparse_ldlt_eq_cond;
+    if (kkt_solver_str == "sparse_ldlt_ineq_cond") return piqp::KKTSolver::sparse_ldlt_ineq_cond;
+    if (kkt_solver_str == "sparse_ldlt_cond") return piqp::KKTSolver::sparse_ldlt_cond;
     if (kkt_solver_str == "sparse_multistage") return piqp::KKTSolver::sparse_multistage;
     if (is_dense) {
         mexWarnMsgTxt("Unknown kkt_solver, using dense_cholesky as a fallback.");
@@ -182,6 +183,7 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     mxSetField(mx_ptr, 0, "max_iter", mxCreateDoubleScalar((double) settings.max_iter));
     mxSetField(mx_ptr, 0, "max_factor_retires", mxCreateDoubleScalar((double) settings.max_factor_retires));
     mxSetField(mx_ptr, 0, "preconditioner_scale_cost", mxCreateDoubleScalar(settings.preconditioner_scale_cost));
+    mxSetField(mx_ptr, 0, "preconditioner_reuse_on_update", mxCreateDoubleScalar(settings.preconditioner_reuse_on_update));
     mxSetField(mx_ptr, 0, "preconditioner_iter", mxCreateDoubleScalar((double) settings.preconditioner_iter));
     mxSetField(mx_ptr, 0, "tau", mxCreateDoubleScalar(settings.tau));
     mxSetField(mx_ptr, 0, "kkt_solver", mxCreateString(piqp::kkt_solver_to_string(settings.kkt_solver)));
@@ -214,6 +216,7 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
     settings.max_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "max_iter"));
     settings.max_factor_retires = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "max_factor_retires"));
     settings.preconditioner_scale_cost = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "preconditioner_scale_cost"));
+    settings.preconditioner_reuse_on_update = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "preconditioner_reuse_on_update"));
     settings.preconditioner_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "preconditioner_iter"));
     settings.tau = (double) mxGetScalar(mxGetField(mx_ptr, 0, "tau"));
     char kkt_solver[30];
@@ -266,17 +269,14 @@ mxArray* result_to_mx_struct(const piqp::Result<double>& result)
 
     mxSetField(mx_result_ptr, 0, "x", eigen_to_mx(result.x));
     mxSetField(mx_result_ptr, 0, "y", eigen_to_mx(result.y));
-    mxSetField(mx_result_ptr, 0, "z", eigen_to_mx(result.z));
-    mxSetField(mx_result_ptr, 0, "z_lb", eigen_to_mx(result.z_lb));
-    mxSetField(mx_result_ptr, 0, "z_ub", eigen_to_mx(result.z_ub));
-    mxSetField(mx_result_ptr, 0, "s", eigen_to_mx(result.s));
-    mxSetField(mx_result_ptr, 0, "s_lb", eigen_to_mx(result.s_lb));
-    mxSetField(mx_result_ptr, 0, "s_ub", eigen_to_mx(result.s_ub));
-    mxSetField(mx_result_ptr, 0, "zeta", eigen_to_mx(result.zeta));
-    mxSetField(mx_result_ptr, 0, "lambda", eigen_to_mx(result.lambda));
-    mxSetField(mx_result_ptr, 0, "nu", eigen_to_mx(result.nu));
-    mxSetField(mx_result_ptr, 0, "nu_lb", eigen_to_mx(result.nu_lb));
-    mxSetField(mx_result_ptr, 0, "nu_ub", eigen_to_mx(result.nu_ub));
+    mxSetField(mx_result_ptr, 0, "z_l", eigen_to_mx(result.z_l));
+    mxSetField(mx_result_ptr, 0, "z_u", eigen_to_mx(result.z_u));
+    mxSetField(mx_result_ptr, 0, "z_bl", eigen_to_mx(result.z_bl));
+    mxSetField(mx_result_ptr, 0, "z_bu", eigen_to_mx(result.z_bu));
+    mxSetField(mx_result_ptr, 0, "s_l", eigen_to_mx(result.s_l));
+    mxSetField(mx_result_ptr, 0, "s_u", eigen_to_mx(result.s_u));
+    mxSetField(mx_result_ptr, 0, "s_bl", eigen_to_mx(result.s_bl));
+    mxSetField(mx_result_ptr, 0, "s_bu", eigen_to_mx(result.s_bu));
     mxSetField(mx_result_ptr, 0, "info", mx_info_ptr);
 
     return mx_result_ptr;
@@ -367,11 +367,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         if (mex_handle->isDense()) {
             plhs[0] = mxCreateDoubleScalar((double) mex_handle->as_dense_ptr()->result().x.rows());
             plhs[1] = mxCreateDoubleScalar((double) mex_handle->as_dense_ptr()->result().y.rows());
-            plhs[2] = mxCreateDoubleScalar((double) mex_handle->as_dense_ptr()->result().z.rows());
+            plhs[2] = mxCreateDoubleScalar((double) mex_handle->as_dense_ptr()->result().z_l.rows());
         } else {
             plhs[0] = mxCreateDoubleScalar((double) mex_handle->as_sparse_ptr()->result().x.rows());
             plhs[1] = mxCreateDoubleScalar((double) mex_handle->as_sparse_ptr()->result().y.rows());
-            plhs[2] = mxCreateDoubleScalar((double) mex_handle->as_sparse_ptr()->result().z.rows());
+            plhs[2] = mxCreateDoubleScalar((double) mex_handle->as_sparse_ptr()->result().z_l.rows());
         }
         return;
     }
@@ -386,26 +386,28 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         const mxArray* A_ptr = prhs[7];
         const mxArray* b_ptr = prhs[8];
         const mxArray* G_ptr = prhs[9];
-        const mxArray* h_ptr = prhs[10];
-        const mxArray* x_lb_ptr = prhs[11];
-        const mxArray* x_ub_ptr = prhs[12];
+        const mxArray* h_l_ptr = prhs[10];
+        const mxArray* h_u_ptr = prhs[11];
+        const mxArray* x_l_ptr = prhs[12];
+        const mxArray* x_u_ptr = prhs[13];
 
         Eigen::Map<Vec> c(mxGetPr(c_ptr), n);
         Eigen::Map<Vec> b(mxGetPr(b_ptr), p);
-        Eigen::Map<Vec> h(mxGetPr(h_ptr), m);
-        Eigen::Map<Vec> x_lb(mxGetPr(x_lb_ptr), n);
-        Eigen::Map<Vec> x_ub(mxGetPr(x_ub_ptr), n);
+        Eigen::Map<Vec> h_l(mxGetPr(h_l_ptr), m);
+        Eigen::Map<Vec> h_u(mxGetPr(h_u_ptr), m);
+        Eigen::Map<Vec> x_l(mxGetPr(x_l_ptr), n);
+        Eigen::Map<Vec> x_u(mxGetPr(x_u_ptr), n);
 
         if (mex_handle->isDense()) {
-            copy_mx_struct_to_settings(prhs[13], mex_handle->as_dense_ptr()->settings(), mex_handle->isDense());
+            copy_mx_struct_to_settings(prhs[14], mex_handle->as_dense_ptr()->settings(), mex_handle->isDense());
 
             Eigen::Map<Mat> P(mxGetPr(P_ptr), n, n);
             Eigen::Map<Mat> A(mxGetPr(A_ptr), p, n);
             Eigen::Map<Mat> G(mxGetPr(G_ptr), m, n);
 
-            mex_handle->as_dense_ptr()->setup(P, c, A, b, G, h, x_lb, x_ub);
+            mex_handle->as_dense_ptr()->setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
         } else {
-            copy_mx_struct_to_settings(prhs[13], mex_handle->as_sparse_ptr()->settings(), mex_handle->isDense());
+            copy_mx_struct_to_settings(prhs[14], mex_handle->as_sparse_ptr()->settings(), mex_handle->isDense());
 
             IVec Pp = to_int_vec(mxGetJc(P_ptr), n + 1);
             IVec Pi = to_int_vec(mxGetIr(P_ptr), Pp(n));
@@ -419,7 +421,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
             IVec Gi = to_int_vec(mxGetIr(G_ptr), Gp(n));
             Eigen::Map<SparseMat> G(m, n, (Eigen::Index) mxGetNzmax(G_ptr), Gp.data(), Gi.data(), mxGetPr(G_ptr));
 
-            mex_handle->as_sparse_ptr()->setup(P, c, A, b, G, h, x_lb, x_ub);
+            mex_handle->as_sparse_ptr()->setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
         }
 
         return;
@@ -447,20 +449,23 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         const mxArray* A_ptr = prhs[7];
         const mxArray* b_ptr = prhs[8];
         const mxArray* G_ptr = prhs[9];
-        const mxArray* h_ptr = prhs[10];
-        const mxArray* x_lb_ptr = prhs[11];
-        const mxArray* x_ub_ptr = prhs[12];
+        const mxArray* h_l_ptr = prhs[10];
+        const mxArray* h_u_ptr = prhs[11];
+        const mxArray* x_l_ptr = prhs[12];
+        const mxArray* x_u_ptr = prhs[13];
 
         piqp::optional<Eigen::Map<Vec>> c;
         piqp::optional<Eigen::Map<Vec>> b;
-        piqp::optional<Eigen::Map<Vec>> h;
-        piqp::optional<Eigen::Map<Vec>> x_lb;
-        piqp::optional<Eigen::Map<Vec>> x_ub;
+        piqp::optional<Eigen::Map<Vec>> h_l;
+        piqp::optional<Eigen::Map<Vec>> h_u;
+        piqp::optional<Eigen::Map<Vec>> x_l;
+        piqp::optional<Eigen::Map<Vec>> x_u;
         if (!mxIsEmpty(c_ptr)) { c = Eigen::Map<Vec>(mxGetPr(c_ptr), n); }
         if (!mxIsEmpty(b_ptr)) { b = Eigen::Map<Vec>(mxGetPr(b_ptr), p); }
-        if (!mxIsEmpty(h_ptr)) { h = Eigen::Map<Vec>(mxGetPr(h_ptr), m); }
-        if (!mxIsEmpty(x_lb_ptr)) { x_lb = Eigen::Map<Vec>(mxGetPr(x_lb_ptr), n); }
-        if (!mxIsEmpty(x_ub_ptr)) { x_ub = Eigen::Map<Vec>(mxGetPr(x_ub_ptr), n); }
+        if (!mxIsEmpty(h_l_ptr)) { h_l = Eigen::Map<Vec>(mxGetPr(h_l_ptr), m); }
+        if (!mxIsEmpty(h_u_ptr)) { h_u = Eigen::Map<Vec>(mxGetPr(h_u_ptr), m); }
+        if (!mxIsEmpty(x_l_ptr)) { x_l = Eigen::Map<Vec>(mxGetPr(x_l_ptr), n); }
+        if (!mxIsEmpty(x_u_ptr)) { x_u = Eigen::Map<Vec>(mxGetPr(x_u_ptr), n); }
 
         if (mex_handle->isDense()) {
             piqp::optional<Eigen::Map<Mat>> P;
@@ -470,7 +475,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
             if (!mxIsEmpty(A_ptr)) { A = Eigen::Map<Mat>(mxGetPr(A_ptr), p, n); }
             if (!mxIsEmpty(G_ptr)) { G = Eigen::Map<Mat>(mxGetPr(G_ptr), m, n); }
 
-            mex_handle->as_dense_ptr()->update(P, c, A, b, G, h, x_lb, x_ub);
+            mex_handle->as_dense_ptr()->update(P, c, A, b, G, h_l, h_u, x_l, x_u);
         } else {
             piqp::optional<Eigen::Map<SparseMat>> P;
             IVec Pp;
@@ -499,7 +504,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
                 G = Eigen::Map<SparseMat>(m, n, (Eigen::Index) mxGetNzmax(G_ptr), Gp.data(), Gi.data(), mxGetPr(G_ptr));
             }
 
-            mex_handle->as_sparse_ptr()->update(P, c, A, b, G, h, x_lb, x_ub);
+            mex_handle->as_sparse_ptr()->update(P, c, A, b, G, h_l, h_u, x_l, x_u);
         }
 
         return;

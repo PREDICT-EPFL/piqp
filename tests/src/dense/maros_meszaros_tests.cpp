@@ -28,8 +28,8 @@ TEST_P(DenseMarosMeszarosTest, CanSolveProblemKKTFull)
     solver.settings().verbose = true;
     solver.setup(model.P, model.c,
                  model.A, model.b,
-                 model.G, model.h,
-                 model.x_lb, model.x_ub);
+                 model.G, model.h_l, model.h_u,
+                 model.x_l, model.x_u);
 
     piqp::Status status = solver.solve();
     ASSERT_EQ(status, piqp::Status::PIQP_SOLVED);
@@ -41,7 +41,7 @@ std::vector<std::string> get_maros_meszaros_problems()
     for (const auto & entry : piqp::fs::directory_iterator("data/maros_meszaros"))
     {
         std::string file_name = entry.path().filename().string();
-        if (file_name == "README.md" || file_name == "LICENSE") continue;
+        if (file_name.substr(file_name.size() - 4) != ".mat") continue;
 
         std::string path = "data/maros_meszaros/" + file_name;
         piqp::sparse::Model<T, int> model = piqp::load_sparse_model<T, int>(path);
