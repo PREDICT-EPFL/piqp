@@ -123,10 +123,21 @@ typedef struct {
     piqp_float primal_step;
     piqp_float dual_step;
 
-    piqp_float primal_inf;
-    piqp_float primal_rel_inf;
-    piqp_float dual_inf;
-    piqp_float dual_rel_inf;
+    piqp_float primal_res;
+    piqp_float primal_res_rel;
+    piqp_float dual_res;
+    piqp_float dual_res_rel;
+
+    piqp_float primal_res_reg;
+    piqp_float primal_res_reg_rel;
+    piqp_float dual_res_reg;
+    piqp_float dual_res_reg_rel;
+
+    piqp_float primal_prox_inf;
+    piqp_float dual_prox_inf;
+
+    piqp_float prev_primal_res;
+    piqp_float prev_dual_res;
 
     piqp_float primal_obj;
     piqp_float dual_obj;
