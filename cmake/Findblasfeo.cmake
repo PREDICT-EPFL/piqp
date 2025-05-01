@@ -2,7 +2,7 @@
 
 # Look for the header file.
 find_path(blasfeo_INCLUDE_DIR
-  HINTS ${BLASFEO_DIR}/include "/opt/blasfeo/include"
+  HINTS ${blasfeo_DIR}/include "/opt/blasfeo/include"
   NAMES blasfeo_target.h)
 mark_as_advanced(blasfeo_INCLUDE_DIR)
 
@@ -23,7 +23,7 @@ if (NOT blasfeo_FOUND)
 endif ()
 
 if (blasfeo_FOUND)
-  message(STATUS "Found blasfeo: ${blasfeo_INCLUDE_DIR}")
+  message(STATUS "Found blasfeo: ${blasfeo_INCLUDE_DIR} ${blasfeo_LIBRARY}")
   set(blasfeo_LIBRARIES ${blasfeo_LIBRARY})
   set(blasfeo_INCLUDE_DIRS ${blasfeo_INCLUDE_DIR})
   if (NOT TARGET blasfeo)
