@@ -10,6 +10,10 @@ on:
     types:
       - published
 
+# see https://docs.astral.sh/uv/guides/integration/github/#using-uv-pip
+# env:
+#   UV_SYSTEM_PYTHON: 1
+
 jobs:
   setup_build_targets:
     name: Setup build targets
@@ -22,8 +26,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      # - name: Setup uv
+      #   uses: astral-sh/setup-uv@v5
+
       - name: Setup Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
 
       - name: Install cibuildwheel
         run: python -m pip install cibuildwheel==2.21.3
@@ -44,7 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          submodules: 'recursive'
+          submodules: "recursive"
 
       - uses: ilammy/msvc-dev-cmd@v1
 
@@ -82,7 +89,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          submodules: 'recursive'
+          submodules: "recursive"
 
       - name: Build sdist
         run: pipx run build --sdist

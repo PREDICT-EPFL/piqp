@@ -3,10 +3,11 @@ import subprocess
 import json
 
 platforms = [
-    ('linux', 'ubuntu-22.04', 'x86_64,i686,aarch64'),
-    ('macos', 'macos-13', 'x86_64'),
-    ('macos', 'macos-14', 'arm64'),
-    ('windows', 'windows-2022', 'AMD64')
+    ('linux', 'ubuntu-22.04', 'x86_64'),
+    # ('linux', 'ubuntu-22.04', 'x86_64,i686,aarch64'),
+    # ('macos', 'macos-13', 'x86_64'),
+    # ('macos', 'macos-14', 'arm64'),
+    # ('windows', 'windows-2022', 'AMD64')
 ]
 
 targets = []

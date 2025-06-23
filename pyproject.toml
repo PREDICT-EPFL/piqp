@@ -70,7 +70,7 @@ testpaths = ["interfaces/python/tests"]
 # the following will use uv whenever possible (e.g. to create the envs with the build and test deps)
 # which will speed up the overall process. See https://cibuildwheel.pypa.io/en/stable/options/#build-frontend
 # for more details
-build-frontend = "build[uv]"
+# build-frontend = "build[uv]"
 test-command = "pytest {project}/interfaces/python/tests"
 test-extras = ["test"]
 # scipy has no prebuild wheels for pypy and 32bit architectures
