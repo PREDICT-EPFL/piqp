@@ -17,6 +17,7 @@ build-dir = "build-python/{wheel_tag}"
 wheel.packages = ["interfaces/python/piqp"]
 
 [tool.scikit-build.cmake.define]
+PIQP_VERSION_INFO = "0.5.0"
 BUILD_WITH_TEMPLATE_INSTANTIATION = "OFF"
 BUILD_PYTHON_INTERFACE = "ON"
 BUILD_C_INTERFACE = "OFF"
@@ -24,7 +25,6 @@ BUILD_TESTS = "OFF"
 BUILD_EXAMPLES = "OFF"
 BUILD_BENCHMARKS = "OFF"
 CMAKE_POSITION_INDEPENDENT_CODE = true
-PIQP_VERSION_INFO = "0.5.0"
 # don't install the c++ headers, shared libs, and CMake config files
 ENABLE_INSTALL = "OFF"
 
@@ -63,4 +63,4 @@ test-skip = [
     "*-win32",
 ]
 # Setuptools bug causes collision between pypy and cpython artifacts
-before-build = "rm -rf {project}/build"
+before-build = "rm -rf {project}/build-python"
