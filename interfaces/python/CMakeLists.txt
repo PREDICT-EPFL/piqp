@@ -14,12 +14,8 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 endif()
 
 # Find pybind11
-include(FetchContent)
-FetchContent_Declare(
-    pybind11
-    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.13.6.zip
-)
-FetchContent_MakeAvailable(pybind11)
+set(PYBIND11_FINDPYTHON ON)
+find_package(pybind11 CONFIG REQUIRED)
 
 # detect arm64 cross compilation on macOS
 if(DEFINED ENV{_PYTHON_HOST_PLATFORM})
@@ -101,3 +97,6 @@ if (BUILD_WITH_BLASFEO)
         target_link_libraries(piqp_python PRIVATE blasfeo)
     endif()
 endif ()
+
+install(TARGETS instruction_set LIBRARY DESTINATION piqp)
+install(TARGETS piqp_python LIBRARY DESTINATION piqp)

@@ -10,3 +10,5 @@ cmake-build-*/
 *.oct
 *.asv
 *.pdb
+install
+build-python
