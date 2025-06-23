@@ -1,11 +1,23 @@
+# This file is part of PIQP.
+#
+# Copyright (c) 2025 EPFL
+#
+# This source code is licensed under the BSD 2-Clause License found in the
+# LICENSE file in the root directory of this source tree.
+
 [project]
 name = "piqp"
 version = "0.5.0"
 readme = "README.md"
 description = "A Proximal Interior Point Quadratic Programming solver"
 requires-python = ">=3.7"
-license = 'BSD-2-Clause'
 dependencies = ["numpy", "scipy"]
+
+[project.urls]
+Homepage = "https://predict-epfl.github.io/piqp/"
+
+[project.license]
+file = "LICENSE"
 
 [project.optional-dependencies]
 test = ["pytest>=6.0"]
