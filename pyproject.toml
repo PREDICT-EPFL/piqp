@@ -1,11 +1,47 @@
+# This file is part of PIQP.
+#
+# Copyright (c) 2025 EPFL
+#
+# This source code is licensed under the BSD 2-Clause License found in the
+# LICENSE file in the root directory of this source tree.
+
+[project]
+name = "piqp"
+version = "0.5.0"
+readme = "README.md"
+description = "A Proximal Interior Point Quadratic Programming solver"
+requires-python = ">=3.7"
+dependencies = ["numpy", "scipy"]
+
+[project.urls]
+Homepage = "https://predict-epfl.github.io/piqp/"
+
+[project.license]
+file = "LICENSE"
+
+[dependency-groups]
+dev = ["pytest>=6.0"]
+
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel",
-    "ninja",
-    "cmake>=3.12",
-]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core>=0.10", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["interfaces/python/piqp"]
+
+[tool.scikit-build.cmake.define]
+PIQP_VERSION_INFO = "0.5.0"
+BUILD_WITH_TEMPLATE_INSTANTIATION = "OFF"
+BUILD_PYTHON_INTERFACE = "ON"
+BUILD_C_INTERFACE = "OFF"
+BUILD_TESTS = "OFF"
+BUILD_EXAMPLES = "OFF"
+BUILD_BENCHMARKS = "OFF"
+CMAKE_POSITION_INDEPENDENT_CODE = true
+# don't install the c++ headers, shared libs, and CMake config files
+ENABLE_INSTALL = "OFF"
 
 [tool.isort]
 profile = "black"
@@ -31,9 +67,19 @@ filterwarnings = ["error"]
 testpaths = ["interfaces/python/tests"]
 
 [tool.cibuildwheel]
+# the following will use uv whenever possible (e.g. to create the envs with the build and test deps)
+# which will speed up the overall process. See https://cibuildwheel.pypa.io/en/stable/options/#build-frontend
+# for more details
+# build-frontend = "build[uv]"
 test-command = "pytest {project}/interfaces/python/tests"
-test-extras = ["test"]
+test-groups = ["dev"]
 # scipy has no prebuild wheels for pypy and 32bit architectures
-test-skip = ["*universal2:arm64", "pp*", "*-*linux_i686", "*-musllinux*", "*-win32"]
+test-skip = [
+    "*universal2:arm64",
+    "pp*",
+    "*-*linux_i686",
+    "*-musllinux*",
+    "*-win32",
+]
 # Setuptools bug causes collision between pypy and cpython artifacts
 before-build = "rm -rf {project}/build"
