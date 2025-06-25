@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-22.04, macos-13, macos-14, windows-2019 ]
+        os: [ ubuntu-22.04, macos-13, macos-14, windows-2022 ]
         include:
           - os: ubuntu-22.04
             platform: linux
@@ -23,7 +23,7 @@ jobs:
             platform: maci
           - os: macos-14
             platform: maca
-          - os: windows-2019
+          - os: windows-2022
             platform: windows
 
     runs-on: ${{ matrix.os }}
