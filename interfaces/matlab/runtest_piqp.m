@@ -14,3 +14,9 @@ tests_path = fullfile(root_path, 'tests');
 
 suite = TestSuite.fromFolder(tests_path);
 result = run(suite);
+
+% Always throw error on failure - CI will catch it, GUI will show it
+if any([result.Failed]) || any([result.Incomplete])
+    error('Tests failed! %d failed, %d incomplete', ...
+          sum([result.Failed]), sum([result.Incomplete]));
+end
