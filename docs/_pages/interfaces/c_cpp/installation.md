@@ -33,6 +33,10 @@ cmake .. -DCMAKE_CXX_FLAGS="-march=native" -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=
 cmake --build . --config Release
 ```
 Note that by setting `-march=native`, we allow the compiler to optimize for the full available instruction set on the machine compiling the code.
+
+{: .warning }
+When compiling with `-march=native` and you are on a modern x86 architecture (which you are very very likely are), Eigen will align vectors to 32 (AVX2) or 64 (AVX512) bytes. Hence, when consuming the precompiled PIQP library, your target needs to be built with the same architecture flags (e.g. `-march=native`) otherwise there will be ABI incompatibilities with Eigen. Alternatively, by setting the CMake flag `-DBUILD_WITH_EIGEN_MAX_ALIGN_BYTES=ON`, PIQP will be built with `EIGEN_MAX_ALIGN_BYTES=64` ensuring maximal Eigen compatibility and export it as well to the linked target. Note that this might conflict with other libraries and has to be used cautiously. For more information see the *Alignment* section in the [Eigen docs](https://eigen.tuxfamily.org/dox/TopicPreprocessorDirectives.html).
+
 * Install libraries and header files (requires CMake 3.15+)
 ```shell
 cmake --install . --config Release
