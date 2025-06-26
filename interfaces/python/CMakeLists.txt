@@ -14,12 +14,8 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 endif()
 
 # Find pybind11
-include(FetchContent)
-FetchContent_Declare(
-    pybind11
-    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.13.6.zip
-)
-FetchContent_MakeAvailable(pybind11)
+set(PYBIND11_FINDPYTHON ON)
+find_package(pybind11 CONFIG REQUIRED)
 
 # detect arm64 cross compilation on macOS
 if(DEFINED ENV{_PYTHON_HOST_PLATFORM})
@@ -42,8 +38,8 @@ function(CREATE_PIQP_PYTHON_TARGET target_name COMPILE_OPTIONS)
     target_compile_options(${target_name} PRIVATE ${COMPILE_OPTIONS})
     target_link_libraries(${target_name} PRIVATE piqp_header_only_no_blasfeo_linked)
     target_compile_definitions(${target_name} PRIVATE PYTHON_MODULE_NAME=${target_name})
-    # PIQP_VERSION_INFO is defined by setup.py and passed into the C++ code as a define (VERSION_INFO) here.
-    target_compile_definitions(${target_name} PRIVATE VERSION_INFO=${PIQP_VERSION_INFO})
+    # SKBUILD_PROJECT_VERSION_FULL is defined by scikit-build-core and passed into the C++ code as a define (VERSION_INFO) here.
+    target_compile_definitions(${target_name} PRIVATE VERSION_INFO=${SKBUILD_PROJECT_VERSION_FULL})
 endfunction()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
@@ -101,3 +97,10 @@ if (BUILD_WITH_BLASFEO)
         target_link_libraries(piqp_python PRIVATE blasfeo)
     endif()
 endif ()
+
+install(TARGETS instruction_set LIBRARY DESTINATION piqp)
+install(TARGETS piqp_python LIBRARY DESTINATION piqp)
+if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
+    install(TARGETS piqp_python_avx2 LIBRARY DESTINATION piqp)
+    install(TARGETS piqp_python_avx512 LIBRARY DESTINATION piqp)
+endif()

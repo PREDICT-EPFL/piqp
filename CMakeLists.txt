@@ -106,7 +106,7 @@ if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
     include(FetchContent)
     FetchContent_Declare(
         cpu_features
-        URL https://github.com/google/cpu_features/archive/refs/tags/v0.9.0.zip
+        URL https://github.com/google/cpu_features/archive/refs/tags/v0.10.1.zip
     )
     set(BUILD_SHARED_LIBS_COPY ${BUILD_SHARED_LIBS})
     set(BUILD_SHARED_LIBS OFF)
