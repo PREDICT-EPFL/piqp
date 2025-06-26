@@ -10,6 +10,9 @@ name = "piqp"
 version = "0.5.0"
 readme = "README.md"
 description = "A Proximal Interior Point Quadratic Programming solver"
+authors = [
+  { name = "Roland Schwan", email = "roland.schwan@epfl.ch" },
+]
 requires-python = ">=3.7"
 dependencies = ["numpy", "scipy"]
 
@@ -32,7 +35,6 @@ build-dir = "build/{wheel_tag}"
 wheel.packages = ["interfaces/python/piqp"]
 
 [tool.scikit-build.cmake.define]
-PIQP_VERSION_INFO = "0.5.0"
 BUILD_WITH_TEMPLATE_INSTANTIATION = "OFF"
 BUILD_PYTHON_INTERFACE = "ON"
 BUILD_C_INTERFACE = "OFF"
