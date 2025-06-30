@@ -13,8 +13,10 @@ namespace piqp
 namespace sparse
 {
 
-template class KKTImpl<KKT<common::Scalar, common::StorageIndex, KKTMode::KKT_FULL, common::sparse::Ordering>, common::Scalar, common::StorageIndex, KKTMode::KKT_FULL>;
-template class KKT<common::Scalar, common::StorageIndex>;
+template class KKT<common::Scalar, common::StorageIndex, KKTMode::KKT_FULL, common::sparse::Ordering>;
+template class KKT<common::Scalar, common::StorageIndex, KKTMode::KKT_EQ_ELIMINATED, common::sparse::Ordering>;
+template class KKT<common::Scalar, common::StorageIndex, KKTMode::KKT_INEQ_ELIMINATED, common::sparse::Ordering>;
+template class KKT<common::Scalar, common::StorageIndex, KKTMode::KKT_ALL_ELIMINATED, common::sparse::Ordering>;
 
 } // namespace sparse
 

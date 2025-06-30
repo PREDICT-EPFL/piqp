@@ -28,9 +28,10 @@ void save_dense_model(const dense::Model<T>& model, const std::string& path)
     file.write_mat("A", model.A);
     file.write_mat("b", model.b);
     file.write_mat("G", model.G);
-    file.write_mat("h", model.h);
-    file.write_mat("x_lb", model.x_lb);
-    file.write_mat("x_ub", model.x_ub);
+    file.write_mat("h_l", model.h_l);
+    file.write_mat("h_u", model.h_u);
+    file.write_mat("x_l", model.x_l);
+    file.write_mat("x_u", model.x_u);
     file.close();
 }
 
@@ -43,9 +44,10 @@ void save_sparse_model(const sparse::Model<T, I>& model, const std::string& path
     file.write_mat("A", model.A);
     file.write_mat("b", model.b);
     file.write_mat("G", model.G);
-    file.write_mat("h", model.h);
-    file.write_mat("x_lb", model.x_lb);
-    file.write_mat("x_ub", model.x_ub);
+    file.write_mat("h_l", model.h_l);
+    file.write_mat("h_u", model.h_u);
+    file.write_mat("x_l", model.x_l);
+    file.write_mat("x_u", model.x_u);
     file.close();
 }
 
@@ -53,19 +55,20 @@ template<typename T>
 dense::Model<T> load_dense_model(const std::string& path)
 {
     Mat<T> P, A, G;
-    Vec<T> c, b, h, x_lb, x_ub;
+    Vec<T> c, b, h_l, h_u, x_l, x_u;
     Eigen::MatioFile file(path.c_str());
     file.read_mat("P", P);
     file.read_mat("c", c);
     file.read_mat("A", A);
     file.read_mat("b", b);
     file.read_mat("G", G);
-    file.read_mat("h", h);
-    file.read_mat("x_lb", x_lb);
-    file.read_mat("x_ub", x_ub);
+    file.read_mat("h_l", h_l);
+    file.read_mat("h_u", h_u);
+    file.read_mat("x_l", x_l);
+    file.read_mat("x_u", x_u);
     file.close();
 
-    dense::Model<T> model(P, c, A, b, G, h, x_lb, x_ub);
+    dense::Model<T> model(P, c, A, b, G, h_l, h_u, x_l, x_u);
     return model;
 }
 
@@ -73,19 +76,20 @@ template<typename T, typename I>
 sparse::Model<T, I> load_sparse_model(const std::string& path)
 {
     SparseMat<T, I> P, A, G;
-    Vec<T> c, b, h, x_lb, x_ub;
+    Vec<T> c, b, h_l, h_u, x_l, x_u;
     Eigen::MatioFile file(path.c_str());
     file.read_mat("P", P);
     file.read_mat("c", c);
     file.read_mat("A", A);
     file.read_mat("b", b);
     file.read_mat("G", G);
-    file.read_mat("h", h);
-    file.read_mat("x_lb", x_lb);
-    file.read_mat("x_ub", x_ub);
+    file.read_mat("h_l", h_l);
+    file.read_mat("h_u", h_u);
+    file.read_mat("x_l", x_l);
+    file.read_mat("x_u", x_u);
     file.close();
 
-    sparse::Model<T, I> model(P, c, A, b, G, h, x_lb, x_ub);
+    sparse::Model<T, I> model(P, c, A, b, G, h_l, h_u, x_l, x_u);
     return model;
 }
 

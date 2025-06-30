@@ -32,10 +32,11 @@ piqp_float A[2] = {1, -2};
 piqp_float b[1] = {1};
 
 piqp_float G[4] = {1, -1, 2, 0};
-piqp_float h[2] = {0.2, -1};
+piqp_float h_l[2] = {-PIQP_INF, -PIQP_INF};
+piqp_float h_u[2] = {0.2, -1};
 
-piqp_float x_lb[2] = {-1, -PIQP_INF};
-piqp_float x_ub[2] = {1, PIQP_INF};
+piqp_float x_l[2] = {-1, -PIQP_INF};
+piqp_float x_u[2] = {1, PIQP_INF};
 
 piqp_data_sparse* data = (piqp_data_sparse*) malloc(sizeof(piqp_data_sparse));
 data->n = n;
@@ -46,9 +47,10 @@ data->c = c;
 data->A = A;
 data->b = b;
 data->G = G;
-data->h = h;
-data->x_lb = x_lb;
-data->x_ub = x_ub;
+data->h_l = h_l;
+data->h_u = h_u;
+data->x_l = x_l;
+data->x_u = x_u;
 ```
 
 Here `PIQP_INF` represents $$\infty$$, and we store the whole problem in the `data` struct.
@@ -128,9 +130,10 @@ piqp_status status = piqp_solve(work);
 The result of the optimization can be obtained from the `work->result` struct. More specifically, the most important information includes
 * `work->result->x`: primal solution
 * `work->result->y`: dual solution of equality constraints
-* `work->result->z`: dual solution of inequality constraints
-* `work->result->z_lb`: dual solution of lower bound box constraints
-* `work->result->z_ub`: dual solution of upper bound box constraints
+* `work->result->z_l`: dual solution of lower inequality constraints
+* `work->result->z_u`: dual solution of upper inequality constraints
+* `work->result->z_bl`: dual solution of lower bound box constraints
+* `work->result->z_bu`: dual solution of upper bound box constraints
 * `work->result->info.primal_obj`: primal objective value
 * `work->result->info.run_time`: total runtime
 
@@ -145,9 +148,9 @@ Instead of creating a new solver object everytime it's possible to update the pr
 
 ```c
 // dense interface
-piqp_update_dense(&work, P, c, A, b, G, h, x_lb, x_ub);
+piqp_update_dense(&work, P, c, A, b, G, h_l, h_u, x_l, x_u);
 // or sparse interface
-piqp_update_sparse(&work, P, c, A, b, G, h, x_lb, x_ub);
+piqp_update_sparse(&work, P, c, A, b, G, h_l, h_u, x_l, x_u);
 ```
 
 with a subsequent call to

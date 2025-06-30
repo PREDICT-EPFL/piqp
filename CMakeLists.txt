@@ -8,7 +8,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(piqp
-    VERSION 0.5.0
+    VERSION 0.6.0
     LANGUAGES C CXX
 )
 
@@ -25,6 +25,7 @@ endif()
 
 #### Interface options ####
 option(BUILD_WITH_TEMPLATE_INSTANTIATION "Build a shared library with common templates instantiated" ON)
+option(BUILD_WITH_EIGEN_MAX_ALIGN_BYTES "Build with EIGEN_MAX_ALIGN_BYTES=64 (up to AVX512) on x86 for maximal Eigen ABI compatibility" OFF)
 option(BUILD_WITH_BLASFEO "Build with blasfeo which is required for some kkt solvers" OFF)
 option(BUILD_WITH_OPENMP "Build with OpenMP parallelization support" OFF)
 option(BUILD_SHARED_LIBS "Build library as shared." ON)
@@ -106,7 +107,7 @@ if (BUILD_PYTHON_INTERFACE OR BUILD_MATLAB_INTERFACE)
     include(FetchContent)
     FetchContent_Declare(
         cpu_features
-        URL https://github.com/google/cpu_features/archive/refs/tags/v0.9.0.zip
+        URL https://github.com/google/cpu_features/archive/refs/tags/v0.10.1.zip
     )
     set(BUILD_SHARED_LIBS_COPY ${BUILD_SHARED_LIBS})
     set(BUILD_SHARED_LIBS OFF)
@@ -166,7 +167,9 @@ if (BUILD_WITH_TEMPLATE_INSTANTIATION)
     target_compile_definitions(piqp PUBLIC PIQP_WITH_TEMPLATE_INSTANTIATION)
     if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
         # Ensure ABI compatibility up to AVX512
-        target_compile_definitions(piqp PUBLIC EIGEN_MAX_ALIGN_BYTES=64)
+        if (BUILD_WITH_EIGEN_MAX_ALIGN_BYTES)
+            target_compile_definitions(piqp PUBLIC EIGEN_MAX_ALIGN_BYTES=64)
+        endif ()
     endif ()
     target_compile_options(piqp PRIVATE ${compiler_flags})
     target_link_options(piqp PRIVATE ${compiler_flags})

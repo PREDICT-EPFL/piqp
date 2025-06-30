@@ -10,6 +10,7 @@
 #define PIQP_RESULTS_HPP
 
 #include "piqp/typedefs.hpp"
+#include "piqp/variables.hpp"
 
 namespace piqp
 {
@@ -53,10 +54,21 @@ struct Info
     T primal_step;
     T dual_step;
 
-    T primal_inf;
-    T primal_rel_inf;
-    T dual_inf;
-    T dual_rel_inf;
+    T primal_res;
+    T primal_res_rel;
+    T dual_res;
+    T dual_res_rel;
+
+    T primal_res_reg;
+    T primal_res_reg_rel;
+    T dual_res_reg;
+    T dual_res_reg_rel;
+
+    T primal_prox_inf;
+    T dual_prox_inf;
+
+    T prev_primal_res;
+    T prev_dual_res;
 
     T primal_obj;
     T dual_obj;
@@ -75,23 +87,8 @@ struct Info
 };
 
 template<typename T>
-struct Result
+struct Result : Variables<T>
 {
-    Vec<T> x;
-    Vec<T> y;
-    Vec<T> z;
-    Vec<T> z_lb;
-    Vec<T> z_ub;
-    Vec<T> s;
-    Vec<T> s_lb;
-    Vec<T> s_ub;
-
-    Vec<T> zeta;
-    Vec<T> lambda;
-    Vec<T> nu;
-    Vec<T> nu_lb;
-    Vec<T> nu_ub;
-
     Info<T> info;
 };
 

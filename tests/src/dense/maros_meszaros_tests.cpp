@@ -28,8 +28,8 @@ TEST_P(DenseMarosMeszarosTest, CanSolveProblemKKTFull)
     solver.settings().verbose = true;
     solver.setup(model.P, model.c,
                  model.A, model.b,
-                 model.G, model.h,
-                 model.x_lb, model.x_ub);
+                 model.G, model.h_l, model.h_u,
+                 model.x_l, model.x_u);
 
     piqp::Status status = solver.solve();
     ASSERT_EQ(status, piqp::Status::PIQP_SOLVED);

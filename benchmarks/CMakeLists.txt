@@ -32,16 +32,16 @@ endif()
 # copy data
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-add_library(pipq-benchmark INTERFACE)
-target_compile_options(pipq-benchmark INTERFACE ${compiler_flags})
-target_link_options(pipq-benchmark INTERFACE ${compiler_flags})
-target_link_libraries(pipq-benchmark INTERFACE piqp benchmark::benchmark)
+add_library(piqp-benchmark INTERFACE)
+target_compile_options(piqp-benchmark INTERFACE ${compiler_flags})
+target_link_options(piqp-benchmark INTERFACE ${compiler_flags})
+target_link_libraries(piqp-benchmark INTERFACE piqp benchmark::benchmark)
 
 add_executable(sqp_benchmarks src/sqp_benchmarks.cpp)
-target_link_libraries(sqp_benchmarks PRIVATE pipq-benchmark Matio::Matio)
+target_link_libraries(sqp_benchmarks PRIVATE piqp-benchmark Matio::Matio)
 
 add_executable(dense_cholesky_factorization_benchmark src/dense_cholesky_factorization_benchmark.cpp)
-target_link_libraries(dense_cholesky_factorization_benchmark PRIVATE pipq-benchmark)
+target_link_libraries(dense_cholesky_factorization_benchmark PRIVATE piqp-benchmark)
 
 add_executable(dense_sparse_solver_benchmark src/dense_sparse_solver_benchmark.cpp)
-target_link_libraries(dense_sparse_solver_benchmark PRIVATE pipq-benchmark)
+target_link_libraries(dense_sparse_solver_benchmark PRIVATE piqp-benchmark)

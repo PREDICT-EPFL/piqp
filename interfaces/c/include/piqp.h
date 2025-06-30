@@ -30,13 +30,13 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
 void piqp_update_dense(piqp_workspace* workspace,
                        piqp_float* P, piqp_float* c,
                        piqp_float* A, piqp_float* b,
-                       piqp_float* G, piqp_float* h,
-                       piqp_float* x_lb, piqp_float* x_ub);
+                       piqp_float* G, piqp_float* h_l, piqp_float* h_u,
+                       piqp_float* x_l, piqp_float* x_u);
 void piqp_update_sparse(piqp_workspace* workspace,
                         piqp_csc* P, piqp_float* c,
                         piqp_csc* A, piqp_float* b,
-                        piqp_csc* G, piqp_float* h,
-                        piqp_float* x_lb, piqp_float* x_ub);
+                        piqp_csc* G, piqp_float* h_l, piqp_float* h_u,
+                        piqp_float* x_l, piqp_float* x_u);
 
 piqp_status piqp_solve(piqp_workspace* workspace);
 

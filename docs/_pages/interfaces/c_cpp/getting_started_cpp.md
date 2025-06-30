@@ -25,6 +25,8 @@ int n = 2;
 int p = 1;
 int m = 2;
 
+double inf = std::numeric_limits<double>::infinity();
+
 Eigen::MatrixXd P(n, n); P << 6, 0, 0, 4;
 Eigen::VectorXd c(n); c << -1, -4;
 
@@ -32,10 +34,11 @@ Eigen::MatrixXd A(p, n); A << 1, -2;
 Eigen::VectorXd b(p); b << 1;
 
 Eigen::MatrixXd G(m, n); G << 1, -1, 2, 0;
-Eigen::VectorXd h(m); h << 0.2, -1;
+Eigen::VectorXd h_l(m); h << -inf, -inf;
+Eigen::VectorXd h_u(m); h << 0.2, -1;
 
-Eigen::VectorXd x_lb(n); x_lb << -1, -std::numeric_limits<double>::infinity();
-Eigen::VectorXd x_ub(n); x_ub << 1, std::numeric_limits<double>::infinity();
+Eigen::VectorXd x_l(n); x_lb << -1, -inf;
+Eigen::VectorXd x_u(n); x_ub << 1, inf;
 ```
 
 For the sparse interface $$P$$, $$A$$, and $$G$$ have to be in compressed sparse column (CSC) format.
@@ -90,11 +93,11 @@ In this example we enable the verbose output and internal timings. The full set 
 We can now set up the problem using
 
 ```c++
-solver.setup(P, c, A, b, G, h, x_lb, x_ub);
+solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
 ```
 
 {: .note }
-Every variable except `P` and `c` are optional and `laopt::nullopt` may be passed.
+Every variable except `P` and `c` are optional and `piqp::nullopt` may be passed.
 
 The data is internally copied, and the solver initializes all internal data structures.
 
@@ -113,9 +116,10 @@ piqp::Status status = solver.solve();
 The result of the optimization can be obtained from the `solver.result()` object. More specifically, the most important information includes
 * `solver.result().x`: primal solution
 * `solver.result().y`: dual solution of equality constraints
-* `solver.result().z`: dual solution of inequality constraints
-* `solver.result().z_lb`: dual solution of lower bound box constraints
-* `solver.result().z_ub`: dual solution of upper bound box constraints
+* `solver.result().z_l`: dual solution of lower inequality constraints
+* `solver.result().z_u`: dual solution of upper inequality constraints
+* `solver.result().z_bl`: dual solution of lower bound box constraints
+* `solver.result().z_bu`: dual solution of upper bound box constraints
 * `solver.result().info.primal_obj`: primal objective value
 * `solver.result().info.run_time`: total runtime 
 
@@ -129,7 +133,7 @@ Timing information like `solver.result().info.run_time` is only measured if `sol
 Instead of creating a new solver object everytime it's possible to update the problem directly using
 
 ```c++
-solver.update(P, c, A, b, G, h, x_lb, x_ub);
+solver.update(P, c, A, b, G, h_l, h_u, x_l, x_u);
 ```
 
 with a subsequent call to 
@@ -138,7 +142,7 @@ with a subsequent call to
 piqp::Status status = solver.solve();
 ```
 
-This allows the solver to internally reuse memory and factorizations speeding up subsequent solves. Similar to the `setup` function, all parameters are optional and `laopt::nullopt` may be passed instead.
+This allows the solver to internally reuse memory and factorizations speeding up subsequent solves. Similar to the `setup` function, all parameters are optional and `piqp::nullopt` may be passed instead.
 
 {: .warning }
 Note the dimension and sparsity pattern of the problem are not allowed to change when calling the `update` function.

@@ -23,10 +23,10 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Setup Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
 
       - name: Install cibuildwheel
-        run: python -m pip install cibuildwheel==2.21.3
+        run: python -m pip install cibuildwheel==2.23.2
 
       - name: Generate strategy matrix
         id: set-matrix
@@ -42,9 +42,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: "recursive"
 
       - uses: ilammy/msvc-dev-cmd@v1
 
@@ -59,11 +59,11 @@ jobs:
         uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21.3
+        uses: pypa/cibuildwheel@v2.23.2
         env:
-          CIBW_ENVIRONMENT_LINUX: ${{ (matrix.target.arch == 'x86_64' || matrix.target.arch == 'amd64') && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || ((matrix.target.arch == 'arm64' || matrix.target.arch == 'aarch64') && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
-          CIBW_ENVIRONMENT_MACOS: ${{ (matrix.target.arch == 'x86_64' || matrix.target.arch == 'amd64') && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || ((matrix.target.arch == 'arm64' || matrix.target.arch == 'aarch64') && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
-          CIBW_ENVIRONMENT_WINDOWS: CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=c:/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=c:/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=c:/opt/blasfeo_x64_avx512"
+          CIBW_ENVIRONMENT_LINUX: ${{ matrix.target.arch == 'x86_64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || (matrix.target.arch == 'aarch64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
+          CIBW_ENVIRONMENT_MACOS: ${{ matrix.target.arch == 'x86_64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || (matrix.target.arch == 'arm64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
+          CIBW_ENVIRONMENT_WINDOWS: ${{ matrix.target.arch == 'AMD64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=c:/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=c:/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=c:/opt/blasfeo_x64_avx512"' || (matrix.target.arch == 'ARM64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=c:/opt/blasfeo_arm64"' || '') }}
           CIBW_ARCHS_LINUX: ${{ matrix.target.arch }}
           CIBW_BEFORE_ALL_LINUX: bash ci/install_all_deps_linux.sh
           CIBW_BEFORE_ALL_WINDOWS: bash ci/install_all_deps_windows.sh
@@ -82,7 +82,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          submodules: 'recursive'
+          submodules: "recursive"
 
       - name: Build sdist
         run: pipx run build --sdist

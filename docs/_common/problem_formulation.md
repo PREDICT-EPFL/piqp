@@ -6,15 +6,15 @@ $$
 \begin{aligned}
 \min_{x} \quad & \frac{1}{2} x^\top P x + c^\top x \\
 \text {s.t.}\quad & Ax=b, \\
-& Gx \leq h, \\
-& x_{lb} \leq x \leq x_{ub}
+& h_l \leq Gx \leq h_u, \\
+& x_l \leq x \leq x_u,
 \end{aligned}
 $$
 
-with primal decision variables $$x \in \mathbb{R}^n$$, matrices $$P\in \mathbb{S}_+^n$$, $$A \in \mathbb{R}^{p \times n}$$,  $$G \in \mathbb{R}^{m \times n}$$, and vectors $$c \in \mathbb{R}^n$$, $$b \in \mathbb{R}^p$$, $$h \in \mathbb{R}^m$$, $$x_{lb} \in \mathbb{R}^n$$, and $$x_{ub} \in \mathbb{R}^n$$.
+with primal decision variables $$x \in \mathbb{R}^n$$, matrices $$P\in \mathbb{S}_+^n$$, $$A \in \mathbb{R}^{p \times n}$$,  $$G \in \mathbb{R}^{m \times n}$$, and vectors $$c \in \mathbb{R}^n$$, $$b \in \mathbb{R}^p$$, $$h_l \in \mathbb{R}^m$$, $$h_u \in \mathbb{R}^m$$, $$x_l \in \mathbb{R}^n$$, and $$x_u \in \mathbb{R}^n$$.
 
 {: .note }
-PIQP can handle infinite box constraints well, i.e. when elements of $$x_{lb}$$ or $$x_{ub}$$ are $$-\infty$$ or $$\infty$$, respectively. On the contrary, infinite values in the general inequalities $$Gx \leq h = \pm \infty$$ can cause problems. PIQP internally disables them by setting the corresponding rows in $$G$$ to zero (sparsity structure is preserved). For best performance, consider removing the corresponding constraints from the problem formulation directly.
+PIQP can handle infinite box constraints well, i.e. when elements of $$x_{lb}$$ or $$x_{ub}$$ are $$-\infty$$ or $$\infty$$, respectively. On the contrary, infinite values in the general inequalities $$-\infty = h_l \leq Gx \leq h_u = \infty$$ can cause problems when both sides are unbounded. PIQP internally disables them by setting the corresponding rows in $$G$$ to zero (sparsity structure is preserved). For best performance, consider removing the corresponding constraints from the problem formulation directly.
 
 ### Example QP
 

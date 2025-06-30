@@ -23,6 +23,12 @@ static piqp_kkt_solver cpp_to_c_kkt_solver(piqp::KKTSolver cpp_kkt_solver)
             return PIQP_DENSE_CHOLESKY;
         case piqp::KKTSolver::sparse_ldlt:
             return PIQP_SPARSE_LDLT;
+        case piqp::KKTSolver::sparse_ldlt_eq_cond:
+            return PIQP_SPARSE_LDLT_EQ_COND;
+        case piqp::KKTSolver::sparse_ldlt_ineq_cond:
+            return PIQP_SPARSE_LDLT_INEQ_COND;
+        case piqp::KKTSolver::sparse_ldlt_cond:
+            return PIQP_SPARSE_LDLT_COND;
         case piqp::KKTSolver::sparse_multistage:
             return PIQP_SPARSE_MULTISTAGE;
     }
@@ -36,6 +42,12 @@ static piqp::KKTSolver c_to_cpp_kkt_solver(piqp_kkt_solver c_kkt_solver)
             return piqp::KKTSolver::dense_cholesky;
         case PIQP_SPARSE_LDLT:
             return piqp::KKTSolver::sparse_ldlt;
+        case PIQP_SPARSE_LDLT_EQ_COND:
+            return piqp::KKTSolver::sparse_ldlt_eq_cond;
+        case PIQP_SPARSE_LDLT_INEQ_COND:
+            return piqp::KKTSolver::sparse_ldlt_ineq_cond;
+        case PIQP_SPARSE_LDLT_COND:
+            return piqp::KKTSolver::sparse_ldlt_cond;
         case PIQP_SPARSE_MULTISTAGE:
             return piqp::KKTSolver::sparse_multistage;
     }
@@ -62,18 +74,14 @@ static void piqp_update_result(piqp_result* result, const piqp::Result<piqp_floa
 {
     result->x = solver_result.x.data();
     result->y = solver_result.y.data();
-    result->z = solver_result.z.data();
-    result->z_lb = solver_result.z_lb.data();
-    result->z_ub = solver_result.z_ub.data();
-    result->s = solver_result.s.data();
-    result->s_lb = solver_result.s_lb.data();
-    result->s_ub = solver_result.s_ub.data();
-
-    result->zeta = solver_result.zeta.data();
-    result->lambda = solver_result.lambda.data();
-    result->nu = solver_result.nu.data();
-    result->nu_lb = solver_result.nu_lb.data();
-    result->nu_ub = solver_result.nu_ub.data();
+    result->z_l = solver_result.z_l.data();
+    result->z_u = solver_result.z_u.data();
+    result->z_bl = solver_result.z_bl.data();
+    result->z_bu = solver_result.z_bu.data();
+    result->s_l = solver_result.s_l.data();
+    result->s_u = solver_result.s_u.data();
+    result->s_bl = solver_result.s_bl.data();
+    result->s_bu = solver_result.s_bu.data();
 
     result->info.status = (piqp_status) solver_result.info.status;
     result->info.iter = (piqp_int) solver_result.info.iter;
@@ -83,10 +91,18 @@ static void piqp_update_result(piqp_result* result, const piqp::Result<piqp_floa
     result->info.sigma = solver_result.info.sigma;
     result->info.primal_step = solver_result.info.primal_step;
     result->info.dual_step = solver_result.info.dual_step;
-    result->info.primal_inf = solver_result.info.primal_inf;
-    result->info.primal_rel_inf = solver_result.info.primal_rel_inf;
-    result->info.dual_inf = solver_result.info.dual_inf;
-    result->info.dual_rel_inf = solver_result.info.dual_rel_inf;
+    result->info.primal_res = solver_result.info.primal_res;
+    result->info.primal_res_rel = solver_result.info.primal_res_rel;
+    result->info.dual_res = solver_result.info.dual_res;
+    result->info.dual_res_rel = solver_result.info.dual_res_rel;
+    result->info.primal_res_reg = solver_result.info.primal_res_reg;
+    result->info.primal_res_reg_rel = solver_result.info.primal_res_reg_rel;
+    result->info.dual_res_reg = solver_result.info.dual_res_reg;
+    result->info.dual_res_reg_rel = solver_result.info.dual_res_reg_rel;
+    result->info.primal_prox_inf = solver_result.info.primal_prox_inf;
+    result->info.dual_prox_inf = solver_result.info.dual_prox_inf;
+    result->info.prev_primal_res = solver_result.info.prev_primal_res;
+    result->info.prev_dual_res = solver_result.info.prev_dual_res;
     result->info.primal_obj = solver_result.info.primal_obj;
     result->info.dual_obj = solver_result.info.dual_obj;
     result->info.duality_gap = solver_result.info.duality_gap;
@@ -118,6 +134,7 @@ static void piqp_set_default_settings(piqp_settings* settings, Solver&& solver)
     settings->max_iter = (piqp_int) solver.settings().max_iter;
     settings->max_factor_retires = (piqp_int) solver.settings().max_factor_retires;
     settings->preconditioner_scale_cost = solver.settings().preconditioner_scale_cost;
+    settings->preconditioner_reuse_on_update = solver.settings().preconditioner_reuse_on_update;
     settings->preconditioner_iter = (piqp_int) solver.settings().preconditioner_iter;
     settings->tau = solver.settings().tau;
     settings->kkt_solver = cpp_to_c_kkt_solver(solver.settings().kkt_solver);
@@ -195,11 +212,12 @@ void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, c
     piqp::optional<Eigen::Map<CMat>> A = piqp_optional_mat_map(data->A, data->p, data->n);
     piqp::optional<Eigen::Map<CVec>> b = piqp_optional_vec_map(data->b, data->p);
     piqp::optional<Eigen::Map<CMat>> G = piqp_optional_mat_map(data->G, data->m, data->n);
-    piqp::optional<Eigen::Map<CVec>> h = piqp_optional_vec_map(data->h, data->m);
-    piqp::optional<Eigen::Map<CVec>> x_lb = piqp_optional_vec_map(data->x_lb, data->n);
-    piqp::optional<Eigen::Map<CVec>> x_ub = piqp_optional_vec_map(data->x_ub, data->n);
+    piqp::optional<Eigen::Map<CVec>> h_l = piqp_optional_vec_map(data->h_l, data->m);
+    piqp::optional<Eigen::Map<CVec>> h_u = piqp_optional_vec_map(data->h_u, data->m);
+    piqp::optional<Eigen::Map<CVec>> x_l = piqp_optional_vec_map(data->x_l, data->n);
+    piqp::optional<Eigen::Map<CVec>> x_u = piqp_optional_vec_map(data->x_u, data->n);
 
-    solver->setup(P, c, A, b, G, h, x_lb, x_ub);
+    solver->setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
 
     piqp_update_result(work->result, solver->result());
 }
@@ -227,11 +245,12 @@ void piqp_setup_sparse(piqp_workspace** workspace, const piqp_data_sparse* data,
     piqp::optional<Eigen::Map<CSparseMat>> A = piqp_optional_sparse_mat_map(data->A);
     piqp::optional<Eigen::Map<CVec>> b = piqp_optional_vec_map(data->b, data->p);
     piqp::optional<Eigen::Map<CSparseMat>> G = piqp_optional_sparse_mat_map(data->G);
-    piqp::optional<Eigen::Map<CVec>> h = piqp_optional_vec_map(data->h, data->m);
-    piqp::optional<Eigen::Map<CVec>> x_lb = piqp_optional_vec_map(data->x_lb, data->n);
-    piqp::optional<Eigen::Map<CVec>> x_ub = piqp_optional_vec_map(data->x_ub, data->n);
+    piqp::optional<Eigen::Map<CVec>> h_l = piqp_optional_vec_map(data->h_l, data->m);
+    piqp::optional<Eigen::Map<CVec>> h_u = piqp_optional_vec_map(data->h_u, data->m);
+    piqp::optional<Eigen::Map<CVec>> x_l = piqp_optional_vec_map(data->x_l, data->n);
+    piqp::optional<Eigen::Map<CVec>> x_u = piqp_optional_vec_map(data->x_u, data->n);
 
-    solver->setup(P, c, A, b, G, h, x_lb, x_ub);
+    solver->setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
 
     piqp_update_result(work->result, solver->result());
 }
@@ -256,6 +275,7 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().max_iter = settings->max_iter;
         solver->settings().max_factor_retires = settings->max_factor_retires;
         solver->settings().preconditioner_scale_cost = settings->preconditioner_scale_cost;
+        solver->settings().preconditioner_reuse_on_update = settings->preconditioner_reuse_on_update;
         solver->settings().preconditioner_iter = settings->preconditioner_iter;
         solver->settings().tau = settings->tau;
         solver->settings().kkt_solver = c_to_cpp_kkt_solver(settings->kkt_solver);
@@ -287,6 +307,7 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().max_iter = settings->max_iter;
         solver->settings().max_factor_retires = settings->max_factor_retires;
         solver->settings().preconditioner_scale_cost = settings->preconditioner_scale_cost;
+        solver->settings().preconditioner_reuse_on_update = settings->preconditioner_reuse_on_update;
         solver->settings().preconditioner_iter = settings->preconditioner_iter;
         solver->settings().tau = settings->tau;
         solver->settings().kkt_solver = c_to_cpp_kkt_solver(settings->kkt_solver);
@@ -305,39 +326,41 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
 void piqp_update_dense(piqp_workspace* workspace,
                        piqp_float* P, piqp_float* c,
                        piqp_float* A, piqp_float* b,
-                       piqp_float* G, piqp_float* h,
-                       piqp_float* x_lb, piqp_float* x_ub)
+                       piqp_float* G, piqp_float* h_l, piqp_float* h_u,
+                       piqp_float* x_l, piqp_float* x_u)
 {
     piqp::optional<Eigen::Map<CMat>> P_ = piqp_optional_mat_map(P, workspace->solver_info.n, workspace->solver_info.n);
     piqp::optional<Eigen::Map<CVec>> c_ = piqp_optional_vec_map(c, workspace->solver_info.n);
     piqp::optional<Eigen::Map<CMat>> A_ = piqp_optional_mat_map(A, workspace->solver_info.p, workspace->solver_info.n);
     piqp::optional<Eigen::Map<CVec>> b_ = piqp_optional_vec_map(b, workspace->solver_info.p);
     piqp::optional<Eigen::Map<CMat>> G_ = piqp_optional_mat_map(G, workspace->solver_info.m, workspace->solver_info.n);
-    piqp::optional<Eigen::Map<CVec>> h_ = piqp_optional_vec_map(h, workspace->solver_info.m);
-    piqp::optional<Eigen::Map<CVec>> x_lb_ = piqp_optional_vec_map(x_lb, workspace->solver_info.n);
-    piqp::optional<Eigen::Map<CVec>> x_ub_ = piqp_optional_vec_map(x_ub, workspace->solver_info.n);
+    piqp::optional<Eigen::Map<CVec>> h_l_ = piqp_optional_vec_map(h_l, workspace->solver_info.m);
+    piqp::optional<Eigen::Map<CVec>> h_u_ = piqp_optional_vec_map(h_u, workspace->solver_info.m);
+    piqp::optional<Eigen::Map<CVec>> x_l_ = piqp_optional_vec_map(x_l, workspace->solver_info.n);
+    piqp::optional<Eigen::Map<CVec>> x_u_ = piqp_optional_vec_map(x_u, workspace->solver_info.n);
 
     auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
-    solver->update(P_, c_, A_, b_, G_, h_, x_lb_, x_ub_);
+    solver->update(P_, c_, A_, b_, G_, h_l_, h_u_, x_l_, x_u_);
 }
 
 void piqp_update_sparse(piqp_workspace* workspace,
                         piqp_csc* P, piqp_float* c,
                         piqp_csc* A, piqp_float* b,
-                        piqp_csc* G, piqp_float* h,
-                        piqp_float* x_lb, piqp_float* x_ub)
+                        piqp_csc* G, piqp_float* h_l, piqp_float* h_u,
+                        piqp_float* x_l, piqp_float* x_u)
 {
     piqp::optional<Eigen::Map<CSparseMat>> P_ = piqp_optional_sparse_mat_map(P);
     piqp::optional<Eigen::Map<CVec>> c_ = piqp_optional_vec_map(c, workspace->solver_info.n);
     piqp::optional<Eigen::Map<CSparseMat>> A_ = piqp_optional_sparse_mat_map(A);
     piqp::optional<Eigen::Map<CVec>> b_ = piqp_optional_vec_map(b, workspace->solver_info.p);
     piqp::optional<Eigen::Map<CSparseMat>> G_ = piqp_optional_sparse_mat_map(G);
-    piqp::optional<Eigen::Map<CVec>> h_ = piqp_optional_vec_map(h, workspace->solver_info.m);
-    piqp::optional<Eigen::Map<CVec>> x_lb_ = piqp_optional_vec_map(x_lb, workspace->solver_info.n);
-    piqp::optional<Eigen::Map<CVec>> x_ub_ = piqp_optional_vec_map(x_ub, workspace->solver_info.n);
+    piqp::optional<Eigen::Map<CVec>> h_l_ = piqp_optional_vec_map(h_l, workspace->solver_info.m);
+    piqp::optional<Eigen::Map<CVec>> h_u_ = piqp_optional_vec_map(h_u, workspace->solver_info.m);
+    piqp::optional<Eigen::Map<CVec>> x_l_ = piqp_optional_vec_map(x_l, workspace->solver_info.n);
+    piqp::optional<Eigen::Map<CVec>> x_u_ = piqp_optional_vec_map(x_u, workspace->solver_info.n);
 
     auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
-    solver->update(P_, c_, A_, b_, G_, h_, x_lb_, x_ub_);
+    solver->update(P_, c_, A_, b_, G_, h_l_, h_u_, x_l_, x_u_);
 }
 
 piqp_status piqp_solve(piqp_workspace* workspace)

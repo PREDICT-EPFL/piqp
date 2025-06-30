@@ -20,9 +20,10 @@ c = [-1; -4];
 A = [1 -2];
 b = 1;
 G = [1 -1; 2, 0];
-h = [0.2; -1];
-x_lb = [-1; -Inf];
-x_ub = [1; Inf];
+h_l = [-Inf; -Inf];
+h_u = [0.2; -1];
+x_l = [-1; -Inf];
+x_u = [1; Inf];
 ```
 
 For the sparse interface $$P$$, $$A$$, and $$G$$ should be sparse matrices.
@@ -59,7 +60,7 @@ In this example we enable the verbose output and internal timings. The full set 
 We can now set up the problem using
 
 ```matlab
-solver.setup(P, c, A, b, G, h, x_lb, x_ub);
+solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
 ```
 
 The data is internally copied, and the solver initializes all internal data structures.
@@ -73,9 +74,10 @@ result = solver.solve()
 The result of the optimization are directly returned. More specifically, the most important information includes
 * `result.x`: primal solution
 * `result.y`: dual solution of equality constraints
-* `result.z`: dual solution of inequality constraints
-* `result.z_lb`: dual solution of lower bound box constraints
-* `result.z_ub`: dual solution of upper bound box constraints
+* `result.z_l`: dual solution of lower inequality constraints
+* `result.z_u`: dual solution of upper inequality constraints
+* `result.z_bl`: dual solution of lower bound box constraints
+* `result.z_bu`: dual solution of upper bound box constraints
 * `result.info.staus`: solver status
 * `result.info.primal_obj`: primal objective value
 * `result.info.run_time`: total runtime

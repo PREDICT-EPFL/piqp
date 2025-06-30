@@ -32,15 +32,15 @@ int main()
     G.insert(0, 1) = -1;
     G.insert(1, 0) = 2;
     G.makeCompressed();
-    Eigen::VectorXd h(m); h << 0.2, -1;
+    Eigen::VectorXd h_u(m); h_u << 0.2, -1;
 
-    Eigen::VectorXd x_lb(n); x_lb << -1, -std::numeric_limits<double>::infinity();
-    Eigen::VectorXd x_ub(n); x_ub << 1, std::numeric_limits<double>::infinity();
+    Eigen::VectorXd x_l(n); x_l << -1, -std::numeric_limits<double>::infinity();
+    Eigen::VectorXd x_u(n); x_u << 1, std::numeric_limits<double>::infinity();
 
     piqp::SparseSolver<double> solver;
     solver.settings().verbose = true;
     solver.settings().compute_timings = true;
-    solver.setup(P, c, A, b, G, h, x_lb, x_ub);
+    solver.setup(P, c, A, b, G, piqp::nullopt, h_u, x_l, x_u);
 
     piqp::Status status = solver.solve();
 
