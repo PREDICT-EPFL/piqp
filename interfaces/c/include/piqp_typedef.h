@@ -30,13 +30,13 @@ typedef struct {
     piqp_int   nnz; // non-zero elements
     piqp_int*  p;   // column indices (size n+1), i.e. stores for each column the index of the first non-zero
     piqp_int*  i;   // row indices (size nzz)
-    piqp_float* x;   // numerical values (size nzz)
+    piqp_float* x;  // numerical values (size nzz)
 } piqp_csc;
 
 typedef struct {
-    piqp_int   n;   // number of decision variables
-    piqp_int   p;   // number of equality constraints
-    piqp_int   m;   // number of inequality constraints
+    piqp_int   n;    // number of decision variables
+    piqp_int   p;    // number of equality constraints
+    piqp_int   m;    // number of inequality constraints
     piqp_float* P;   // quadratic cost matrix P (size n x n), only upper triangular part is used
     piqp_float* c;   // linear cost weights c (size n)
     piqp_float* A;   // equality constraints matrix A (size p x n), can be NULL
@@ -49,14 +49,14 @@ typedef struct {
 } piqp_data_dense;
 
 typedef struct {
-    piqp_int   n;   // number of decision variables
-    piqp_int   p;   // number of equality constraints
-    piqp_int   m;   // number of inequality constraints
-    piqp_csc*  P;   // quadratic cost matrix P (size n x n), only upper triangular part is used
+    piqp_int   n;    // number of decision variables
+    piqp_int   p;    // number of equality constraints
+    piqp_int   m;    // number of inequality constraints
+    piqp_csc*  P;    // quadratic cost matrix P (size n x n), only upper triangular part is used
     piqp_float* c;   // linear cost weights c (size n)
-    piqp_csc*  A;   // equality constraints matrix A (size p x n), can be NULL
+    piqp_csc*  A;    // equality constraints matrix A (size p x n), can be NULL
     piqp_float* b;   // equality constraints constant b (size p), can be NULL
-    piqp_csc*  G;   // inequality constraints matrix G (size m x n), can be NULL
+    piqp_csc*  G;    // inequality constraints matrix G (size m x n), can be NULL
     piqp_float* h_l; // inequality lower bounds h_l (size m), can be NULL
     piqp_float* h_u; // inequality upper bounds h_u (size m), can be NULL
     piqp_float* x_l; // decision variables lower bounds x_lb (size n), can be NULL
@@ -73,15 +73,15 @@ typedef enum {
 } piqp_kkt_solver;
 
 typedef struct {
-    piqp_float       rho_init;
-    piqp_float       delta_init;
-    piqp_float       eps_abs;
-    piqp_float       eps_rel;
+    piqp_float      rho_init;
+    piqp_float      delta_init;
+    piqp_float      eps_abs;
+    piqp_float      eps_rel;
     piqp_int        check_duality_gap;
-    piqp_float       eps_duality_gap_abs;
-    piqp_float       eps_duality_gap_rel;
-    piqp_float       reg_lower_limit;
-    piqp_float       reg_finetune_lower_limit;
+    piqp_float      eps_duality_gap_abs;
+    piqp_float      eps_duality_gap_rel;
+    piqp_float      reg_lower_limit;
+    piqp_float      reg_finetune_lower_limit;
     piqp_int        reg_finetune_primal_update_threshold;
     piqp_int        reg_finetune_dual_update_threshold;
     piqp_int        max_iter;
@@ -89,15 +89,15 @@ typedef struct {
     piqp_int        preconditioner_scale_cost;
     piqp_int        preconditioner_reuse_on_update;
     piqp_int        preconditioner_iter;
-    piqp_float       tau;
+    piqp_float      tau;
     piqp_kkt_solver kkt_solver;
     piqp_int        iterative_refinement_always_enabled;
-    piqp_float       iterative_refinement_eps_abs;
-    piqp_float       iterative_refinement_eps_rel;
+    piqp_float      iterative_refinement_eps_abs;
+    piqp_float      iterative_refinement_eps_rel;
     piqp_int        iterative_refinement_max_iter;
-    piqp_float       iterative_refinement_min_improvement_rate;
-    piqp_float       iterative_refinement_static_regularization_eps;
-    piqp_float       iterative_refinement_static_regularization_rel;
+    piqp_float      iterative_refinement_min_improvement_rate;
+    piqp_float      iterative_refinement_static_regularization_eps;
+    piqp_float      iterative_refinement_static_regularization_rel;
     piqp_int        verbose;
     piqp_int        compute_timings;
 } piqp_settings;
@@ -178,11 +178,11 @@ typedef struct {
     piqp_int n;        // number of decision variables
     piqp_int p;        // number of equality constraints
     piqp_int m;        // number of inequality constraints
-} pipq_solver_info;
+} piqp_solver_info;
 
 typedef struct {
     piqp_solver_handle* solver_handle;
-    pipq_solver_info    solver_info;
+    piqp_solver_info    solver_info;
     piqp_result*        result;
 } piqp_workspace;
 

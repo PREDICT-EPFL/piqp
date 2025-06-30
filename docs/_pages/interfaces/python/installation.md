@@ -38,7 +38,7 @@ cd piqp
 # export CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON"
 python3 -m pip install .
 ```
-This will build and install pipq. Alternatively, also a wheel can be build using
+This will build and install piqp. Alternatively, also a wheel can be build using
 ```shell
 python3 -m build --wheel
 ```

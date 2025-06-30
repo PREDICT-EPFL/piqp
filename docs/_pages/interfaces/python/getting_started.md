@@ -27,9 +27,10 @@ c = np.array([-1, -4], dtype=np.float64)
 A = np.array([[1, -2]], dtype=np.float64)
 b = np.array([1], dtype=np.float64)
 G = np.array([[1, -1], [2, 0]], dtype=np.float64)
-h = np.array([0.2, -1], dtype=np.float64)
-x_lb = np.array([-1, -np.inf], dtype=np.float64)
-x_ub = np.array([1, np.inf], dtype=np.float64)
+h_l = np.array([-np.inf, -np.inf], dtype=np.float64)
+h_u = np.array([0.2, -1], dtype=np.float64)
+x_l = np.array([-1, -np.inf], dtype=np.float64)
+x_u = np.array([1, np.inf], dtype=np.float64)
 ```
 
 For the sparse interface $$P$$, $$A$$, and $$G$$ have to be in compressed sparse column (CSC) format.
@@ -67,7 +68,7 @@ In this example we enable the verbose output and internal timings. The full set 
 We can now set up the problem using
 
 ```python
-solver.setup(P, c, A, b, G, h, x_lb, x_ub)
+solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u)
 ```
 
 {: .note }
@@ -90,9 +91,10 @@ status = solver.solve()
 The result of the optimization can be obtained from the `solver.result` object. More specifically, the most important information includes
 * `solver.result.x`: primal solution
 * `solver.result.y`: dual solution of equality constraints
-* `solver.result.z`: dual solution of inequality constraints
-* `solver.result.z_lb`: dual solution of lower bound box constraints
-* `solver.result.z_ub`: dual solution of upper bound box constraints
+* `solver.result.z_l`: dual solution of lower inequality constraints
+* `solver.result.z_u`: dual solution of upper inequality constraints
+* `solver.result.z_bl`: dual solution of lower bound box constraints
+* `solver.result.z_bu`: dual solution of upper bound box constraints
 * `solver.result.info.primal_obj`: primal objective value
 * `solver.result.info.run_time`: total runtime
 
@@ -106,7 +108,7 @@ Timing information like `solver.result.info.run_time` is only measured if `solve
 Instead of creating a new solver object everytime it's possible to update the problem directly using
 
 ```python
-solver.update(P, c, A, b, G, h, x_lb, x_ub)
+solver.update(P, c, A, b, G, h_l, h_u, x_l, x_u)
 ```
 
 with a subsequent call to

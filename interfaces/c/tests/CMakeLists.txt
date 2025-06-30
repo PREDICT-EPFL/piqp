@@ -32,14 +32,14 @@ endif()
 
 enable_testing()
 
-add_library(pipq-c-interface-test INTERFACE)
-target_include_directories(pipq-c-interface-test INTERFACE include)
-target_compile_options(pipq-c-interface-test INTERFACE ${compiler_flags})
-target_link_options(pipq-c-interface-test INTERFACE ${compiler_flags})
-target_link_libraries(pipq-c-interface-test INTERFACE piqp_c gtest_main gtest)
+add_library(piqp-c-interface-test INTERFACE)
+target_include_directories(piqp-c-interface-test INTERFACE include)
+target_compile_options(piqp-c-interface-test INTERFACE ${compiler_flags})
+target_link_options(piqp-c-interface-test INTERFACE ${compiler_flags})
+target_link_libraries(piqp-c-interface-test INTERFACE piqp_c gtest_main gtest)
 
 add_executable(c_interface_test src/c_interface_test.cpp)
-target_link_libraries(c_interface_test PRIVATE pipq-c-interface-test)
+target_link_libraries(c_interface_test PRIVATE piqp-c-interface-test)
 
 fix_test_dll(c_interface_test)
 

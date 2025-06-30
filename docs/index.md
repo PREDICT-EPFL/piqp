@@ -10,12 +10,12 @@ $$
 \begin{aligned}
 \min_{x} \quad & \frac{1}{2} x^\top P x + c^\top x \\
 \text {s.t.}\quad & Ax=b, \\
-& Gx \leq h, \\
-& x_{lb} \leq x \leq x_{ub},
+& h_l \leq Gx \leq h_u, \\
+& x_l \leq x \leq x_u,
 \end{aligned}
 $$
 
-with primal decision variables $$x \in \mathbb{R}^n$$, matrices $$P\in \mathbb{S}_+^n$$, $$A \in \mathbb{R}^{p \times n}$$,  $$G \in \mathbb{R}^{m \times n}$$, and vectors $$c \in \mathbb{R}^n$$, $$b \in \mathbb{R}^p$$, $$h \in \mathbb{R}^m$$, $$x_{lb} \in \mathbb{R}^n$$, and $$x_{ub} \in \mathbb{R}^n$$. Combining an infeasible interior point method with the proximal method of multipliers, the algorithm can handle ill-conditioned convex QP problems without the need for linear independence of the constraints.
+with primal decision variables $$x \in \mathbb{R}^n$$, matrices $$P\in \mathbb{S}_+^n$$, $$A \in \mathbb{R}^{p \times n}$$,  $$G \in \mathbb{R}^{m \times n}$$, and vectors $$c \in \mathbb{R}^n$$, $$b \in \mathbb{R}^p$$, $$h_l \in \mathbb{R}^m$$, $$h_u \in \mathbb{R}^m$$, $$x_l \in \mathbb{R}^n$$, and $$x_u \in \mathbb{R}^n$$. Combining an infeasible interior point method with the proximal method of multipliers, the algorithm can handle ill-conditioned convex QP problems without the need for linear independence of the constraints.
 
 For more detailed technical results see our papers:
 
@@ -42,8 +42,6 @@ PIQP support a wide range of interfaces including
 * Python
 * Matlab/Octave
 * R
-* Julia (soon)
-* Rust (soon)
 
 ### Credits
 

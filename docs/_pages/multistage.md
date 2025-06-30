@@ -61,15 +61,15 @@ $$
 \begin{aligned}
 \min_{x} \quad & \frac{1}{2} x^\top P x + c^\top x \\
 \text {s.t.}\quad & Ax=b, \\
-& Gx \leq h, \\
-& x_{lb} \leq x \leq x_{ub}
+& h_l \leq Gx \leq h_u, \\
+& x_l \leq x \leq x_u,
 \end{aligned}
 $$
 
 PIQP detects the structure automatically and extracts the dense blocks from the sparse problem data.
 
 {: .note }
-The order of the decision variables is important and has to match the multistage optimization problem, i.e. $$x = (x_0, x_1, \dots, x_N, g)$$. The order of the constraints $$Ax=b$$ and $$Gx \leq h$$ can be arbitrary, i.e., gets correctly permuted internally.
+The order of the decision variables is important and has to match the multistage optimization problem, i.e. $$x = (x_0, x_1, \dots, x_N, g)$$. The order of the constraints $$Ax=b$$ and $$h_l \leq Gx \leq h_u$$ can be arbitrary, i.e., gets correctly permuted internally.
 
 Changing the KKT solver backend amounts to adding one line, by changing the `kkt_solver` setting. Make sure you use the sparse solver interface and set the setting **before** the `setup` function.
 

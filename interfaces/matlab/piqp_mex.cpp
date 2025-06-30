@@ -311,7 +311,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         if (nrhs < 2) {
             strcpy(backend, "sparse");
             mexWarnMsgTxt("The sparse backend is automatically used. To get rid of this warning or use another backend, "
-                          "provide the backend explicitly using pipq('dense') or piqp('sparse').");
+                          "provide the backend explicitly using piqp('dense') or piqp('sparse').");
         } else if (mxGetString(prhs[1], backend, sizeof(backend))) {
             mexErrMsgTxt("Second input should be string less than 10 characters long.");
         }
