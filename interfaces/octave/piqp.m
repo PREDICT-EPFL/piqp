@@ -185,7 +185,7 @@ classdef piqp < handle
             end
 
             % Create proper inequalty constraints if they are not passed
-            if (isempty(G) && ~isempty(h)) || (~isempty(G) && isempty(h))
+            if (isempty(G) && ~isempty([h_l; h_u])) || (~isempty(G) && isempty([h_l; h_u]))
                 error('G must be supplied together with h');
             end
 
