@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-06-30
+
+### Changed
+- Fix compatibility with Octave 10 or newer [#20](https://github.com/PREDICT-EPFL/piqp/pull/20)
+- Change preconditioner to scale lower and upper bounds using the same scaling and refactor KKT system logic [#21](https://github.com/PREDICT-EPFL/piqp/pull/21)
+- Add support for double sided general inequality constraints [#22](https://github.com/PREDICT-EPFL/piqp/pull/22)
+- General convergence improvements [#23](https://github.com/PREDICT-EPFL/piqp/pull/23)
+- Switch build system to scikit-build-core [#25](https://github.com/PREDICT-EPFL/piqp/pull/25)
+- Make building with EIGEN_MAX_ALIGN_BYTES definition opt-in [#28](https://github.com/PREDICT-EPFL/piqp/pull/28)
+
 ## [0.5.0] - 2025-03-17
 
 ### Changed
@@ -113,7 +123,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.5.0...HEAD
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.0...v0.4.1
