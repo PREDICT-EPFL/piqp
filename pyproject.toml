@@ -7,7 +7,7 @@
 
 [project]
 name = "piqp"
-version = "0.5.0"
+version = "0.6.0"
 readme = "README.md"
 description = "A Proximal Interior Point Quadratic Programming solver"
 authors = [
