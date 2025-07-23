@@ -114,13 +114,13 @@ public:
         block_syrk_ln_alloc(GT, GT_scaled, GtG);
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp barrier
-#endif
-        init_kkt_fac();
-
-#ifdef PIQP_HAS_OPENMP
         } // end of parallel region
 #endif
+
+        // when we are allocating the kkt matrix there are
+        // dependencies which leads to race conditions,
+        // thus, we have to allocate on a single thread
+        init_kkt_fac();
 
         work_x_block_1 = BlockVec(block_info);
         work_x_block_2 = BlockVec(block_info);
@@ -239,7 +239,6 @@ public:
 
 
 #ifdef PIQP_HAS_OPENMP
-
 #pragma omp parallel
         {
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve:parallel");
@@ -247,6 +246,9 @@ public:
 
         // block_rhs += GT * block_rhs_z_bar
         block_t_gemv_n(1.0, GT, block_rhs_z_bar, 1.0, block_rhs, block_rhs);
+#ifdef PIQP_HAS_OPENMP
+#pragma omp barrier
+#endif
         // block_rhs += delta_inv * AT * block_rhs_y
         block_t_gemv_n(delta_inv, AT, block_rhs_y, 1.0, block_rhs, block_rhs);
 
