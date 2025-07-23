@@ -100,12 +100,27 @@ public:
         G_scaling = BlockVec(GT.block_row_sizes);
         GT_scaled = GT;
 
-        block_syrk_ln_alloc(AT, AT, AtA);
-        block_syrk_ln_calc(AT, AT, AtA);
+#ifdef PIQP_HAS_OPENMP
+#pragma omp parallel
+        {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::constructor:parallel");
+#endif
 
+        block_syrk_ln_alloc(AT, AT, AtA);
+#ifdef PIQP_HAS_OPENMP
+#pragma omp barrier
+#endif
+        block_syrk_ln_calc(AT, AT, AtA);
         block_syrk_ln_alloc(GT, GT_scaled, GtG);
 
+#ifdef PIQP_HAS_OPENMP
+#pragma omp barrier
+#endif
         init_kkt_fac();
+
+#ifdef PIQP_HAS_OPENMP
+        } // end of parallel region
+#endif
 
         work_x_block_1 = BlockVec(block_info);
         work_x_block_2 = BlockVec(block_info);
@@ -143,7 +158,15 @@ public:
         if (options & KKTUpdateOptions::KKT_UPDATE_A)
         {
             transpose_to_block_mat<false>(data.AT, true, AT);
+#ifdef PIQP_HAS_OPENMP
+#pragma omp parallel
+            {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::update_data:parallel");
+#endif
             block_syrk_ln_calc(AT, AT, AtA);
+#ifdef PIQP_HAS_OPENMP
+            } // end of parallel region
+#endif
         }
 
         if (options & KKTUpdateOptions::KKT_UPDATE_G)
@@ -169,10 +192,25 @@ public:
                 i++;
             }
         }
+#ifdef PIQP_HAS_OPENMP
+#pragma omp parallel
+        {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::update_scalings_and_factor:parallel");
+#endif
 
         block_gemm_nd(GT, G_scaling, GT_scaled);
+#ifdef PIQP_HAS_OPENMP
+#pragma omp barrier
+#endif
         block_syrk_ln_calc(GT_scaled, GT_scaled, GtG);
+#ifdef PIQP_HAS_OPENMP
+#pragma omp barrier
+#endif
         populate_kkt_fac(x_reg);
+
+#ifdef PIQP_HAS_OPENMP
+        } // end of parallel region
+#endif
         factor_kkt();
 
         return true;
@@ -199,41 +237,41 @@ public:
         block_rhs_y.assign(rhs_y, AT.perm_inv);
         block_rhs_z_bar.assign(rhs_z_bar, GT.perm_inv);
 
-        {
+
 #ifdef PIQP_HAS_OPENMP
 
 #pragma omp parallel
-            {
-            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve:parallel");
+        {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve:parallel");
 #endif
 
-            // block_rhs += GT * block_rhs_z_bar
-            block_t_gemv_n(1.0, GT, block_rhs_z_bar, 1.0, block_rhs, block_rhs);
-            // block_rhs += delta_inv * AT * block_rhs_y
-            block_t_gemv_n(delta_inv, AT, block_rhs_y, 1.0, block_rhs, block_rhs);
+        // block_rhs += GT * block_rhs_z_bar
+        block_t_gemv_n(1.0, GT, block_rhs_z_bar, 1.0, block_rhs, block_rhs);
+        // block_rhs += delta_inv * AT * block_rhs_y
+        block_t_gemv_n(delta_inv, AT, block_rhs_y, 1.0, block_rhs, block_rhs);
 
 #ifdef PIQP_HAS_OPENMP
 #pragma omp barrier
 #pragma omp master
-            {
+        {
 #endif
 
-            solve_llt_in_place(block_rhs);
+        solve_llt_in_place(block_rhs);
 
 #ifdef PIQP_HAS_OPENMP
-            } // end of master region
+        } // end of master region
 #pragma omp barrier
 #endif
 
-            // block_lhs_y = delta_inv * A * block_lhs_x
-            block_t_gemv_t(delta_inv, AT, block_lhs_x, 0.0, block_lhs_y, block_lhs_y);
-            // block_lhs_z = G * block_lhs_x
-            block_t_gemv_t(1.0, GT, block_lhs_x, 0.0, block_lhs_z, block_lhs_z);
+        // block_lhs_y = delta_inv * A * block_lhs_x
+        block_t_gemv_t(delta_inv, AT, block_lhs_x, 0.0, block_lhs_y, block_lhs_y);
+        // block_lhs_z = G * block_lhs_x
+        block_t_gemv_t(1.0, GT, block_lhs_x, 0.0, block_lhs_z, block_lhs_z);
 
 #ifdef PIQP_HAS_OPENMP
-            } // end of parallel region
+        } // end of parallel region
 #endif
-        }
+
 
         block_lhs_x.load(lhs_x);
         block_lhs_y.load(lhs_y, AT.perm_inv);
@@ -757,11 +795,6 @@ protected:
             sD.E.resize(N - 1);
         }
 
-#ifdef PIQP_HAS_OPENMP
-        #pragma omp parallel
-        {
-#endif
-
         // ----- DIAGONAL -----
 
 #ifdef PIQP_HAS_OPENMP
@@ -903,9 +936,6 @@ protected:
                 }
             }
         }
-#ifdef PIQP_HAS_OPENMP
-        } // end of parallel region
-#endif
     }
 
     void init_kkt_fac()
@@ -929,6 +959,11 @@ protected:
         I arrow_width = block_info.back().diag_size;
         T delta_inv = 1.0 / m_delta;
 
+#ifdef PIQP_HAS_OPENMP
+#pragma omp barrier
+#pragma omp single
+        {
+#endif
         kkt_fac.D.resize(N);
         kkt_fac.B.resize(N - 2);
         kkt_fac.E.resize(N - 1);
@@ -937,10 +972,8 @@ protected:
         {
             x_reg_block.assign(x_reg);
         }
-
 #ifdef PIQP_HAS_OPENMP
-        #pragma omp parallel
-        {
+        } // end of single region
 #endif
 
         // ----- DIAGONAL -----
@@ -1128,10 +1161,6 @@ protected:
                 }
             }
         }
-
-#ifdef PIQP_HAS_OPENMP
-        } // end of parallel region
-#endif
     }
 
     // sD = sA * diag(sB)
@@ -1140,11 +1169,6 @@ protected:
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_gemm_nd");
 
         std::size_t N = block_info.size();
-
-#ifdef PIQP_HAS_OPENMP
-        #pragma omp parallel
-        {
-#endif
 
 #ifdef PIQP_HAS_OPENMP
         #pragma omp for nowait
@@ -1169,10 +1193,6 @@ protected:
                 blasfeo_dgemm_nd(1.0, *sA.E[i], sB.x[i], 0.0, *sD.E[i], *sD.E[i]);
             }
         }
-
-#ifdef PIQP_HAS_OPENMP
-        } // end of parallel region
-#endif
     }
 
     void factor_kkt()
