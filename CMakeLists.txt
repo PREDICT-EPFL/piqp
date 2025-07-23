@@ -28,6 +28,7 @@ option(BUILD_WITH_TEMPLATE_INSTANTIATION "Build a shared library with common tem
 option(BUILD_WITH_EIGEN_MAX_ALIGN_BYTES "Build with EIGEN_MAX_ALIGN_BYTES=64 (up to AVX512) on x86 for maximal Eigen ABI compatibility" OFF)
 option(BUILD_WITH_BLASFEO "Build with blasfeo which is required for some kkt solvers" OFF)
 option(BUILD_WITH_OPENMP "Build with OpenMP parallelization support" OFF)
+option(BUILD_WITH_TRACY "Build and link with tracy support" OFF)
 option(BUILD_SHARED_LIBS "Build library as shared." ON)
 option(BUILD_WITH_STD_OPTIONAL "Build using std::optional" OFF)
 option(BUILD_WITH_STD_FILESYSTEM "Build using std::filesystem" OFF)
@@ -273,6 +274,30 @@ if (BUILD_WITH_OPENMP)
         target_link_libraries(piqp_header_only_no_blasfeo_linked INTERFACE OpenMP::OpenMP_CXX)
     else ()
         message(STATUS "OpenMP NOT found.")
+    endif ()
+endif ()
+
+if (BUILD_WITH_TRACY)
+    # Find tracy
+    include(FetchContent)
+    FetchContent_Declare(
+        tracy
+        URL https://github.com/wolfpld/tracy/archive/refs/tags/v0.12.2.zip
+    )
+    set(TRACY_ENABLE ON)
+    set(TRACY_LTO ON)
+    FetchContent_GetProperties(tracy)
+    if(NOT tracy_POPULATED)
+        FetchContent_Populate(tracy)
+        add_subdirectory(${tracy_SOURCE_DIR} ${tracy_BINARY_DIR} EXCLUDE_FROM_ALL)
+    endif()
+
+    if (BUILD_WITH_TEMPLATE_INSTANTIATION)
+        target_compile_definitions(piqp PUBLIC PIQP_HAS_TRACY)
+        target_link_libraries(piqp PUBLIC Tracy::TracyClient)
+    else ()
+        target_compile_definitions(piqp INTERFACE PIQP_HAS_TRACY)
+        target_link_libraries(piqp INTERFACE Tracy::TracyClient)
     endif ()
 endif ()
 
