@@ -18,6 +18,7 @@
 #ifdef PIQP_HAS_BLASFEO
 #include "piqp/sparse/multistage_kkt.hpp"
 #endif
+#include "piqp/utils/tracy.hpp"
 
 namespace piqp
 {
@@ -95,6 +96,8 @@ public:
 
 	bool init(const DataType& data, const Settings<T>& settings)
 	{
+		PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::init");
+
 		P_diag.resize(data.n);
 		P_diag.setZero();
 
@@ -140,6 +143,8 @@ public:
 	bool update_scalings_and_factor(const DataType& data, const Settings<T>& settings, bool iterative_refinement,
 		                            const T& rho, const T& delta, const Variables<T>& vars)
     {
+		PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::update_scalings_and_factor");
+
 		Vec<T>& m_z_reg_iter_ref = work_z;
 
 		m_rho = rho;
@@ -153,31 +158,39 @@ public:
 		m_z_bl_inv.head(data.n_x_l).array() = vars.z_bl.head(data.n_x_l).array().inverse();
 		m_z_bu_inv.head(data.n_x_u).array() = vars.z_bu.head(data.n_x_u).array().inverse();
 
-		m_x_reg.setConstant(rho);
-		for (isize i = 0; i < data.n_x_l; i++)
 		{
-			Eigen::Index idx = data.x_l_idx(i);
-			m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_bl_inv(i) * m_s_bl(i) + m_delta);
-		}
-		for (isize i = 0; i < data.n_x_u; i++)
-		{
-			Eigen::Index idx = data.x_u_idx(i);
-			m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_bu_inv(i) * m_s_bu(i) + m_delta);
+			PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::update_scalings_and_factor::x_reg");
+
+			m_x_reg.setConstant(rho);
+			for (isize i = 0; i < data.n_x_l; i++)
+			{
+				Eigen::Index idx = data.x_l_idx(i);
+				m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_bl_inv(i) * m_s_bl(i) + m_delta);
+			}
+			for (isize i = 0; i < data.n_x_u; i++)
+			{
+				Eigen::Index idx = data.x_u_idx(i);
+				m_x_reg(idx) += data.x_b_scaling(idx) * data.x_b_scaling(idx) / (m_z_bu_inv(i) * m_s_bu(i) + m_delta);
+			}
 		}
 
-		m_z_reg.setZero();
-		for (isize i = 0; i < data.n_h_l; i++)
 		{
-			Eigen::Index idx = data.h_l_idx(i);
-			m_z_reg(idx) += T(1) / (m_z_l_inv(idx) * m_s_l(idx) + delta);
+			PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::update_scalings_and_factor::z_reg");
+
+			m_z_reg.setZero();
+			for (isize i = 0; i < data.n_h_l; i++)
+			{
+				Eigen::Index idx = data.h_l_idx(i);
+				m_z_reg(idx) += T(1) / (m_z_l_inv(idx) * m_s_l(idx) + delta);
+			}
+			for (isize i = 0; i < data.n_h_u; i++)
+			{
+				Eigen::Index idx = data.h_u_idx(i);
+				m_z_reg(idx) += T(1) / (m_z_u_inv(idx) * m_s_u(idx) + delta);
+			}
+			m_z_reg.array() = m_z_reg.array().inverse();
+			m_z_reg_iter_ref.array() = m_z_reg.array();
 		}
-		for (isize i = 0; i < data.n_h_u; i++)
-		{
-			Eigen::Index idx = data.h_u_idx(i);
-			m_z_reg(idx) += T(1) / (m_z_u_inv(idx) * m_s_u(idx) + delta);
-		}
-		m_z_reg.array() = m_z_reg.array().inverse();
-		m_z_reg_iter_ref.array() = m_z_reg.array();
 
 		T delta_reg = delta;
 		if (iterative_refinement)
@@ -199,38 +212,49 @@ public:
 
 	bool solve(const DataType& data, const Settings<T>& settings, const Variables<T>& rhs, Variables<T>& lhs)
 	{
+		PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::solve");
+
 		Vec<T>& lhs_z = work_z;
 
-		rhs_z_bar.setZero();
-		for (isize i = 0; i < data.n_h_l; i++)
 		{
-			Eigen::Index idx = data.h_l_idx(i);
-			rhs_z_bar(idx) -= T(1) / (m_z_l_inv(idx) * m_s_l(idx) + m_delta) * (rhs.z_l(idx) - m_z_l_inv(idx) * rhs.s_l(idx));
-		}
-		for (isize i = 0; i < data.n_h_u; i++)
-		{
-			Eigen::Index idx = data.h_u_idx(i);
-			rhs_z_bar(idx) += T(1) / (m_z_u_inv(idx) * m_s_u(idx) + m_delta) * (rhs.z_u(idx) - m_z_u_inv(idx) * rhs.s_u(idx));
-		}
-		rhs_z_bar.array() *= m_z_reg.array();
+			PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::solve::rhs_z_bar");
 
-		rhs_x_bar = rhs.x;
-		for (isize i = 0; i < data.n_x_l; i++)
-		{
-			Eigen::Index idx = data.x_l_idx(i);
-			rhs_x_bar(idx) -= data.x_b_scaling(idx) * (rhs.z_bl(i) - m_z_bl_inv(i) * rhs.s_bl(i))
-				/ (m_s_bl(i) * m_z_bl_inv(i) + m_delta);
+			rhs_z_bar.setZero();
+			for (isize i = 0; i < data.n_h_l; i++)
+			{
+				Eigen::Index idx = data.h_l_idx(i);
+				rhs_z_bar(idx) -= T(1) / (m_z_l_inv(idx) * m_s_l(idx) + m_delta) * (rhs.z_l(idx) - m_z_l_inv(idx) * rhs.s_l(idx));
+			}
+			for (isize i = 0; i < data.n_h_u; i++)
+			{
+				Eigen::Index idx = data.h_u_idx(i);
+				rhs_z_bar(idx) += T(1) / (m_z_u_inv(idx) * m_s_u(idx) + m_delta) * (rhs.z_u(idx) - m_z_u_inv(idx) * rhs.s_u(idx));
+			}
+			rhs_z_bar.array() *= m_z_reg.array();
 		}
-		for (isize i = 0; i < data.n_x_u; i++)
+
 		{
-			Eigen::Index idx = data.x_u_idx(i);
-			rhs_x_bar(idx) += data.x_b_scaling(idx) * (rhs.z_bu(i) - m_z_bu_inv(i) * rhs.s_bu(i))
-				/ (m_s_bu(i) * m_z_bu_inv(i) + m_delta);
+			PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::solve::rhs_x_bar");
+
+			rhs_x_bar = rhs.x;
+			for (isize i = 0; i < data.n_x_l; i++)
+			{
+				Eigen::Index idx = data.x_l_idx(i);
+				rhs_x_bar(idx) -= data.x_b_scaling(idx) * (rhs.z_bl(i) - m_z_bl_inv(i) * rhs.s_bl(i))
+					/ (m_s_bl(i) * m_z_bl_inv(i) + m_delta);
+			}
+			for (isize i = 0; i < data.n_x_u; i++)
+			{
+				Eigen::Index idx = data.x_u_idx(i);
+				rhs_x_bar(idx) += data.x_b_scaling(idx) * (rhs.z_bu(i) - m_z_bu_inv(i) * rhs.s_bu(i))
+					/ (m_s_bu(i) * m_z_bu_inv(i) + m_delta);
+			}
 		}
 
 		kkt_solver->solve(data, rhs_x_bar, rhs.y, rhs_z_bar, lhs.x, lhs.y, lhs_z);
 
 		if (use_iterative_refinement) {
+			PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::solve::iterative_refinement");
 
 			T rhs_norm = inf_norm(rhs_x_bar, rhs.y, rhs_z_bar);
 
@@ -283,55 +307,63 @@ public:
 			}
 		}
 
-		isize i_l = 0;
-		isize i_u = 0;
-		for (isize i = 0; i < data.m; i++) {
-			Eigen::Index idx_l = i_l < data.n_h_l ? data.h_l_idx(i_l) : -1;
-			while (idx_l < i && i_l < data.n_h_l) { idx_l = data.h_l_idx(++i_l); }
-			Eigen::Index idx_u = i_u < data.n_h_u ? data.h_u_idx(i_u) : -1;
-			while (idx_u < i && i_u < data.n_h_u) { idx_u = data.h_u_idx(++i_u); }
+		{
+			PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::solve::dual_recovery");
 
-			if (idx_l == i && idx_u == i) {
-				T rz_l_bar = rhs.z_l(i) - m_z_l_inv(i) * rhs.s_l(i);
-				T W_l_inv = T(1) / (m_z_l_inv(i) * m_s_l(i) + m_delta);
-				T rz_u_bar = rhs.z_u(i) - m_z_u_inv(i) * rhs.s_u(i);
-				T W_u_inv = T(1) / (m_z_u_inv(i) * m_s_u(i) + m_delta);
-				T r_sum = W_l_inv * W_u_inv * (rz_l_bar + rz_u_bar);
-				lhs.z_l(i) = -m_z_reg(i) * (r_sum + W_l_inv * lhs_z(i));
-				lhs.z_u(i) = -m_z_reg(i) * (r_sum - W_u_inv * lhs_z(i));
-				lhs.s_l(i) = m_z_l_inv(i) * (rhs.s_l(i) - m_s_l(i) * lhs.z_l(i));
-				lhs.s_u(i) = m_z_u_inv(i) * (rhs.s_u(i) - m_s_u(i) * lhs.z_u(i));
-			} else if (idx_l == i) {
-				lhs.z_l(i) = -lhs_z(i);
-				lhs.z_u(i) = T(0);
-				lhs.s_l(i) = m_z_l_inv(i) * (rhs.s_l(i) - m_s_l(i) * lhs.z_l(i));
-				lhs.s_u(i) = T(0);
-			} else if (idx_u == i) {
-				lhs.z_l(i) = T(0);
-				lhs.z_u(i) = lhs_z(i);
-				lhs.s_l(i) = T(0);
-				lhs.s_u(i) = m_z_u_inv(i) * (rhs.s_u(i) - m_s_u(i) * lhs.z_u(i));
-			} else {
-				assert(false && "This should be unreachable...");
+			isize i_l = 0;
+			isize i_u = 0;
+			for (isize i = 0; i < data.m; i++) {
+				Eigen::Index idx_l = i_l < data.n_h_l ? data.h_l_idx(i_l) : -1;
+				while (idx_l < i && i_l < data.n_h_l) { idx_l = data.h_l_idx(++i_l); }
+				Eigen::Index idx_u = i_u < data.n_h_u ? data.h_u_idx(i_u) : -1;
+				while (idx_u < i && i_u < data.n_h_u) { idx_u = data.h_u_idx(++i_u); }
+
+				if (idx_l == i && idx_u == i) {
+					T rz_l_bar = rhs.z_l(i) - m_z_l_inv(i) * rhs.s_l(i);
+					T W_l_inv = T(1) / (m_z_l_inv(i) * m_s_l(i) + m_delta);
+					T rz_u_bar = rhs.z_u(i) - m_z_u_inv(i) * rhs.s_u(i);
+					T W_u_inv = T(1) / (m_z_u_inv(i) * m_s_u(i) + m_delta);
+					T r_sum = W_l_inv * W_u_inv * (rz_l_bar + rz_u_bar);
+					lhs.z_l(i) = -m_z_reg(i) * (r_sum + W_l_inv * lhs_z(i));
+					lhs.z_u(i) = -m_z_reg(i) * (r_sum - W_u_inv * lhs_z(i));
+					lhs.s_l(i) = m_z_l_inv(i) * (rhs.s_l(i) - m_s_l(i) * lhs.z_l(i));
+					lhs.s_u(i) = m_z_u_inv(i) * (rhs.s_u(i) - m_s_u(i) * lhs.z_u(i));
+				} else if (idx_l == i) {
+					lhs.z_l(i) = -lhs_z(i);
+					lhs.z_u(i) = T(0);
+					lhs.s_l(i) = m_z_l_inv(i) * (rhs.s_l(i) - m_s_l(i) * lhs.z_l(i));
+					lhs.s_u(i) = T(0);
+				} else if (idx_u == i) {
+					lhs.z_l(i) = T(0);
+					lhs.z_u(i) = lhs_z(i);
+					lhs.s_l(i) = T(0);
+					lhs.s_u(i) = m_z_u_inv(i) * (rhs.s_u(i) - m_s_u(i) * lhs.z_u(i));
+				} else {
+					assert(false && "This should be unreachable...");
+				}
 			}
 		}
 
-		for (isize i = 0; i < data.n_x_l; i++) {
-			Eigen::Index idx = data.x_l_idx(i);
-			lhs.z_bl(i) = (-data.x_b_scaling(idx) * lhs.x(idx) - rhs.z_bl(i) + m_z_bl_inv(i) * rhs.s_bl(i))
-				/ (m_s_bl(i) * m_z_bl_inv(i) + m_delta);
-		}
-		for (isize i = 0; i < data.n_x_u; i++) {
-			Eigen::Index idx = data.x_u_idx(i);
-			lhs.z_bu(i) = (data.x_b_scaling(idx) * lhs.x(idx) - rhs.z_bu(i) + m_z_bu_inv(i) * rhs.s_bu(i))
-				/ (m_s_bu(i) * m_z_bu_inv(i) + m_delta);
-		}
+		{
+			PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::solve::box_dual_recovery");
 
-		lhs.s_bl.head(data.n_x_l).array() = m_z_bl_inv.head(data.n_x_l).array()
-			* (rhs.s_bl.head(data.n_x_l).array() - m_s_bl.head(data.n_x_l).array() * lhs.z_bl.head(data.n_x_l).array());
+			for (isize i = 0; i < data.n_x_l; i++) {
+				Eigen::Index idx = data.x_l_idx(i);
+				lhs.z_bl(i) = (-data.x_b_scaling(idx) * lhs.x(idx) - rhs.z_bl(i) + m_z_bl_inv(i) * rhs.s_bl(i))
+					/ (m_s_bl(i) * m_z_bl_inv(i) + m_delta);
+			}
+			for (isize i = 0; i < data.n_x_u; i++) {
+				Eigen::Index idx = data.x_u_idx(i);
+				lhs.z_bu(i) = (data.x_b_scaling(idx) * lhs.x(idx) - rhs.z_bu(i) + m_z_bu_inv(i) * rhs.s_bu(i))
+					/ (m_s_bu(i) * m_z_bu_inv(i) + m_delta);
+			}
 
-		lhs.s_bu.head(data.n_x_u).array() = m_z_bu_inv.head(data.n_x_u).array()
-			* (rhs.s_bu.head(data.n_x_u).array() - m_s_bu.head(data.n_x_u).array() * lhs.z_bu.head(data.n_x_u).array());
+			lhs.s_bl.head(data.n_x_l).array() = m_z_bl_inv.head(data.n_x_l).array()
+				* (rhs.s_bl.head(data.n_x_l).array() - m_s_bl.head(data.n_x_l).array() * lhs.z_bl.head(data.n_x_l).array());
+
+			lhs.s_bu.head(data.n_x_u).array() = m_z_bu_inv.head(data.n_x_u).array()
+				* (rhs.s_bu.head(data.n_x_u).array() - m_s_bu.head(data.n_x_u).array() * lhs.z_bu.head(data.n_x_u).array());
+		}
 
 		return true;
 	}
@@ -339,18 +371,21 @@ public:
 	// z = alpha * P * x
 	void eval_P_x(const DataType& data, const T& alpha, const Vec<T>& x, Vec<T>& z)
 	{
+		PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::eval_P_x");
 		kkt_solver->eval_P_x(data, alpha, x, z);
 	}
 
 	// zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
 	void eval_A_xn_and_AT_xt(const DataType& data, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt)
 	{
+		PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::eval_A_xn_and_AT_xt");
 		kkt_solver->eval_A_xn_and_AT_xt(data, alpha_n, alpha_t, xn, xt, zn, zt);
 	}
 
 	// zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
 	void eval_G_xn_and_GT_xt(const DataType& data, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt)
 	{
+		PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::eval_G_xn_and_GT_xt");
 		kkt_solver->eval_G_xn_and_GT_xt(data, alpha_n, alpha_t, xn, xt, zn, zt);
 	}
 
@@ -489,6 +524,8 @@ protected:
 		              const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z,
 		              Vec<T>& err_x, Vec<T>& err_y, Vec<T>& err_z)
 	{
+		PIQP_TRACY_ZoneScopedN("piqp::KKTSystem::get_refine_error");
+
 		mul_condensed_kkt(data, lhs_x, lhs_y, lhs_z, err_x, err_y, err_z);
 
 		err_x.array() = rhs_x.array() - err_x.array();
