@@ -291,8 +291,21 @@ public:
 
         block_x.assign(x);
 
+#ifdef PIQP_HAS_OPENMP
+#pragma omp parallel
+        {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::eval_P_x:parallel");
+
+            // block_z = alpha * P * block_x, P is symmetric and only the lower triangular part of P is accessed
+            block_symv_l_parallel(alpha, P, block_x, block_z);
+
+        } // end of parallel region
+#else
+
         // block_z = alpha * P * block_x, P is symmetric and only the lower triangular part of P is accessed
         block_symv_l(alpha, P, block_x, block_z);
+
+#endif
 
         block_z.load(z);
     }
@@ -308,9 +321,24 @@ public:
         block_xn.assign(xn);
         block_xt.assign(xt, AT.perm_inv);
 
+#ifdef PIQP_HAS_OPENMP
+#pragma omp parallel
+        {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::eval_A_xn_and_AT_xt:parallel");
+
+            // block_zt = alpha_t * AT * block_xt
+            block_t_gemv_n(alpha_t, AT, block_xt, 0.0, block_zt, block_zt);
+            // block_zn = alpha_n * A * block_xn
+            block_t_gemv_t(alpha_n, AT, block_xn, 0.0, block_zn, block_zn);
+
+        } // end of parallel region
+#else
+
         // block_zt = alpha_t * AT * block_xt
         // block_zn = alpha_n * A * block_xn
         block_t_gemv_nt(alpha_t, alpha_n, AT, block_xt, block_xn, 0.0, 0.0, block_zt, block_zn, block_zt, block_zn);
+
+#endif
 
         block_zn.load(zn, AT.perm_inv);
         block_zt.load(zt);
@@ -327,9 +355,24 @@ public:
         block_xn.assign(xn);
         block_xt.assign(xt, GT.perm_inv);
 
+#ifdef PIQP_HAS_OPENMP
+#pragma omp parallel
+        {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::eval_G_xn_and_GT_xt:parallel");
+
+            // block_zt = alpha_t * GT * block_xt
+            block_t_gemv_n(alpha_t, GT, block_xt, 0.0, block_zt, block_zt);
+            // block_zn = alpha_n * G * block_xn
+            block_t_gemv_t(alpha_n, GT, block_xn, 0.0, block_zn, block_zn);
+
+        } // end of parallel region
+#else
+
         // block_zt = alpha_t * GT * block_xt
         // block_zn = alpha_n * G * block_xn
         block_t_gemv_nt(alpha_t, alpha_n, GT, block_xt, block_xn, 0.0, 0.0, block_zt, block_zn, block_zt, block_zn);
+
+#endif
 
         block_zn.load(zn, GT.perm_inv);
         block_zt.load(zt);
@@ -790,9 +833,17 @@ protected:
         I arrow_width = block_info.back().diag_size;
 
         if (allocate) {
+#ifdef PIQP_HAS_OPENMP
+#pragma omp barrier
+#pragma omp single
+            {
+#endif
             sD.D.resize(N);
             sD.B.resize(N - 2);
             sD.E.resize(N - 1);
+#ifdef PIQP_HAS_OPENMP
+            } // end of single region
+#endif
         }
 
         // ----- DIAGONAL -----
@@ -1348,6 +1399,87 @@ protected:
         }
     }
 
+    // z = alpha * sA * x
+    void block_symv_l_parallel(double alpha, BlockKKT& sA, BlockVec& x, BlockVec& z)
+    {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_symv_l_parallel");
+
+        std::size_t N = block_info.size();
+        I arrow_width = block_info.back().diag_size;
+
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for nowait
+#endif
+        for (std::size_t i = 0; i < N; i++)
+        {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_symv_l_parallel::diagonal_off_diagonal");
+            PIQP_TRACY_ZoneValue(i);
+
+            if (sA.D[i]) {
+                int m = sA.D[i]->rows();
+                assert(x.x[i].rows() == m && "size mismatch");
+                assert(z.x[i].rows() == m && "size mismatch");
+                // z_i = alpha * D_i * x_i, D_i is symmetric and only the lower triangular part of D_i is accessed
+                blasfeo_dsymv_l(m, alpha, sA.D[i]->ref(), 0, 0, x.x[i].ref(), 0, 0.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
+            } else {
+                z.x[i].setZero();
+            }
+
+            if (i < N - 2 && sA.B[i]) {
+                int m = sA.B[i]->rows();
+                int n = sA.B[i]->cols();
+                assert(x.x[i+1].rows() >= m && "size mismatch");
+                assert(z.x[i].rows() == n && "size mismatch");
+                // z_i += alpha * B_i^T * x_{i+1}
+                blasfeo_dgemv_t(m, n, alpha, sA.B[i]->ref(), 0, 0, x.x[i+1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
+            }
+
+            if (i > 0 && i < N - 1 && sA.B[i-1]) {
+                int m = sA.B[i-1]->rows();
+                int n = sA.B[i-1]->cols();
+                assert(x.x[i-1].rows() == n && "size mismatch");
+                assert(z.x[i].rows() >= m && "size mismatch");
+                // z_i += alpha * B_{i-1} * x_{i-1}
+                blasfeo_dgemv_n(m, n, alpha, sA.B[i-1]->ref(), 0, 0, x.x[i-1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
+            }
+
+            if (i < N - 1 && sA.E[i]) {
+                int m = sA.E[i]->rows();
+                int n = sA.E[i]->cols();
+                assert(x.x[N-1].rows() == m && "size mismatch");
+                assert(z.x[i].rows() == n && "size mismatch");
+                // z_i += alpha * E_i^T * x_{N-1}
+                blasfeo_dgemv_t(m, n, alpha, sA.E[i]->ref(), 0, 0, x.x[N-1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
+            }
+        }
+
+#ifdef PIQP_HAS_OPENMP
+#pragma omp single nowait
+        {
+#endif
+        if (arrow_width > 0)
+        {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_symv_l_parallel::arrow");
+
+            for (std::size_t i = 0; i < N - 1; i++)
+            {
+                if (sA.E[i]) {
+                    int m = sA.E[i]->rows();
+                    int n = sA.E[i]->cols();
+                    assert(x.x[i].rows() == n && "size mismatch");
+                    assert(z.x[N-1].rows() == m && "size mismatch");
+                    assert(x.x[N-1].rows() == m && "size mismatch");
+                    assert(z.x[i].rows() == n && "size mismatch");
+                    // z_{N-1} += alpha * E_i * x_i
+                    blasfeo_dgemv_n(m, n, alpha, sA.E[i]->ref(), 0, 0, x.x[i].ref(), 0, 1.0, z.x[N-1].ref(), 0, z.x[N-1].ref(), 0);
+                }
+            }
+        }
+#ifdef PIQP_HAS_OPENMP
+        } // end of single region
+#endif
+    }
+
     // y = alpha * x
     void block_veccpsc(double alpha, BlockVec& x, BlockVec& y)
     {
@@ -1420,7 +1552,7 @@ protected:
             PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_t_gemv_n::arrow");
 
             // z_{N-1} = beta * y_{N-1}
-            assert(z.x[i].rows() == y.x[i].rows() && "size mismatch");
+            assert(z.x[N-1].rows() == y.x[N-1].rows() && "size mismatch");
             blasfeo_dveccpsc(z.x[N-1].rows(), beta, z.x[N-1].ref(), 0, y.x[N-1].ref(), 0);
 
             for (std::size_t i = 0; i < N - 1; i++)
@@ -1461,7 +1593,7 @@ protected:
 #endif
         for (std::size_t i = 0; i < N - 1; i++)
         {
-            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_t_gemv_t::all");
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_t_gemv_t::par");
             PIQP_TRACY_ZoneValue(i);
 
             // z_i = beta * y_i
