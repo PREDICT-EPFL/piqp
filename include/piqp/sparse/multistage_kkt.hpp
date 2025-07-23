@@ -29,6 +29,7 @@
 #include "piqp/sparse/blocksparse/block_kkt.hpp"
 #include "piqp/sparse/blocksparse/block_mat.hpp"
 #include "piqp/sparse/blocksparse/block_vec.hpp"
+#include "piqp/utils/tracy.hpp"
 
 namespace piqp
 {
@@ -121,6 +122,8 @@ public:
 
     void update_data(const Data<T, I>& data, int options) override
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::update_data");
+
         std::size_t N = block_info.size();
 
         if (options & KKTUpdateOptions::KKT_UPDATE_P)
@@ -177,10 +180,16 @@ public:
 
     void solve(const Data<T, I>&, const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z, Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) override
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve");
+
         Vec<T>& rhs_z_bar = work_z;
         BlockVec& block_rhs = work_x_block_1;
         BlockVec& block_rhs_y = work_y_block_1;
         BlockVec& block_rhs_z_bar = work_z_block_1;
+
+        BlockVec& block_lhs_x = block_rhs;
+        BlockVec& block_lhs_y = work_y_block_1;
+        BlockVec& block_lhs_z = work_z_block_1;
 
         T delta_inv = T(1) / m_delta;
 
@@ -190,21 +199,41 @@ public:
         block_rhs_y.assign(rhs_y, AT.perm_inv);
         block_rhs_z_bar.assign(rhs_z_bar, GT.perm_inv);
 
-        // block_rhs += GT * block_rhs_z_bar
-        block_t_gemv_n(1.0, GT, block_rhs_z_bar, 1.0, block_rhs, block_rhs);
-        // block_rhs += delta_inv * AT * block_rhs_y
-        block_t_gemv_n(delta_inv, AT, block_rhs_y, 1.0, block_rhs, block_rhs);
+        {
+#ifdef PIQP_HAS_OPENMP
 
-        solve_llt_in_place(block_rhs);
+#pragma omp parallel
+            {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve:parallel");
+#endif
 
-        BlockVec& block_lhs_x = block_rhs;
-        BlockVec& block_lhs_y = work_y_block_1;
-        BlockVec& block_lhs_z = work_z_block_1;
+            // block_rhs += GT * block_rhs_z_bar
+            block_t_gemv_n(1.0, GT, block_rhs_z_bar, 1.0, block_rhs, block_rhs);
+            // block_rhs += delta_inv * AT * block_rhs_y
+            block_t_gemv_n(delta_inv, AT, block_rhs_y, 1.0, block_rhs, block_rhs);
 
-        // block_lhs_y = delta_inv * A * block_lhs_x
-        block_t_gemv_t(delta_inv, AT, block_lhs_x, 0.0, block_lhs_y, block_lhs_y);
-        // block_lhs_z = G * block_lhs_x
-        block_t_gemv_t(1.0, GT, block_lhs_x, 0.0, block_lhs_z, block_lhs_z);
+#ifdef PIQP_HAS_OPENMP
+#pragma omp barrier
+#pragma omp master
+            {
+#endif
+
+            solve_llt_in_place(block_rhs);
+
+#ifdef PIQP_HAS_OPENMP
+            } // end of master region
+#pragma omp barrier
+#endif
+
+            // block_lhs_y = delta_inv * A * block_lhs_x
+            block_t_gemv_t(delta_inv, AT, block_lhs_x, 0.0, block_lhs_y, block_lhs_y);
+            // block_lhs_z = G * block_lhs_x
+            block_t_gemv_t(1.0, GT, block_lhs_x, 0.0, block_lhs_z, block_lhs_z);
+
+#ifdef PIQP_HAS_OPENMP
+            } // end of parallel region
+#endif
+        }
 
         block_lhs_x.load(lhs_x);
         block_lhs_y.load(lhs_y, AT.perm_inv);
@@ -305,6 +334,8 @@ protected:
 
     void extract_arrow_structure(const Data<T, I>& data)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::extract_arrow_structure");
+
         // build condensed KKT structure for analysis
         SparseMat<T, I> P_ltri = data.P_utri.transpose();
         SparseMat<T, I> identity;
@@ -703,11 +734,13 @@ protected:
 
     void block_syrk_ln_alloc(BlockMat<I>& sA, BlockMat<I>& sB, BlockKKT& sD)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_syrk_ln_alloc");
         block_syrk_ln<true>(sA, sB, sD);
     }
 
     void block_syrk_ln_calc(BlockMat<I>& sA, BlockMat<I>& sB, BlockKKT& sD)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_syrk_ln_calc");
         block_syrk_ln<false>(sA, sB, sD);
     }
 
@@ -736,6 +769,9 @@ protected:
 #endif
         for (std::size_t i = 0; i < N - 1; i++)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_syrk_ln::diagonal");
+            PIQP_TRACY_ZoneValue(i);
+
             // D_{i,i} = 0
             if (!allocate && sD.D[i]) {
                 sD.D[i]->setZero();
@@ -772,6 +808,8 @@ protected:
 #endif
         if (arrow_width > 0)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_syrk_ln::diagonal_last");
+
             // D_{N,N} = 0
             if (!allocate && sD.D[N-1]) {
                 sD.D[N-1]->setZero();
@@ -804,6 +842,9 @@ protected:
 #endif
         for (std::size_t i = 0; i < N - 2; i++)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_syrk_ln::off_diagonal");
+            PIQP_TRACY_ZoneValue(i);
+
             if (sA.B[i] && sB.D[i]) {
                 if (allocate) {
                     if (!sD.B[i]) {
@@ -827,6 +868,9 @@ protected:
 #endif
             for (std::size_t i = 0; i < N - 1; i++)
             {
+                PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_syrk_ln::arrow");
+                PIQP_TRACY_ZoneValue(i);
+
                 // D_{N,i} = 0
                 if (!allocate && sD.E[i]) {
                     sD.E[i]->setZero();
@@ -866,11 +910,13 @@ protected:
 
     void init_kkt_fac()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::init_kkt_fac");
         construct_kkt_fac<true>(work_x);
     }
 
     void populate_kkt_fac(const Vec<T>& x_reg)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::populate_kkt_fac");
         construct_kkt_fac<false>(x_reg);
     }
 
@@ -904,6 +950,9 @@ protected:
 #endif
         for (std::size_t i = 0; i < N; i++)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::construct_kkt_fac::diagonal");
+            PIQP_TRACY_ZoneValue(i);
+
             I m = block_info[i].diag_size;
 
             if (allocate) {
@@ -959,6 +1008,9 @@ protected:
 #endif
         for (std::size_t i = 0; i < N - 2; i++)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::construct_kkt_fac::off_diagonal");
+            PIQP_TRACY_ZoneValue(i);
+
             int m = block_info[i].off_diag_size;
             int n = block_info[i].diag_size;
 
@@ -1019,6 +1071,9 @@ protected:
 #endif
             for (std::size_t i = 0; i < N - 1; i++)
             {
+                PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::construct_kkt_fac::arrow");
+                PIQP_TRACY_ZoneValue(i);
+
                 int m = arrow_width;
                 int n = block_info[i].diag_size;
 
@@ -1082,6 +1137,8 @@ protected:
     // sD = sA * diag(sB)
     void block_gemm_nd(BlockMat<I>& sA, BlockVec& sB, BlockMat<I>& sD)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_gemm_nd");
+
         std::size_t N = block_info.size();
 
 #ifdef PIQP_HAS_OPENMP
@@ -1094,6 +1151,9 @@ protected:
 #endif
         for (std::size_t i = 0; i < N - 1; i++)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_gemm_nd::diagonal");
+            PIQP_TRACY_ZoneValue(i);
+
             if (sA.D[i]) {
                 // sD.D = sA.D * diag(sB)
                 blasfeo_dgemm_nd(1.0, *sA.D[i], sB.x[i], 0.0, *sD.D[i], *sD.D[i]);
@@ -1117,6 +1177,8 @@ protected:
 
     void factor_kkt()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::factor_kkt");
+
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().diag_size;
 
@@ -1217,6 +1279,8 @@ protected:
     // z = alpha * sA * x
     void block_symv_l(double alpha, BlockKKT& sA, BlockVec& x, BlockVec& z)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_symv_l");
+
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().diag_size;
         for (std::size_t i = 0; i < N; i++)
@@ -1267,6 +1331,8 @@ protected:
     // y = alpha * x
     void block_veccpsc(double alpha, BlockVec& x, BlockVec& y)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_veccpsc");
+
         assert(x.x.size() == y.x.size() && "size mismatch");
 
         std::size_t N = x.x.size();
@@ -1289,22 +1355,23 @@ protected:
     //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N}   A_{N-1,N}  ]
     void block_t_gemv_n(double alpha, BlockMat<I>& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
     {
-        // z = beta * y
-        block_veccpsc(beta, y, z);
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_t_gemv_n");
 
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().diag_size;
-
-#ifdef PIQP_HAS_OPENMP
-        #pragma omp parallel
-        {
-#endif
 
 #ifdef PIQP_HAS_OPENMP
         #pragma omp for nowait
 #endif
         for (std::size_t i = 0; i < N - 1; i++)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_t_gemv_n::diagonal_off_diagonal");
+            PIQP_TRACY_ZoneValue(i);
+
+            // z_i = beta * y_i
+            assert(z.x[i].rows() == y.x[i].rows() && "size mismatch");
+            blasfeo_dveccpsc(z.x[i].rows(), beta, z.x[i].ref(), 0, y.x[i].ref(), 0);
+
             if (sA.D[i]) {
                 int m = sA.D[i]->rows();
                 int n = sA.D[i]->cols();
@@ -1330,6 +1397,12 @@ protected:
 #endif
         if (arrow_width > 0)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_t_gemv_n::arrow");
+
+            // z_{N-1} = beta * y_{N-1}
+            assert(z.x[i].rows() == y.x[i].rows() && "size mismatch");
+            blasfeo_dveccpsc(z.x[N-1].rows(), beta, z.x[N-1].ref(), 0, y.x[N-1].ref(), 0);
+
             for (std::size_t i = 0; i < N - 1; i++)
             {
                 if (sA.E[i]) {
@@ -1345,10 +1418,6 @@ protected:
 #ifdef PIQP_HAS_OPENMP
         } // end of single region
 #endif
-
-#ifdef PIQP_HAS_OPENMP
-        } // end of parallel region
-#endif
     }
 
     // z = beta * y + alpha * A^T * x
@@ -1362,22 +1431,23 @@ protected:
     //     [A_{1,N} A_{2,N} A_{3,N}   ...      A_{N-4,N} A_{N-3,N} A_{N-2,N}    ]
     void block_t_gemv_t(double alpha, BlockMat<I>& sA, BlockVec& x, double beta, BlockVec& y, BlockVec& z)
     {
-        // z = beta * y
-        block_veccpsc(beta, y, z);
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_t_gemv_t");
 
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().diag_size;
-
-#ifdef PIQP_HAS_OPENMP
-        #pragma omp parallel
-        {
-#endif
 
 #ifdef PIQP_HAS_OPENMP
         #pragma omp for nowait
 #endif
         for (std::size_t i = 0; i < N - 1; i++)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_t_gemv_t::all");
+            PIQP_TRACY_ZoneValue(i);
+
+            // z_i = beta * y_i
+            assert(z.x[i].rows() == y.x[i].rows() && "size mismatch");
+            blasfeo_dveccpsc(z.x[i].rows(), beta, z.x[i].ref(), 0, y.x[i].ref(), 0);
+
             if (sA.D[i]) {
                 int m = sA.D[i]->rows();
                 int n = sA.D[i]->cols();
@@ -1405,10 +1475,6 @@ protected:
                 blasfeo_dgemv_t(m, n, alpha, sA.E[i]->ref(), 0, 0, x.x[N-1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
             }
         }
-
-#ifdef PIQP_HAS_OPENMP
-        } // end of parallel region
-#endif
     }
 
     // z_n = beta_n * y_n + alpha_n * A * x_n
@@ -1424,6 +1490,8 @@ protected:
     void block_t_gemv_nt(double alpha_n, double alpha_t, BlockMat<I>& sA, BlockVec& x_n, BlockVec& x_t,
                          double beta_n, double beta_t, BlockVec& y_n, BlockVec& y_t, BlockVec& z_n, BlockVec& z_t)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_t_gemv_nt");
+
         // z_n = beta_n * y_n
         block_veccpsc(beta_n, y_n, z_n);
         // z_t = beta_t * y_t
@@ -1474,101 +1542,110 @@ protected:
     // solves A * x = b inplace
     void solve_llt_in_place(BlockVec& b_and_x)
     {
-        // ----- FORWARD SUBSTITUTION -----
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve_llt_in_place");
 
         std::size_t N = block_info.size();
         I arrow_width = block_info.back().diag_size;
+        int m, n;
 
-        int m = kkt_fac.D[0]->rows();
-        int n;
-        assert(b_and_x.x[0].rows() == m && "size mismatch");
-        // y_1 = L_1^{-1} * b_1
-        blasfeo_dtrsv_lnn(m, kkt_fac.D[0]->ref(), 0, 0, b_and_x.x[0].ref(), 0, b_and_x.x[0].ref(), 0);
-
-        for (std::size_t i = 1; i < N - 1; i++)
+        // ----- FORWARD SUBSTITUTION -----
         {
-            if (kkt_fac.B[i-1]) {
-                m = kkt_fac.B[i-1]->rows();
-                n = kkt_fac.B[i-1]->cols();
-                assert(kkt_fac.D[i]->rows() >= m && "size mismatch");
-                assert(b_and_x.x[i-1].rows() == n && "size mismatch");
-                assert(b_and_x.x[i].rows() >= m && "size mismatch");
-                // y_i = b_i - C_{i-1} * y_{i-1}
-                blasfeo_dgemv_n(m, n, -1.0, kkt_fac.B[i-1]->ref(), 0, 0, b_and_x.x[i-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
-            }
-            m = kkt_fac.D[i]->rows();
-            assert(b_and_x.x[i].rows() == m && "size mismatch");
-            // y_i = L_i^{-1} * y_i
-            blasfeo_dtrsv_lnn(m, kkt_fac.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
-        }
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve_llt_in_place::forward");
 
-        if (arrow_width > 0)
-        {
-            for (std::size_t i = 0; i < N - 1; i++)
+            m = kkt_fac.D[0]->rows();
+            assert(b_and_x.x[0].rows() == m && "size mismatch");
+            // y_1 = L_1^{-1} * b_1
+            blasfeo_dtrsv_lnn(m, kkt_fac.D[0]->ref(), 0, 0, b_and_x.x[0].ref(), 0, b_and_x.x[0].ref(), 0);
+
+            for (std::size_t i = 1; i < N - 1; i++)
             {
-                if (kkt_fac.E[i]) {
-                    m = kkt_fac.E[i]->rows();
-                    n = kkt_fac.E[i]->cols();
-                    assert(b_and_x.x[i].rows() == n && "size mismatch");
-                    assert(b_and_x.x[N-1].rows() == m && "size mismatch");
-                    // y_N -= F_i * y_i
-                    blasfeo_dgemv_n(m, n, -1.0, kkt_fac.E[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, 1.0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+                if (kkt_fac.B[i-1]) {
+                    m = kkt_fac.B[i-1]->rows();
+                    n = kkt_fac.B[i-1]->cols();
+                    assert(kkt_fac.D[i]->rows() >= m && "size mismatch");
+                    assert(b_and_x.x[i-1].rows() == n && "size mismatch");
+                    assert(b_and_x.x[i].rows() >= m && "size mismatch");
+                    // y_i = b_i - C_{i-1} * y_{i-1}
+                    blasfeo_dgemv_n(m, n, -1.0, kkt_fac.B[i-1]->ref(), 0, 0, b_and_x.x[i-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
                 }
+                m = kkt_fac.D[i]->rows();
+                assert(b_and_x.x[i].rows() == m && "size mismatch");
+                // y_i = L_i^{-1} * y_i
+                blasfeo_dtrsv_lnn(m, kkt_fac.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
             }
-            m = kkt_fac.D[N-1]->rows();
-            assert(b_and_x.x[N-1].rows() == m && "size mismatch");
-            // y_N = L_N^{-1} * y_N
-            blasfeo_dtrsv_lnn(m, kkt_fac.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+
+            if (arrow_width > 0)
+            {
+                for (std::size_t i = 0; i < N - 1; i++)
+                {
+                    if (kkt_fac.E[i]) {
+                        m = kkt_fac.E[i]->rows();
+                        n = kkt_fac.E[i]->cols();
+                        assert(b_and_x.x[i].rows() == n && "size mismatch");
+                        assert(b_and_x.x[N-1].rows() == m && "size mismatch");
+                        // y_N -= F_i * y_i
+                        blasfeo_dgemv_n(m, n, -1.0, kkt_fac.E[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, 1.0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+                    }
+                }
+                m = kkt_fac.D[N-1]->rows();
+                assert(b_and_x.x[N-1].rows() == m && "size mismatch");
+                // y_N = L_N^{-1} * y_N
+                blasfeo_dtrsv_lnn(m, kkt_fac.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+            }
         }
 
         // ----- BACK SUBSTITUTION -----
 
-        if (arrow_width > 0)
         {
-            m = kkt_fac.D[N-1]->rows();
-            assert(b_and_x.x[N-1].rows() == m && "size mismatch");
-            // x_N = L_N^{-T} * y_N
-            blasfeo_dtrsv_ltn(m, kkt_fac.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
+            PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve_llt_in_place::backward");
 
-            if (kkt_fac.E[N-2]) {
-                m = kkt_fac.E[N-2]->rows();
-                n = kkt_fac.E[N-2]->cols();
+            if (arrow_width > 0)
+            {
+                m = kkt_fac.D[N-1]->rows();
                 assert(b_and_x.x[N-1].rows() == m && "size mismatch");
-                assert(b_and_x.x[N-2].rows() == n && "size mismatch");
-                // x_{N-1} = y_{N-1} - F_{N-1}^T * x_N
-                blasfeo_dgemv_t(m, n, -1.0, kkt_fac.E[N-2]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
-            }
-        }
+                // x_N = L_N^{-T} * y_N
+                blasfeo_dtrsv_ltn(m, kkt_fac.D[N-1]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, b_and_x.x[N-1].ref(), 0);
 
-        m = kkt_fac.D[N-2]->rows();
-        assert(b_and_x.x[N-2].rows() == m && "size mismatch");
-        // x_{N-1} = L_{N-1}^{-T} * x_{N-1}
-        blasfeo_dtrsv_ltn(m, kkt_fac.D[N-2]->ref(), 0, 0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
-
-        for (std::size_t i = N - 2; i--;)
-        {
-            if (kkt_fac.B[i]) {
-                m = kkt_fac.B[i]->rows();
-                n = kkt_fac.B[i]->cols();
-                assert(b_and_x.x[i+1].rows() >= m && "size mismatch");
-                assert(b_and_x.x[i].rows() == n && "size mismatch");
-                // x_i = y_i - C_i^T * x_{i+1}
-                blasfeo_dgemv_t(m, n, -1.0, kkt_fac.B[i]->ref(), 0, 0, b_and_x.x[i+1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+                if (kkt_fac.E[N-2]) {
+                    m = kkt_fac.E[N-2]->rows();
+                    n = kkt_fac.E[N-2]->cols();
+                    assert(b_and_x.x[N-1].rows() == m && "size mismatch");
+                    assert(b_and_x.x[N-2].rows() == n && "size mismatch");
+                    // x_{N-1} = y_{N-1} - F_{N-1}^T * x_N
+                    blasfeo_dgemv_t(m, n, -1.0, kkt_fac.E[N-2]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
+                }
             }
 
-            if (kkt_fac.E[i]) {
-                m = kkt_fac.E[i]->rows();
-                n = kkt_fac.E[i]->cols();
-                assert(b_and_x.x[N-1].rows() == m && "size mismatch");
-                assert(b_and_x.x[i].rows() == n && "size mismatch");
-                // x_i -= F_i^T * x_N
-                blasfeo_dgemv_t(m, n, -1.0, kkt_fac.E[i]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
-            }
+            m = kkt_fac.D[N-2]->rows();
+            assert(b_and_x.x[N-2].rows() == m && "size mismatch");
+            // x_{N-1} = L_{N-1}^{-T} * x_{N-1}
+            blasfeo_dtrsv_ltn(m, kkt_fac.D[N-2]->ref(), 0, 0, b_and_x.x[N-2].ref(), 0, b_and_x.x[N-2].ref(), 0);
 
-            m = kkt_fac.D[i]->rows();
-            assert(b_and_x.x[i].rows() == m && "size mismatch");
-            // x_i = L_i^{-T} * x_i
-            blasfeo_dtrsv_ltn(m, kkt_fac.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+            for (std::size_t i = N - 2; i--;)
+            {
+                if (kkt_fac.B[i]) {
+                    m = kkt_fac.B[i]->rows();
+                    n = kkt_fac.B[i]->cols();
+                    assert(b_and_x.x[i+1].rows() >= m && "size mismatch");
+                    assert(b_and_x.x[i].rows() == n && "size mismatch");
+                    // x_i = y_i - C_i^T * x_{i+1}
+                    blasfeo_dgemv_t(m, n, -1.0, kkt_fac.B[i]->ref(), 0, 0, b_and_x.x[i+1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+                }
+
+                if (kkt_fac.E[i]) {
+                    m = kkt_fac.E[i]->rows();
+                    n = kkt_fac.E[i]->cols();
+                    assert(b_and_x.x[N-1].rows() == m && "size mismatch");
+                    assert(b_and_x.x[i].rows() == n && "size mismatch");
+                    // x_i -= F_i^T * x_N
+                    blasfeo_dgemv_t(m, n, -1.0, kkt_fac.E[i]->ref(), 0, 0, b_and_x.x[N-1].ref(), 0, 1.0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+                }
+
+                m = kkt_fac.D[i]->rows();
+                assert(b_and_x.x[i].rows() == m && "size mismatch");
+                // x_i = L_i^{-T} * x_i
+                blasfeo_dtrsv_ltn(m, kkt_fac.D[i]->ref(), 0, 0, b_and_x.x[i].ref(), 0, b_and_x.x[i].ref(), 0);
+            }
         }
     }
 };
