@@ -829,6 +829,14 @@ protected:
 
         alpha_s = T(1);
         alpha_z = T(1);
+
+#ifdef PIQP_HAS_OPENMP
+#pragma omp parallel
+        {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::calculate_step:parallel");
+
+        #pragma omp for reduction(min:alpha_s,alpha_z)
+#endif
         for (isize i = 0; i < m_data.m; i++)
         {
             if (step.s_l(i) < 0)
@@ -848,6 +856,9 @@ protected:
                 alpha_z = (std::min)(alpha_z, -m_result.z_u(i) / step.z_u(i));
             }
         }
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for reduction(min:alpha_s,alpha_z)
+#endif
         for (isize i = 0; i < m_data.n_x_l; i++)
         {
             if (step.s_bl(i) < 0)
@@ -859,6 +870,9 @@ protected:
                 alpha_z = (std::min)(alpha_z, -m_result.z_bl(i) / step.z_bl(i));
             }
         }
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for reduction(min:alpha_s,alpha_z)
+#endif
         for (isize i = 0; i < m_data.n_x_u; i++)
         {
             if (step.s_bu(i) < 0)
@@ -870,6 +884,10 @@ protected:
                 alpha_z = (std::min)(alpha_z, -m_result.z_bu(i) / step.z_bu(i));
             }
         }
+
+#ifdef PIQP_HAS_OPENMP
+        } // end of parallel region
+#endif
     }
 
     void update_residuals_nr()
