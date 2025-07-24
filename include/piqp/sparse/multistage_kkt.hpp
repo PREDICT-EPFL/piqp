@@ -1412,7 +1412,7 @@ protected:
 #ifdef PIQP_HAS_OPENMP
         #pragma omp for nowait
 #endif
-        for (std::size_t i = 0; i < N; i++)
+        for (std::size_t i = 0; i < N - 1; i++)
         {
             PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_symv_l_parallel::diagonal_off_diagonal");
             PIQP_TRACY_ZoneValue(i);
@@ -1436,7 +1436,7 @@ protected:
                 blasfeo_dgemv_t(m, n, alpha, sA.B[i]->ref(), 0, 0, x.x[i+1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
             }
 
-            if (i > 0 && i < N - 1 && sA.B[i-1]) {
+            if (i > 0 && sA.B[i-1]) {
                 int m = sA.B[i-1]->rows();
                 int n = sA.B[i-1]->cols();
                 assert(x.x[i-1].rows() == n && "size mismatch");
@@ -1445,7 +1445,7 @@ protected:
                 blasfeo_dgemv_n(m, n, alpha, sA.B[i-1]->ref(), 0, 0, x.x[i-1].ref(), 0, 1.0, z.x[i].ref(), 0, z.x[i].ref(), 0);
             }
 
-            if (i < N - 1 && sA.E[i]) {
+            if (sA.E[i]) {
                 int m = sA.E[i]->rows();
                 int n = sA.E[i]->cols();
                 assert(x.x[N-1].rows() == m && "size mismatch");
@@ -1462,6 +1462,16 @@ protected:
         if (arrow_width > 0)
         {
             PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::block_symv_l_parallel::arrow");
+
+            if (sA.D[N-1]) {
+                int m = sA.D[N-1]->rows();
+                assert(x.x[N-1].rows() == m && "size mismatch");
+                assert(z.x[N-1].rows() == m && "size mismatch");
+                // z_{N-1} = alpha * D_{N-1} * x_{N-1}, D_{N-1} is symmetric and only the lower triangular part of D_{N-1} is accessed
+                blasfeo_dsymv_l(m, alpha, sA.D[N-1]->ref(), 0, 0, x.x[N-1].ref(), 0, 0.0, z.x[N-1].ref(), 0, z.x[N-1].ref(), 0);
+            } else {
+                z.x[N-1].setZero();
+            }
 
             for (std::size_t i = 0; i < N - 1; i++)
             {
