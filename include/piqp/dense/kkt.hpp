@@ -13,6 +13,7 @@
 #include "piqp/kkt_fwd.hpp"
 #include "piqp/dense/data.hpp"
 #include "piqp/dense/ldlt_no_pivot.hpp"
+#include "piqp/utils/tracy.hpp"
 
 namespace piqp
 {
@@ -37,6 +38,8 @@ protected:
 public:
     explicit KKT(const Data<T>& data)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::KKT::constructor");
+
         // init workspace
         m_z_reg_inv.resize(data.m);
         W_delta_inv_G.resize(data.m, data.n);
@@ -58,6 +61,8 @@ public:
 
     void update_data(const Data<T>& data, int options) override
     {
+        PIQP_TRACY_ZoneScopedN("piqp::KKT::update_data");
+
         if (options & KKTUpdateOptions::KKT_UPDATE_A) {
             if (data.p > 0) {
                 AT_A.template triangularView<Eigen::Lower>() = data.AT * data.AT.transpose();
@@ -67,6 +72,8 @@ public:
 
     bool update_scalings_and_factor(const Data<T>& data, const T& delta, const Vec<T>& x_reg, const Vec<T>& z_reg) override
     {
+        PIQP_TRACY_ZoneScopedN("piqp::KKT::update_scalings_and_factor");
+
         m_delta = delta;
         m_z_reg_inv.array() = z_reg.array().inverse();
 
@@ -78,6 +85,8 @@ public:
 
     void solve(const Data<T>& data, const Vec<T>& rhs_x, const Vec<T>& rhs_y, const Vec<T>& rhs_z, Vec<T>& lhs_x, Vec<T>& lhs_y, Vec<T>& lhs_z) override
     {
+        PIQP_TRACY_ZoneScopedN("piqp::KKT::solve");
+
         T delta_inv = T(1) / m_delta;
 
         lhs_x = rhs_x;
@@ -98,6 +107,8 @@ public:
     // z = alpha * P * x
     void eval_P_x(const Data<T>& data, const T& alpha, const Vec<T>& x, Vec<T>& z) override
     {
+        PIQP_TRACY_ZoneScopedN("piqp::KKT::eval_P_x");
+
         z.noalias() = alpha * data.P_utri * x;
         z.noalias() += data.P_utri.transpose().template triangularView<Eigen::StrictlyLower>() * (alpha * x);
     }
@@ -105,6 +116,8 @@ public:
     // zn = alpha_n * A * xn, zt = alpha_t * A^T * xt
     void eval_A_xn_and_AT_xt(const Data<T>& data, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
+        PIQP_TRACY_ZoneScopedN("piqp::KKT::eval_A_xn_and_AT_xt");
+
         zn.noalias() = alpha_n * data.AT.transpose() * xn;
         zt.noalias() = alpha_t * data.AT * xt;
     }
@@ -112,6 +125,8 @@ public:
     // zn = alpha_n * G * xn, zt = alpha_t * G^T * xt
     void eval_G_xn_and_GT_xt(const Data<T>& data, const T& alpha_n, const T& alpha_t, const Vec<T>& xn, const Vec<T>& xt, Vec<T>& zn, Vec<T>& zt) override
     {
+        PIQP_TRACY_ZoneScopedN("piqp::KKT::eval_G_xn_and_GT_xt");
+
         zn.noalias() = alpha_n * data.GT.transpose() * xn;
         zt.noalias() = alpha_t * data.GT * xt;
     }
@@ -124,23 +139,30 @@ public:
 protected:
     void update_kkt(const Data<T>& data, const Vec<T>& x_reg)
     {
-        kkt_mat.template triangularView<Eigen::Lower>() = data.P_utri.transpose();
-        kkt_mat.diagonal() += x_reg;
-
-        if (data.m > 0)
         {
-            W_delta_inv_G = m_z_reg_inv.asDiagonal() * data.GT.transpose();
-            kkt_mat.template triangularView<Eigen::Lower>() += data.GT * W_delta_inv_G;
+            PIQP_TRACY_ZoneScopedN("piqp::KKT::update_scalings_and_factor::kkt_cost");
+            kkt_mat.template triangularView<Eigen::Lower>() = data.P_utri.transpose();
+            kkt_mat.diagonal() += x_reg;
         }
 
         if (data.p > 0)
         {
+            PIQP_TRACY_ZoneScopedN("piqp::KKT::update_kkt::kkt_equality");
             kkt_mat.template triangularView<Eigen::Lower>() += T(1) / m_delta * AT_A;
+        }
+
+        if (data.m > 0)
+        {
+            PIQP_TRACY_ZoneScopedN("piqp::KKT::update_kkt::kkt_inequality");
+            W_delta_inv_G = m_z_reg_inv.asDiagonal() * data.GT.transpose();
+            kkt_mat.template triangularView<Eigen::Lower>() += data.GT * W_delta_inv_G;
         }
     }
 
     void solve_ldlt_in_place(Vec<T>& x)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::KKT::solve_ldlt_in_place");
+
 #ifdef PIQP_DEBUG_PRINT
         Vec<T> x_copy = x;
 #endif

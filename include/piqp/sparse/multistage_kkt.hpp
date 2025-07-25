@@ -73,6 +73,8 @@ protected:
 public:
     MultistageKKT(const Data<T, I>& data)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::constructor");
+
         // init workspace
         m_delta = T(1);
 
