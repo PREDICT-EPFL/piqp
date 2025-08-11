@@ -77,6 +77,21 @@ enum SolverMatrixType
     PIQP_SPARSE = 1
 };
 
+#ifdef PIQP_WITH_TEMPLATE_INSTANTIATION
+
+#define PIQP_CONCAT_IMPL(a, b) a##b
+#define PIQP_CONCAT(a, b) PIQP_CONCAT_IMPL(a, b)
+#define PIQP_EIGEN_ABI_CHECK_MAX_ALIGN PIQP_CONCAT(_piqp_eigen_abi_check_max_align_, EIGEN_MAX_ALIGN_BYTES)
+
+extern void PIQP_EIGEN_ABI_CHECK_MAX_ALIGN();
+inline void enforce_abi_compatibility() {
+    PIQP_EIGEN_ABI_CHECK_MAX_ALIGN();
+}
+
+static const auto _abi_enforcer = (enforce_abi_compatibility(), 0);
+
+#endif
+
 } // namespace piqp
 
 #endif //PIQP_TYPEDEFS_HPP
