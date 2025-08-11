@@ -15,6 +15,7 @@
 #include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
 #include "piqp/dense/data.hpp"
+#include "piqp/utils/tracy.hpp"
 
 namespace piqp
 {
@@ -62,6 +63,8 @@ public:
 
     inline void scale_data(Data<T>& data, bool reuse_prev_scaling = false, bool scale_cost = false, isize max_iter = 10, T epsilon = T(1e-3))
     {
+        PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data");
+
         if (!reuse_prev_scaling)
         {
             // init scaling in case max_iter is 0
@@ -78,29 +81,33 @@ public:
                     (1 - delta_iter_b.array()).matrix().template lpNorm<Eigen::Infinity>()
                 }) > epsilon; i++)
             {
-                // calculate scaling of full KKT matrix
-                // [ P AT GT D ]
-                // [ A 0  0  0 ]
-                // [ G 0  0  0 ]
-                // [ D 0  0  0 ]
-                // where D is the diagonal of the bounds scaling
-                for (isize k = 0; k < n; k++)
                 {
-                    delta_iter(k) = (std::max)({data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
-                                                data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>(),
-                                                p > 0 ? data.AT.row(k).template lpNorm<Eigen::Infinity>() : T(0),
-                                                m > 0 ? data.GT.row(k).template lpNorm<Eigen::Infinity>() : T(0),
-                                                data.x_b_scaling(k)});
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::kkt_scaling");
+
+                    // calculate scaling of full KKT matrix
+                    // [ P AT GT D ]
+                    // [ A 0  0  0 ]
+                    // [ G 0  0  0 ]
+                    // [ D 0  0  0 ]
+                    // where D is the diagonal of the bounds scaling
+                    for (isize k = 0; k < n; k++)
+                    {
+                        delta_iter(k) = (std::max)({data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
+                                                    data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>(),
+                                                    p > 0 ? data.AT.row(k).template lpNorm<Eigen::Infinity>() : T(0),
+                                                    m > 0 ? data.GT.row(k).template lpNorm<Eigen::Infinity>() : T(0),
+                                                    data.x_b_scaling(k)});
+                    }
+                    for (isize k = 0; k < p; k++)
+                    {
+                        delta_iter(n + k) = data.AT.col(k).template lpNorm<Eigen::Infinity>();
+                    }
+                    for (isize k = 0; k < m; k++)
+                    {
+                        delta_iter(n + p + k) = data.GT.col(k).template lpNorm<Eigen::Infinity>();
+                    }
+                    delta_iter_b.array() = data.x_b_scaling.array();
                 }
-                for (isize k = 0; k < p; k++)
-                {
-                    delta_iter(n + k) = data.AT.col(k).template lpNorm<Eigen::Infinity>();
-                }
-                for (isize k = 0; k < m; k++)
-                {
-                    delta_iter(n + p + k) = data.GT.col(k).template lpNorm<Eigen::Infinity>();
-                }
-                delta_iter_b.array() = data.x_b_scaling.array();
 
                 limit_scaling(delta_iter);
                 limit_scaling(delta_iter_b);
@@ -108,27 +115,39 @@ public:
                 delta_iter.array() = delta_iter.array().sqrt().inverse();
                 delta_iter_b.array() = delta_iter_b.array().sqrt().inverse();
 
-                // scale cost
-                for (isize k = 0; k < n; k++) {
-                    data.P_utri.col(k).head(k + 1) *= delta_iter(k);
+                {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::cost");
+                    // scale cost
+                    for (isize k = 0; k < n; k++) {
+                        data.P_utri.col(k).head(k + 1) *= delta_iter(k);
+                    }
+                    for (isize k = 0; k < n; k++) {
+                        data.P_utri.row(k).tail(n - k) *= delta_iter(k);
+                    }
+                    data.c.array() *= delta_iter.head(n).array();
                 }
-                for (isize k = 0; k < n; k++) {
-                    data.P_utri.row(k).tail(n - k) *= delta_iter(k);
+                {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::A");
+                    // scale AT
+                    data.AT = delta_iter.head(n).asDiagonal() * data.AT * delta_iter.segment(n, p).asDiagonal();
                 }
-                data.c.array() *= delta_iter.head(n).array();
-
-                // scale AT and GT
-                data.AT = delta_iter.head(n).asDiagonal() * data.AT * delta_iter.segment(n, p).asDiagonal();
-                data.GT = delta_iter.head(n).asDiagonal() * data.GT * delta_iter.tail(m).asDiagonal();
-
-                // scale box scalings
-                data.x_b_scaling.array() *= delta_iter_b.array() * delta_iter.head(n).array();
+                {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::G");
+                    // scale GT
+                    data.GT = delta_iter.head(n).asDiagonal() * data.GT * delta_iter.tail(m).asDiagonal();
+                }
+                {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::x_b");
+                    // scale box scalings
+                    data.x_b_scaling.array() *= delta_iter_b.array() * delta_iter.head(n).array();
+                }
 
                 delta.array() *= delta_iter.array();
                 delta_b.array() *= delta_iter_b.array();
 
                 if (scale_cost)
                 {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::cost_scaling");
                     // scaling for the cost
                     T gamma = 0;
                     for (isize k = 0; k < n; k++)
@@ -156,40 +175,56 @@ public:
         }
         else
         {
-            // scale cost
-            data.P_utri *= c;
-            for (isize k = 0; k < n; k++) {
-                data.P_utri.col(k).head(k + 1) *= delta(k);
+            {
+                PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::cost");
+                // scale cost
+                data.P_utri *= c;
+                for (isize k = 0; k < n; k++) {
+                    data.P_utri.col(k).head(k + 1) *= delta(k);
+                }
+                for (isize k = 0; k < n; k++) {
+                    data.P_utri.row(k).tail(n - k) *= delta(k);
+                }
+                data.c.array() *= c * delta.head(n).array();
             }
-            for (isize k = 0; k < n; k++) {
-                data.P_utri.row(k).tail(n - k) *= delta(k);
+            {
+                PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::A");
+                // scale AT
+                data.AT = delta.head(n).asDiagonal() * data.AT * delta.segment(n, p).asDiagonal();
             }
-            data.c.array() *= c * delta.head(n).array();
-
-            // scale AT and GT
-            data.AT = delta.head(n).asDiagonal() * data.AT * delta.segment(n, p).asDiagonal();
-            data.GT = delta.head(n).asDiagonal() * data.GT * delta.tail(m).asDiagonal();
-
-            // scale box scalings
-            data.x_b_scaling.array() *= delta_b.array() * delta.head(n).array();
+            {
+                PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::G");
+                // scale GT
+                data.GT = delta.head(n).asDiagonal() * data.GT * delta.tail(m).asDiagonal();
+            }
+            {
+                PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::x_b");
+                // scale box scalings
+                data.x_b_scaling.array() *= delta_b.array() * delta.head(n).array();
+            }
         }
 
-        // scale bounds
-        data.b.array() *= delta.segment(n, p).array();
-        data.h_l.array() *= delta.tail(m).array();
-        data.h_u.array() *= delta.tail(m).array();
-        for (isize i = 0; i < data.n_x_l; i++)
         {
-            data.x_l(i) *= delta_b(data.x_l_idx(i));
-        }
-        for (isize i = 0; i < data.n_x_u; i++)
-        {
-            data.x_u(i) *= delta_b(data.x_u_idx(i));
+            PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::bounds");
+            // scale bounds
+            data.b.array() *= delta.segment(n, p).array();
+            data.h_l.array() *= delta.tail(m).array();
+            data.h_u.array() *= delta.tail(m).array();
+            for (isize i = 0; i < data.n_x_l; i++)
+            {
+                data.x_l(i) *= delta_b(data.x_l_idx(i));
+            }
+            for (isize i = 0; i < data.n_x_u; i++)
+            {
+                data.x_u(i) *= delta_b(data.x_u_idx(i));
+            }
         }
     }
 
     inline void unscale_data(Data<T>& data)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::unscale_data");
+
         // unscale cost
         data.P_utri *= c_inv;
         for (isize k = 0; k < n; k++) {

@@ -74,7 +74,7 @@ void test_solve_multiply(Data<T, I>& data, Settings<T> settings1, Settings<T> se
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt1.mul(data, lhs_1, rhs_sol_1);
-    kkt1.mul(data, lhs_2, rhs_sol_2);
+    kkt2.mul(data, lhs_2, rhs_sol_2);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     ASSERT_TRUE(rhs_sol_1.x.isApprox(rhs_sol_2.x, 1e-8));

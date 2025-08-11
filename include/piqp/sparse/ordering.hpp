@@ -11,6 +11,7 @@
 
 #include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
+#include "piqp/utils/tracy.hpp"
 
 namespace piqp
 {
@@ -66,6 +67,8 @@ public:
     template<typename T>
     void init(const SparseMat<T, I>& A)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::AMDOrdering::init");
+
         Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic, I> P_eigen;
         Eigen::AMDOrdering<I> amd_ordering;
         amd_ordering(A.template selfadjointView<Eigen::Upper>(), P_eigen);
@@ -98,6 +101,8 @@ public:
     template<typename T>
     void perm(VecRef<T> x, const CVecRef<T>& b)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::AMDOrdering::perm");
+
         isize n = x.rows();
         eigen_assert(n == b.rows() && n == P.rows() && "vector dimension missmatch!");
         for (isize j = 0; j < n; j++)
@@ -109,6 +114,8 @@ public:
     template<typename T>
     void permt(VecRef<T> x, const CVecRef<T>& b)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::AMDOrdering::permt");
+
         isize n = x.rows();
         eigen_assert(n == b.rows() && n == P.rows() && "vector dimension missmatch!");
         for (isize j = 0 ; j < n; j++) {

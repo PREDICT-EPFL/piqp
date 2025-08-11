@@ -25,6 +25,7 @@
 #include "piqp/sparse/data.hpp"
 #include "piqp/sparse/preconditioner.hpp"
 #include "piqp/utils/optional.hpp"
+#include "piqp/utils/tracy.hpp"
 
 namespace piqp
 {
@@ -68,6 +69,8 @@ public:
 
     Status solve()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::solve");
+
         if (m_settings.verbose)
         {
             piqp_print("----------------------------------------------------------\n");
@@ -153,6 +156,8 @@ protected:
                     const optional<CVecRef<T>>& x_l,
                     const optional<CVecRef<T>>& x_u)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::setup");
+
         if (m_settings.compute_timings)
         {
             m_timer.start();
@@ -217,6 +222,8 @@ protected:
                      const optional<CVecRef<T>>& x_l,
                      const optional<CVecRef<T>>& x_u)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::update");
+
         if (!m_setup_done)
         {
             piqp_eprint("Solver not setup yet\n");
@@ -818,8 +825,18 @@ protected:
 
     void calculate_step(T& alpha_s, T& alpha_z)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::calculate_step");
+
         alpha_s = T(1);
         alpha_z = T(1);
+
+#ifdef PIQP_HAS_OPENMP
+#pragma omp parallel
+        {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::calculate_step:parallel");
+
+        #pragma omp for reduction(min:alpha_s,alpha_z)
+#endif
         for (isize i = 0; i < m_data.m; i++)
         {
             if (step.s_l(i) < 0)
@@ -839,6 +856,9 @@ protected:
                 alpha_z = (std::min)(alpha_z, -m_result.z_u(i) / step.z_u(i));
             }
         }
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for reduction(min:alpha_s,alpha_z)
+#endif
         for (isize i = 0; i < m_data.n_x_l; i++)
         {
             if (step.s_bl(i) < 0)
@@ -850,6 +870,9 @@ protected:
                 alpha_z = (std::min)(alpha_z, -m_result.z_bl(i) / step.z_bl(i));
             }
         }
+#ifdef PIQP_HAS_OPENMP
+        #pragma omp for reduction(min:alpha_s,alpha_z)
+#endif
         for (isize i = 0; i < m_data.n_x_u; i++)
         {
             if (step.s_bu(i) < 0)
@@ -861,10 +884,16 @@ protected:
                 alpha_z = (std::min)(alpha_z, -m_result.z_bu(i) / step.z_bu(i));
             }
         }
+
+#ifdef PIQP_HAS_OPENMP
+        } // end of parallel region
+#endif
     }
 
     void update_residuals_nr()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::update_residuals_nr");
+
         using std::abs;
 
         // step is not used and we can use it as temporary storage
@@ -1010,6 +1039,8 @@ protected:
 
     void update_residuals_r()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::update_residuals_r");
+
         res.x = res_nr.x - m_result.info.rho * (m_result.x - prox_vars.x);
         res.y = res_nr.y - m_result.info.delta * (prox_vars.y - m_result.y);
         res.z_l = res_nr.z_l - m_result.info.delta * (prox_vars.z_l - m_result.z_l);
@@ -1031,6 +1062,8 @@ protected:
 
     T primal_res_nr()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::primal_res_nr");
+
         T inf = m_preconditioner.unscale_primal_res_eq(res_nr.y).template lpNorm<Eigen::Infinity>();
         inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res_nr.z_l).template lpNorm<Eigen::Infinity>());
         inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res_nr.z_u).template lpNorm<Eigen::Infinity>());
@@ -1047,6 +1080,8 @@ protected:
 
     T primal_res_r()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::primal_res_r");
+
         T inf = m_preconditioner.unscale_primal_res_eq(res.y).template lpNorm<Eigen::Infinity>();
         inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res.z_l).template lpNorm<Eigen::Infinity>());
         inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res.z_u).template lpNorm<Eigen::Infinity>());
@@ -1063,6 +1098,8 @@ protected:
 
     T primal_prox_inf()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::primal_prox_inf");
+
         T inf = m_preconditioner.unscale_dual_eq(prox_vars.y - m_result.y).template lpNorm<Eigen::Infinity>();
         inf = (std::max)(inf, m_preconditioner.unscale_dual_ineq(prox_vars.z_l - m_result.z_l).template lpNorm<Eigen::Infinity>());
         inf = (std::max)(inf, m_preconditioner.unscale_dual_ineq(prox_vars.z_u - m_result.z_u).template lpNorm<Eigen::Infinity>());
@@ -1079,21 +1116,29 @@ protected:
 
     T dual_res_nr()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::dual_res_nr");
+
         return m_preconditioner.unscale_dual_res(res_nr.x).template lpNorm<Eigen::Infinity>();
     }
 
     T dual_res_r()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::dual_res_r");
+
         return m_preconditioner.unscale_dual_res(res.x).template lpNorm<Eigen::Infinity>();
     }
 
     T dual_prox_inf()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::dual_prox_inf");
+
         return m_preconditioner.unscale_primal(m_result.x - prox_vars.x).template lpNorm<Eigen::Infinity>();
     }
 
     void unscale_results()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::unscale_results");
+
         m_result.x = m_preconditioner.unscale_primal(m_result.x);
         m_result.y = m_preconditioner.unscale_dual_eq(m_result.y);
         m_result.z_l = m_preconditioner.unscale_dual_ineq(m_result.z_l);
@@ -1116,6 +1161,8 @@ protected:
 
     void restore_dual()
     {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::restore_dual");
+
         for (isize i = 0; i < m_data.m; i++)
         {
             if (m_result.z_l(i) == 0) {

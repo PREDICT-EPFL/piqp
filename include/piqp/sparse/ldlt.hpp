@@ -11,6 +11,7 @@
 
 #include "piqp/fwd.hpp"
 #include "piqp/typedefs.hpp"
+#include "piqp/utils/tracy.hpp"
 
 namespace piqp
 {
@@ -44,6 +45,8 @@ struct LDLt
         // https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/stable/LDL/Source/ldl.c
         // see LDL_License.txt for license
         // we assume A has only the upper triangular part stored which simplifies the code from the original
+
+        PIQP_TRACY_ZoneScopedN("piqp::LDLt::factorize_symbolic_upper_triangular");
 
         static_assert(!SparseMat<T, I>::IsRowMajor, "A has to be column major!");
         eigen_assert(A.rows() == A.cols() && "A has to be quadratic!");
@@ -102,6 +105,8 @@ struct LDLt
         // see LDL_License.txt for license
         // we assume A has only the upper triangular part stored which simplifies the code from the original
         // additionally we assume that there are no duplicate entries present
+
+        PIQP_TRACY_ZoneScopedN("piqp::LDLt::factorize_numeric_upper_triangular");
 
         const isize n = A.rows();
         const Eigen::Map<const Vec<I>> Ap(A.outerIndexPtr(), A.outerSize() + 1);
@@ -165,6 +170,8 @@ struct LDLt
 
     void lsolve(Vec<T>& x)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::LDLt::lsolve");
+
         isize n = x.rows();
         eigen_assert(n == L_cols.rows() - 1 && "vector dimension missmatch!");
         for (isize j = 0; j < n; j++)
@@ -179,6 +186,8 @@ struct LDLt
 
     void dsolve(Vec<T>& x)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::LDLt::dsolve");
+
         PIQP_MAYBE_UNUSED isize n = x.rows();
         eigen_assert(n == D_inv.rows() && "vector dimension missmatch!");
         x.array() *= D_inv.array();
@@ -186,6 +195,8 @@ struct LDLt
 
     void ltsolve(Vec<T>& x)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::LDLt::ltsolve");
+
         isize n = x.rows();
         eigen_assert(n == L_cols.rows() - 1 && "vector dimension missmatch!");
         for (isize j = n - 1; j >= 0; j--)
@@ -200,6 +211,7 @@ struct LDLt
 
     void solve_inplace(Vec<T>& x)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::LDLt::solve_inplace");
         lsolve(x);
         dsolve(x);
         ltsolve(x);

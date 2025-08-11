@@ -16,6 +16,7 @@
 #include "piqp/typedefs.hpp"
 #include "piqp/sparse/data.hpp"
 #include "piqp/sparse/utils.hpp"
+#include "piqp/utils/tracy.hpp"
 
 namespace piqp
 {
@@ -63,6 +64,8 @@ public:
 
     inline void scale_data(Data<T, I>& data, bool reuse_prev_scaling = false, bool scale_cost = false, isize max_iter = 10, T epsilon = T(1e-3))
     {
+        PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data");
+
         using std::abs;
 
         if (!reuse_prev_scaling)
@@ -81,46 +84,50 @@ public:
                     (1 - delta_iter_b.array()).matrix().template lpNorm<Eigen::Infinity>()
                 }) > epsilon; i++)
             {
-                delta_iter.setZero();
-
-                // calculate scaling of full KKT matrix
-                // [ P AT GT D ]
-                // [ A 0  0  0 ]
-                // [ G 0  0  0 ]
-                // [ D 0  0  0 ]
-                // where D is the diagonal of the bounds scaling
-                for (isize j = 0; j < n; j++)
                 {
-                    for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::kkt_scaling");
+
+                    delta_iter.setZero();
+
+                    // calculate scaling of full KKT matrix
+                    // [ P AT GT D ]
+                    // [ A 0  0  0 ]
+                    // [ G 0  0  0 ]
+                    // [ D 0  0  0 ]
+                    // where D is the diagonal of the bounds scaling
+                    for (isize j = 0; j < n; j++)
                     {
-                        I i_row = P_utri_it.index();
-                        delta_iter(j) = (std::max)(delta_iter(j), abs(P_utri_it.value()));
-                        if (i_row != j)
+                        for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
                         {
-                            delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(P_utri_it.value()));
+                            I i_row = P_utri_it.index();
+                            delta_iter(j) = (std::max)(delta_iter(j), abs(P_utri_it.value()));
+                            if (i_row != j)
+                            {
+                                delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(P_utri_it.value()));
+                            }
+                        }
+                        delta_iter(j) = (std::max)(delta_iter(j), data.x_b_scaling(j));
+                    }
+                    for (isize j = 0; j < p; j++)
+                    {
+                        for (typename SparseMat<T, I>::InnerIterator AT_it(data.AT, j); AT_it; ++AT_it)
+                        {
+                            I i_row = AT_it.index();
+                            delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(AT_it.value()));
+                            delta_iter(n + j) = (std::max)(delta_iter(n + j), abs(AT_it.value()));
                         }
                     }
-                    delta_iter(j) = (std::max)(delta_iter(j), data.x_b_scaling(j));
-                }
-                for (isize j = 0; j < p; j++)
-                {
-                    for (typename SparseMat<T, I>::InnerIterator AT_it(data.AT, j); AT_it; ++AT_it)
+                    for (isize j = 0; j < m; j++)
                     {
-                        I i_row = AT_it.index();
-                        delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(AT_it.value()));
-                        delta_iter(n + j) = (std::max)(delta_iter(n + j), abs(AT_it.value()));
+                        for (typename SparseMat<T, I>::InnerIterator GT_it(data.GT, j); GT_it; ++GT_it)
+                        {
+                            I i_row = GT_it.index();
+                            delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(GT_it.value()));
+                            delta_iter(n + p + j) = (std::max)(delta_iter(n + p + j), abs(GT_it.value()));
+                        }
                     }
+                    delta_iter_b.array() = data.x_b_scaling.array();
                 }
-                for (isize j = 0; j < m; j++)
-                {
-                    for (typename SparseMat<T, I>::InnerIterator GT_it(data.GT, j); GT_it; ++GT_it)
-                    {
-                        I i_row = GT_it.index();
-                        delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(GT_it.value()));
-                        delta_iter(n + p + j) = (std::max)(delta_iter(n + p + j), abs(GT_it.value()));
-                    }
-                }
-                delta_iter_b.array() = data.x_b_scaling.array();
 
                 limit_scaling(delta_iter);
                 limit_scaling(delta_iter_b);
@@ -128,25 +135,37 @@ public:
                 delta_iter.array() = delta_iter.array().sqrt().inverse();
                 delta_iter_b.array() = delta_iter_b.array().sqrt().inverse();
 
-                // scale cost
-                pre_mult_diagonal<T, I>(data.P_utri, delta_iter.head(n));
-                post_mult_diagonal<T, I>(data.P_utri, delta_iter.head(n));
-                data.c.array() *= delta_iter.head(n).array();
-
-                // scale AT and GT
-                pre_mult_diagonal<T, I>(data.AT, delta_iter.head(n));
-                post_mult_diagonal<T, I>(data.AT, delta_iter.segment(n, p));
-                pre_mult_diagonal<T, I>(data.GT, delta_iter.head(n));
-                post_mult_diagonal<T, I>(data.GT, delta_iter.tail(m));
-
-                // scale box scalings
-                data.x_b_scaling.array() *= delta_iter_b.array() * delta_iter.head(n).array();
+                {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::cost");
+                    // scale cost
+                    pre_mult_diagonal<T, I>(data.P_utri, delta_iter.head(n));
+                    post_mult_diagonal<T, I>(data.P_utri, delta_iter.head(n));
+                    data.c.array() *= delta_iter.head(n).array();
+                }
+                {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::A");
+                    // scale AT
+                    pre_mult_diagonal<T, I>(data.AT, delta_iter.head(n));
+                    post_mult_diagonal<T, I>(data.AT, delta_iter.segment(n, p));
+                }
+                {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::G");
+                    // scale GT
+                    pre_mult_diagonal<T, I>(data.GT, delta_iter.head(n));
+                    post_mult_diagonal<T, I>(data.GT, delta_iter.tail(m));
+                }
+                {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::x_b");
+                    // scale box scalings
+                    data.x_b_scaling.array() *= delta_iter_b.array() * delta_iter.head(n).array();
+                }
 
                 delta.array() *= delta_iter.array();
                 delta_b.array() *= delta_iter_b.array();
 
                 if (scale_cost)
                 {
+                    PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::cost_scaling");
                     // scaling for the cost
                     Vec<T>& delta_iter_cost = delta_b_inv; // we use delta_l_inv as a temporary storage
                     delta_iter_cost.setZero();
@@ -182,39 +201,54 @@ public:
         }
         else
         {
-            // scale cost
-            data.P_utri *= c;
-            pre_mult_diagonal<T, I>(data.P_utri, delta.head(n));
-            post_mult_diagonal<T, I>(data.P_utri, delta.head(n));
-            data.c.array() *= c * delta.head(n).array();
-
-            // scale AT and GT
-            pre_mult_diagonal<T, I>(data.AT, delta.head(n));
-            post_mult_diagonal<T, I>(data.AT, delta.segment(n, p));
-            pre_mult_diagonal<T, I>(data.GT, delta.head(n));
-            post_mult_diagonal<T, I>(data.GT, delta.tail(m));
-
-            // scale box scalings
-            data.x_b_scaling.array() *= delta_b.array() * delta.head(n).array();
+            {
+                PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::cost");
+                // scale cost
+                data.P_utri *= c;
+                pre_mult_diagonal<T, I>(data.P_utri, delta.head(n));
+                post_mult_diagonal<T, I>(data.P_utri, delta.head(n));
+                data.c.array() *= c * delta.head(n).array();
+            }
+            {
+                PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::A");
+                // scale AT
+                pre_mult_diagonal<T, I>(data.AT, delta.head(n));
+                post_mult_diagonal<T, I>(data.AT, delta.segment(n, p));
+            }
+            {
+                PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::G");
+                // scale GT
+                pre_mult_diagonal<T, I>(data.GT, delta.head(n));
+                post_mult_diagonal<T, I>(data.GT, delta.tail(m));
+            }
+            {
+                PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::x_b");
+                // scale box scalings
+                data.x_b_scaling.array() *= delta_b.array() * delta.head(n).array();
+            }
         }
 
-        // scale bounds
-        data.b.array() *= delta.segment(n, p).array();
-        data.h_l.array() *= delta.tail(m).array();
-        data.h_u.array() *= delta.tail(m).array();
-        for (isize i = 0; i < data.n_x_l; i++)
         {
-            data.x_l(i) *= delta_b(data.x_l_idx(i));
-        }
-
-        for (isize i = 0; i < data.n_x_u; i++)
-        {
-            data.x_u(i) *= delta_b(data.x_u_idx(i));
+            PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::bounds");
+            // scale bounds
+            data.b.array() *= delta.segment(n, p).array();
+            data.h_l.array() *= delta.tail(m).array();
+            data.h_u.array() *= delta.tail(m).array();
+            for (isize i = 0; i < data.n_x_l; i++)
+            {
+                data.x_l(i) *= delta_b(data.x_l_idx(i));
+            }
+            for (isize i = 0; i < data.n_x_u; i++)
+            {
+                data.x_u(i) *= delta_b(data.x_u_idx(i));
+            }
         }
     }
 
     inline void unscale_data(Data<T, I>& data)
     {
+        PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::unscale_data");
+
         // unscale cost
         data.P_utri *= c_inv;
         pre_mult_diagonal<T, I>(data.P_utri, delta_inv.head(n));
