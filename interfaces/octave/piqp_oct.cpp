@@ -104,6 +104,7 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     ov_struct.assign("check_duality_gap", octave_value(settings.check_duality_gap));
     ov_struct.assign("eps_duality_gap_abs", octave_value(settings.eps_duality_gap_abs));
     ov_struct.assign("eps_duality_gap_rel", octave_value(settings.eps_duality_gap_rel));
+    ov_struct.assign("infeasibility_threshold", octave_value(settings.infeasibility_threshold));
     ov_struct.assign("reg_lower_limit", octave_value(settings.reg_lower_limit));
     ov_struct.assign("reg_finetune_lower_limit", octave_value(settings.reg_finetune_lower_limit));
     ov_struct.assign("reg_finetune_primal_update_threshold", octave_value(settings.reg_finetune_primal_update_threshold));
@@ -137,6 +138,7 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
     settings.check_duality_gap = ov_struct.getfield("check_duality_gap").bool_value();
     settings.eps_duality_gap_abs = ov_struct.getfield("eps_duality_gap_abs").double_value();
     settings.eps_duality_gap_rel = ov_struct.getfield("eps_duality_gap_rel").double_value();
+    settings.infeasibility_threshold = ov_struct.getfield("infeasibility_threshold").double_value();
     settings.reg_lower_limit = ov_struct.getfield("reg_lower_limit").double_value();
     settings.reg_finetune_lower_limit = ov_struct.getfield("reg_finetune_lower_limit").double_value();
     settings.reg_finetune_primal_update_threshold = ov_struct.getfield("check_duality_gap").int_value();

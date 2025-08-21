@@ -33,6 +33,7 @@ const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "check_duality_gap",
                                       "eps_duality_gap_abs",
                                       "eps_duality_gap_rel",
+                                      "infeasibility_threshold",
                                       "reg_lower_limit",
                                       "reg_finetune_lower_limit",
                                       "reg_finetune_primal_update_threshold",
@@ -184,6 +185,7 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     mxSetField(mx_ptr, 0, "check_duality_gap", mxCreateDoubleScalar(settings.check_duality_gap));
     mxSetField(mx_ptr, 0, "eps_duality_gap_abs", mxCreateDoubleScalar(settings.eps_duality_gap_abs));
     mxSetField(mx_ptr, 0, "eps_duality_gap_rel", mxCreateDoubleScalar(settings.eps_duality_gap_rel));
+    mxSetField(mx_ptr, 0, "infeasibility_threshold", mxCreateDoubleScalar(settings.infeasibility_threshold));
     mxSetField(mx_ptr, 0, "reg_lower_limit", mxCreateDoubleScalar(settings.reg_lower_limit));
     mxSetField(mx_ptr, 0, "reg_finetune_lower_limit", mxCreateDoubleScalar(settings.reg_finetune_lower_limit));
     mxSetField(mx_ptr, 0, "reg_finetune_primal_update_threshold", mxCreateDoubleScalar((double) settings.reg_finetune_primal_update_threshold));
@@ -217,6 +219,7 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
     settings.check_duality_gap = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "check_duality_gap"));
     settings.eps_duality_gap_abs = (double) mxGetScalar(mxGetField(mx_ptr, 0, "eps_duality_gap_abs"));
     settings.eps_duality_gap_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "eps_duality_gap_rel"));
+    settings.infeasibility_threshold = (double) mxGetScalar(mxGetField(mx_ptr, 0, "infeasibility_threshold"));
     settings.reg_lower_limit = (double) mxGetScalar(mxGetField(mx_ptr, 0, "reg_lower_limit"));
     settings.reg_finetune_lower_limit = (double) mxGetScalar(mxGetField(mx_ptr, 0, "reg_finetune_lower_limit"));
     settings.reg_finetune_primal_update_threshold = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "reg_finetune_primal_update_threshold"));

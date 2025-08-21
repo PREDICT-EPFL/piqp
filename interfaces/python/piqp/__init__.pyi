@@ -127,6 +127,7 @@ class Settings:
     eps_duality_gap_abs: float
     eps_duality_gap_rel: float
     eps_rel: float
+    infeasibility_threshold: float
     iterative_refinement_always_enabled: bool
     iterative_refinement_eps_abs: float
     iterative_refinement_eps_rel: float
