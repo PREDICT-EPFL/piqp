@@ -153,6 +153,34 @@ TEST(DenseSolverTest, DualInfeasibleQP)
     ASSERT_EQ(status, Status::PIQP_DUAL_INFEASIBLE);
 }
 
+TEST(DenseSolverTest, IllConditionedSmall)
+{
+    T inf = std::numeric_limits<T>::infinity();
+
+    Mat<T> P(6, 6);
+    P.setZero();
+    P.diagonal() << 61, 2e+09, 61, 2e+09, 1000, 100;
+    Vec<T> c(6); c.setZero();
+
+    Mat<T> A(2, 6);
+    A << 1,    0,    1,    0,    1,    0,
+         2.4,  0, -2.4,    0,    0,    1;
+    Vec<T> b(2); b.setZero();
+
+    Vec<T> x_l(6); x_l << -2e+04, -0.3491, -2e+04, -0.3491, -inf, -inf;
+    Vec<T> x_u(6); x_u << 2e+04, 0.3491, 2e+04, 0.3491, inf, inf;
+
+    DenseSolver<T> solver;
+    solver.settings().verbose = true;
+    solver.setup(P, c, A, b, nullopt, nullopt, nullopt, x_l, x_u);
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    Status status = solver.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+}
+
 //TEST(DenseSolverTest, NonConvexQP)
 //{
 //    Mat<T> P(2, 2); P << 2, 5, 5, 1;
