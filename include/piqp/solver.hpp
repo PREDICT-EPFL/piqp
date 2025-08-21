@@ -749,7 +749,7 @@ protected:
                 else
                 {
                     m_result.info.no_primal_update++;
-                    if (m_result.info.dual_prox_inf < m_settings.infeasibility_threshold) {
+                    if (m_result.info.iter < 5 || m_result.info.dual_prox_inf < m_settings.infeasibility_threshold) {
                         m_result.info.rho = (std::max)(m_result.info.reg_limit, (T(1) - T(0.666) * mu_rate) * m_result.info.rho);
                     }
                 }
@@ -768,7 +768,7 @@ protected:
                 else
                 {
                     m_result.info.no_dual_update++;
-                    if (m_result.info.primal_prox_inf < m_settings.infeasibility_threshold) {
+                    if (m_result.info.iter < 5 || m_result.info.primal_prox_inf < m_settings.infeasibility_threshold) {
                         m_result.info.delta = (std::max)(m_result.info.reg_limit, (T(1) - T(0.666) * mu_rate) * m_result.info.delta);
                     }
                 }
@@ -794,7 +794,7 @@ protected:
                 else
                 {
                     m_result.info.no_primal_update++;
-                    if (m_result.info.dual_prox_inf < m_settings.infeasibility_threshold) {
+                    if (m_result.info.iter < 5 || m_result.info.dual_prox_inf < m_settings.infeasibility_threshold) {
                         m_result.info.rho = (std::max)(m_result.info.reg_limit, T(0.5) * m_result.info.rho);
                     }
                 }
@@ -807,7 +807,7 @@ protected:
                 else
                 {
                     m_result.info.no_dual_update++;
-                    if (m_result.info.primal_prox_inf < m_settings.infeasibility_threshold) {
+                    if (m_result.info.iter < 5 || m_result.info.primal_prox_inf < m_settings.infeasibility_threshold) {
                         m_result.info.delta = (std::max)(m_result.info.reg_limit, T(0.5) * m_result.info.delta);
                     }
                 }
@@ -1060,8 +1060,8 @@ protected:
         m_result.info.dual_res_reg = dual_res_r();
         m_result.info.dual_res_reg_rel = m_result.info.dual_res_reg / dual_rel_scaling;
 
-        m_result.info.primal_prox_inf = primal_prox_inf() / primal_rel_scaling * m_result.info.delta;
-        m_result.info.dual_prox_inf = dual_prox_inf() / dual_rel_scaling * m_result.info.rho;
+        m_result.info.primal_prox_inf = primal_prox_inf() * m_result.info.delta;
+        m_result.info.dual_prox_inf = dual_prox_inf() * m_result.info.rho;
     }
 
     T primal_res_nr()
