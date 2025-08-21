@@ -739,7 +739,9 @@ protected:
                 // ------------------ update regularization ------------------
                 update_residuals_nr();
 
-                if (m_result.info.dual_res < 0.95 * m_result.info.prev_dual_res || (m_result.info.rho == m_settings.reg_finetune_lower_limit && m_result.info.dual_prox_inf < m_settings.infeasibility_threshold))
+                if (m_result.info.dual_res < 0.95 * m_result.info.prev_dual_res ||
+                    (m_result.info.dual_res < m_settings.eps_abs || m_result.info.dual_res_rel < m_settings.eps_rel) ||
+                    (m_result.info.rho == m_settings.reg_finetune_lower_limit && m_result.info.dual_prox_inf < m_settings.infeasibility_threshold))
                 {
                     prox_vars.x = m_result.x;
                     m_result.info.rho = (std::max)(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.rho);
@@ -752,7 +754,9 @@ protected:
                     }
                 }
 
-                if (m_result.info.primal_res < 0.95 * m_result.info.prev_primal_res || (m_result.info.delta == m_settings.reg_finetune_lower_limit && m_result.info.primal_prox_inf < m_settings.infeasibility_threshold))
+                if (m_result.info.primal_res < 0.95 * m_result.info.prev_primal_res ||
+                    (m_result.info.primal_res < m_settings.eps_abs || m_result.info.primal_res_rel < m_settings.eps_rel) ||
+                    (m_result.info.delta == m_settings.reg_finetune_lower_limit && m_result.info.primal_prox_inf < m_settings.infeasibility_threshold))
                 {
                     prox_vars.y = m_result.y;
                     prox_vars.z_l = m_result.z_l;
@@ -782,7 +786,7 @@ protected:
                 // ------------------ update regularization ------------------
                 update_residuals_nr();
 
-                if (m_result.info.dual_res < 0.95 * m_result.info.prev_dual_res)
+                if (m_result.info.dual_res < 0.95 * m_result.info.prev_dual_res || (m_result.info.dual_res < m_settings.eps_abs || m_result.info.dual_res_rel < m_settings.eps_rel))
                 {
                     prox_vars.x = m_result.x;
                     m_result.info.rho = (std::max)(m_result.info.reg_limit, T(0.1) * m_result.info.rho);
@@ -795,7 +799,7 @@ protected:
                     }
                 }
 
-                if (m_result.info.primal_res < 0.95 * m_result.info.prev_primal_res)
+                if (m_result.info.primal_res < 0.95 * m_result.info.prev_primal_res || (m_result.info.primal_res < m_settings.eps_abs || m_result.info.primal_res_rel < m_settings.eps_rel))
                 {
                     prox_vars.y = m_result.y;
                     m_result.info.delta = (std::max)(m_result.info.reg_limit, T(0.1) * m_result.info.delta);
@@ -1048,8 +1052,8 @@ protected:
         res.z_bl.head(m_data.n_x_l) = res_nr.z_bl.head(m_data.n_x_l) - m_result.info.delta * (prox_vars.z_bl.head(m_data.n_x_l) - m_result.z_bl.head(m_data.n_x_l));
         res.z_bu.head(m_data.n_x_u) = res_nr.z_bu.head(m_data.n_x_u) - m_result.info.delta * (prox_vars.z_bu.head(m_data.n_x_u) - m_result.z_bu.head(m_data.n_x_u));
 
-        T primal_rel_scaling = m_result.info.primal_res / m_result.info.primal_res_rel;
-        T dual_rel_scaling = m_result.info.dual_res / m_result.info.dual_res_rel;
+        T primal_rel_scaling = m_result.info.primal_res_rel > 0 ? m_result.info.primal_res / m_result.info.primal_res_rel : T(1);
+        T dual_rel_scaling = m_result.info.dual_res_rel > 0 ? m_result.info.dual_res / m_result.info.dual_res_rel : T(1);
 
         m_result.info.primal_res_reg = primal_res_r();
         m_result.info.primal_res_reg_rel = m_result.info.primal_res_reg / primal_rel_scaling;
