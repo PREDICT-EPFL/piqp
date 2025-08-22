@@ -46,7 +46,8 @@ else()
     option(BUILD_TESTS "Build tests" ON)
     option(BUILD_EXAMPLES "Build examples" ON)
 endif()
-option(BUILD_MAROS_MESZAROS_TEST "Build maros meszaros tests" OFF)
+option(BUILD_MAROS_MESZAROS_TESTS "Build maros meszaros tests" OFF)
+option(BUILD_NETLIB_TESTS "Build netlib tests" OFF)
 option(BUILD_BENCHMARKS "Build benchmarks" OFF)
 
 #### Developer options ####

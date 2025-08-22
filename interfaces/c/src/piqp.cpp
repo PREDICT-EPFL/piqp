@@ -127,6 +127,7 @@ static void piqp_set_default_settings(piqp_settings* settings, Solver&& solver)
     settings->check_duality_gap = solver.settings().check_duality_gap;
     settings->eps_duality_gap_abs = solver.settings().eps_duality_gap_abs;
     settings->eps_duality_gap_rel = solver.settings().eps_duality_gap_rel;
+    settings->infeasibility_threshold = solver.settings().infeasibility_threshold;
     settings->reg_lower_limit = solver.settings().reg_lower_limit;
     settings->reg_finetune_lower_limit = solver.settings().reg_finetune_lower_limit;
     settings->reg_finetune_primal_update_threshold = (piqp_int)  solver.settings().reg_finetune_primal_update_threshold;
@@ -268,6 +269,7 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().check_duality_gap = settings->check_duality_gap;
         solver->settings().eps_duality_gap_abs = settings->eps_duality_gap_abs;
         solver->settings().eps_duality_gap_rel = settings->eps_duality_gap_rel;
+        solver->settings().infeasibility_threshold = settings->infeasibility_threshold;
         solver->settings().reg_lower_limit = settings->reg_lower_limit;
         solver->settings().reg_finetune_lower_limit = settings->reg_finetune_lower_limit;
         solver->settings().reg_finetune_primal_update_threshold = settings->reg_finetune_primal_update_threshold;
@@ -300,6 +302,7 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().check_duality_gap = settings->check_duality_gap;
         solver->settings().eps_duality_gap_abs = settings->eps_duality_gap_abs;
         solver->settings().eps_duality_gap_rel = settings->eps_duality_gap_rel;
+        solver->settings().infeasibility_threshold = settings->infeasibility_threshold;
         solver->settings().reg_lower_limit = settings->reg_lower_limit;
         solver->settings().reg_finetune_lower_limit = settings->reg_finetune_lower_limit;
         solver->settings().reg_finetune_primal_update_threshold = settings->reg_finetune_primal_update_threshold;
