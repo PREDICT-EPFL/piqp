@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2025-08-22
+
+### Changed
+- Add tracy support [#30](https://github.com/PREDICT-EPFL/piqp/pull/30)
+- Enforce Eigen ABI with Template Instantiation [#32](https://github.com/PREDICT-EPFL/piqp/pull/32)
+- Improved and more robust infeasibility detection [#34](https://github.com/PREDICT-EPFL/piqp/pull/34)
+
 ## [0.6.0] - 2025-06-30
 
 ### Changed
@@ -123,7 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.0...HEAD
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.1...v0.4.2
