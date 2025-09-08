@@ -197,6 +197,8 @@ octave_value result_to_ov_struct(const piqp::Result<double>& result)
     ov_info_struct.assign("setup_time", octave_value(result.info.setup_time));
     ov_info_struct.assign("update_time", octave_value(result.info.update_time));
     ov_info_struct.assign("solve_time", octave_value(result.info.solve_time));
+    ov_info_struct.assign("kkt_factor_time", octave_value(result.info.kkt_factor_time));
+    ov_info_struct.assign("kkt_solve_time", octave_value(result.info.kkt_solve_time));
     ov_info_struct.assign("run_time", octave_value(result.info.run_time));
 
     octave_scalar_map ov_result_struct;

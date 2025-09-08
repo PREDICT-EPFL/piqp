@@ -114,6 +114,8 @@ static void piqp_update_result(piqp_result* result, const piqp::Result<piqp_floa
     result->info.setup_time = solver_result.info.setup_time;
     result->info.update_time = solver_result.info.update_time;
     result->info.solve_time = solver_result.info.solve_time;
+    result->info.kkt_factor_time = solver_result.info.kkt_factor_time;
+    result->info.kkt_solve_time = solver_result.info.kkt_solve_time;
     result->info.run_time = solver_result.info.run_time;
 }
 

@@ -71,6 +71,8 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("setup_time", &piqp::Info<T>::setup_time)
         .def_readwrite("update_time", &piqp::Info<T>::update_time)
         .def_readwrite("solve_time", &piqp::Info<T>::solve_time)
+        .def_readwrite("kkt_factor_time", &piqp::Info<T>::kkt_factor_time)
+        .def_readwrite("kkt_solve_time", &piqp::Info<T>::kkt_solve_time)
         .def_readwrite("run_time", &piqp::Info<T>::run_time);
 
     py::class_<piqp::Result<T>>(m, "Result", py::module_local())

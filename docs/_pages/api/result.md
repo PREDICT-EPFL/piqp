@@ -22,6 +22,8 @@ nav_order: 2
 | `info.setup_time`      | Setup time                                    |
 | `info.update_time`     | Update time                                   |
 | `info.solve_time`      | Solve time                                    |
+| `info.kkt_factor_time` | KKT factor time                               |
+| `info.kkt_solve_time`  | KKT solve time                                |
 | `info.run_time`        | Total run time: setup/update + solve          |
 
 {: .warning }

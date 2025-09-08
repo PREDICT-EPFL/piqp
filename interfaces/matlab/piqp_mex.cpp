@@ -87,6 +87,8 @@ const char* PIQP_INFO_FIELDS[] = {"status",
                                   "setup_time",
                                   "update_time",
                                   "solve_time",
+                                  "kkt_factor_time",
+                                  "kkt_solve_time",
                                   "run_time"};
 
 const char* PIQP_RESULT_FIELDS[] = {"x",
@@ -281,6 +283,8 @@ mxArray* result_to_mx_struct(const piqp::Result<double>& result)
     mxSetField(mx_info_ptr, 0, "setup_time", mxCreateDoubleScalar(result.info.setup_time));
     mxSetField(mx_info_ptr, 0, "update_time", mxCreateDoubleScalar(result.info.update_time));
     mxSetField(mx_info_ptr, 0, "solve_time", mxCreateDoubleScalar(result.info.solve_time));
+    mxSetField(mx_info_ptr, 0, "kkt_factor_time", mxCreateDoubleScalar(result.info.kkt_factor_time));
+    mxSetField(mx_info_ptr, 0, "kkt_solve_time", mxCreateDoubleScalar(result.info.kkt_solve_time));
     mxSetField(mx_info_ptr, 0, "run_time", mxCreateDoubleScalar(result.info.run_time));
 
     int n_result_fields  = sizeof(PIQP_RESULT_FIELDS) / sizeof(PIQP_RESULT_FIELDS[0]);

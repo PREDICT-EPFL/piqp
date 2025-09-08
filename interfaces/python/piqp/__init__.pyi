@@ -36,6 +36,8 @@ class Info:
     duality_gap_rel: float
     factor_retires: int
     iter: int
+    kkt_factor_time: float
+    kkt_solve_time: float
     mu: float
     no_dual_update: int
     no_primal_update: int

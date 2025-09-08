@@ -83,6 +83,8 @@ struct Info
     T setup_time;
     T update_time;
     T solve_time;
+    T kkt_factor_time;
+    T kkt_solve_time;
     T run_time;
 };
 

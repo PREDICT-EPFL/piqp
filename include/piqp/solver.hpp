@@ -37,7 +37,6 @@ protected:
     using DataType = std::conditional_t<MatrixType == PIQP_DENSE, dense::Data<T>, sparse::Data<T, I>>;
     using CMatRefType = std::conditional_t<MatrixType == PIQP_DENSE, CMatRef<T>, CSparseMatRef<T, I>>;
 
-    Timer<T> m_timer;
     Result<T> m_result;
     Settings<T> m_settings;
     DataType m_data;
@@ -74,7 +73,7 @@ public:
         if (m_settings.verbose)
         {
             piqp_print("----------------------------------------------------------\n");
-            piqp_print("                           PIQP                           \n");
+            piqp_print("                        PIQP v0.6.1                       \n");
             piqp_print("                    (c) Roland Schwan                     \n");
             piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2025   \n");
             piqp_print("----------------------------------------------------------\n");
@@ -101,9 +100,10 @@ public:
             piqp_print("iter  prim_obj       dual_obj       duality_gap   prim_res      dual_res      rho         delta       mu          p_step   d_step\n");
         }
 
+        Timer<T> solve_timer;
         if (m_settings.compute_timings)
         {
-            m_timer.start();
+            solve_timer.start();
         }
 
         Status status = solve_impl();
@@ -113,7 +113,7 @@ public:
 
         if (m_settings.compute_timings)
         {
-            T solve_time = m_timer.stop();
+            T solve_time = solve_timer.stop();
             m_result.info.solve_time = solve_time;
             if (m_first_run) {
                 m_result.info.run_time = m_result.info.setup_time + m_result.info.solve_time;
@@ -137,6 +137,8 @@ public:
                     piqp_print("  update time:        %.3es\n", static_cast<double>(m_result.info.update_time));
                 }
                 piqp_print("  solve time:         %.3es\n", static_cast<double>(m_result.info.solve_time));
+                piqp_print("    kkt factor time:  %.3es\n", static_cast<double>(m_result.info.kkt_factor_time));
+                piqp_print("    kkt solve time:   %.3es\n", static_cast<double>(m_result.info.kkt_solve_time));
             }
         }
 
@@ -158,9 +160,10 @@ protected:
     {
         PIQP_TRACY_ZoneScopedN("piqp::Solver::setup");
 
+        Timer<T> setup_timer;
         if (m_settings.compute_timings)
         {
-            m_timer.start();
+            setup_timer.start();
         }
 
         m_data.resize(P.rows(), A.has_value() ? A->rows() : 0, G.has_value() ? G->rows() : 0);
@@ -207,7 +210,7 @@ protected:
 
         if (m_settings.compute_timings)
         {
-            T setup_time = m_timer.stop();
+            T setup_time = setup_timer.stop();
             m_result.info.setup_time = setup_time;
         }
     }
@@ -230,9 +233,10 @@ protected:
             return;
         }
 
+        Timer<T> update_timer;
         if (m_settings.compute_timings)
         {
-            m_timer.start();
+            update_timer.start();
         }
 
         m_preconditioner.unscale_data(m_data);
@@ -298,7 +302,7 @@ protected:
 
         if (m_settings.compute_timings)
         {
-            T update_time = m_timer.stop();
+            T update_time = update_timer.stop();
             m_result.info.update_time = update_time;
         }
     }
@@ -362,6 +366,8 @@ protected:
         m_result.info.setup_time = 0;
         m_result.info.update_time = 0;
         m_result.info.solve_time = 0;
+        m_result.info.kkt_factor_time = 0;
+        m_result.info.kkt_solve_time = 0;
         m_result.info.run_time = 0;
 
         res_nr.resize(m_data.n, m_data.p, m_data.m);
@@ -384,6 +390,10 @@ protected:
             m_result.info.status = Status::PIQP_INVALID_SETTINGS;
             return m_result.info.status;
         }
+
+        Timer<T> timer;
+        m_result.info.kkt_factor_time = 0;
+        m_result.info.kkt_solve_time = 0;
 
         m_result.info.status = Status::PIQP_UNSOLVED;
         m_result.info.iter = 0;
@@ -428,6 +438,11 @@ protected:
 
         m_enable_iterative_refinement = m_settings.iterative_refinement_always_enabled;
 
+
+        if (m_settings.compute_timings)
+        {
+            timer.start();
+        }
         while (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
                                                         m_result.info.rho, m_result.info.delta, m_result))
         {
@@ -449,6 +464,11 @@ protected:
             }
         }
         m_result.info.factor_retires = 0;
+        if (m_settings.compute_timings)
+        {
+            T kkt_factor_time = timer.stop();
+            m_result.info.kkt_factor_time += kkt_factor_time;
+        }
 
         res.x = -m_data.c;
         res.y = m_data.b;
@@ -460,7 +480,16 @@ protected:
         res.s_u.setZero();
         res.s_bl.setZero();
         res.s_bu.setZero();
+
+        if (m_settings.compute_timings) {
+            timer.start();
+        }
         m_kkt_system.solve(m_data, m_settings, res, m_result);
+        if (m_settings.compute_timings)
+        {
+            T kkt_solve_time = timer.stop();
+            m_result.info.kkt_solve_time += kkt_solve_time;
+        }
 
         // We make an Eigen expression for convenience. Note that we are doing it after
         // the first solve since m_kkt_system.solve might swap internal pointers in m_result
@@ -651,6 +680,10 @@ protected:
                 }
             }
 
+            if (m_settings.compute_timings)
+            {
+                timer.start();
+            }
             bool regularization_changed = false;
             while (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
                                                             m_result.info.rho, m_result.info.delta, m_result))
@@ -674,6 +707,11 @@ protected:
                 return m_result.info.status;
             }
             m_result.info.factor_retires = 0;
+            if (m_settings.compute_timings)
+            {
+                T kkt_factor_time = timer.stop();
+                m_result.info.kkt_factor_time += kkt_factor_time;
+            }
 
             if (regularization_changed) {
                 update_residuals_r();
@@ -687,7 +725,16 @@ protected:
                 res.s_bl.head(m_data.n_x_l).array() = -s_bl.array() * z_bl.array();
                 res.s_bu.head(m_data.n_x_u).array() = -s_bu.array() * z_bu.array();
 
+                if (m_settings.compute_timings)
+                {
+                    timer.start();
+                }
                 m_kkt_system.solve(m_data, m_settings, res, step);
+                if (m_settings.compute_timings)
+                {
+                    T kkt_solve_time = timer.stop();
+                    m_result.info.kkt_solve_time += kkt_solve_time;
+                }
 
                 // step in the non-negative orthant
                 T alpha_s, alpha_z;
@@ -711,7 +758,15 @@ protected:
                 res.s_bl.head(m_data.n_x_l).array() += -step.s_bl.head(m_data.n_x_l).array() * step.z_bl.head(m_data.n_x_l).array() + m_result.info.sigma * m_result.info.mu;
                 res.s_bu.head(m_data.n_x_u).array() += -step.s_bu.head(m_data.n_x_u).array() * step.z_bu.head(m_data.n_x_u).array() + m_result.info.sigma * m_result.info.mu;
 
+                if (m_settings.compute_timings)
+                {
+                    timer.start();
+                }
                 m_kkt_system.solve(m_data, m_settings, res, step);
+                {
+                    T kkt_solve_time = timer.stop();
+                    m_result.info.kkt_solve_time += kkt_solve_time;
+                }
 
                 // step in the non-negative orthant
                 calculate_step(alpha_s, alpha_z);
@@ -775,8 +830,16 @@ protected:
             }
             else
             {
+                if (m_settings.compute_timings)
+                {
+                    timer.start();
+                }
                 // since there are no inequalities we can take full steps
                 m_kkt_system.solve(m_data, m_settings, res, step);
+                {
+                    T kkt_solve_time = timer.stop();
+                    m_result.info.kkt_solve_time += kkt_solve_time;
+                }
 
                 m_result.info.primal_step = T(1);
                 m_result.info.dual_step = T(1);

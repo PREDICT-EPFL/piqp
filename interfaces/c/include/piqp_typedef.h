@@ -153,6 +153,8 @@ typedef struct {
     piqp_float setup_time;
     piqp_float update_time;
     piqp_float solve_time;
+    piqp_float kkt_factor_time;
+    piqp_float kkt_solve_time;
     piqp_float run_time;
 } piqp_info;
 
