@@ -22,7 +22,8 @@ enum class KKTSolver
     sparse_ldlt_eq_cond,
     sparse_ldlt_ineq_cond,
     sparse_ldlt_cond,
-    sparse_multistage
+    sparse_multistage,
+    sparse_multistage_parallel
 };
 
 constexpr const char* kkt_solver_to_string(KKTSolver kkt_solver)
@@ -35,6 +36,7 @@ constexpr const char* kkt_solver_to_string(KKTSolver kkt_solver)
         case KKTSolver::sparse_ldlt_ineq_cond: return "sparse_ldlt_ineq_cond";
         case KKTSolver::sparse_ldlt_cond: return "sparse_ldlt_cond";
         case KKTSolver::sparse_multistage: return "sparse_multistage";
+        case KKTSolver::sparse_multistage_parallel: return "sparse_multistage_parallel";
         default: return "unknown";
     }
 }

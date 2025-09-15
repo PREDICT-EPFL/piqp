@@ -184,6 +184,9 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
     Settings<T> settings_multistage;
     settings_multistage.kkt_solver = KKTSolver::sparse_multistage;
 
+    Settings<T> settings_multistage_parallel;
+    settings_multistage_parallel.kkt_solver = KKTSolver::sparse_multistage_parallel;
+
     Settings<T> settings_sparse;
     settings_sparse.kkt_solver = KKTSolver::sparse_ldlt;
 
@@ -201,13 +204,17 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
 
     KKTSystem<T, I, PIQP_SPARSE> kkt_multistage;
     kkt_multistage.init(data, settings_multistage);
+    KKTSystem<T, I, PIQP_SPARSE> kkt_multistage_parallel;
+    kkt_multistage_parallel.init(data, settings_multistage_parallel);
     KKTSystem<T, I, PIQP_SPARSE> kkt_sparse;
     kkt_sparse.init(data, settings_sparse);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt_multistage.update_scalings_and_factor(data, settings_multistage, false, rho, delta, scaling);
+    kkt_multistage_parallel.update_scalings_and_factor(data, settings_multistage_parallel, false, rho, delta, scaling);
     kkt_sparse.update_scalings_and_factor(data, settings_sparse, false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
+    test_solve_multiply(data, settings_multistage_parallel, settings_sparse, kkt_multistage_parallel, kkt_sparse);
     test_solve_multiply(data, settings_multistage, settings_sparse, kkt_multistage, kkt_sparse);
 }
 

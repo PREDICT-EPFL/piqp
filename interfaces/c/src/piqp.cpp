@@ -31,6 +31,8 @@ static piqp_kkt_solver cpp_to_c_kkt_solver(piqp::KKTSolver cpp_kkt_solver)
             return PIQP_SPARSE_LDLT_COND;
         case piqp::KKTSolver::sparse_multistage:
             return PIQP_SPARSE_MULTISTAGE;
+        case piqp::KKTSolver::sparse_multistage_parallel:
+            return PIQP_SPARSE_MULTISTAGE_PARALLEL;
     }
     return PIQP_DENSE_CHOLESKY;
 }
@@ -50,6 +52,8 @@ static piqp::KKTSolver c_to_cpp_kkt_solver(piqp_kkt_solver c_kkt_solver)
             return piqp::KKTSolver::sparse_ldlt_cond;
         case PIQP_SPARSE_MULTISTAGE:
             return piqp::KKTSolver::sparse_multistage;
+        case PIQP_SPARSE_MULTISTAGE_PARALLEL:
+            return piqp::KKTSolver::sparse_multistage_parallel;
     }
     return piqp::KKTSolver::dense_cholesky;
 }
