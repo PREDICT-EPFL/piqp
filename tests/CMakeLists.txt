@@ -59,6 +59,9 @@ target_link_libraries(dense_solver_test PRIVATE piqp-test)
 add_executable(multistage_kkt_test src/sparse/multistage_kkt_test.cpp)
 target_link_libraries(multistage_kkt_test PRIVATE piqp-test Matio::Matio)
 
+add_executable(multistage_kkt_parallel_test src/sparse/multistage_kkt_parallel_test.cpp)
+target_link_libraries(multistage_kkt_parallel_test PRIVATE piqp-test Matio::Matio)
+
 add_executable(sparse_kkt_test src/sparse/kkt_test.cpp)
 target_link_libraries(sparse_kkt_test PRIVATE piqp-test)
 
