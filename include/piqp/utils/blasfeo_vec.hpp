@@ -118,6 +118,48 @@ public:
     {
         blasfeo_print_dvec(rows(), ref(), 0);
     }
+
+    double getEntry(size_t i)
+    {
+        if (static_cast<int>(i) >= vec.m)
+            throw std::out_of_range("BlasfeoVec::getEntry: index (" + std::to_string(i) + ", " +
+                                    ") out of bounds for vector of size " + std::to_string(vec.m));
+        return BLASFEO_DVECEL(&vec, i);
+    }
+
+    void load(Vec<double>& x) const
+    {
+        assert(x.rows() == rows() && "size mismatch");
+        for (int r = 0; r < rows(); r++)
+            x(r) = BLASFEO_DVECEL(&this->vec, r);
+    }
+
+    void assign(const Vec<double>& x)
+    {
+        assert(x.rows() == rows() && "size mismatch");
+        for (int r = 0; r < rows(); r++)
+            BLASFEO_DVECEL(&this->vec, r) = x(r);
+    }
+
+    bool hasNan() const {
+        for (int i = 0; i < vec.m; ++i) {
+            if (std::isnan(BLASFEO_DVECEL(&vec, i))) {
+                // std::cerr << "BlasfeoVec contains NaN at (" + std::to_string(i) + ")\n";
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool hasInf() const {
+        for (int i = 0; i < vec.m; ++i) {
+            if (std::isinf(BLASFEO_DVECEL(&vec, i))) {
+                // std::cerr << "BlasfeoVec contains Inf at (" + std::to_string(i) + ")\n";
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 } // namespace piqp
