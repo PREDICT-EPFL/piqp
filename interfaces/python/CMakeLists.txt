@@ -40,6 +40,9 @@ function(CREATE_PIQP_PYTHON_TARGET target_name COMPILE_OPTIONS)
     target_compile_definitions(${target_name} PRIVATE PYTHON_MODULE_NAME=${target_name})
     # SKBUILD_PROJECT_VERSION_FULL is defined by scikit-build-core and passed into the C++ code as a define (VERSION_INFO) here.
     target_compile_definitions(${target_name} PRIVATE VERSION_INFO=${SKBUILD_PROJECT_VERSION_FULL})
+    if(UNIX AND NOT APPLE)
+        target_link_options(${target_name} PRIVATE "-Wl,-z,noexecstack")
+    endif()
 endfunction()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
