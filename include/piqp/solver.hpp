@@ -73,7 +73,7 @@ public:
         if (m_settings.verbose)
         {
             piqp_print("----------------------------------------------------------\n");
-            piqp_print("                        PIQP v0.6.1                       \n");
+            piqp_print("                        PIQP v0.6.2                       \n");
             piqp_print("                    (c) Roland Schwan                     \n");
             piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2025   \n");
             piqp_print("----------------------------------------------------------\n");

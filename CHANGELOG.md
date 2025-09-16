@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2025-09-16
+
+### Changed
+- Record KKT timings
+- Disable stack execution for matlab and python libraries on linux [#35](https://github.com/PREDICT-EPFL/piqp/pull/35)
+
 ## [0.6.1] - 2025-08-22
 
 ### Changed
@@ -130,8 +136,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.1...HEAD
-[0.6.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.0...v0.6.1
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.0...v0.6.2
 [0.6.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/PREDICT-EPFL/piqp/compare/v0.4.1...v0.4.2
