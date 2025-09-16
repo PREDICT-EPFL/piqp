@@ -26,7 +26,7 @@ jobs:
         uses: actions/setup-python@v5
 
       - name: Install cibuildwheel
-        run: python -m pip install cibuildwheel==3.0.1
+        run: python -m pip install cibuildwheel==3.1.4
 
       - name: Generate strategy matrix
         id: set-matrix
@@ -59,7 +59,7 @@ jobs:
         uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.2
+        uses: pypa/cibuildwheel@v3.1.4
         env:
           CIBW_ENVIRONMENT_LINUX: ${{ matrix.target.arch == 'x86_64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || (matrix.target.arch == 'aarch64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
           CIBW_ENVIRONMENT_MACOS: ${{ matrix.target.arch == 'x86_64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_X64_DIR=/opt/blasfeo_x64 -DBLASFEO_X64_AVX2_DIR=/opt/blasfeo_x64_avx2 -DBLASFEO_X64_AVX512_DIR=/opt/blasfeo_x64_avx512"' || (matrix.target.arch == 'arm64' && 'CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBLASFEO_ARM64_DIR=/opt/blasfeo_arm64"' || '') }}
@@ -69,6 +69,7 @@ jobs:
           CIBW_BEFORE_ALL_WINDOWS: bash ci/install_all_deps_windows.sh
           CIBW_BEFORE_ALL_MACOS: bash ci/install_all_deps_macos.sh
           CIBW_BUILD: ${{ matrix.target.build }}
+          CIBW_SKIP: cp31?t-*
 
       - uses: actions/upload-artifact@v4
         with:
