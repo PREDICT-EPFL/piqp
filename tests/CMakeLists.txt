@@ -80,6 +80,9 @@ target_link_libraries(io_utils_test PRIVATE piqp-test Matio::Matio)
 add_executable(preconditioner_test src/preconditioner_test.cpp)
 target_link_libraries(preconditioner_test PRIVATE piqp-test)
 
+add_executable(blasfeo_wrapper_test src/blasfeo_wrapper_test.cpp)
+target_link_libraries(blasfeo_wrapper_test PRIVATE piqp-test)
+
 if (BUILD_MAROS_MESZAROS_TESTS)
     add_executable(dense_maros_meszaros_tests src/dense/maros_meszaros_tests.cpp)
     target_link_libraries(dense_maros_meszaros_tests PRIVATE piqp-test Matio::Matio)
