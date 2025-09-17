@@ -682,6 +682,14 @@ namespace sparse
                 auto& vec = b_and_x.x[segments[k][0]];
                 assert(vec.rows() == sub_blocks[k].D[0]->rows() && "size mismatch");
                 blasfeo_dtrsv_lnn(vec.rows(), sub_blocks[k].D[0]->ref(), 0, 0, vec.ref(), 0, vec.ref(), 0);
+                // rhs - B_1^T * b_1
+                if (k > 0) {
+                    const auto& B_0 = sub_blocks[k].B[0];
+                    assert(vec.rows() == B_0->rows() && "size mismatch");
+                    assert(b_and_x.x[pivots[k-1]].rows() == B_0->cols() && "size mismatch");
+                    blasfeo_dgemv_t(B_0->rows(), B_0->cols(), -1.0, B_0->ref(), 0, 0,
+                                    vec.ref(), 0, 1.0, b_and_x.x[pivots[k-1]].ref(), 0, b_and_x.x[pivots[k-1]].ref(), 0);
+                }
                 assert(!vec.hasNan() && "vector has NaN values");
                 for (size_t i = 1; i < segments[k].size(); i++) {
                     // y2 = D_2^{-1} * (b_2 - E_1 * y_1)
@@ -693,6 +701,16 @@ namespace sparse
                     blasfeo_dgemv_n(E_im1->rows(), E_im1->cols(), -1.0, E_im1->ref(), 0, 0, vec_im1.ref(), 0, 1.0, vec_i.ref(), 0, vec_i.ref(), 0);
                     assert(!vec_im1.hasNan() && "vector has NaN values");
                     blasfeo_dtrsv_lnn(D_i->rows(), D_i->ref(), 0, 0, vec_i.ref(), 0, vec_i.ref(), 0);
+
+                    // rhs - B_1^T * b_1
+                    if (k > 0) {
+                        const auto& B_i = sub_blocks[k].B[i];
+                        assert(vec_i.rows() == B_i->rows() && "size mismatch");
+                        assert(b_and_x.x[pivots[k-1]].rows() == B_i->cols() && "size mismatch");
+                        // blasfeo_dgemv_t(B_i->rows(), B_i->cols(), -1.0, B_i->ref(), 0, 0,
+                        //                 vec_i.ref(), 0, 1.0, b_and_x.x[pivots[k-1]].ref(), 0, b_and_x.x[pivots[k-1]].ref(), 0);
+                        blasfeo_dgemv_t(-1.0, *B_i, vec_i, 1.0, b_and_x.x[pivots[k-1]], b_and_x.x[pivots[k-1]]);
+                    }
                     assert(!vec_i.hasNan() && "vector has NaN values");
                 }
             }
@@ -713,14 +731,6 @@ namespace sparse
                     blasfeo_dgemv_n(mat_F->rows(), mat_F->cols(), -1.0, mat_F->ref(), 0, 0,
                                     b_and_x.x[segments[k - 1].back()].ref(), 0, 1.0, vec_k, 0, vec_k, 0);
                     assert(!b_and_x.x[pivots[k - 1]].hasNan() && "vector has NaN values");
-                    // rhs - B^T * v
-                    for (size_t i = 0; i < segments[k].size(); i++) {
-                        const std::unique_ptr<BlasfeoMat> &mat_B = sub_blocks[k].B[i];
-                        assert(b_and_x.x[segments[k][i]].rows() == mat_B->rows() && "size mismatch");
-                        blasfeo_dgemv_t(mat_B->rows(), mat_B->cols(), -1.0, mat_B->ref(), 0, 0,
-                                        b_and_x.x[segments[k][i]].ref(), 0, 1.0, vec_k, 0, vec_k, 0);
-                        assert(!b_and_x.x[segments[k][i]].hasNan() && "vector has NaN values");
-                    }
 
                     // rhs - H * v
                     if (k > 1) {
