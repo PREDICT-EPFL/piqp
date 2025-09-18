@@ -22,63 +22,11 @@ namespace piqp {
             std::unique_ptr<BlasfeoMat> F;
             std::unique_ptr<BlasfeoMat> A;
             std::unique_ptr<BlasfeoMat> H;
+            std::vector<std::unique_ptr<BlasfeoMat>> G;
+            std::unique_ptr<BlasfeoMat> Q;
+            std::unique_ptr<BlasfeoMat> R;
 
             SubBlockKKTParallel() = default;
-
-            SubBlockKKTParallel(const BlockKKT& kkt, const std::vector<size_t>& pivots, const std::vector<std::vector<size_t>>& segments, const size_t index): index(index) {
-                const std::vector<size_t>& segment = segments[index];
-                // D
-                D.clear(); D.resize(segment.size());
-                for (size_t i = 0; i < segment.size(); i++) {
-                    D[i] = std::make_unique<BlasfeoMat>(*kkt.D[segment[i]]);
-                }
-
-                // E
-                E.clear(); E.resize(segment.size()-1);
-                for (size_t i = 0; i < segment.size() - 1; i++) {
-                    E[i] = std::make_unique<BlasfeoMat>(*kkt.B[segment[i]]);
-                }
-
-                // F
-                if (index < segments.size() - 1) {
-                    F = std::make_unique<BlasfeoMat>(*kkt.B[pivots[index]-1]);
-                } else {
-                    F = nullptr;  // The last sub-block does not have an F matrix
-                }
-
-                // A
-                if (index > 0) {
-                    A = std::make_unique<BlasfeoMat>(*kkt.D[pivots[index-1]]);
-                } else {
-                    A = nullptr;  // The first sub-block does not have an A matrix
-                }
-
-                // H
-                if (index > 0 && index < segments.size() - 1) {
-                    BlasfeoMat mat(F->rows(), A->cols());
-                    mat.setZero();
-                    H = std::make_unique<BlasfeoMat>(mat);
-                } else {
-                    H = nullptr;  // The first and last sub-blocks do not have an H matrix
-                }
-
-                // B
-                B.clear();
-                if (index > 0) {
-                    B.resize(segment.size());
-                    // ! B[i] must have the size (nx[i+1], nx[i]) !!!  Cannot use the size of offdiagonal matrix in the original KKT!
-                    B[0] = std::make_unique<BlasfeoMat>(D[0]->cols(), A->rows());
-                    B[0]->setZero();
-                    blasfeo_dgecp(kkt.B[pivots[index-1]]->rows(), kkt.B[pivots[index-1]]->cols(), kkt.B[pivots[index-1]]->ref(), 0, 0, B[0]->ref(), 0, 0);
-                    for (size_t i = 1; i < segment.size(); i++) {
-                        B[i] = std::make_unique<BlasfeoMat>(D[i]->cols(), B[i-1]->cols());
-                        B[i]->setZero();
-                    }
-                } else {
-                    B.resize(0);
-                }
-            }
-
 
             SubBlockKKTParallel(SubBlockKKTParallel&&) = default;
 
@@ -88,9 +36,12 @@ namespace piqp {
                 D.resize(other.D.size());
                 E.resize(other.E.size());
                 B.resize(other.B.size());
+                G.resize(other.G.size());
                 F = std::make_unique<BlasfeoMat>(*other.F);
                 A = std::make_unique<BlasfeoMat>(*other.A);
                 H = std::make_unique<BlasfeoMat>(*other.H);
+                Q = std::make_unique<BlasfeoMat>(*other.Q);
+                R = std::make_unique<BlasfeoMat>(*other.R);
 
                 for (std::size_t i = 0; i < other.D.size(); i++) {
                     if (other.D[i]) {
@@ -107,8 +58,11 @@ namespace piqp {
                         B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
                     }
                 }
-
-
+                for (std::size_t i = 0; i < other.G.size(); i++) {
+                    if (other.G[i]) {
+                        G[i] = std::make_unique<BlasfeoMat>(*other.G[i]);
+                    }
+                }
             }
 
             SubBlockKKTParallel& operator=(SubBlockKKTParallel&&) = default;
@@ -186,6 +140,39 @@ namespace piqp {
                     }
                 } else {
                     H = nullptr;
+                }
+
+                G.clear(); G.resize(other.G.size());
+                for (std::size_t i = 0; i < other.G.size(); i++) {
+                    if (other.G[i]) {
+                        if (!G[i]) {
+                            G[i] = std::make_unique<BlasfeoMat>(*other.G[i]);
+                        } else {
+                            *G[i] = *other.G[i];
+                        }
+                    } else {
+                        G[i] = nullptr;
+                    }
+                }
+
+                if (other.Q) {
+                    if (!Q) {
+                        Q = std::make_unique<BlasfeoMat>(*other.Q);
+                    } else {
+                        *Q = *other.Q;
+                    }
+                } else {
+                    Q = nullptr;
+                }
+
+                if (other.R) {
+                    if (!R) {
+                        R = std::make_unique<BlasfeoMat>(*other.R);
+                    } else {
+                        *R = *other.R;
+                    }
+                } else {
+                    R = nullptr;
                 }
 
                 return *this;

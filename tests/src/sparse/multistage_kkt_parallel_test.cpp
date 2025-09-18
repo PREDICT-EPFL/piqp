@@ -110,6 +110,11 @@ TEST(BlocksparseStageParallelKKTTest, FactorizeSolveSQPBlocksize1)
 {
     Eigen::Index N = 35;
     SparseMat<T, I> P(N, N); P.setIdentity();
+    for (Eigen::Index i = 0; i < N; ++i) {
+        T tmp = static_cast<T>(i+1) / static_cast<T>(N) / static_cast<T>(100);
+        P.coeffRef(N-1, i) = tmp; // last row
+        P.coeffRef(i, N-1) = tmp; // last column
+    }
     Vec<T> c(N); c.setConstant(1.0);
     SparseMat<T, I> A(N-1, N);
     using Triplet = Eigen::Triplet<double>;
@@ -161,19 +166,10 @@ TEST(BlocksparseStageParallelKKTTest, FactorizeSolveSQPBlocksize1)
     test_solve_multiply(data, settings_multistage, settings_multistage_parallel, kkt_multistage, kkt_multistage_parallel);
 }
 
-TEST(BlocksparseStageKKTParallelTest, FactorizeSolveSQPNoGlobal)
+TEST_P(BlocksparseStageParallelKKTTest, FactorizeSolveSQP)
 {
-    std::string path = "data/chain_mass_sqp.mat";
+    std::string path = "data/" + GetParam() + ".mat";
     Model<T, I> model = load_sparse_model<T, I>(path);
-    // remove the global variables since it's not supported yet
-    const size_t seg_len = 981;
-    model.P = model.P.topLeftCorner(seg_len, seg_len);
-    model.c = model.c.head(seg_len);
-    model.A = model.A.leftCols(seg_len);
-    model.G = model.G.leftCols(seg_len);
-    model.x_l = model.x_l.head(seg_len);
-    model.x_u = model.x_u.head(seg_len);
-
     Data<T, I> data(model);
 
     Settings<T> settings_sparse;
@@ -212,3 +208,7 @@ TEST(BlocksparseStageKKTParallelTest, FactorizeSolveSQPNoGlobal)
     test_solve_multiply(data, settings_sparse, settings_multistage_parallel, kkt_sparse, kkt_multistage_parallel);
     test_solve_multiply(data, settings_multistage_serial, settings_multistage_parallel, kkt_multistage_serial, kkt_multistage_parallel);
 }
+
+INSTANTIATE_TEST_SUITE_P(FromFolder, BlocksparseStageParallelKKTTest,
+                         ::testing::Values("scenario_mpc", "chain_mass_sqp", "robot_arm_sqp",
+                                           "robot_arm_sqp_constr_perm", "robot_arm_sqp_no_global"));

@@ -20,11 +20,14 @@ namespace sparse
     {
 
     protected:
+        static_assert(std::is_same<T, double>::value, "sparse_multistage_parallel only supports doubles");
+
         // For parallel factorization
         size_t kkt_solve_num_threads = KKT_SOLVE_NUM_THREADS;
         BlockKKTParallel kkt_fac_parallel;
         std::vector<size_t> pivots;
         std::vector<std::vector<size_t>> segments;
+        std::vector<std::unique_ptr<BlasfeoVec>> work_rhs_g;  // store the r_g for each thread in forward substitution
 
     public:
         explicit MultistageParallelKKT(const Data<T, I>& data)
@@ -40,6 +43,13 @@ namespace sparse
             }
             generate_partitions();  // Generate partitions for multi-threads
             init_kkt_fac();
+
+            if (this->block_info.back().diag_size > 0) {
+                work_rhs_g.resize(kkt_solve_num_threads);
+                for (size_t i = 0; i < kkt_solve_num_threads; i++) {
+                    work_rhs_g[i] = std::make_unique<BlasfeoVec>(this->block_info.back().diag_size);
+                }
+            }
 
         }
 
@@ -115,6 +125,8 @@ namespace sparse
                     sub_block.E.resize(segments[k].size() - 1);
                     sub_block.B.clear();
                     k > 0 ? sub_block.B.resize(segments[k].size()) : sub_block.B.resize(0);
+                    sub_block.G.clear();
+                    sub_block.G.resize(segments[k].size());
                 }
 
                 for (size_t k = 0; k < kkt_solve_num_threads; k++) {
@@ -163,12 +175,21 @@ namespace sparse
                     if (k > 0) {
                         sub_block.B[0] = std::make_unique<BlasfeoMat>(sub_block.D[0]->cols(), sub_block.A->rows());
                         for (size_t i = 1; i < segments[k].size(); i++) {
+                            // ! B[i] must have the size (nx[i+1], nx[i]) !!!  Cannot use the size of offdiagonal matrix in the original KKT!
                             sub_block.B[i] = std::make_unique<BlasfeoMat>(sub_block.D[i]->cols(), sub_block.B[i-1]->cols());
                         }
                     }
 
+                    // Arrow part (coupling with global variables)
                     if (arrow_width > 0) {
-                        // TODO: consider arrow parts
+                        // G
+                        for (size_t i = 0; i < segments[k].size(); i++) {
+                            sub_block.G[i] = std::make_unique<BlasfeoMat>(arrow_width, sub_block.D[i]->cols());
+                        }
+                        // Q
+                        if (k > 0) { sub_block.Q = std::make_unique<BlasfeoMat>(arrow_width, sub_block.A->cols()); }
+                        // R
+                        sub_block.R = std::make_unique<BlasfeoMat>(arrow_width, arrow_width);
                     }
                 }
 
@@ -414,6 +435,136 @@ namespace sparse
                         assert(!sub_block_k.B[0]->hasNan() && "B matrix has NaN values");
                         assert(!sub_block_k.B[0]->hasInf() && "B matrix has Inf values");
                     }
+
+                    // Arrow part (coupling with global variables)
+                    if (arrow_width > 0) {
+                        // ----- G -----
+                        for (size_t i = 0; i < segment_k.size(); i++) {
+
+                            bool G_mat_set = false;
+                            if (this->P.E[segment_k[i]]) {
+                                assert(this->P.E[segment_k[i]]->rows() <= sub_block_k.G[i]->rows() && "size mismatch");
+                                assert(this->P.E[segment_k[i]]->cols() <= sub_block_k.D[i]->cols() && "size mismatch");
+                                blasfeo_dgecp(*this->P.E[segment_k[i]], *sub_block_k.G[i]);
+                                G_mat_set = true;
+                            }
+
+                            if (this->AtA.E[segment_k[i]]) {
+                                assert(this->AtA.E[segment_k[i]]->rows() <= sub_block_k.G[i]->rows() && "size mismatch");
+                                assert(this->AtA.E[segment_k[i]]->cols() <= sub_block_k.D[i]->cols() && "size mismatch");
+                                if (G_mat_set) {
+                                    // G_i += delta^{-1} * AtA.E_i
+                                    blasfeo_dgead(delta_inv, *this->AtA.E[segment_k[i]], *sub_block_k.G[i]); // TODO: is there a blasfeo function that only add the lower triangular part?
+                                } else {
+                                    // G_i = delta^{-1} * AtA.E_i, lower triangular
+                                    blasfeo_dgecpsc(delta_inv, *this->AtA.E[segment_k[i]], *sub_block_k.G[i]);
+                                    G_mat_set = true;
+                                }
+                            }
+
+                            if (this->GtG.E[segment_k[i]]) {
+                                assert(this->GtG.E[segment_k[i]]->rows() <= sub_block_k.G[i]->rows() && "size mismatch");
+                                assert(this->GtG.E[segment_k[i]]->cols() <= sub_block_k.G[i]->cols() && "size mismatch");
+                                if (G_mat_set) {
+                                    // D_i += GtG.D_i
+                                    blasfeo_dgead(1.0, *this->GtG.E[segment_k[i]], *sub_block_k.G[i]);
+                                } else {
+                                    // D_i = GtG.D_i, lower triangular
+                                    blasfeo_dgecp(*this->GtG.E[segment_k[i]], *sub_block_k.G[i]);
+                                    G_mat_set = true;
+                                }
+                            }
+
+                            assert(!sub_block_k.G[i]->hasNan() && "G matrix has NaN values");
+                            assert(!sub_block_k.G[i]->hasInf() && "G matrix has Inf values");
+                        }
+
+                        // ----- Q -----
+                        if (k > 0) {
+                            bool Q_mat_set = false;
+                            if (this->P.E[pivots[k-1]]) {
+                                assert(this->P.E[pivots[k-1]]->rows() <= sub_block_k.Q->rows() && "size mismatch");
+                                assert(this->P.E[pivots[k-1]]->cols() <= sub_block_k.Q->cols() && "size mismatch");
+                                blasfeo_dgecp(*this->P.E[pivots[k-1]], *sub_block_k.Q);
+                                Q_mat_set = true;
+                            }
+
+                            if (this->AtA.E[pivots[k-1]]) {
+                                assert(this->AtA.E[pivots[k-1]]->rows() <= sub_block_k.Q->rows() && "size mismatch");
+                                assert(this->AtA.E[pivots[k-1]]->cols() <= sub_block_k.Q->cols() && "size mismatch");
+                                if (Q_mat_set) {
+                                    blasfeo_dgead(delta_inv, *this->AtA.E[pivots[k-1]], *sub_block_k.Q);
+                                } else {
+                                    blasfeo_dgecpsc(delta_inv, *this->AtA.E[pivots[k-1]], *sub_block_k.Q);
+                                    Q_mat_set = true;
+                                }
+                            }
+
+                            if (this->GtG.E[pivots[k-1]]) {
+                                assert(this->GtG.E[pivots[k-1]]->rows() <= sub_block_k.Q->rows() && "size mismatch");
+                                assert(this->GtG.E[pivots[k-1]]->cols() <= sub_block_k.Q->cols() && "size mismatch");
+                                if (Q_mat_set) {
+                                    blasfeo_dgead(1.0, *this->GtG.E[pivots[k-1]], *sub_block_k.Q);
+                                } else {
+                                    blasfeo_dgecp(*this->GtG.E[pivots[k-1]], *sub_block_k.Q);
+                                    Q_mat_set = true;
+                                }
+                            }
+
+                            assert(!sub_block_k.Q->hasNan() && "Q matrix has NaN values");
+                            assert(!sub_block_k.Q->hasInf() && "Q matrix has Inf values");
+                        }
+
+                        // ----- R -----
+                        bool R_mat_set = false;
+                        T num_threads_inv = static_cast<T>(1.0 / static_cast<T>(kkt_solve_num_threads));
+                        if (this->P.D.back()) {
+                            // R = P.D_i, lower triangular
+                            assert(this->P.D.back()->rows() <= sub_block_k.R->rows() && "size mismatch");
+                            assert(this->P.D.back()->cols() <= sub_block_k.R->cols() && "size mismatch");
+                            blasfeo_dtrcpsc_l(num_threads_inv, *this->P.D.back(), *sub_block_k.R);
+                            R_mat_set = true;
+                        }
+
+                        if (this->AtA.D.back()) {
+                            assert(this->AtA.D.back()->rows() <= sub_block_k.R->rows() && "size mismatch");
+                            assert(this->AtA.D.back()->cols() <= sub_block_k.R->cols() && "size mismatch");
+                            if (R_mat_set) {
+                                // R += delta^{-1} * AtA.D_i
+                                blasfeo_dgead(delta_inv * num_threads_inv, *this->AtA.D.back(), *sub_block_k.R); // TODO: is there a blasfeo function that only add the lower triangular part?
+                            } else {
+                                // R = delta^{-1} * AtA.D_i, lower triangular
+                                blasfeo_dtrcpsc_l(delta_inv * num_threads_inv, *this->AtA.D.back(), *sub_block_k.R);
+                                R_mat_set = true;
+                            }
+                        }
+
+                        if (this->GtG.D.back()) {
+                            assert(this->GtG.D.back()->rows() <= sub_block_k.R->rows() && "size mismatch");
+                            assert(this->GtG.D.back()->cols() <= sub_block_k.R->cols() && "size mismatch");
+                            if (R_mat_set) {
+                                // R += GtG.D_i
+                                blasfeo_dgead(num_threads_inv, *this->GtG.D.back(), *sub_block_k.R);
+                            } else {
+                                // R = GtG.D_i, lower triangular
+                                blasfeo_dtrcpsc_l(num_threads_inv, *this->GtG.D.back(), *sub_block_k.R);
+                                R_mat_set = true;
+                            }
+                        }
+
+                        if (R_mat_set) {
+                            // diag(R) += diag
+                            blasfeo_ddiaad(num_threads_inv, x_reg_block.x.back(), *sub_block_k.R);
+                        } else {
+                            // R = diag
+                            sub_block_k.R->setZero();
+                            blasfeo_ddiain(num_threads_inv, x_reg_block.x.back(), *sub_block_k.R);
+                        }
+
+                        assert(!sub_block_k.R->hasNan() && "R matrix has NaN values");
+                        assert(!sub_block_k.R->hasInf() && "R matrix has Inf values");
+
+                    }
                 }
             }  // end of allocate if-else
 
@@ -531,6 +682,7 @@ namespace sparse
 
         void factor_kkt() override {
             auto& sub_blocks = kkt_fac_parallel.sub_blocks;
+            I arrow_width = this->block_info.back().diag_size;
 
             // Phase 1, parallel
 
@@ -539,8 +691,9 @@ namespace sparse
 #endif
 
             for (size_t index = 0; index < kkt_solve_num_threads; index++) {
-                PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::update_scalings_and_factor:factor_kkt:phase_1");
+                PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::factor_kkt::phase_1");
                 PIQP_TRACY_ZoneValue(index);
+                std::unique_ptr<BlasfeoMat>& R = sub_blocks[index].R;
                 for (size_t i = 0; i < sub_blocks[index].D.size() - 1; i++) {
                     std::unique_ptr<BlasfeoMat>& D_i = sub_blocks[index].D[i];
                     std::unique_ptr<BlasfeoMat>& E_i = sub_blocks[index].E[i];
@@ -558,6 +711,23 @@ namespace sparse
                     blasfeo_dsyrk_ln(E_i->rows(), E_i->cols(), -1.0, E_i->ref(), 0, 0, E_i->ref(), 0, 0, 1.0, D_ip1->ref(), 0, 0, D_ip1->ref(), 0, 0);
                     assert(!D_ip1->hasNan() && "matrix has NaN values");
 
+                    if (arrow_width > 0) {
+                        std::unique_ptr<BlasfeoMat>& G_i = sub_blocks[index].G[i];
+                        std::unique_ptr<BlasfeoMat>& G_ip1 = sub_blocks[index].G[i + 1];
+                        // G[i] = G[i] * D[i]^-T
+                        assert(G_i->cols() == D_i->cols() && "size mismatch");
+                        blasfeo_dtrsm_rltn(G_i->rows(), G_i->cols(), 1.0, D_i->ref(), 0, 0, G_i->ref(), 0, 0, G_i->ref(), 0, 0);
+                        assert(!G_i->hasNan() && "matrix has NaN values");
+                        // R -= G[i] * G[i].T
+                        assert(R->rows() >= G_i->rows() && "size mismatch");
+                        blasfeo_dsyrk_ln(-1.0, *G_i, *G_i, 1.0, *R, *R);
+                        assert(!R->hasNan() && "matrix has NaN values");
+                        // G[i+1] -= G[i] * E[i].T
+                        assert(G_i->cols() == D_i->cols() && "size mismatch");
+                        blasfeo_dgemm_nt(-1.0, *G_i, *E_i, 1.0, *G_ip1, *G_ip1);
+                        assert(!G_ip1->hasNan() && "matrix has NaN values");
+                    }
+
                     if (index > 0) {
                         std::unique_ptr<BlasfeoMat>& B_i = sub_blocks[index].B[i];
                         std::unique_ptr<BlasfeoMat>& B_ip1 = sub_blocks[index].B[i + 1];
@@ -573,6 +743,15 @@ namespace sparse
                         assert(E_i->cols() == B_i->rows() && "size mismatch");
                         assert(B_ip1->rows() >= E_i->rows() && B_ip1->cols() == B_i->cols() && "size mismatch");
                         blasfeo_dgemm_nn(E_i->rows(), B_i->rows(), B_i->cols(), -1.0, E_i->ref(), 0, 0, B_i->ref(), 0, 0, 1.0, B_ip1->ref(), 0, 0, B_ip1->ref(), 0, 0);
+
+                        if (arrow_width > 0) {
+                            // Q -= G[i] * B[i]
+                            std::unique_ptr<BlasfeoMat>& G_i = sub_blocks[index].G[i];
+                            std::unique_ptr<BlasfeoMat>& Q = sub_blocks[index].Q;
+                            assert(G_i->cols() == B_i->rows() && "size mismatch");
+                            blasfeo_dgemm_nn(-1.0, *G_i, *B_i, 1.0, *Q, *Q);
+                            assert(!Q->hasNan() && "matrix has NaN values");
+                        }
                     }
                 }
 
@@ -580,6 +759,19 @@ namespace sparse
                 std::unique_ptr<BlasfeoMat>& D_last = sub_blocks[index].D.back();
                 assert(D_last->rows() == D_last->cols() && "size mismatch");
                 blasfeo_dpotrf_l(D_last->rows(), D_last->ref(), 0, 0, D_last->ref(), 0, 0);
+
+                if (arrow_width > 0) {
+                    // G[-1] = G[-1] * D[-1]^-T
+                    std::unique_ptr<BlasfeoMat>& G_last = sub_blocks[index].G.back();
+                    assert(G_last->cols() == D_last->cols() && "size mismatch");
+                    blasfeo_dtrsm_rltn(G_last->rows(), G_last->cols(), 1.0, D_last->ref(), 0, 0, G_last->ref(), 0, 0, G_last->ref(), 0, 0);
+                    assert(!G_last->hasNan() && "matrix has NaN values");
+                    // R -= G[-1].T * G[-1]
+                    assert(R->rows() >= G_last->rows() && "size mismatch");
+                    blasfeo_dsyrk_ln(G_last->rows(), G_last->cols(), -1.0, G_last->ref(), 0, 0, G_last->ref(), 0, 0, 1.0, R->ref(), 0, 0, R->ref(), 0, 0);
+                    assert(!R->hasNan() && "matrix has NaN values");
+                }
+
 
                 if (index > 0) {
                     std::unique_ptr<BlasfeoMat>& B_last = sub_blocks[index].B.back();
@@ -591,6 +783,15 @@ namespace sparse
                     assert(A->rows() == A->cols() && A->rows() == B_last->cols() && "size mismatch");
                     // NOTICE THAT it should be B.cols(), B.rows() in dsyrk_lt, not the other way around!!!!!
                     blasfeo_dsyrk_lt(B_last->cols(), B_last->rows(), -1.0, B_last->ref(), 0, 0, B_last->ref(), 0, 0, 1.0, A->ref(), 0, 0, A->ref(), 0, 0);
+
+                    if (arrow_width > 0) {
+                        // Q -= G[-1] * B[-1]
+                        std::unique_ptr<BlasfeoMat>& G_last = sub_blocks[index].G.back();
+                        std::unique_ptr<BlasfeoMat>& Q = sub_blocks[index].Q;
+                        assert(G_last->cols() == B_last->rows() && "size mismatch");
+                        blasfeo_dgemm_nn(-1.0, *G_last, *B_last, 1.0, *Q, *Q);
+                        assert(!Q->hasNan() && "matrix has NaN values");
+                    }
                 }
 
                 if (index < kkt_solve_num_threads - 1) {
@@ -606,7 +807,7 @@ namespace sparse
                     std::unique_ptr<BlasfeoMat>& F = sub_blocks[index].F;
                     std::unique_ptr<BlasfeoMat>& H = sub_blocks[index].H;
                     assert(F->cols() == B_last->rows() && H->rows() == F->rows() && H->cols() == B_last->cols() && "size mismatch");
-                    blasfeo_dgemm_nn(F->rows(), F->cols(), B_last->cols(), -1.0, F->ref(), 0, 0, B_last->ref(), 0, 0, 1.0, H->ref(), 0, 0, H->ref(), 0, 0);
+                    blasfeo_dgemm_nn(-1.0, *F, *B_last, 1.0, *H, *H);
                 }
 
             }
@@ -616,42 +817,73 @@ namespace sparse
             {
 #endif
 
-                // Phase 2
+                // Phase 2, sequential
                 {
-                    PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::update_scalings_and_factor:factor_kkt:phase_2");
-                    for (size_t k = 1; k < kkt_solve_num_threads - 1; k++) {
+                    PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::factor_kkt::phase_2");
+                    for (size_t k = 1; k < kkt_solve_num_threads; k++) {
                         std::unique_ptr<BlasfeoMat> &F_km1 = sub_blocks[k - 1].F;
                         std::unique_ptr<BlasfeoMat> &A_k = sub_blocks[k].A;
-                        std::unique_ptr<BlasfeoMat> &A_kp1 = sub_blocks[k + 1].A;
                         std::unique_ptr<BlasfeoMat> &H_k = sub_blocks[k].H;
-                        // A[i] -= F[i-1] * F[i-1]^T, notice that rows of F[i-1] might be smaller than rows of A[i]
+                        // A[k] -= F[k-1] * F[k-1]^T, notice that rows of F[k-1] might be smaller than rows of A[k]
                         assert(A_k->rows() >= F_km1->rows() && "size mismatch");
                         blasfeo_dsyrk_ln(F_km1->rows(), F_km1->cols(), -1.0, F_km1->ref(), 0, 0, F_km1->ref(), 0, 0, 1.0,
                                          A_k->ref(), 0, 0, A_k->ref(), 0, 0);
-                        // A[i] = chol(A[i])
+                        // A[k] = chol(A[k])
                         assert(A_k->rows() == A_k->cols() && "size mismatch");
                         blasfeo_dpotrf_l(A_k->rows(), A_k->ref(), 0, 0, A_k->ref(), 0, 0);
-                        // H[i] = H[i] * A[i]^-T
-                        assert(H_k->cols() == A_k->cols() && "size mismatch");
-                        blasfeo_dtrsm_rltn(H_k->rows(), H_k->cols(), 1.0, A_k->ref(), 0, 0, H_k->ref(), 0, 0, H_k->ref(), 0,
-                                           0);
-                        // A[i+1] -= H[i] * H[i]^T, notice that rows of H[i] might be smaller than rows of A[i+1]
-                        assert(A_kp1->rows() >= H_k->rows() && "size mismatch");
-                        blasfeo_dsyrk_ln(H_k->rows(), H_k->cols(), -1.0, H_k->ref(), 0, 0, H_k->ref(), 0, 0, 1.0,
-                                         A_kp1->ref(),
-                                         0, 0, A_kp1->ref(), 0, 0);
+
+                        if (k < kkt_solve_num_threads - 1) {
+                            // H[k] = H[k] * A[k]^-T
+                            assert(H_k->cols() == A_k->cols() && "size mismatch");
+                            blasfeo_dtrsm_rltn(H_k->rows(), H_k->cols(), 1.0, A_k->ref(), 0, 0, H_k->ref(), 0, 0, H_k->ref(), 0,
+                                               0);
+                            // A[k+1] -= H[k] * H[k]^T, notice that rows of H[i] might be smaller than rows of A[i+1]
+                            std::unique_ptr<BlasfeoMat> &A_kp1 = sub_blocks[k + 1].A;
+                            assert(A_kp1->rows() >= H_k->rows() && "size mismatch");
+                            blasfeo_dsyrk_ln(H_k->rows(), H_k->cols(), -1.0, H_k->ref(), 0, 0, H_k->ref(), 0, 0, 1.0,
+                                             A_kp1->ref(),
+                                             0, 0, A_kp1->ref(), 0, 0);
+                        }
+
+                        if (arrow_width > 0) {
+                            std::unique_ptr<BlasfeoMat>& Q_k = sub_blocks[k].Q;
+                            std::unique_ptr<BlasfeoMat>& G_km1_last = sub_blocks[k-1].G.back();
+                            std::unique_ptr<BlasfeoMat>& R_k = sub_blocks[k].R;
+                            // Q[k] -= G[k-1,-1] * F[k-1]^T
+                            assert(G_km1_last->cols() == F_km1->cols() && "size mismatch");
+                            blasfeo_dgemm_nt(-1.0, *G_km1_last, *F_km1, 1.0, *Q_k, *Q_k);
+
+                            // Q[k] = Q[k] * A[k]^-T
+                            assert(Q_k->cols() == A_k->cols() && "size mismatch");
+                            blasfeo_dtrsm_rltn(Q_k->rows(), Q_k->cols(), 1.0, A_k->ref(), 0, 0, Q_k->ref(), 0, 0, Q_k->ref(), 0, 0);
+                            assert(!Q_k->hasNan() && "matrix has NaN values");
+
+                            // R[k] -= Q[k] * Q[k]^T
+                            assert(R_k->rows() == Q_k->rows() && "size mismatch");
+                            blasfeo_dsyrk_ln(Q_k->rows(), Q_k->cols(), -1.0, Q_k->ref(), 0, 0, Q_k->ref(), 0, 0, 1.0,
+                                             R_k->ref(), 0, 0, R_k->ref(), 0, 0);
+                            assert(!R_k->hasNan() && "matrix has NaN values");
+
+                            if (k < kkt_solve_num_threads - 1) {
+                                // Q[k+1] -= Q[k] * H[k]^T
+                                std::unique_ptr<BlasfeoMat>& Q_kp1 = sub_blocks[k+1].Q;
+                                blasfeo_dgemm_nt(-1.0, *Q_k, *H_k, 1.0, *Q_kp1, *Q_kp1);
+                            }
+                        }
                     }
 
-                    // A[-1] -= F[-2] * F[-2]^T
-                    const size_t k = kkt_solve_num_threads - 1;
-                    assert(sub_blocks[k].A->rows() >= sub_blocks[k - 1].F->rows() && "size mismatch");
-                    blasfeo_dsyrk_ln(sub_blocks[k - 1].F->rows(), sub_blocks[k - 1].F->cols(), -1.0,
-                                     sub_blocks[k - 1].F->ref(),
-                                     0, 0, sub_blocks[k - 1].F->ref(), 0, 0, 1.0, sub_blocks[k].A->ref(), 0, 0,
-                                     sub_blocks[k].A->ref(), 0, 0);
-                    // A[-1] = chol(A[-1])
-                    assert(sub_blocks[k].A->rows() == sub_blocks[k].A->cols() && "size mismatch");
-                    blasfeo_dpotrf_l(sub_blocks[k].A->rows(), sub_blocks[k].A->ref(), 0, 0, sub_blocks[k].A->ref(), 0, 0);
+                    if (arrow_width > 0) {
+                        // R = sum(R_k), add all R_k onto R_1
+                        for (size_t j = 1; j < kkt_solve_num_threads; ++j) {
+                            blasfeo_dgead(1.0, *sub_blocks[j].R, *sub_blocks[0].R);
+                            assert(!sub_blocks[0].R->hasNan() && "matrix has NaN values");
+                        }
+                        // chol(R)
+                        assert(sub_blocks[0].R->rows() == sub_blocks[0].R->cols() && "size mismatch");
+                        blasfeo_dpotrf_l(sub_blocks[0].R->rows(), sub_blocks[0].R->ref(), 0, 0, sub_blocks[0].R->ref(), 0, 0);
+                        assert(!sub_blocks[0].R->hasNan() && "matrix has NaN values");
+                    }
+
 
                 }
 #ifdef PIQP_HAS_OPENMP
@@ -671,6 +903,7 @@ namespace sparse
             // --- Forward Substitution
             PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place:forward");
             const auto& sub_blocks = kkt_fac_parallel.sub_blocks;
+            I arrow_width = this->block_info.back().diag_size;
 
 #ifdef PIQP_HAS_OPENMP
 #pragma omp for
@@ -691,6 +924,19 @@ namespace sparse
                                     vec.ref(), 0, 1.0, b_and_x.x[pivots[k-1]].ref(), 0, b_and_x.x[pivots[k-1]].ref(), 0);
                 }
                 assert(!vec.hasNan() && "vector has NaN values");
+
+                if (arrow_width > 0) {
+                    // y_g -= G_1 * y_1
+                    auto& vec_g = b_and_x.x.back();
+                    const auto& G_0 = sub_blocks[k].G[0];
+
+                    T scaling = static_cast<T>(static_cast<T>(1.0) / static_cast<T>(kkt_solve_num_threads));
+                    blasfeo_dveccpsc(vec_g.rows(), scaling, vec_g.ref(), 0, work_rhs_g[k]->ref(), 0);
+
+                    // blasfeo_dgemv_n(-1.0, *G_0, vec, 1.0, vec_g, vec_g);
+                    blasfeo_dgemv_n(-1.0, *G_0, vec, 1.0, *work_rhs_g[k], *work_rhs_g[k]);
+                }
+
                 for (size_t i = 1; i < segments[k].size(); i++) {
                     // y2 = D_2^{-1} * (b_2 - E_1 * y_1)
                     const auto& E_im1 = sub_blocks[k].E[i-1];
@@ -707,11 +953,14 @@ namespace sparse
                         const auto& B_i = sub_blocks[k].B[i];
                         assert(vec_i.rows() == B_i->rows() && "size mismatch");
                         assert(b_and_x.x[pivots[k-1]].rows() == B_i->cols() && "size mismatch");
-                        // blasfeo_dgemv_t(B_i->rows(), B_i->cols(), -1.0, B_i->ref(), 0, 0,
-                        //                 vec_i.ref(), 0, 1.0, b_and_x.x[pivots[k-1]].ref(), 0, b_and_x.x[pivots[k-1]].ref(), 0);
                         blasfeo_dgemv_t(-1.0, *B_i, vec_i, 1.0, b_and_x.x[pivots[k-1]], b_and_x.x[pivots[k-1]]);
                     }
                     assert(!vec_i.hasNan() && "vector has NaN values");
+
+                    if (arrow_width > 0) {
+                        const auto& G_i = sub_blocks[k].G[i];
+                        blasfeo_dgemv_n(-1.0, *G_i, vec_i, 1.0, *work_rhs_g[k], *work_rhs_g[k]);
+                    }
                 }
             }
 
@@ -723,6 +972,15 @@ namespace sparse
 #endif
             {
                 PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place:forward:pivots");
+
+                if (arrow_width > 0) {
+                    // get back vec_g
+                    b_and_x.x.back().setZero();
+                    for (size_t i = 0; i < kkt_solve_num_threads; i++) {
+                        blasfeo_dvecad(b_and_x.x.back().rows(), 1.0, work_rhs_g[i]->ref(), 0, b_and_x.x.back().ref(), 0);
+                    }
+                }
+
                 for (size_t k = 1; k < kkt_solve_num_threads; k++) {
                     blasfeo_dvec *vec_k = b_and_x.x[pivots[k - 1]].ref();
                     // rhs - F[k-1] * v
@@ -745,6 +1003,19 @@ namespace sparse
                     assert(vec_k->m == sub_blocks[k].A->rows() && "size mismatch");
                     blasfeo_dtrsv_lnn(sub_blocks[k].A->rows(), sub_blocks[k].A->ref(), 0, 0, vec_k, 0, vec_k, 0);
                     assert(!b_and_x.x[pivots[k - 1]].hasNan() && "vector has NaN values");
+
+                    if (arrow_width > 0) {
+                        // rhs -= Q_k * v
+                        auto& vec_g = b_and_x.x.back();
+                        const auto& Q_k = sub_blocks[k].Q;
+                        blasfeo_dgemv_n(-1.0, *Q_k, b_and_x.x[pivots[k - 1]], 1.0, vec_g, vec_g);
+                    }
+                }
+
+                if (arrow_width > 0) {
+                    // r_g = R^-1 * r_g
+                    auto& vec_g = b_and_x.x.back();
+                    blasfeo_dtrsv_lnn(*sub_blocks[0].R, vec_g, vec_g);
                 }
             }
 
@@ -757,6 +1028,7 @@ namespace sparse
             // --- Backward Substitution
             PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place:backward");
             const auto& sub_blocks = kkt_fac_parallel.sub_blocks;
+            I arrow_width = this->block_info.back().diag_size;
 
 #ifdef PIQP_HAS_OPENMP
 #pragma omp master
@@ -765,10 +1037,27 @@ namespace sparse
 
             {
                 PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place:backward:pivots");
+
+                if (arrow_width > 0) {
+                    // r_g = R^-T * r_g
+                    auto& vec_g = b_and_x.x.back();
+                    blasfeo_dtrsv_ltn(*sub_blocks[0].R, vec_g, vec_g);
+
+                    // r_p -= Q^T * r_g
+                    auto& vec_p = b_and_x.x[pivots.back()];
+                    blasfeo_dgemv_t(-1.0, *sub_blocks.back().Q, vec_g, 1.0, vec_p, vec_p);
+                }
+
+                // r_p = A_p^-T * r_p
                 assert(sub_blocks.back().A->rows() == b_and_x.x[pivots.back()].rows() && "size mismatch");
                 blasfeo_dtrsv_ltn(sub_blocks.back().A->rows(), sub_blocks.back().A->ref(), 0, 0,
                                   b_and_x.x[pivots.back()].ref(), 0, b_and_x.x[pivots.back()].ref(), 0);
                 for (size_t k = pivots.size() - 2; k != SIZE_MAX; k--) {
+                    if (arrow_width > 0) {
+                        // r_k -= Q_k^T * r_g
+                        auto& vec_g = b_and_x.x.back();
+                        blasfeo_dgemv_t(-1.0, *sub_blocks[k+1].Q, vec_g, 1.0, b_and_x.x[pivots[k]], b_and_x.x[pivots[k]]);
+                    }
                     assert(sub_blocks[k + 1].H->rows() <= b_and_x.x[pivots[k + 1]].rows() && "size mismatch");
                     assert(sub_blocks[k + 1].H->cols() == b_and_x.x[pivots[k]].rows() && "size mismatch");
                     blasfeo_dgemv_t(sub_blocks[k + 1].H->rows(), sub_blocks[k + 1].H->cols(), -1.0,
@@ -794,6 +1083,17 @@ namespace sparse
                         assert(B_i->cols() == b_and_x.x[pivots[k-1]].rows() && "size mismatch");
                         assert(B_i->rows() == b_and_x.x[segments[k][i]].rows() && "size mismatch");
                         blasfeo_dgemv_n(B_i->rows(), B_i->cols(), -1.0, B_i->ref(), 0, 0, b_and_x.x[pivots[k-1]].ref(), 0, 1.0, b_and_x.x[segments[k][i]].ref(), 0, b_and_x.x[segments[k][i]].ref(), 0);
+                    }
+                }
+
+                if (arrow_width > 0) {
+                    // r_i -= G_i^T * r_g
+                    auto& vec_g = b_and_x.x.back();
+                    for (size_t i = segments[k].size() - 1; i != SIZE_MAX; i--) {
+                        const std::unique_ptr<BlasfeoMat>& G_i = sub_blocks[k].G[i];
+                        assert(G_i->rows() == vec_g.rows() && "size mismatch");
+                        assert(G_i->cols() <= b_and_x.x[segments[k][i]].rows() && "size mismatch");
+                        blasfeo_dgemv_t(-1.0, *G_i, vec_g, 1.0, b_and_x.x[segments[k][i]], b_and_x.x[segments[k][i]]);
                     }
                 }
 
