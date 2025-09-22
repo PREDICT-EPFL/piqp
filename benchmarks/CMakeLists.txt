@@ -42,6 +42,9 @@ target_link_libraries(piqp-benchmark INTERFACE piqp benchmark::benchmark)
 add_executable(sqp_benchmarks src/sqp_benchmarks.cpp)
 target_link_libraries(sqp_benchmarks PRIVATE piqp-benchmark Matio::Matio)
 
+add_executable(multistage_benchmarks src/multistage_benchmarks.cpp)
+target_link_libraries(multistage_benchmarks PRIVATE piqp-benchmark Matio::Matio)
+
 add_executable(dense_cholesky_factorization_benchmark src/dense_cholesky_factorization_benchmark.cpp)
 target_link_libraries(dense_cholesky_factorization_benchmark PRIVATE piqp-benchmark)
 
