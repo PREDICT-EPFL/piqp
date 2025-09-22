@@ -112,8 +112,6 @@ namespace sparse
             if (allocate) {
 
                 kkt_fac_parallel.sub_blocks.resize(kkt_solve_num_threads);
-                kkt_fac_parallel.segments = segments;
-                kkt_fac_parallel.pivots = pivots;
                 kkt_fac_parallel.num_threads = kkt_solve_num_threads;
 
                 // TODO: parallelize the following loop

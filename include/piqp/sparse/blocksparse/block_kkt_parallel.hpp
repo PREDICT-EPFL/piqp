@@ -184,8 +184,6 @@ namespace piqp {
         struct BlockKKTParallel {
             size_t num_threads = 1;
             std::vector<SubBlockKKTParallel> sub_blocks; // stores the permuted sub-blocks
-            std::vector<size_t> pivots;
-            std::vector<std::vector<size_t>> segments;
 
             BlockKKTParallel() = default;
 
