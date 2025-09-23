@@ -1050,15 +1050,15 @@ namespace sparse
                         blasfeo_dgemv_n(-1.0, *F_km1, r_km1_last, 1.0, r_k, r_k);
                     }
 
-                    // r[k+1] -= H[k-1] * r[k]
-                    const std::unique_ptr<BlasfeoMat> &H_km1 = sub_blocks[k - 1].H;
-                    if (H_km1) {
+                    // r[k+1] -= H[k] * r[k]
+                    const std::unique_ptr<BlasfeoMat> &H_k = sub_blocks[k - 1].H;
+                    if (H_k) {
                         assert(!pivots.empty() && k > 1);
-                        BlasfeoVec& r_k = b_and_x.x[pivots[k - 1]];
-                        BlasfeoVec& r_kp1 = b_and_x.x[pivots[k]];
-                        assert(r_k.rows() == H_km1->cols() && "size mismatch");
-                        assert(r_kp1.rows() >= H_km1->rows() && "size mismatch");  // r[k+1] might have more rows than H[k-1]
-                        blasfeo_dgemv_n(-1.0, *H_km1, r_k, 1.0, r_kp1, r_kp1);
+                        BlasfeoVec& r_k = b_and_x.x[pivots[k - 2]];
+                        BlasfeoVec& r_kp1 = b_and_x.x[pivots[k - 1]];
+                        assert(r_k.rows() == H_k->cols() && "size mismatch");
+                        assert(r_kp1.rows() >= H_k->rows() && "size mismatch");  // r[k+1] might have more rows than H[k-1]
+                        blasfeo_dgemv_n(-1.0, *H_k, r_k, 1.0, r_kp1, r_kp1);
                     }
 
                     // r[k] = A[k]^-1 * r[k]
@@ -1137,7 +1137,12 @@ namespace sparse
                         // r[k] -= H[k]^T * r[k+1]
                         assert(sub_blocks[k + 1].H->rows() <= b_and_x.x[pivots[k + 1]].rows() && "size mismatch");
                         assert(sub_blocks[k + 1].H->cols() == b_and_x.x[pivots[k]].rows() && "size mismatch");
-                        blasfeo_dgemv_t(-1.0, *sub_blocks[k + 1].H, b_and_x.x[pivots[k + 1]], 1.0, b_and_x.x[pivots[k]], b_and_x.x[pivots[k]]);
+                        // blasfeo_dgemv_t(-1.0, *sub_blocks[k + 1].H, b_and_x.x[pivots[k + 1]], 1.0, b_and_x.x[pivots[k]], b_and_x.x[pivots[k]]);
+                        // NOTICE that if the original off-diagonal block B[i] has less rows than D[i+1], then H[k] will
+                        // also have less rows than A[k+1]. This will cause H[k].T to have less cols than r[k+1]
+                        blasfeo_dgemv_t(sub_blocks[k + 1].H->rows(), sub_blocks[k + 1].H->cols(), -1.0,
+                                sub_blocks[k + 1].H->ref(), 0, 0, b_and_x.x[pivots[k + 1]].ref(), 0, 1.0,
+                                b_and_x.x[pivots[k]].ref(), 0, b_and_x.x[pivots[k]].ref(), 0);
                         // r[k] = A[k]^-T * r[k]
                         assert(sub_blocks[k + 1].A->rows() == b_and_x.x[pivots[k]].rows() && "size mismatch");
                         blasfeo_dtrsv_ltn(*sub_blocks[k+1].A, b_and_x.x[pivots[k]], b_and_x.x[pivots[k]]);
