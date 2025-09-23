@@ -989,8 +989,7 @@ namespace sparse
                     const auto& G_0 = sub_blocks[k].G[0];
 
                     T scaling = static_cast<T>(static_cast<T>(1.0) / static_cast<T>(segments.size()));
-                    blasfeo_dveccpsc(vec_g.rows(), scaling, vec_g.ref(), 0, work_rhs_g[k]->ref(), 0);
-                    blasfeo_dgemv_n(-1.0, *G_0, vec, 1.0, *work_rhs_g[k], *work_rhs_g[k]);
+                    blasfeo_dgemv_n(-1.0, *G_0, vec, scaling, vec_g, *work_rhs_g[k]);
                 }
 
                 for (size_t i = 1; i < segments[k].size(); i++) {
