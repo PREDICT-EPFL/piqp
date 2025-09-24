@@ -738,8 +738,7 @@ namespace sparse
                     std::unique_ptr<BlasfeoMat>& E_i = sub_blocks[index].E[i];
                     std::unique_ptr<BlasfeoMat>& D_ip1 = sub_blocks[index].D[i + 1];
                     // D[i] = chol(D[i])
-                    assert(D_i->rows() == D_i->cols() && "size mismatch");
-                    blasfeo_dpotrf_l(D_i->rows(), D_i->ref(), 0, 0, D_i->ref(), 0, 0);
+                    blasfeo_dpotrf_l(*D_i);
                     assert(!D_i->hasNan() && "matrix has NaN values");
                     // E[i] = E[i] * D[i]^-T
                     assert(E_i->cols() == D_i->cols() && "size mismatch");
@@ -798,8 +797,7 @@ namespace sparse
 
                 // D[-1] = chol(D[-1])
                 std::unique_ptr<BlasfeoMat>& D_last = sub_blocks[index].D.back();
-                assert(D_last->rows() == D_last->cols() && "size mismatch");
-                blasfeo_dpotrf_l(D_last->rows(), D_last->ref(), 0, 0, D_last->ref(), 0, 0);
+                blasfeo_dpotrf_l(*D_last);
 
                 if (arrow_width > 0) {
                     // G[-1] = G[-1] * D[-1]^-T
@@ -877,8 +875,7 @@ namespace sparse
                         }
                         // A[k] = chol(A[k])
                         if (A_k) {
-                            assert(A_k->rows() == A_k->cols() && "size mismatch");
-                            blasfeo_dpotrf_l(A_k->rows(), A_k->ref(), 0, 0, A_k->ref(), 0, 0);
+                            blasfeo_dpotrf_l(*A_k);
                         }
 
                         if (H_k) {
@@ -937,8 +934,7 @@ namespace sparse
                             assert(!sub_blocks[0].R->hasNan() && "matrix has NaN values");
                         }
                         // chol(R)
-                        assert(sub_blocks[0].R->rows() == sub_blocks[0].R->cols() && "size mismatch");
-                        blasfeo_dpotrf_l(sub_blocks[0].R->rows(), sub_blocks[0].R->ref(), 0, 0, sub_blocks[0].R->ref(), 0, 0);
+                        blasfeo_dpotrf_l(*sub_blocks[0].R);
                         assert(!sub_blocks[0].R->hasNan() && "matrix has NaN values");
                     }
 
