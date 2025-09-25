@@ -95,6 +95,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
             .value("sparse_ldlt_ineq_cond", piqp::KKTSolver::sparse_ldlt_ineq_cond)
             .value("sparse_ldlt_cond", piqp::KKTSolver::sparse_ldlt_cond)
             .value("sparse_multistage", piqp::KKTSolver::sparse_multistage)
+            .value("sparse_multistage_parallel", piqp::KKTSolver::sparse_multistage_parallel)
             .export_values();
 
     py::class_<piqp::Settings<T>>(m, "Settings", py::module_local())
