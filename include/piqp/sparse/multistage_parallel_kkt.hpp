@@ -1,7 +1,7 @@
 #ifndef PIQP_MULTISTAGE_PARALLEL_KKT_H
 #define PIQP_MULTISTAGE_PARALLEL_KKT_H
 
-#define KKT_SOLVE_NUM_THREADS 2
+#define KKT_SOLVE_NUM_THREADS 4
 
 #include "piqp/sparse/multistage_kkt.hpp"
 #include "piqp/sparse/blocksparse/block_kkt_parallel.hpp"
@@ -74,28 +74,37 @@ namespace sparse
             if (idx_empty_off_diag_blocks.size() <= 1) {
                 const size_t P = kkt_solve_num_threads;
                 // Compute segment size such that first segment is ~19/7 times others
-                std::div_t s_div = std::div(static_cast<I>(7*N), static_cast<I>(7*P + 12));
-                const size_t seg_len = s_div.quot > 0 ? static_cast<size_t>(s_div.quot) : 1;  // ensure at least one element per segment
+                T ratio = T(19.0) / T(7.0);  // the optimal ratio of first segment length over intermediate segments lengths
+                T Ni_ideal = T(N - P + 1) / (T(P - 1) + ratio);
+                auto Ni_ceil = static_cast<size_t>(std::ceil(Ni_ideal));
+                auto Ni_floor = static_cast<size_t>(std::floor(Ni_ideal));
+
+                // Compare ceiling and flooring
+                // lambda: time complexity of the parallel part if we pick Ni
+                auto cost_parallel_part = [N, P](size_t Ni) -> T {
+                    size_t N1 = N - (P - 1) * (Ni + 1);
+                    // 7/3 * N1  vs  19/3 * Ni
+                    return std::max(T(7.0)/T(3.0)*static_cast<T>(N1),
+                                    T(19.0)/T(3.0)*static_cast<T>(Ni));
+                };
+
+                const size_t Ni = cost_parallel_part(Ni_ceil) < cost_parallel_part(Ni_floor)? Ni_ceil : Ni_floor;
+                const size_t N1 = N - (P - 1) * (Ni + 1);
 
                 // Compute pivot indices
                 pivots.reserve(P - 1);
-                for (size_t i = 0; i < P - 1; ++i) {
-                    assert(N > 1 + seg_len * (i+1) + i && "pivot index out of bounds");
-                    pivots.insert(pivots.begin(), N - 1 - seg_len * (i+1) - i);
+                for (size_t j = 0; j < P - 1; ++j) {
+                    size_t pivot_j = N1 + Ni * j + j;
+                    pivots.push_back(pivot_j);
                 }
 
-                // Build segments using pivots
-                std::vector<size_t> pivots_tmp = pivots;
-                pivots_tmp.insert(pivots_tmp.begin(), static_cast<size_t>(-1));  // underflows to max size_t
-                pivots_tmp.back() = std::min(pivots_tmp.back(), N - 1);  // guard overflow
-                pivots_tmp.push_back(N);
-
-                for (size_t i = 0; i < pivots_tmp.size() - 1; ++i) {
-                    std::vector<size_t> segment;
-                    for (size_t j = pivots_tmp[i] + 1; j < std::min(pivots_tmp[i + 1], N); ++j) {
-                        segment.push_back(j);
-                    }
-                    segments.push_back(segment);
+                std::vector<size_t> segment_i;
+                for (size_t i = 0; i < N1; i++) { segment_i.push_back(i); }
+                segments.push_back(segment_i);
+                for (size_t j = 0; j < P-1; ++j) {
+                    segment_i.clear();
+                    for (size_t i = 0; i < Ni; i++) { segment_i.push_back(pivots[j] + 1 + i); }
+                    segments.push_back(segment_i);
                 }
             } else {
                 // Scenario MPC, naturally parallelizable structure
