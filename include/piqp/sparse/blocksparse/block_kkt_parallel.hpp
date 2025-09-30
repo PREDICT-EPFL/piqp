@@ -18,7 +18,8 @@ namespace piqp {
             size_t index = 0;
             std::vector<std::unique_ptr<BlasfeoMat>> D; // lower triangular diagonal
             std::vector<std::unique_ptr<BlasfeoMat>> E; // off diagonal
-            std::vector<std::unique_ptr<BlasfeoMat>> B; //
+            std::vector<std::unique_ptr<BlasfeoMat>> Bt;
+            std::unique_ptr<BlasfeoMat> Bt0_tmp;
             std::unique_ptr<BlasfeoMat> F;
             std::unique_ptr<BlasfeoMat> A;
             std::unique_ptr<BlasfeoMat> H;
@@ -35,7 +36,7 @@ namespace piqp {
                 index = other.index;
                 D.resize(other.D.size());
                 E.resize(other.E.size());
-                B.resize(other.B.size());
+                Bt.resize(other.Bt.size());
                 G.resize(other.G.size());
                 F = std::make_unique<BlasfeoMat>(*other.F);
                 A = std::make_unique<BlasfeoMat>(*other.A);
@@ -53,9 +54,9 @@ namespace piqp {
                         E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
                     }
                 }
-                for (std::size_t i = 0; i < other.B.size(); i++) {
-                    if (other.B[i]) {
-                        B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
+                for (std::size_t i = 0; i < other.Bt.size(); i++) {
+                    if (other.Bt[i]) {
+                        Bt[i] = std::make_unique<BlasfeoMat>(*other.Bt[i]);
                     }
                 }
                 for (std::size_t i = 0; i < other.G.size(); i++) {
@@ -86,16 +87,16 @@ namespace piqp {
                     }
                 }
 
-                B.clear(); B.resize(other.B.size());
-                for (std::size_t i = 0; i < other.B.size(); i++) {
-                    if (other.B[i]) {
-                        if (!B[i]) {
-                            B[i] = std::make_unique<BlasfeoMat>(*other.B[i]);
+                Bt.clear(); Bt.resize(other.Bt.size());
+                for (std::size_t i = 0; i < other.Bt.size(); i++) {
+                    if (other.Bt[i]) {
+                        if (!Bt[i]) {
+                            Bt[i] = std::make_unique<BlasfeoMat>(*other.Bt[i]);
                         } else {
-                            *B[i] = *other.B[i];
+                            *Bt[i] = *other.Bt[i];
                         }
                     } else {
-                        B[i] = nullptr;
+                        Bt[i] = nullptr;
                     }
                 }
 

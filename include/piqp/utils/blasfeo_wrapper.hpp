@@ -27,6 +27,14 @@ static inline void blasfeo_dgecp(BlasfeoMat& A, BlasfeoMat& B)
     blasfeo_dgecp(m, n, A.ref(), 0, 0, B.ref(), 0, 0);
 }
 
+static inline void blasfeo_dgetr(BlasfeoMat& A, BlasfeoMat& B)
+{
+    int m = A.rows();
+    int n = A.cols();
+    assert(B.cols() >= m && B.rows() >= n && "size mismatch");
+    blasfeo_dgetr(m, n, A.ref(), 0, 0, B.ref(), 0, 0);
+}
+
 // B <= alpha * A
 static inline void blasfeo_dgecpsc(double alpha, BlasfeoMat& A, BlasfeoMat& B)
 {
