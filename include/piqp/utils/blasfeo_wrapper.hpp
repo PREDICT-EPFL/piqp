@@ -41,7 +41,14 @@ static inline void blasfeo_dgecpsc(double alpha, BlasfeoMat& A, BlasfeoMat& B)
     int m = A.rows();
     int n = A.cols();
     assert(B.rows() >= m && B.cols() >= n && "size mismatch");
+#ifdef TARGET_X64_INTEL_SKYLAKE_X
+    // blasfeo_dgecpsc not implemented on Skylake yet
+    // and reference implementation not exported ...
+    B.setZero();
+    blasfeo_dgead(m, n, alpha, A.ref(), 0, 0, B.ref(), 0, 0);
+#else
     blasfeo_dgecpsc(m, n, alpha, A.ref(), 0, 0, B.ref(), 0, 0);
+#endif
 }
 
 // B <= A, A lower triangular
