@@ -1,13 +1,52 @@
 #ifndef PIQP_MULTISTAGE_PARALLEL_KKT_H
 #define PIQP_MULTISTAGE_PARALLEL_KKT_H
 
-#define KKT_SOLVE_NUM_THREADS 4
-
 #include "piqp/sparse/multistage_kkt.hpp"
 #include "piqp/sparse/blocksparse/block_kkt_parallel.hpp"
 #ifdef PIQP_HAS_OPENMP
 #include "omp.h"
 #endif
+
+
+__attribute__((constructor))
+inline void setup_omp_options() {
+#ifdef PIQP_HAS_OPENMP
+
+    piqp_print("setup_omp_options() called\n"); // CHECK THIS OUTPUT
+
+    omp_set_dynamic(0); // disable dynamic teams
+    omp_set_schedule(omp_sched_static, 0); // fix scheduling method
+
+    // Print the number of threads being used
+    piqp_print("OpenMP: Using %d threads.\n", omp_get_max_threads());
+
+    // Bind threads onto cores
+#ifdef __linux__
+    if (setenv("OMP_DISPLAY_ENV", "TRUE", 1) != 0) {
+        piqp_eprint("Error setting OMP_DISPLAY_ENV\n");
+    }
+    if (setenv("OMP_WAIT_POLICY", "ACTIVE", 1) != 0) {
+        piqp_eprint("Error setting OMP_WAIT_POLICY\n");
+    }
+
+#pragma omp parallel num_threads(omp_get_max_threads())
+    {
+        int tid = omp_get_thread_num();
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(tid, &cpuset);
+
+        if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) < 0) {
+            piqp_eprint("Failed to set thread affinity for thread %d\n", tid);
+        }
+        // piqp_print("Thread %d running on CPU %d\n", tid, sched_getcpu());
+    }
+#else
+    piqp_print("Cannot bind threads onto cores. The performance might be considerably compromised.");
+#endif
+#endif
+}
+
 
 
 namespace piqp
@@ -23,7 +62,7 @@ namespace sparse
         static_assert(std::is_same<T, double>::value, "sparse_multistage_parallel only supports doubles");
 
         // For parallel factorization
-        size_t kkt_solve_num_threads = KKT_SOLVE_NUM_THREADS;
+        size_t kkt_solve_num_threads = 0;
         BlockKKTParallel kkt_fac_parallel;
         std::vector<size_t> pivots;
         std::vector<std::vector<size_t>> segments;
@@ -38,9 +77,17 @@ namespace sparse
         }
 
         void init() {
-            if (this->block_info.size() - 1 < 3 * kkt_solve_num_threads) {
-                throw std::runtime_error("Cannot use parallel multistage kkt solver. Use serial solver instead.");
+            kkt_solve_num_threads = static_cast<size_t>(omp_get_max_threads());
+            if (omp_get_max_threads() <= 1) {
+                throw std::runtime_error("Number of threads must be greater than 1 when using Multistage Parallel KKT solver.");
             }
+            if (this->block_info.size() - 1 <= 2 * kkt_solve_num_threads) {
+                throw std::runtime_error("The multistage problem's horizon is too short for given number thread to use parallel multistage kkt solver. Please decrease the number of threads of use serial solver instead.");
+            }
+            omp_set_num_threads(static_cast<int>(kkt_solve_num_threads));
+
+            // setup_omp_options();
+
             generate_partitions();  // Generate partitions for multi-threads
             init_kkt_fac();
 
@@ -53,6 +100,13 @@ namespace sparse
 
         }
 
+        /**
+         * @brief This constructor function is automatically executed when the library is loaded.
+         *
+         * It runs before the user's main() function (if dynamically linked at startup)
+         * and definitely before any of your solver's functions are called.
+         * This is the correct place to configure the OpenMP environment.
+         */
 
         void generate_partitions() {
             pivots.clear();
