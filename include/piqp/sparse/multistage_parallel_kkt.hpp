@@ -274,7 +274,7 @@ namespace sparse
                         sub_block.Bt0_tmp = std::make_unique<BlasfeoMat>(sub_block.A->rows(), sub_block.D[0]->cols());
                         for (size_t i = 1; i < segments[k].size(); i++) {
                             // ! B[i] must have the size (nx[i+1], nx[i]) !!!  Cannot use the size of offdiagonal matrix in the original KKT!
-                            sub_block.Bt[i] = std::make_unique<BlasfeoMat>(sub_block.Bt[i-1]->cols(), sub_block.D[i]->cols());
+                            sub_block.Bt[i] = std::make_unique<BlasfeoMat>(sub_block.Bt[i-1]->rows(), sub_block.D[i]->cols());
                         }
                     }
 
@@ -555,6 +555,12 @@ namespace sparse
                                 G_mat_set = true;
                             }
 
+                            // the terms AtA.E or GtG.E might be smaller,
+                            // thus we have to zero the whole matrix just in case
+                            if (sub_block_k.G[i] && !G_mat_set) {
+                                sub_block_k.G[i]->setZero();
+                            }
+
                             if (this->AtA.E[segment_k[i]]) {
                                 assert(this->AtA.E[segment_k[i]]->rows() <= sub_block_k.G[i]->rows() && "size mismatch");
                                 assert(this->AtA.E[segment_k[i]]->cols() <= sub_block_k.D[i]->cols() && "size mismatch");
@@ -594,6 +600,12 @@ namespace sparse
                                 assert(this->P.E[pivots[k-1]]->cols() <= sub_block_k.Q->cols() && "size mismatch");
                                 blasfeo_dgecp(*this->P.E[pivots[k-1]], *sub_block_k.Q);
                                 Q_mat_set = true;
+                            }
+
+                            // the terms AtA.E or GtG.E might be smaller,
+                            // thus we have to zero the whole matrix just in case
+                            if (sub_block_k.Q && !Q_mat_set) {
+                                sub_block_k.Q->setZero();
                             }
 
                             if (this->AtA.E[pivots[k-1]]) {
@@ -841,7 +853,7 @@ namespace sparse
                         std::unique_ptr<BlasfeoMat>& Bt_i = sub_blocks[index].Bt[i];
                         std::unique_ptr<BlasfeoMat>& Bt_ip1 = sub_blocks[index].Bt[i + 1];
                         // Bt[i] = Bt[i] *  D[i]^-T
-                        assert(D_i->cols() == Bt_i->rows() && "size mismatch");
+                        assert(D_i->cols() == Bt_i->cols() && "size mismatch");
                         blasfeo_dtrsm_rltn(Bt_i->rows(), Bt_i->cols(), 1.0, D_i->ref(), 0, 0, Bt_i->ref(), 0, 0, Bt_i->ref(), 0, 0);
 
                         // A -= B[i].T * B[i]
