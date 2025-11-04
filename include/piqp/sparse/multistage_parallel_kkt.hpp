@@ -12,13 +12,11 @@ __attribute__((constructor))
 inline void setup_omp_options() {
 #ifdef PIQP_HAS_OPENMP
 
-    piqp_print("setup_omp_options() called\n"); // CHECK THIS OUTPUT
-
     omp_set_dynamic(0); // disable dynamic teams
     omp_set_schedule(omp_sched_static, 0); // fix scheduling method
 
     // Print the number of threads being used
-    piqp_print("OpenMP: Using %d threads.\n", omp_get_max_threads());
+    // piqp_print("OpenMP: Using %d threads.\n", omp_get_max_threads());
 
     // Bind threads onto cores
 #ifdef __linux__
@@ -42,7 +40,7 @@ inline void setup_omp_options() {
         // piqp_print("Thread %d running on CPU %d\n", tid, sched_getcpu());
     }
 #else
-    piqp_print("Cannot bind threads onto cores. The performance might be considerably compromised.");
+    piqp_print("Cannot bind threads onto cores. The performance might be considerably compromised.\n");
 #endif
 #endif
 }
@@ -133,17 +131,26 @@ namespace sparse
                 auto Ni_ceil = static_cast<size_t>(std::ceil(Ni_ideal));
                 auto Ni_floor = static_cast<size_t>(std::floor(Ni_ideal));
 
-                // Compare ceiling and flooring
-                // lambda: time complexity of the parallel part if we pick Ni
-                auto cost_parallel_part = [N, P](size_t Ni) -> T {
-                    size_t N1 = N - (P - 1) * (Ni + 1);
-                    // 7/3 * N1  vs  19/3 * Ni
-                    return std::max(T(7.0)/T(3.0)*static_cast<T>(N1),
-                                    T(19.0)/T(3.0)*static_cast<T>(Ni));
-                };
-
-                const size_t Ni = cost_parallel_part(Ni_ceil) < cost_parallel_part(Ni_floor)? Ni_ceil : Ni_floor;
-                const size_t N1 = N - (P - 1) * (Ni + 1);
+                size_t Ni = 0, N1 = 0;
+                if (N <= (P - 1) * (Ni_ceil + 1) ) {
+                    // If ceiling Ni makes the left N1 zero or negative, we have to pick flooring
+                    Ni = Ni_floor;
+                    if ((P - 1) * (Ni + 1) >= N) {
+                        throw std::runtime_error("The multistage problem's horizon is too short for given number thread to use parallel multistage kkt solver. Please decrease the number of threads of use serial solver instead.");
+                    }
+                    N1 = N - (P - 1) * (Ni + 1);
+                } else {
+                    // Compare ceiling and floor
+                    // lambda: time complexity of the parallel part if we pick Ni
+                    auto cost_parallel_part = [N, P](size_t Ni) -> T {
+                        size_t N1 = N - (P - 1) * (Ni + 1);
+                        // 7/3 * N1  vs  19/3 * Ni
+                        return std::max(T(7.0)/T(3.0)*static_cast<T>(N1),
+                                        T(19.0)/T(3.0)*static_cast<T>(Ni));
+                    };
+                    Ni = cost_parallel_part(Ni_ceil) < cost_parallel_part(Ni_floor)? Ni_ceil : Ni_floor;
+                    N1 = N - (P - 1) * (Ni + 1);
+                }
 
                 // Compute pivot indices
                 pivots.reserve(P - 1);
@@ -203,7 +210,7 @@ namespace sparse
         template<bool allocate>
         void construct_kkt_fac(const Vec<T>& x_reg) {
 
-            I arrow_width = this->block_info.back().diag_size;  // TODO: consider arrow parts
+            I arrow_width = this->block_info.back().diag_size;
             T delta_inv = 1.0 / this->m_delta;
             BlockVec& x_reg_block = this->work_x_block_1;
             x_reg_block.assign(x_reg);
