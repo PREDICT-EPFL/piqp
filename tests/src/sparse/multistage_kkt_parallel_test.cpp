@@ -104,6 +104,44 @@ void test_solve_multiply(Data<T, I>& data, Settings<T> settings1, Settings<T> se
     }
 }
 
+template<typename PIQPSolver1, typename PIQPSolver2>
+void test_solve_qp(Model<T, I>& model, PIQPSolver1& solver1, PIQPSolver2& solver2)
+{
+    // setup and solve
+    solver1.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+    solver2.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    solver1.solve();
+    solver2.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(solver1.result().info.status, solver2.result().info.status);
+    ASSERT_EQ(solver1.result().info.iter, solver2.result().info.iter);
+    if (solver1.result().info.status == PIQP_SOLVED) {
+        ASSERT_TRUE(solver1.result().x.isApprox(solver2.result().x, 1e-8));
+        ASSERT_TRUE(solver1.result().y.isApprox(solver2.result().y, 1e-8));
+        ASSERT_TRUE(solver1.result().z_l.isApprox(solver2.result().z_l, 1e-8));
+        ASSERT_TRUE(solver1.result().z_u.isApprox(solver2.result().z_u, 1e-8));
+    }
+
+    // update and solve
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    solver1.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+    solver2.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+    solver1.solve();
+    solver2.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(solver1.result().info.status, solver2.result().info.status);
+    ASSERT_EQ(solver1.result().info.iter, solver2.result().info.iter);
+    if (solver1.result().info.status == PIQP_SOLVED) {
+        ASSERT_TRUE(solver1.result().x.isApprox(solver2.result().x, 1e-8));
+        ASSERT_TRUE(solver1.result().y.isApprox(solver2.result().y, 1e-8));
+        ASSERT_TRUE(solver1.result().z_l.isApprox(solver2.result().z_l, 1e-8));
+        ASSERT_TRUE(solver1.result().z_u.isApprox(solver2.result().z_u, 1e-8));
+    }
+}
 
 
 TEST(BlocksparseStageParallelKKTTest, FactorizeSolveSQPBlocksize1)
@@ -207,6 +245,19 @@ TEST_P(BlocksparseStageParallelKKTTest, FactorizeSolveSQP)
 
     test_solve_multiply(data, settings_sparse, settings_multistage_parallel, kkt_sparse, kkt_multistage_parallel);
     test_solve_multiply(data, settings_multistage_serial, settings_multistage_parallel, kkt_multistage_serial, kkt_multistage_parallel);
+}
+
+TEST_P(BlocksparseStageParallelKKTTest, SolveQP)
+{
+    std::string path = "data/" + GetParam() + ".mat";
+    Model<T, I> model = load_sparse_model<T, I>(path);
+
+    SparseSolver<T, I> solver_multistage;
+    solver_multistage.settings().kkt_solver = KKTSolver::sparse_multistage;
+    SparseSolver<T, I> solver_multistage_parallel;
+    solver_multistage_parallel.settings().kkt_solver = KKTSolver::sparse_multistage_parallel;
+
+    test_solve_qp(model, solver_multistage, solver_multistage_parallel);
 }
 
 INSTANTIATE_TEST_SUITE_P(FromFolder, BlocksparseStageParallelKKTTest,
