@@ -15,6 +15,9 @@
 #include "piqp/sparse/kkt.hpp"
 #ifdef PIQP_HAS_BLASFEO
 #include "piqp/sparse/multistage_kkt.hpp"
+#ifdef PIQP_HAS_OPENMP
+#include "piqp/sparse/multistage_parallel_kkt.hpp"
+#endif
 #endif
 #include "piqp/utils/tracy.hpp"
 
@@ -87,6 +90,11 @@ bool init_kkt_solver_impl(const sparse::Data<T, I>& data, const Settings<T>& set
 		case KKTSolver::sparse_multistage:
 			kkt_solver = std::make_unique<sparse::MultistageKKT<T, I>>(data);
 			break;
+#ifdef PIQP_HAS_OPENMP
+		case KKTSolver::sparse_multistage_parallel:
+			kkt_solver = std::make_unique<sparse::MultistageParallelKKT<T, I>>(data);
+			break;
+#endif
 #endif
 		default:
 			piqp_eprint("kkt solver not supported\n");

@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "piqp/sparse/multistage_kkt.hpp"
+#include "piqp/utils/blasfeo_wrapper.hpp"
 #include "piqp/sparse/blocksparse/block_kkt_parallel.hpp"
 #ifdef PIQP_HAS_OPENMP
 #include "omp.h"
@@ -167,13 +168,13 @@ namespace sparse
         }
 
 
-        void init_kkt_fac() override
+        void init_kkt_fac()
         {
             PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::init_kkt_fac");
             construct_kkt_fac<true>(this->work_x);
         }
 
-        void populate_kkt_fac(const Vec<T>& x_reg) override
+        void populate_kkt_fac(const Vec<T>& x_reg)
         {
             PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::populate_kkt_fac");
             construct_kkt_fac<false>(x_reg);
@@ -779,7 +780,7 @@ namespace sparse
 
 
 
-        void factor_kkt() override {
+        void factor_kkt() {
             auto& sub_blocks = kkt_fac_parallel.sub_blocks;
             const I arrow_width = this->block_info.back().diag_size;
 
@@ -1006,7 +1007,7 @@ namespace sparse
         }
 
 
-        void solve_llt_in_place(BlockVec& b_and_x) override
+        void solve_llt_in_place(BlockVec& b_and_x)
         {
             PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place");
             solve_llt_in_place_forward(b_and_x);
