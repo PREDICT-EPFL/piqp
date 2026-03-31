@@ -111,7 +111,7 @@ static void BM_ROBOT_ARM_SQP_MULTISTAGE_KKT(benchmark::State& state)
 
     for (auto _ : state)
     {
-        solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+        // solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
         solver.solve();
     }
 }
@@ -135,13 +135,6 @@ static void BM_ROBOT_ARM_SQP_MULTISTAGE_PARALLEL_KKT(benchmark::State& state)
 static void BM_CHAIN_MASS_SQP_MULTISTAGE_KKT(benchmark::State& state)
 {
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
-    // const size_t new_nx = 644;
-    // model.A = model.A.leftCols(new_nx);
-    // model.G = model.G.leftCols(new_nx);
-    // model.P = model.P.topLeftCorner(new_nx, new_nx);
-    // model.c = model.c.head(new_nx);
-    // model.x_u = model.x_u.head(new_nx);
-    // model.x_l = model.x_l.head(new_nx);
     piqp::SparseSolver<T, I> solver;
     solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage;
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
@@ -157,13 +150,6 @@ static void BM_CHAIN_MASS_SQP_MULTISTAGE_KKT(benchmark::State& state)
 static void BM_CHAIN_MASS_SQP_MULTISTAGE_PARALLEL_KKT(benchmark::State& state)
 {
     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
-    // const size_t new_nx = 644;
-    // model.A = model.A.leftCols(new_nx);
-    // model.G = model.G.leftCols(new_nx);
-    // model.P = model.P.topLeftCorner(new_nx, new_nx);
-    // model.c = model.c.head(new_nx);
-    // model.x_u = model.x_u.head(new_nx);
-    // model.x_l = model.x_l.head(new_nx);
     piqp::SparseSolver<T, I> solver;
     solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage_parallel;
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
