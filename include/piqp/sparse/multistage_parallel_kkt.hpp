@@ -1,51 +1,13 @@
 #ifndef PIQP_MULTISTAGE_PARALLEL_KKT_H
 #define PIQP_MULTISTAGE_PARALLEL_KKT_H
 
+#include <algorithm>
+
 #include "piqp/sparse/multistage_kkt.hpp"
 #include "piqp/sparse/blocksparse/block_kkt_parallel.hpp"
 #ifdef PIQP_HAS_OPENMP
 #include "omp.h"
 #endif
-
-
-__attribute__((constructor))
-inline void setup_omp_options() {
-#ifdef PIQP_HAS_OPENMP
-
-    omp_set_dynamic(0); // disable dynamic teams
-    omp_set_schedule(omp_sched_static, 0); // fix scheduling method
-
-    // Print the number of threads being used
-    // piqp_print("OpenMP: Using %d threads.\n", omp_get_max_threads());
-
-    // Bind threads onto cores
-#ifdef __linux__
-    if (setenv("OMP_DISPLAY_ENV", "TRUE", 1) != 0) {
-        piqp_eprint("Error setting OMP_DISPLAY_ENV\n");
-    }
-    if (setenv("OMP_WAIT_POLICY", "ACTIVE", 1) != 0) {
-        piqp_eprint("Error setting OMP_WAIT_POLICY\n");
-    }
-
-#pragma omp parallel num_threads(omp_get_max_threads())
-    {
-        int tid = omp_get_thread_num();
-        cpu_set_t cpuset;
-        CPU_ZERO(&cpuset);
-        CPU_SET(tid, &cpuset);
-
-        if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) < 0) {
-            piqp_eprint("Failed to set thread affinity for thread %d\n", tid);
-        }
-        // piqp_print("Thread %d running on CPU %d\n", tid, sched_getcpu());
-    }
-#else
-    piqp_print("Cannot bind threads onto cores. The performance might be considerably compromised.\n");
-#endif
-#endif
-}
-
-
 
 namespace piqp
 {
@@ -59,7 +21,9 @@ namespace sparse
     protected:
         static_assert(std::is_same<T, double>::value, "sparse_multistage_parallel only supports doubles");
 
-        // For parallel factorization
+        // Max threads available from the current OpenMP environment.
+        size_t max_num_threads = 1;
+        // Solver-local thread count for KKT factorization and triangular solves.
         size_t kkt_solve_num_threads = 0;
         BlockKKTParallel kkt_fac_parallel;
         std::vector<size_t> pivots;
@@ -75,16 +39,13 @@ namespace sparse
         }
 
         void init() {
-            kkt_solve_num_threads = static_cast<size_t>(omp_get_max_threads());
-            if (omp_get_max_threads() <= 1) {
-                throw std::runtime_error("Number of threads must be greater than 1 when using Multistage Parallel KKT solver.");
-            }
-            if (this->block_info.size() - 1 <= 2 * kkt_solve_num_threads) {
-                throw std::runtime_error("The multistage problem's horizon is too short for given number thread to use parallel multistage kkt solver. Please decrease the number of threads of use serial solver instead.");
-            }
-            omp_set_num_threads(static_cast<int>(kkt_solve_num_threads));
-
-            // setup_omp_options();
+#ifdef PIQP_HAS_OPENMP
+            const int max_threads = omp_get_max_threads();
+#else
+            const int max_threads = 1;
+#endif
+            max_num_threads = static_cast<size_t>(std::max(1, max_threads));
+            kkt_solve_num_threads = max_num_threads;
 
             generate_partitions();  // Generate partitions for multi-threads
             init_kkt_fac();
@@ -97,14 +58,6 @@ namespace sparse
             }
 
         }
-
-        /**
-         * @brief This constructor function is automatically executed when the library is loaded.
-         *
-         * It runs before the user's main() function (if dynamically linked at startup)
-         * and definitely before any of your solver's functions are called.
-         * This is the correct place to configure the OpenMP environment.
-         */
 
         void generate_partitions() {
             pivots.clear();
@@ -124,7 +77,20 @@ namespace sparse
             }
 
             if (idx_empty_off_diag_blocks.size() <= 1) {
+                const size_t max_possible_threads = (N > 1) ? std::max<size_t>(1, (N - 1) / 2) : size_t(1);
+                if (kkt_solve_num_threads > max_possible_threads) {
+                    piqp_eprint("Warning: multistage parallel KKT requested %zu OpenMP threads for %zu stages; using %zu threads for KKT factorization/solve instead.\n",
+                                kkt_solve_num_threads, N, max_possible_threads);
+                    kkt_solve_num_threads = max_possible_threads;
+                }
                 const size_t P = kkt_solve_num_threads;
+                if (P <= 1) {
+                    std::vector<size_t> segment_i;
+                    segment_i.reserve(N);
+                    for (size_t i = 0; i < N; ++i) { segment_i.push_back(i); }
+                    segments.push_back(segment_i);
+                    return;
+                }
                 // Compute segment size such that first segment is ~19/7 times others
                 T ratio = T(19.0) / T(7.0);  // the optimal ratio of first segment length over intermediate segments lengths
                 T Ni_ideal = T(N - P + 1) / (T(P - 1) + ratio);
@@ -169,13 +135,19 @@ namespace sparse
                 }
             } else {
                 // Scenario MPC, naturally parallelizable structure
-                kkt_solve_num_threads = idx_empty_off_diag_blocks.size();  // TODO: what if too many scenarios? more than number of threads?
+                const size_t max_possible_threads = std::max<size_t>(1, idx_empty_off_diag_blocks.size());
+                if (kkt_solve_num_threads > max_possible_threads) {
+                    piqp_eprint("Warning: multistage parallel KKT requested %zu OpenMP threads for %zu scenario partitions; using %zu threads for KKT factorization/solve instead.\n",
+                                kkt_solve_num_threads, idx_empty_off_diag_blocks.size(), max_possible_threads);
+                    kkt_solve_num_threads = max_possible_threads;
+                }
 
                 std::vector<size_t> pivots_tmp = idx_empty_off_diag_blocks;
                 pivots_tmp.insert(pivots_tmp.begin(), static_cast<size_t>(-1));  // underflows to max size_t
-                for (size_t i = 0; i < pivots_tmp.size() - 1; ++i) {
+                for (size_t i = 0; i < kkt_solve_num_threads; ++i) {
                     std::vector<size_t> segment;
-                    for (size_t j = pivots_tmp[i] + 1; j <= pivots_tmp[i + 1]; ++j) {
+                    const size_t segment_end = (i + 1 < kkt_solve_num_threads) ? pivots_tmp[i + 1] : (N - 1);
+                    for (size_t j = pivots_tmp[i] + 1; j <= segment_end; ++j) {
                         segment.push_back(j);
                     }
                     segments.push_back(segment);
@@ -1290,4 +1262,3 @@ namespace sparse
 }
 
 #endif //PIQP_MULTISTAGE_PARALLEL_KKT_H
-
