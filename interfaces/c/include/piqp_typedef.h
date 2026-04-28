@@ -75,6 +75,8 @@ typedef enum {
 typedef struct {
     piqp_float       rho_init;
     piqp_float       delta_init;
+    piqp_float       rho_eq_factor;
+    piqp_float       delta_eq_factor;
     piqp_float       eps_abs;
     piqp_float       eps_rel;
     piqp_int        check_duality_gap;
@@ -99,6 +101,12 @@ typedef struct {
     piqp_float       iterative_refinement_min_improvement_rate;
     piqp_float       iterative_refinement_static_regularization_eps;
     piqp_float       iterative_refinement_static_regularization_rel;
+    piqp_int         max_init_admm_iter;
+    piqp_float       init_mu_scale;
+    piqp_float       cold_start_alpha;
+    piqp_float       cold_start_sigma;
+    piqp_float       warm_start_sigma;
+    piqp_int        warm_start;
     piqp_int        verbose;
     piqp_int        compute_timings;
 } piqp_settings;
@@ -117,6 +125,7 @@ typedef struct {
     piqp_status status;
 
     piqp_int iter;
+    piqp_int init_admm_iter;
     piqp_float rho;
     piqp_float delta;
     piqp_float mu;

@@ -18,6 +18,7 @@
 #include "piqp/timer.hpp"
 #include "piqp/solver.hpp"
 #include "piqp/sparse/utils.hpp"
+#include "piqp/utils/smoothing.hpp"
 #include "piqp/utils/tracy.hpp"
 
 namespace piqp
@@ -34,6 +35,73 @@ SolverBase<T, I, Preconditioner, MatrixType>::SolverBase()
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::set_warm_start(
+    const CVecRef<T>& x,
+    const optional<CVecRef<T>>& y,
+    const optional<CVecRef<T>>& z_l,
+    const optional<CVecRef<T>>& z_u,
+    const optional<CVecRef<T>>& z_bl,
+    const optional<CVecRef<T>>& z_bu)
+{
+    if (!m_setup_done)
+    {
+        piqp_eprint("Solver not setup yet\n");
+        return;
+    }
+
+    if (x.size() != m_data.n) { piqp_eprint("x has wrong dimensions\n"); return; }
+    if (y.has_value() && y->size() != m_data.p) { piqp_eprint("y has wrong dimensions\n"); return; }
+    if (z_l.has_value() && z_l->size() != m_data.m) { piqp_eprint("z_l has wrong dimensions\n"); return; }
+    if (z_u.has_value() && z_u->size() != m_data.m) { piqp_eprint("z_u has wrong dimensions\n"); return; }
+    if (z_bl.has_value() && z_bl->size() != m_data.n) { piqp_eprint("z_bl has wrong dimensions\n"); return; }
+    if (z_bu.has_value() && z_bu->size() != m_data.n) { piqp_eprint("z_bu has wrong dimensions\n"); return; }
+
+    m_result.x = x;
+
+    // Set equality duals
+    if (y.has_value()) {
+        m_result.y = *y;
+    } else {
+        m_result.y.setZero();
+    }
+
+    // Set inequality duals
+    if (z_l.has_value()) {
+        m_result.z_l = *z_l;
+    } else {
+        m_result.z_l.setZero();
+    }
+    if (z_u.has_value()) {
+        m_result.z_u = *z_u;
+    } else {
+        m_result.z_u.setZero();
+    }
+
+    // Set bound duals
+    if (z_bl.has_value()) {
+        m_result.z_bl = *z_bl;
+    } else {
+        m_result.z_bl.setZero();
+    }
+    if (z_bu.has_value()) {
+        m_result.z_bu = *z_bu;
+    } else {
+        m_result.z_bu.setZero();
+    }
+
+    // Slacks are computed from x in init_warm_start, no need to set here.
+    m_warm_start_has_y = y.has_value();
+    m_warm_start_has_z = z_l.has_value() || z_u.has_value()
+                         || z_bl.has_value() || z_bu.has_value();
+    m_warm_start_from_solve = false;
+
+    // Mark as having a valid warm-start point
+    m_result.info.status = Status::PIQP_SOLVED;
+    m_first_run = false;
+    m_settings.warm_start = true;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
 Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::solve");
@@ -43,7 +111,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
         piqp_print("----------------------------------------------------------\n");
         piqp_print("                        PIQP v0.6.2                       \n");
         piqp_print("                    (c) Roland Schwan                     \n");
-        piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2025   \n");
+        piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2026   \n");
         piqp_print("----------------------------------------------------------\n");
         if (MatrixType == PIQP_DENSE)
         {
@@ -110,6 +178,10 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
         }
     }
 
+    // After a successful solve, the full primal-dual solution is available for warm starting
+    m_warm_start_from_solve = (status == Status::PIQP_SOLVED);
+    m_warm_start_has_y = m_warm_start_from_solve;
+    m_warm_start_has_z = m_warm_start_from_solve;
     m_first_run = false;
 
     return status;
@@ -391,8 +463,12 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
     m_result.info.kkt_factor_time = 0;
     m_result.info.kkt_solve_time = 0;
 
+    bool use_warm_start = m_settings.warm_start && !m_first_run
+                          && m_result.info.status == Status::PIQP_SOLVED;
+
     m_result.info.status = Status::PIQP_UNSOLVED;
     m_result.info.iter = 0;
+    m_result.info.init_admm_iter = 0;
     m_result.info.reg_limit = m_settings.reg_lower_limit;
     m_result.info.factor_retires = 0;
     m_result.info.no_primal_update = 0;
@@ -403,92 +479,34 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
     m_result.info.rho = m_settings.rho_init;
     m_result.info.delta = m_settings.delta_init;
 
-    // Infinite bounds have never active constraints.
-    // Note that we set for all inactive constraints
-    // z = 0 as well as s = 0. To be correct, we should
-    // have s = Inf. But keeping it zero, simplifies calculations
-    // down the road (e.g. norm calculations).
-    // We are correcting this at the end when we restore the solution.
-    m_result.s_l.setZero();
-    m_result.s_u.setZero();
-    m_result.z_l.setZero();
-    m_result.z_u.setZero();
-    for (isize i = 0; i < m_data.n_h_l; i++)
+    // For equality-only problems, scale rho and delta down
+    if (m_data.m + m_data.n_x_l + m_data.n_x_u == 0)
     {
-        Eigen::Index idx = m_data.h_l_idx(i);
-        m_result.s_l(idx) = T(1);
-        m_result.z_l(idx) = T(1);
+        m_result.info.rho = (std::max)(m_settings.rho_init * m_settings.rho_eq_factor, m_settings.reg_lower_limit);
+        m_result.info.delta = (std::max)(m_settings.delta_init * m_settings.delta_eq_factor, m_settings.reg_lower_limit);
     }
-    for (isize i = 0; i < m_data.n_h_u; i++)
-    {
-        Eigen::Index idx = m_data.h_u_idx(i);
-        m_result.s_u(idx) = T(1);
-        m_result.z_u(idx) = T(1);
-    }
-
-    // all finite bounds are stored in the head
-    m_result.s_bl.head(m_data.n_x_l).setConstant(T(1));
-    m_result.s_bu.head(m_data.n_x_u).setConstant(T(1));
-    m_result.z_bl.head(m_data.n_x_l).setConstant(T(1));
-    m_result.z_bu.head(m_data.n_x_u).setConstant(T(1));
 
     m_enable_iterative_refinement = m_settings.iterative_refinement_always_enabled;
 
-
-    if (m_settings.compute_timings)
+    if (use_warm_start)
     {
-        timer.start();
-    }
-    while (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
-                                                    m_result.info.rho, m_result.info.delta, m_result))
-    {
-        if (!m_enable_iterative_refinement)
+        Status warm_status = init_warm_start();
+        if (warm_status != Status::PIQP_UNSOLVED)
         {
-            m_enable_iterative_refinement = true;
-        }
-        else if (m_result.info.factor_retires < m_settings.max_factor_retires)
-        {
-            m_result.info.delta *= 100;
-            m_result.info.rho *= 100;
-            m_result.info.factor_retires++;
-            m_result.info.reg_limit = (std::min)(10 * m_result.info.reg_limit, m_settings.eps_abs);
-        }
-        else
-        {
-            m_result.info.status = Status::PIQP_NUMERICS;
-            return m_result.info.status;
+            return warm_status;
         }
     }
-    m_result.info.factor_retires = 0;
-    if (m_settings.compute_timings)
+    else
     {
-        T kkt_factor_time = timer.stop();
-        m_result.info.kkt_factor_time += kkt_factor_time;
-    }
-
-    res.x = -m_data.c;
-    res.y = m_data.b;
-    res.z_l = -m_data.h_l;
-    res.z_u = m_data.h_u;
-    res.z_bl = -m_data.x_l;
-    res.z_bu = m_data.x_u;
-    res.s_l.setZero();
-    res.s_u.setZero();
-    res.s_bl.setZero();
-    res.s_bu.setZero();
-
-    if (m_settings.compute_timings) {
-        timer.start();
-    }
-    m_kkt_system.solve(m_data, m_settings, res, m_result);
-    if (m_settings.compute_timings)
-    {
-        T kkt_solve_time = timer.stop();
-        m_result.info.kkt_solve_time += kkt_solve_time;
+        Status cold_status = init_cold_start();
+        if (cold_status != Status::PIQP_UNSOLVED)
+        {
+            return cold_status;
+        }
     }
 
     // We make an Eigen expression for convenience. Note that we are doing it after
-    // the first solve since m_kkt_system.solve might swap internal pointers in m_result
+    // init_cold_start since m_kkt_system.solve might swap internal pointers in m_result
     // which can invalidate the reference in the Eigen expression.
     auto s_bl = m_result.s_bl.head(m_data.n_x_l);
     auto s_bu = m_result.s_bu.head(m_data.n_x_u);
@@ -496,74 +514,6 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
     auto z_bu = m_result.z_bu.head(m_data.n_x_u);
     auto nu_bl = prox_vars.z_bl.head(m_data.n_x_l);
     auto nu_bu = prox_vars.z_bu.head(m_data.n_x_u);
-
-    if (m_data.m + m_data.n_x_l + m_data.n_x_u > 0)
-    {
-        T delta_s = T(0);
-        if (m_data.m > 0) {
-            delta_s = (std::max)(delta_s, -m_result.s_l.minCoeff());
-            delta_s = (std::max)(delta_s, -m_result.s_u.minCoeff());
-        }
-        if (m_data.n_x_l > 0) delta_s = (std::max)(delta_s, -s_bl.minCoeff());
-        if (m_data.n_x_u > 0) delta_s = (std::max)(delta_s, -s_bu.minCoeff());
-        T delta_z = T(0);
-        if (m_data.m > 0) {
-            delta_z = (std::max)(delta_z, -m_result.z_l.minCoeff());
-            delta_z = (std::max)(delta_z, -m_result.z_u.minCoeff());
-        }
-        if (m_data.n_x_l > 0) delta_z = (std::max)(delta_z, -z_bl.minCoeff());
-        if (m_data.n_x_u > 0) delta_z = (std::max)(delta_z, -z_bu.minCoeff());
-
-        for (isize i = 0; i < m_data.n_h_l; i++)
-        {
-            Eigen::Index idx = m_data.h_l_idx(i);
-            m_result.s_l(idx) += delta_s;
-            m_result.z_l(idx) += delta_z;
-        }
-        for (isize i = 0; i < m_data.n_h_u; i++)
-        {
-            Eigen::Index idx = m_data.h_u_idx(i);
-            m_result.s_u(idx) += delta_s;
-            m_result.z_u(idx) += delta_z;
-        }
-        s_bl.array() += delta_s;
-        s_bu.array() += delta_s;
-        z_bl.array() += delta_z;
-        z_bu.array() += delta_z;
-
-        m_result.info.mu = (std::max)(calculate_mu(), T(1e-10));
-
-        for (isize i = 0; i < m_data.n_h_l; i++)
-        {
-            Eigen::Index idx = m_data.h_l_idx(i);
-
-            T c = m_result.z_l(idx) - delta_z;
-            m_result.z_l(idx) = (c + std::sqrt(c * c + 4 * m_result.info.mu)) / 2;
-            m_result.s_l(idx) = m_result.z_l(idx) - c;
-        }
-        for (isize i = 0; i < m_data.n_h_u; i++)
-        {
-            Eigen::Index idx = m_data.h_u_idx(i);
-
-            T c = m_result.z_u(idx) - delta_z;
-            m_result.z_u(idx) = (c + std::sqrt(c * c + 4 * m_result.info.mu)) / 2;
-            m_result.s_u(idx) = m_result.z_u(idx) - c;
-        }
-        for (isize i = 0; i < m_data.n_x_l; i++)
-        {
-            T c = m_result.z_bl(i) - delta_z;
-            m_result.z_bl(i) = (c + std::sqrt(c * c + 4 * m_result.info.mu)) / 2;
-            m_result.s_bl(i) = m_result.z_bl(i) - c;
-        }
-        for (isize i = 0; i < m_data.n_x_u; i++)
-        {
-            T c = m_result.z_bu(i) - delta_z;
-            m_result.z_bu(i) = (c + std::sqrt(c * c + 4 * m_result.info.mu)) / 2;
-            m_result.s_bu(i) = m_result.z_bu(i) - c;
-        }
-
-        m_result.info.mu = calculate_mu();
-    }
 
     prox_vars.x = m_result.x;
     prox_vars.y = m_result.y;
@@ -583,20 +533,40 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
 
         if (m_settings.verbose)
         {
-            piqp_print("%3zd   % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.4f   %.4f\n",
-                m_result.info.iter,
-                static_cast<double>(m_result.info.primal_obj),
-                static_cast<double>(m_result.info.dual_obj),
-                static_cast<double>(m_result.info.duality_gap),
-                static_cast<double>(m_result.info.primal_res),
-                static_cast<double>(m_result.info.dual_res),
-                static_cast<double>(m_result.info.rho),
-                static_cast<double>(m_result.info.delta),
-                static_cast<double>(m_result.info.mu),
-                static_cast<double>(m_result.info.primal_step),
-                static_cast<double>(m_result.info.dual_step)
-            );
-            fflush(stdout);
+            if (m_result.info.iter == 0)
+            {
+                piqp_print("%2zd|0  % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.4f   %.4f\n",
+                    m_result.info.init_admm_iter,
+                    static_cast<double>(m_result.info.primal_obj),
+                    static_cast<double>(m_result.info.dual_obj),
+                    static_cast<double>(m_result.info.duality_gap),
+                    static_cast<double>(m_result.info.primal_res),
+                    static_cast<double>(m_result.info.dual_res),
+                    static_cast<double>(m_result.info.rho),
+                    static_cast<double>(m_result.info.delta),
+                    static_cast<double>(m_result.info.mu),
+                    static_cast<double>(m_result.info.primal_step),
+                    static_cast<double>(m_result.info.dual_step)
+                );
+                fflush(stdout);
+            }
+            else
+            {
+                piqp_print("%4zd  % .5e   % .5e   %.5e   %.5e   %.5e   %.3e   %.3e   %.3e   %.4f   %.4f\n",
+                    m_result.info.iter,
+                    static_cast<double>(m_result.info.primal_obj),
+                    static_cast<double>(m_result.info.dual_obj),
+                    static_cast<double>(m_result.info.duality_gap),
+                    static_cast<double>(m_result.info.primal_res),
+                    static_cast<double>(m_result.info.dual_res),
+                    static_cast<double>(m_result.info.rho),
+                    static_cast<double>(m_result.info.delta),
+                    static_cast<double>(m_result.info.mu),
+                    static_cast<double>(m_result.info.primal_step),
+                    static_cast<double>(m_result.info.dual_step)
+                );
+                fflush(stdout);
+            }
         }
 
         if ((m_result.info.primal_res < m_settings.eps_abs || m_result.info.primal_res_rel < m_settings.eps_rel) &&
@@ -1137,11 +1107,11 @@ T SolverBase<T, I, Preconditioner, MatrixType>::primal_res_nr()
     inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res_nr.z_u).template lpNorm<Eigen::Infinity>());
     for (isize i = 0; i < m_data.n_x_l; i++)
     {
-        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_bl(i), m_data.x_l_idx(i)));
+        inf = (std::max)(inf, std::abs(m_preconditioner.unscale_primal_res_b_i(res_nr.z_bl(i), m_data.x_l_idx(i))));
     }
     for (isize i = 0; i < m_data.n_x_u; i++)
     {
-        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res_nr.z_bu(i), m_data.x_u_idx(i)));
+        inf = (std::max)(inf, std::abs(m_preconditioner.unscale_primal_res_b_i(res_nr.z_bu(i), m_data.x_u_idx(i))));
     }
     return inf;
 }
@@ -1156,11 +1126,11 @@ T SolverBase<T, I, Preconditioner, MatrixType>::primal_res_r()
     inf = (std::max)(inf, m_preconditioner.unscale_primal_res_ineq(res.z_u).template lpNorm<Eigen::Infinity>());
     for (isize i = 0; i < m_data.n_x_l; i++)
     {
-        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res.z_bl(i), m_data.x_l_idx(i)));
+        inf = (std::max)(inf, std::abs(m_preconditioner.unscale_primal_res_b_i(res.z_bl(i), m_data.x_l_idx(i))));
     }
     for (isize i = 0; i < m_data.n_x_u; i++)
     {
-        inf = (std::max)(inf, m_preconditioner.unscale_primal_res_b_i(res.z_bu(i), m_data.x_u_idx(i)));
+        inf = (std::max)(inf, std::abs(m_preconditioner.unscale_primal_res_b_i(res.z_bu(i), m_data.x_u_idx(i))));
     }
     return inf;
 }
@@ -1175,11 +1145,11 @@ T SolverBase<T, I, Preconditioner, MatrixType>::primal_prox_inf()
     inf = (std::max)(inf, m_preconditioner.unscale_dual_ineq(prox_vars.z_u - m_result.z_u).template lpNorm<Eigen::Infinity>());
     for (isize i = 0; i < m_data.n_x_l; i++)
     {
-        inf = (std::max)(inf, m_preconditioner.unscale_dual_b_i(prox_vars.z_bl(i) - m_result.z_bl(i), m_data.x_l_idx(i)));
+        inf = (std::max)(inf, std::abs(m_preconditioner.unscale_dual_b_i(prox_vars.z_bl(i) - m_result.z_bl(i), m_data.x_l_idx(i))));
     }
     for (isize i = 0; i < m_data.n_x_u; i++)
     {
-        inf = (std::max)(inf, m_preconditioner.unscale_dual_b_i(prox_vars.z_bu(i) - m_result.z_bu(i), m_data.x_u_idx(i)));
+        inf = (std::max)(inf, std::abs(m_preconditioner.unscale_dual_b_i(prox_vars.z_bu(i) - m_result.z_bu(i), m_data.x_u_idx(i))));
     }
     return inf;
 }
@@ -1209,6 +1179,386 @@ T SolverBase<T, I, Preconditioner, MatrixType>::dual_prox_inf()
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
+T SolverBase<T, I, Preconditioner, MatrixType>::init_compute_mu()
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::init_compute_mu");
+
+    auto s_bl = m_result.s_bl.head(m_data.n_x_l);
+    auto s_bu = m_result.s_bu.head(m_data.n_x_u);
+    auto z_bl = m_result.z_bl.head(m_data.n_x_l);
+    auto z_bu = m_result.z_bu.head(m_data.n_x_u);
+
+    // Project s and z into the non-negative cone, then average complementarity
+    T delta_s = T(0);
+    if (m_data.m > 0) {
+        delta_s = (std::max)(delta_s, -m_result.s_l.minCoeff());
+        delta_s = (std::max)(delta_s, -m_result.s_u.minCoeff());
+    }
+    if (m_data.n_x_l > 0) delta_s = (std::max)(delta_s, -s_bl.minCoeff());
+    if (m_data.n_x_u > 0) delta_s = (std::max)(delta_s, -s_bu.minCoeff());
+
+    T delta_z = T(0);
+    if (m_data.m > 0) {
+        delta_z = (std::max)(delta_z, -m_result.z_l.minCoeff());
+        delta_z = (std::max)(delta_z, -m_result.z_u.minCoeff());
+    }
+    if (m_data.n_x_l > 0) delta_z = (std::max)(delta_z, -z_bl.minCoeff());
+    if (m_data.n_x_u > 0) delta_z = (std::max)(delta_z, -z_bu.minCoeff());
+
+    T sum_mu = T(0);
+    for (isize i = 0; i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        sum_mu += (m_result.s_l(idx) + delta_s) * (m_result.z_l(idx) + delta_z);
+    }
+    for (isize i = 0; i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        sum_mu += (m_result.s_u(idx) + delta_s) * (m_result.z_u(idx) + delta_z);
+    }
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        sum_mu += (s_bl(i) + delta_s) * (z_bl(i) + delta_z);
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        sum_mu += (s_bu(i) + delta_s) * (z_bu(i) + delta_z);
+    }
+    return (std::max)(sum_mu / T(m_data.n_h_l + m_data.n_h_u + m_data.n_x_l + m_data.n_x_u), T(1e-10));
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::apply_smoothing(T sigma, T mu, const Variables<T>& s_kp1, const Variables<T>& z_k)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::apply_smoothing");
+
+    for (isize i = 0; i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        nonneg_smoothing(sigma, mu, s_kp1.s_l(idx) - z_k.z_l(idx) / sigma, m_result.s_l(idx), m_result.z_l(idx));
+    }
+    for (isize i = 0; i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        nonneg_smoothing(sigma, mu, s_kp1.s_u(idx) - z_k.z_u(idx) / sigma, m_result.s_u(idx), m_result.z_u(idx));
+    }
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        nonneg_smoothing(sigma, mu, s_kp1.s_bl(i) - z_k.z_bl(i) / sigma, m_result.s_bl(i), m_result.z_bl(i));
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        nonneg_smoothing(sigma, mu, s_kp1.s_bu(i) - z_k.z_bu(i) / sigma, m_result.s_bu(i), m_result.z_bu(i));
+    }
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::init_cold_start()
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::init_cold_start");
+
+    // Infinite bounds have never active constraints.
+    // Note that we set for all inactive constraints
+    // z = 0 as well as s = 0. To be correct, we should
+    // have s = Inf. But keeping it zero, simplifies calculations
+    // down the road (e.g. norm calculations).
+    // We are correcting this at the end when we restore the solution.
+    m_result.x.setZero();
+    m_result.y.setZero();
+    m_result.s_l.setZero();
+    m_result.s_u.setZero();
+    m_result.s_bl.setZero();
+    m_result.s_bu.setZero();
+    m_result.z_l.setZero();
+    m_result.z_u.setZero();
+    m_result.z_bl.setZero();
+    m_result.z_bu.setZero();
+
+    T s_guess = m_settings.cold_start_alpha;
+    T z_guess = m_settings.cold_start_alpha;
+    for (isize i = 0; i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        m_result.s_l(idx) = s_guess;
+        m_result.z_l(idx) = z_guess;
+    }
+    for (isize i = 0; i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        m_result.s_u(idx) = s_guess;
+        m_result.z_u(idx) = z_guess;
+    }
+    m_result.s_bl.head(m_data.n_x_l).setConstant(s_guess);
+    m_result.s_bu.head(m_data.n_x_u).setConstant(s_guess);
+    m_result.z_bl.head(m_data.n_x_l).setConstant(z_guess);
+    m_result.z_bu.head(m_data.n_x_u).setConstant(z_guess);
+
+    return init_from_guess(m_settings.cold_start_sigma);
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::init_warm_start()
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::init_warm_start");
+
+    // Scale the unscaled warm-start point into the current preconditioner's space.
+    pack_dual();
+    scale_results();
+
+    if (m_warm_start_from_solve)
+    {
+        update_residuals_nr();
+
+        T mu0 = (std::max)(m_result.info.primal_res, m_result.info.dual_res);
+        mu0 = (std::max)(mu0, T(1e-10));
+
+        apply_smoothing(T(1), mu0, m_result, m_result);
+        m_result.info.mu = calculate_mu();
+
+        // Aggressive proximal parameters when the point is near-optimal
+        if (mu0 <= T(1))
+        {
+            m_result.info.rho = (std::max)(mu0, m_settings.reg_lower_limit);
+            m_result.info.delta = (std::max)(mu0, m_settings.reg_lower_limit);
+        }
+
+        return Status::PIQP_UNSOLVED;
+    }
+
+    // Compute slacks: s_l = Gx - h_l, s_u = h_u - Gx
+    m_result.s_l.setZero();
+    m_result.s_u.setZero();
+    if (m_data.m > 0)
+    {
+        // Use step.z_l as temporary for Gx
+        step.z_l.noalias() = m_data.GT.transpose() * m_result.x;
+        for (isize i = 0; i < m_data.n_h_l; i++)
+        {
+            Eigen::Index idx = m_data.h_l_idx(i);
+            m_result.s_l(idx) = step.z_l(idx) - m_data.h_l(idx);
+        }
+        for (isize i = 0; i < m_data.n_h_u; i++)
+        {
+            Eigen::Index idx = m_data.h_u_idx(i);
+            m_result.s_u(idx) = m_data.h_u(idx) - step.z_l(idx);
+        }
+    }
+    // s_bl = x_b_scaling * x - x_l, s_bu = x_u - x_b_scaling * x
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        Eigen::Index idx = m_data.x_l_idx(i);
+        m_result.s_bl(i) = m_data.x_b_scaling(idx) * m_result.x(idx) - m_data.x_l(i);
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        Eigen::Index idx = m_data.x_u_idx(i);
+        m_result.s_bu(i) = m_data.x_u(i) - m_data.x_b_scaling(idx) * m_result.x(idx);
+    }
+
+    return init_from_guess(m_settings.warm_start_sigma);
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::init_from_guess(T sigma)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::init_from_guess");
+
+    step.s_l.setZero();
+    step.s_u.setZero();
+    step.z_l.setZero();
+    step.z_u.setZero();
+    for (isize i = 0; i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        step.s_l(idx) = T(1);
+        step.z_l(idx) = sigma;
+    }
+    for (isize i = 0; i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        step.s_u(idx) = T(1);
+        step.z_u(idx) = sigma;
+    }
+    step.s_bl.head(m_data.n_x_l).setConstant(T(1));
+    step.s_bu.head(m_data.n_x_u).setConstant(T(1));
+    step.z_bl.head(m_data.n_x_l).setConstant(sigma);
+    step.z_bu.head(m_data.n_x_u).setConstant(sigma);
+
+    Timer<T> timer;
+    if (m_settings.compute_timings)
+    {
+        timer.start();
+    }
+    while (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
+                                                    m_result.info.rho, m_result.info.delta, step))
+    {
+        if (!m_enable_iterative_refinement)
+        {
+            m_enable_iterative_refinement = true;
+        }
+        else if (m_result.info.factor_retires < m_settings.max_factor_retires)
+        {
+            m_result.info.delta *= 100;
+            m_result.info.rho *= 100;
+            m_result.info.factor_retires++;
+            m_result.info.reg_limit = (std::min)(10 * m_result.info.reg_limit, m_settings.eps_abs);
+        }
+        else
+        {
+            m_result.info.status = Status::PIQP_NUMERICS;
+            return m_result.info.status;
+        }
+    }
+    m_result.info.factor_retires = 0;
+    if (m_settings.compute_timings)
+    {
+        T kkt_factor_time = timer.stop();
+        m_result.info.kkt_factor_time += kkt_factor_time;
+    }
+
+    // Initialize nu^0 = z^0
+    prox_vars.z_l = m_result.z_l;
+    prox_vars.z_u = m_result.z_u;
+    prox_vars.z_bl = m_result.z_bl;
+    prox_vars.z_bu = m_result.z_bu;
+
+    T mu = T(0);
+    m_result.info.init_admm_iter = 0;
+
+    for (isize admm_iter = 0; admm_iter < m_settings.max_init_admm_iter; admm_iter++)
+    {
+        m_result.info.init_admm_iter++;
+
+        // At this point:
+        //   m_result.{x, y}  = x^k, y^k
+        //   m_result.s_*     = s_tilde^k
+        //   m_result.z_*     = z^k (ADMM consensus dual)
+        //   prox_vars.z_*    = nu^k (augmented Lagrangian dual)
+
+        // Save z^k into step.z_* for apply_smoothing later
+        step.z_l = m_result.z_l;
+        step.z_u = m_result.z_u;
+        step.z_bl = m_result.z_bl;
+        step.z_bu = m_result.z_bu;
+
+        // Build RHS
+        res.x = -m_data.c + m_result.info.rho * m_result.x;
+        res.y = m_data.b - m_result.info.delta * m_result.y;
+
+        res.z_l.setZero();
+        res.z_u.setZero();
+        for (isize i = 0; i < m_data.n_h_l; i++)
+        {
+            Eigen::Index idx = m_data.h_l_idx(i);
+            res.z_l(idx) = -m_data.h_l(idx) - m_result.info.delta * prox_vars.z_l(idx);
+        }
+        for (isize i = 0; i < m_data.n_h_u; i++)
+        {
+            Eigen::Index idx = m_data.h_u_idx(i);
+            res.z_u(idx) = m_data.h_u(idx) - m_result.info.delta * prox_vars.z_u(idx);
+        }
+        res.z_bl.head(m_data.n_x_l) = -m_data.x_l.head(m_data.n_x_l) - m_result.info.delta * prox_vars.z_bl.head(m_data.n_x_l);
+        res.z_bu.head(m_data.n_x_u) = m_data.x_u.head(m_data.n_x_u) - m_result.info.delta * prox_vars.z_bu.head(m_data.n_x_u);
+
+        res.s_l = sigma * m_result.s_l + m_result.z_l;
+        res.s_u = sigma * m_result.s_u + m_result.z_u;
+        res.s_bl = sigma * m_result.s_bl + m_result.z_bl;
+        res.s_bu = sigma * m_result.s_bu + m_result.z_bu;
+
+        // Solve KKT system (reusing factorization)
+        if (m_settings.compute_timings)
+        {
+            timer.start();
+        }
+        m_kkt_system.solve(m_data, m_settings, res, m_result);
+        if (m_settings.compute_timings)
+        {
+            T kkt_solve_time = timer.stop();
+            m_result.info.kkt_solve_time += kkt_solve_time;
+        }
+
+        if (m_data.m + m_data.n_x_l + m_data.n_x_u > 0)
+        {
+            // Compute mu from the first iteration only (fixes the barrier scale)
+            if (admm_iter == 0)
+            {
+                mu = init_compute_mu() * m_settings.init_mu_scale;
+            }
+
+            // Save nu^{k+1} (in m_result.z_*) before smoothing overwrites it
+            prox_vars.z_l = m_result.z_l;
+            prox_vars.z_u = m_result.z_u;
+            prox_vars.z_bl = m_result.z_bl;
+            prox_vars.z_bu = m_result.z_bu;
+
+            apply_smoothing(sigma, mu, m_result, step);
+            m_result.info.mu = calculate_mu();
+
+            // Check ADMM consensus residual: ||r_c|| = ||z^{k+1} - z^k|| / sigma
+            if (admm_iter < m_settings.max_init_admm_iter - 1)
+            {
+                T consensus_res = T(0);
+                for (isize i = 0; i < m_data.n_h_l; i++)
+                {
+                    Eigen::Index idx = m_data.h_l_idx(i);
+                    consensus_res = (std::max)(consensus_res, std::abs(m_result.z_l(idx) - step.z_l(idx)));
+                }
+                for (isize i = 0; i < m_data.n_h_u; i++)
+                {
+                    Eigen::Index idx = m_data.h_u_idx(i);
+                    consensus_res = (std::max)(consensus_res, std::abs(m_result.z_u(idx) - step.z_u(idx)));
+                }
+                for (isize i = 0; i < m_data.n_x_l; i++)
+                {
+                    consensus_res = (std::max)(consensus_res, std::abs(m_result.z_bl(i) - step.z_bl(i)));
+                }
+                for (isize i = 0; i < m_data.n_x_u; i++)
+                {
+                    consensus_res = (std::max)(consensus_res, std::abs(m_result.z_bu(i) - step.z_bu(i)));
+                }
+                consensus_res /= sigma;
+
+                if (consensus_res <= mu)
+                {
+                    break;
+                }
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return Status::PIQP_UNSOLVED;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::scale_results()
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::scale_results");
+
+    m_result.x = m_preconditioner.scale_primal(m_result.x);
+    m_result.y = m_preconditioner.scale_dual_eq(m_result.y);
+    m_result.z_l = m_preconditioner.scale_dual_ineq(m_result.z_l);
+    m_result.z_u = m_preconditioner.scale_dual_ineq(m_result.z_u);
+    m_result.s_l = m_preconditioner.scale_slack_ineq(m_result.s_l);
+    m_result.s_u = m_preconditioner.scale_slack_ineq(m_result.s_u);
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        Eigen::Index idx = m_data.x_l_idx(i);
+        m_result.z_bl(i) = m_preconditioner.scale_dual_b_i(m_result.z_bl(i), idx);
+        m_result.s_bl(i) = m_preconditioner.scale_slack_b_i(m_result.s_bl(i), idx);
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        Eigen::Index idx = m_data.x_u_idx(i);
+        m_result.z_bu(i) = m_preconditioner.scale_dual_b_i(m_result.z_bu(i), idx);
+        m_result.s_bu(i) = m_preconditioner.scale_slack_b_i(m_result.s_bu(i), idx);
+    }
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
 void SolverBase<T, I, Preconditioner, MatrixType>::unscale_results()
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::unscale_results");
@@ -1230,6 +1580,25 @@ void SolverBase<T, I, Preconditioner, MatrixType>::unscale_results()
         Eigen::Index idx = m_data.x_u_idx(i);
         m_result.z_bu(i) = m_preconditioner.unscale_dual_b_i(m_result.z_bu(i), idx);
         m_result.s_bu(i) = m_preconditioner.unscale_slack_b_i(m_result.s_bu(i), idx);
+    }
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::pack_dual()
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::pack_dual");
+
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        Eigen::Index idx = m_data.x_l_idx(i);
+        std::swap(m_result.z_bl(i), m_result.z_bl(idx));
+        std::swap(m_result.s_bl(i), m_result.s_bl(idx));
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        Eigen::Index idx = m_data.x_u_idx(i);
+        std::swap(m_result.z_bu(i), m_result.z_bu(idx));
+        std::swap(m_result.s_bu(i), m_result.s_bu(idx));
     }
 }
 

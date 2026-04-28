@@ -28,6 +28,8 @@ using SparseSolver = piqp::SparseSolver<double, int>;
 
 const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "delta_init",
+                                      "rho_eq_factor",
+                                      "delta_eq_factor",
                                       "eps_abs",
                                       "eps_rel",
                                       "check_duality_gap",
@@ -52,12 +54,19 @@ const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "iterative_refinement_min_improvement_rate",
                                       "iterative_refinement_static_regularization_eps",
                                       "iterative_refinement_static_regularization_rel",
+                                      "max_init_admm_iter",
+                                      "init_mu_scale",
+                                      "cold_start_alpha",
+                                      "cold_start_sigma",
+                                      "warm_start_sigma",
+                                      "warm_start",
                                       "verbose",
                                       "compute_timings"};
 
 const char* PIQP_INFO_FIELDS[] = {"status",
                                   "status_val",
                                   "iter",
+                                  "init_admm_iter",
                                   "rho",
                                   "delta",
                                   "mu",
@@ -182,6 +191,8 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
 
     mxSetField(mx_ptr, 0, "rho_init", mxCreateDoubleScalar(settings.rho_init));
     mxSetField(mx_ptr, 0, "delta_init", mxCreateDoubleScalar(settings.delta_init));
+    mxSetField(mx_ptr, 0, "rho_eq_factor", mxCreateDoubleScalar(settings.rho_eq_factor));
+    mxSetField(mx_ptr, 0, "delta_eq_factor", mxCreateDoubleScalar(settings.delta_eq_factor));
     mxSetField(mx_ptr, 0, "eps_abs", mxCreateDoubleScalar(settings.eps_abs));
     mxSetField(mx_ptr, 0, "eps_rel", mxCreateDoubleScalar(settings.eps_rel));
     mxSetField(mx_ptr, 0, "check_duality_gap", mxCreateDoubleScalar(settings.check_duality_gap));
@@ -206,6 +217,12 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     mxSetField(mx_ptr, 0, "iterative_refinement_min_improvement_rate", mxCreateDoubleScalar(settings.iterative_refinement_min_improvement_rate));
     mxSetField(mx_ptr, 0, "iterative_refinement_static_regularization_eps", mxCreateDoubleScalar(settings.iterative_refinement_static_regularization_eps));
     mxSetField(mx_ptr, 0, "iterative_refinement_static_regularization_rel", mxCreateDoubleScalar(settings.iterative_refinement_static_regularization_rel));
+    mxSetField(mx_ptr, 0, "max_init_admm_iter", mxCreateDoubleScalar(settings.max_init_admm_iter));
+    mxSetField(mx_ptr, 0, "init_mu_scale", mxCreateDoubleScalar(settings.init_mu_scale));
+    mxSetField(mx_ptr, 0, "cold_start_alpha", mxCreateDoubleScalar(settings.cold_start_alpha));
+    mxSetField(mx_ptr, 0, "cold_start_sigma", mxCreateDoubleScalar(settings.cold_start_sigma));
+    mxSetField(mx_ptr, 0, "warm_start_sigma", mxCreateDoubleScalar(settings.warm_start_sigma));
+    mxSetField(mx_ptr, 0, "warm_start", mxCreateDoubleScalar(settings.warm_start));
     mxSetField(mx_ptr, 0, "verbose", mxCreateDoubleScalar(settings.verbose));
     mxSetField(mx_ptr, 0, "compute_timings", mxCreateDoubleScalar(settings.compute_timings));
 
@@ -216,6 +233,8 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
 {
     settings.rho_init = (double) mxGetScalar(mxGetField(mx_ptr, 0, "rho_init"));
     settings.delta_init = (double) mxGetScalar(mxGetField(mx_ptr, 0, "delta_init"));
+    settings.rho_eq_factor = (double) mxGetScalar(mxGetField(mx_ptr, 0, "rho_eq_factor"));
+    settings.delta_eq_factor = (double) mxGetScalar(mxGetField(mx_ptr, 0, "delta_eq_factor"));
     settings.eps_abs = (double) mxGetScalar(mxGetField(mx_ptr, 0, "eps_abs"));
     settings.eps_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "eps_rel"));
     settings.check_duality_gap = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "check_duality_gap"));
@@ -242,6 +261,12 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
     settings.iterative_refinement_min_improvement_rate = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_min_improvement_rate"));
     settings.iterative_refinement_static_regularization_eps = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_static_regularization_eps"));
     settings.iterative_refinement_static_regularization_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_static_regularization_rel"));
+    settings.max_init_admm_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "max_init_admm_iter"));
+    settings.init_mu_scale = (double) mxGetScalar(mxGetField(mx_ptr, 0, "init_mu_scale"));
+    settings.cold_start_alpha = (double) mxGetScalar(mxGetField(mx_ptr, 0, "cold_start_alpha"));
+    settings.cold_start_sigma = (double) mxGetScalar(mxGetField(mx_ptr, 0, "cold_start_sigma"));
+    settings.warm_start_sigma = (double) mxGetScalar(mxGetField(mx_ptr, 0, "warm_start_sigma"));
+    settings.warm_start = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "warm_start"));
     settings.verbose = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "verbose"));
     settings.compute_timings = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "compute_timings"));
 }
@@ -254,6 +279,7 @@ mxArray* result_to_mx_struct(const piqp::Result<double>& result)
     mxSetField(mx_info_ptr, 0, "status", mxCreateString(piqp::status_to_string(result.info.status)));
     mxSetField(mx_info_ptr, 0, "status_val", mxCreateDoubleScalar((double) result.info.status));
     mxSetField(mx_info_ptr, 0, "iter", mxCreateDoubleScalar((double) result.info.iter));
+    mxSetField(mx_info_ptr, 0, "init_admm_iter", mxCreateDoubleScalar((double) result.info.init_admm_iter));
     mxSetField(mx_info_ptr, 0, "rho", mxCreateDoubleScalar(result.info.rho));
     mxSetField(mx_info_ptr, 0, "delta", mxCreateDoubleScalar(result.info.delta));
     mxSetField(mx_info_ptr, 0, "mu", mxCreateDoubleScalar(result.info.mu));
@@ -445,6 +471,38 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
             Eigen::Map<SparseMat> G(m, n, (Eigen::Index) mxGetNzmax(G_ptr), Gp.data(), Gi.data(), mxGetPr(G_ptr));
 
             mex_handle->as_sparse_ptr()->setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
+        }
+
+        return;
+    }
+
+    if (!strcmp("set_warm_start", cmd)) {
+        const mxArray* x_ptr = prhs[2];
+        const mxArray* y_ptr = prhs[3];
+        const mxArray* z_l_ptr = prhs[4];
+        const mxArray* z_u_ptr = prhs[5];
+        const mxArray* z_bl_ptr = prhs[6];
+        const mxArray* z_bu_ptr = prhs[7];
+
+        int n_ws = (int) mxGetM(x_ptr);
+
+        Eigen::Map<Vec> x(mxGetPr(x_ptr), n_ws);
+
+        piqp::optional<Eigen::Map<Vec>> y;
+        piqp::optional<Eigen::Map<Vec>> z_l;
+        piqp::optional<Eigen::Map<Vec>> z_u;
+        piqp::optional<Eigen::Map<Vec>> z_bl;
+        piqp::optional<Eigen::Map<Vec>> z_bu;
+        if (!mxIsEmpty(y_ptr)) { y = Eigen::Map<Vec>(mxGetPr(y_ptr), (int) mxGetM(y_ptr)); }
+        if (!mxIsEmpty(z_l_ptr)) { z_l = Eigen::Map<Vec>(mxGetPr(z_l_ptr), (int) mxGetM(z_l_ptr)); }
+        if (!mxIsEmpty(z_u_ptr)) { z_u = Eigen::Map<Vec>(mxGetPr(z_u_ptr), (int) mxGetM(z_u_ptr)); }
+        if (!mxIsEmpty(z_bl_ptr)) { z_bl = Eigen::Map<Vec>(mxGetPr(z_bl_ptr), (int) mxGetM(z_bl_ptr)); }
+        if (!mxIsEmpty(z_bu_ptr)) { z_bu = Eigen::Map<Vec>(mxGetPr(z_bu_ptr), (int) mxGetM(z_bu_ptr)); }
+
+        if (mex_handle->isDense()) {
+            mex_handle->as_dense_ptr()->set_warm_start(x, y, z_l, z_u, z_bl, z_bu);
+        } else {
+            mex_handle->as_sparse_ptr()->set_warm_start(x, y, z_l, z_u, z_bl, z_bu);
         }
 
         return;

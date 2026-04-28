@@ -42,6 +42,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def(py::init<>())
         .def_readwrite("status", &piqp::Info<T>::status)
         .def_readwrite("iter", &piqp::Info<T>::iter)
+        .def_readwrite("init_admm_iter", &piqp::Info<T>::init_admm_iter)
         .def_readwrite("rho", &piqp::Info<T>::rho)
         .def_readwrite("delta", &piqp::Info<T>::delta)
         .def_readwrite("mu", &piqp::Info<T>::mu)
@@ -100,6 +101,8 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     py::class_<piqp::Settings<T>>(m, "Settings", py::module_local())
         .def_readwrite("rho_init", &piqp::Settings<T>::rho_init)
         .def_readwrite("delta_init", &piqp::Settings<T>::delta_init)
+        .def_readwrite("rho_eq_factor", &piqp::Settings<T>::rho_eq_factor)
+        .def_readwrite("delta_eq_factor", &piqp::Settings<T>::delta_eq_factor)
         .def_readwrite("eps_abs", &piqp::Settings<T>::eps_abs)
         .def_readwrite("eps_rel", &piqp::Settings<T>::eps_rel)
         .def_readwrite("check_duality_gap", &piqp::Settings<T>::check_duality_gap)
@@ -124,6 +127,12 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("iterative_refinement_min_improvement_rate", &piqp::Settings<T>::iterative_refinement_min_improvement_rate)
         .def_readwrite("iterative_refinement_static_regularization_eps", &piqp::Settings<T>::iterative_refinement_static_regularization_eps)
         .def_readwrite("iterative_refinement_static_regularization_rel", &piqp::Settings<T>::iterative_refinement_static_regularization_rel)
+        .def_readwrite("max_init_admm_iter", &piqp::Settings<T>::max_init_admm_iter)
+        .def_readwrite("init_mu_scale", &piqp::Settings<T>::init_mu_scale)
+        .def_readwrite("cold_start_alpha", &piqp::Settings<T>::cold_start_alpha)
+        .def_readwrite("cold_start_sigma", &piqp::Settings<T>::cold_start_sigma)
+        .def_readwrite("warm_start_sigma", &piqp::Settings<T>::warm_start_sigma)
+        .def_readwrite("warm_start", &piqp::Settings<T>::warm_start)
         .def_readwrite("verbose", &piqp::Settings<T>::verbose)
         .def_readwrite("compute_timings", &piqp::Settings<T>::compute_timings);
 
@@ -168,6 +177,10 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
              py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
              py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
+        .def("set_warm_start", &SparseSolver::set_warm_start,
+             py::arg("x"), py::arg("y") = piqp::nullopt,
+             py::arg("z_l") = piqp::nullopt, py::arg("z_u") = piqp::nullopt,
+             py::arg("z_bl") = piqp::nullopt, py::arg("z_bu") = piqp::nullopt)
         .def("solve", &SparseSolver::solve);
 
     using DenseSolver = piqp::DenseSolver<T>;
@@ -185,6 +198,10 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
              py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
              py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
+        .def("set_warm_start", &DenseSolver::set_warm_start,
+             py::arg("x"), py::arg("y") = piqp::nullopt,
+             py::arg("z_l") = piqp::nullopt, py::arg("z_u") = piqp::nullopt,
+             py::arg("z_bl") = piqp::nullopt, py::arg("z_bu") = piqp::nullopt)
         .def("solve", &DenseSolver::solve);
 
 #ifdef VERSION_INFO

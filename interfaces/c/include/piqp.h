@@ -38,6 +38,11 @@ void piqp_update_sparse(piqp_workspace* workspace,
                         piqp_csc* G, piqp_float* h_l, piqp_float* h_u,
                         piqp_float* x_l, piqp_float* x_u);
 
+void piqp_set_warm_start(piqp_workspace* workspace,
+                         piqp_float* x, piqp_float* y,
+                         piqp_float* z_l, piqp_float* z_u,
+                         piqp_float* z_bl, piqp_float* z_bu);
+
 piqp_status piqp_solve(piqp_workspace* workspace);
 
 void piqp_cleanup(piqp_workspace* workspace);

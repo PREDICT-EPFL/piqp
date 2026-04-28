@@ -163,3 +163,21 @@ This allows the solver to internally reuse memory and factorizations speeding up
 
 {: .warning }
 Note the dimension and sparsity pattern of the problem are not allowed to change when calling the `piqp_update_*` functions.
+
+## Warm Starting
+
+To warm start the solver from the previous solution, enable the `warm_start` setting:
+
+```c
+settings->warm_start = 1;
+```
+
+When enabled, the solver automatically uses the previous solution as a starting point after calling `piqp_update_*` and `piqp_solve`.
+
+You can also manually set a warm start point using
+
+```c
+piqp_set_warm_start(work, x, y, NULL, NULL, NULL, NULL);
+```
+
+where `x` is the primal variable and `y` is the equality dual variable. The last four arguments are optional inequality dual variables (`z_l`, `z_u`, `z_bl`, `z_bu`) — pass `NULL` to use defaults. For more details see the [warm starting documentation]({{site.baseurl}}/api/settings#warm-starting).

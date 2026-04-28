@@ -43,7 +43,10 @@ template<typename T>
 struct Settings
 {
     T rho_init = 1e-6;
-    T delta_init = 1e-4;
+    T delta_init = 1e-6;
+    
+    T rho_eq_factor = 1e-3;
+    T delta_eq_factor = 1e-3;
 
     T eps_abs = 1e-8;
     T eps_rel = 1e-9;
@@ -78,6 +81,14 @@ struct Settings
     T iterative_refinement_static_regularization_eps = 1e-8;
     T iterative_refinement_static_regularization_rel = std::numeric_limits<T>::epsilon() * std::numeric_limits<T>::epsilon();
 
+    isize max_init_admm_iter = 5;
+    T init_mu_scale = 0.05;
+    T cold_start_alpha = 0.7;
+    T cold_start_sigma = 3.0;
+    T warm_start_sigma = 100.0;
+
+    bool warm_start = false;
+
     bool verbose = false;
     bool compute_timings = false;
 
@@ -85,6 +96,8 @@ struct Settings
     {
         return rho_init > 0 &&
                delta_init > 0 &&
+               rho_eq_factor > 0 &&
+               delta_eq_factor > 0 &&
                eps_abs > 0 &&
                eps_rel >= 0 &&
                eps_duality_gap_abs > 0 &&
@@ -102,7 +115,12 @@ struct Settings
                iterative_refinement_max_iter >= 0 &&
                iterative_refinement_min_improvement_rate >= 1.0 &&
                iterative_refinement_static_regularization_eps > 0 &&
-               iterative_refinement_static_regularization_rel >= 0;
+               iterative_refinement_static_regularization_rel >= 0 &&
+               max_init_admm_iter > 0 &&
+               init_mu_scale > 0 &&
+               cold_start_alpha >= 0 &&
+               cold_start_sigma > 0 &&
+               warm_start_sigma > 0;
     }
 };
 

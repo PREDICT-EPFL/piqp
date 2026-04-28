@@ -85,6 +85,7 @@ static void piqp_update_result(piqp_result* result, const piqp::Result<piqp_floa
 
     result->info.status = (piqp_status) solver_result.info.status;
     result->info.iter = (piqp_int) solver_result.info.iter;
+    result->info.init_admm_iter = (piqp_int) solver_result.info.init_admm_iter;
     result->info.rho = solver_result.info.rho;
     result->info.delta = solver_result.info.delta;
     result->info.mu = solver_result.info.mu;
@@ -124,6 +125,8 @@ static void piqp_set_default_settings(piqp_settings* settings, Solver&& solver)
 {
     settings->rho_init = solver.settings().rho_init;
     settings->delta_init = solver.settings().delta_init;
+    settings->rho_eq_factor = solver.settings().rho_eq_factor;
+    settings->delta_eq_factor = solver.settings().delta_eq_factor;
     settings->eps_abs = solver.settings().eps_abs;
     settings->eps_rel = solver.settings().eps_rel;
     settings->check_duality_gap = solver.settings().check_duality_gap;
@@ -148,6 +151,12 @@ static void piqp_set_default_settings(piqp_settings* settings, Solver&& solver)
     settings->iterative_refinement_min_improvement_rate = solver.settings().iterative_refinement_min_improvement_rate;
     settings->iterative_refinement_static_regularization_eps = solver.settings().iterative_refinement_static_regularization_eps;
     settings->iterative_refinement_static_regularization_rel = solver.settings().iterative_refinement_static_regularization_rel;
+    settings->max_init_admm_iter = solver.settings().max_init_admm_iter;
+    settings->init_mu_scale = solver.settings().init_mu_scale;
+    settings->cold_start_alpha = solver.settings().cold_start_alpha;
+    settings->cold_start_sigma = solver.settings().cold_start_sigma;
+    settings->warm_start_sigma = solver.settings().warm_start_sigma;
+    settings->warm_start = solver.settings().warm_start;
     settings->verbose = solver.settings().verbose;
     settings->compute_timings = solver.settings().compute_timings;
 }
@@ -266,6 +275,8 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
 
         solver->settings().rho_init = settings->rho_init;
         solver->settings().delta_init = settings->delta_init;
+        solver->settings().rho_eq_factor = settings->rho_eq_factor;
+        solver->settings().delta_eq_factor = settings->delta_eq_factor;
         solver->settings().eps_abs = settings->eps_abs;
         solver->settings().eps_rel = settings->eps_rel;
         solver->settings().check_duality_gap = settings->check_duality_gap;
@@ -290,6 +301,12 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().iterative_refinement_min_improvement_rate = settings->iterative_refinement_min_improvement_rate;
         solver->settings().iterative_refinement_static_regularization_eps = settings->iterative_refinement_static_regularization_eps;
         solver->settings().iterative_refinement_static_regularization_rel = settings->iterative_refinement_static_regularization_rel;
+        solver->settings().max_init_admm_iter = settings->max_init_admm_iter;
+        solver->settings().init_mu_scale = settings->init_mu_scale;
+        solver->settings().cold_start_alpha = settings->cold_start_alpha;
+        solver->settings().cold_start_sigma = settings->cold_start_sigma;
+        solver->settings().warm_start_sigma = settings->warm_start_sigma;
+        solver->settings().warm_start = settings->warm_start;
         solver->settings().verbose = settings->verbose;
         solver->settings().compute_timings = settings->compute_timings;
     }
@@ -299,6 +316,8 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
 
         solver->settings().rho_init = settings->rho_init;
         solver->settings().delta_init = settings->delta_init;
+        solver->settings().rho_eq_factor = settings->rho_eq_factor;
+        solver->settings().delta_eq_factor = settings->delta_eq_factor;
         solver->settings().eps_abs = settings->eps_abs;
         solver->settings().eps_rel = settings->eps_rel;
         solver->settings().check_duality_gap = settings->check_duality_gap;
@@ -323,6 +342,12 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().iterative_refinement_min_improvement_rate = settings->iterative_refinement_min_improvement_rate;
         solver->settings().iterative_refinement_static_regularization_eps = settings->iterative_refinement_static_regularization_eps;
         solver->settings().iterative_refinement_static_regularization_rel = settings->iterative_refinement_static_regularization_rel;
+        solver->settings().max_init_admm_iter = settings->max_init_admm_iter;
+        solver->settings().init_mu_scale = settings->init_mu_scale;
+        solver->settings().cold_start_alpha = settings->cold_start_alpha;
+        solver->settings().cold_start_sigma = settings->cold_start_sigma;
+        solver->settings().warm_start_sigma = settings->warm_start_sigma;
+        solver->settings().warm_start = settings->warm_start;
         solver->settings().verbose = settings->verbose;
         solver->settings().compute_timings = settings->compute_timings;
     }
@@ -366,6 +391,34 @@ void piqp_update_sparse(piqp_workspace* workspace,
 
     auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
     solver->update(P_, c_, A_, b_, G_, h_l_, h_u_, x_l_, x_u_);
+}
+
+void piqp_set_warm_start(piqp_workspace* workspace,
+                         piqp_float* x, piqp_float* y,
+                         piqp_float* z_l, piqp_float* z_u,
+                         piqp_float* z_bl, piqp_float* z_bu)
+{
+    piqp_int n = workspace->solver_info.n;
+    piqp_int p = workspace->solver_info.p;
+    piqp_int m = workspace->solver_info.m;
+
+    Eigen::Map<CVec> x_(x, n);
+    piqp::optional<Eigen::Map<CVec>> y_ = piqp_optional_vec_map(y, p);
+    piqp::optional<Eigen::Map<CVec>> z_l_ = piqp_optional_vec_map(z_l, m);
+    piqp::optional<Eigen::Map<CVec>> z_u_ = piqp_optional_vec_map(z_u, m);
+    piqp::optional<Eigen::Map<CVec>> z_bl_ = piqp_optional_vec_map(z_bl, n);
+    piqp::optional<Eigen::Map<CVec>> z_bu_ = piqp_optional_vec_map(z_bu, n);
+
+    if (workspace->solver_info.is_dense)
+    {
+        auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
+        solver->set_warm_start(x_, y_, z_l_, z_u_, z_bl_, z_bu_);
+    }
+    else
+    {
+        auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
+        solver->set_warm_start(x_, y_, z_l_, z_u_, z_bl_, z_bu_);
+    }
 }
 
 piqp_status piqp_solve(piqp_workspace* workspace)

@@ -84,6 +84,12 @@ struct Variables : BasicVariables<T>
             && s_l.allFinite() && s_u.allFinite() && s_bl.allFinite() && s_bu.allFinite();
     }
 
+    Variables& operator=(const Variables& rhs) = default;
+    Variables& operator=(Variables&& rhs) = default;
+    Variables(const Variables&) = default;
+    Variables(Variables&&) = default;
+    Variables() = default;
+
     Variables& operator+=(const Variables& rhs)
     {
         BasicVariables<T>::operator+=(rhs);

@@ -99,6 +99,8 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
 
     ov_struct.assign("rho_init", octave_value(settings.rho_init));
     ov_struct.assign("delta_init", octave_value(settings.delta_init));
+    ov_struct.assign("rho_eq_factor", octave_value(settings.rho_eq_factor));
+    ov_struct.assign("delta_eq_factor", octave_value(settings.delta_eq_factor));
     ov_struct.assign("eps_abs", octave_value(settings.eps_abs));
     ov_struct.assign("eps_rel", octave_value(settings.eps_rel));
     ov_struct.assign("check_duality_gap", octave_value(settings.check_duality_gap));
@@ -123,6 +125,12 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     ov_struct.assign("iterative_refinement_min_improvement_rate", octave_value(settings.iterative_refinement_min_improvement_rate));
     ov_struct.assign("iterative_refinement_static_regularization_eps", octave_value(settings.iterative_refinement_static_regularization_eps));
     ov_struct.assign("iterative_refinement_static_regularization_rel", octave_value(settings.iterative_refinement_static_regularization_rel));
+    ov_struct.assign("max_init_admm_iter", octave_value(settings.max_init_admm_iter));
+    ov_struct.assign("init_mu_scale", octave_value(settings.init_mu_scale));
+    ov_struct.assign("cold_start_alpha", octave_value(settings.cold_start_alpha));
+    ov_struct.assign("cold_start_sigma", octave_value(settings.cold_start_sigma));
+    ov_struct.assign("warm_start_sigma", octave_value(settings.warm_start_sigma));
+    ov_struct.assign("warm_start", octave_value(settings.warm_start));
     ov_struct.assign("verbose", octave_value(settings.verbose));
     ov_struct.assign("compute_timings", octave_value(settings.compute_timings));
 
@@ -133,6 +141,8 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
 {
     settings.rho_init = ov_struct.getfield("rho_init").double_value();
     settings.delta_init = ov_struct.getfield("delta_init").double_value();
+    settings.rho_eq_factor = ov_struct.getfield("rho_eq_factor").double_value();
+    settings.delta_eq_factor = ov_struct.getfield("delta_eq_factor").double_value();
     settings.eps_abs = ov_struct.getfield("eps_abs").double_value();
     settings.eps_rel = ov_struct.getfield("eps_rel").double_value();
     settings.check_duality_gap = ov_struct.getfield("check_duality_gap").bool_value();
@@ -141,7 +151,7 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
     settings.infeasibility_threshold = ov_struct.getfield("infeasibility_threshold").double_value();
     settings.reg_lower_limit = ov_struct.getfield("reg_lower_limit").double_value();
     settings.reg_finetune_lower_limit = ov_struct.getfield("reg_finetune_lower_limit").double_value();
-    settings.reg_finetune_primal_update_threshold = ov_struct.getfield("check_duality_gap").int_value();
+    settings.reg_finetune_primal_update_threshold = ov_struct.getfield("reg_finetune_primal_update_threshold").int_value();
     settings.reg_finetune_dual_update_threshold = ov_struct.getfield("reg_finetune_dual_update_threshold").int_value();
     settings.max_iter = ov_struct.getfield("max_iter").int_value();
     settings.max_factor_retires = ov_struct.getfield("max_factor_retires").int_value();
@@ -157,6 +167,12 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
     settings.iterative_refinement_min_improvement_rate = ov_struct.getfield("iterative_refinement_min_improvement_rate").double_value();
     settings.iterative_refinement_static_regularization_eps = ov_struct.getfield("iterative_refinement_static_regularization_eps").double_value();
     settings.iterative_refinement_static_regularization_rel = ov_struct.getfield("iterative_refinement_static_regularization_rel").double_value();
+    settings.max_init_admm_iter = ov_struct.getfield("max_init_admm_iter").long_value();
+    settings.init_mu_scale = ov_struct.getfield("init_mu_scale").double_value();
+    settings.cold_start_alpha = ov_struct.getfield("cold_start_alpha").double_value();
+    settings.cold_start_sigma = ov_struct.getfield("cold_start_sigma").double_value();
+    settings.warm_start_sigma = ov_struct.getfield("warm_start_sigma").double_value();
+    settings.warm_start = ov_struct.getfield("warm_start").bool_value();
     settings.verbose = ov_struct.getfield("verbose").bool_value();
     settings.compute_timings = ov_struct.getfield("compute_timings").bool_value();
 }
@@ -168,6 +184,7 @@ octave_value result_to_ov_struct(const piqp::Result<double>& result)
     ov_info_struct.assign("status", octave_value(piqp::status_to_string(result.info.status)));
     ov_info_struct.assign("status_val", octave_value(result.info.status));
     ov_info_struct.assign("iter", octave_value(result.info.iter));
+    ov_info_struct.assign("init_admm_iter", octave_value(result.info.init_admm_iter));
     ov_info_struct.assign("rho", octave_value(result.info.rho));
     ov_info_struct.assign("delta", octave_value(result.info.delta));
     ov_info_struct.assign("mu", octave_value(result.info.mu));
@@ -372,6 +389,38 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
             Eigen::Map<SparseMat> G(m, n, (Eigen::Index) G_ref.nnz(), Gp.data(), Gi.data(), G_ref.sparse_matrix_value().xdata());
 
             oct_handle->as_sparse_ptr()->setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
+        }
+
+        return {};
+    }
+
+    if (args(0).string_value() == "set_warm_start") {
+        const octave_value& x_ref = args(2);
+        const octave_value& y_ref = args(3);
+        const octave_value& z_l_ref = args(4);
+        const octave_value& z_u_ref = args(5);
+        const octave_value& z_bl_ref = args(6);
+        const octave_value& z_bu_ref = args(7);
+
+        int n_ws = x_ref.vector_value().numel();
+
+        Eigen::Map<const Vec> x(x_ref.vector_value().data(), n_ws);
+
+        piqp::optional<Eigen::Map<const Vec>> y;
+        piqp::optional<Eigen::Map<const Vec>> z_l;
+        piqp::optional<Eigen::Map<const Vec>> z_u;
+        piqp::optional<Eigen::Map<const Vec>> z_bl;
+        piqp::optional<Eigen::Map<const Vec>> z_bu;
+        if (!y_ref.isempty()) { y.emplace(y_ref.vector_value().data(), y_ref.vector_value().numel()); }
+        if (!z_l_ref.isempty()) { z_l.emplace(z_l_ref.vector_value().data(), z_l_ref.vector_value().numel()); }
+        if (!z_u_ref.isempty()) { z_u.emplace(z_u_ref.vector_value().data(), z_u_ref.vector_value().numel()); }
+        if (!z_bl_ref.isempty()) { z_bl.emplace(z_bl_ref.vector_value().data(), z_bl_ref.vector_value().numel()); }
+        if (!z_bu_ref.isempty()) { z_bu.emplace(z_bu_ref.vector_value().data(), z_bu_ref.vector_value().numel()); }
+
+        if (oct_handle->isDense()) {
+            oct_handle->as_dense_ptr()->set_warm_start(x, y, z_l, z_u, z_bl, z_bu);
+        } else {
+            oct_handle->as_sparse_ptr()->set_warm_start(x, y, z_l, z_u, z_bl, z_bu);
         }
 
         return {};

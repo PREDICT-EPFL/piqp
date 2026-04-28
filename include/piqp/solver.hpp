@@ -55,6 +55,9 @@ protected:
     bool m_first_run = true;
     bool m_setup_done = false;
     bool m_enable_iterative_refinement = false;
+    bool m_warm_start_has_y = false;
+    bool m_warm_start_has_z = false;
+    bool m_warm_start_from_solve = false;
 
     BasicVariables<T> res_nr;    // non-regularized residuals
     Variables<T> res;            // residuals
@@ -67,6 +70,13 @@ public:
     Settings<T>& settings() { return m_settings; }
 
     const Result<T>& result() const { return m_result; }
+
+    void set_warm_start(const CVecRef<T>& x,
+                        const optional<CVecRef<T>>& y = nullopt,
+                        const optional<CVecRef<T>>& z_l = nullopt,
+                        const optional<CVecRef<T>>& z_u = nullopt,
+                        const optional<CVecRef<T>>& z_bl = nullopt,
+                        const optional<CVecRef<T>>& z_bu = nullopt);
 
     Status solve();
 
@@ -121,7 +131,21 @@ protected:
 
     T dual_prox_inf();
 
+    T init_compute_mu();
+
+    void apply_smoothing(T sigma, T mu, const Variables<T>& s_kp1, const Variables<T>& z_k);
+
+    Status init_cold_start();
+
+    Status init_warm_start();
+
+    Status init_from_guess(T sigma);
+
+    void scale_results();
+
     void unscale_results();
+
+    void pack_dual();
 
     void restore_dual();
 };

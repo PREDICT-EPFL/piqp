@@ -1,105 +1,278 @@
-# Generated using pybind11-stubgen 2.5.3
+# Generated using pybind11-stubgen-2.5.5
 from __future__ import annotations
 import numpy
-import piqp
+import numpy.typing
 import scipy.sparse
 import typing
-__all__ = ['DenseSolver', 'Info', 'KKTSolver', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseSolver', 'Status', 'dense_cholesky', 'sparse_ldlt', 'sparse_ldlt_cond', 'sparse_ldlt_eq_cond', 'sparse_ldlt_ineq_cond', 'sparse_multistage']
+__all__: list[str] = ['DenseSolver', 'Info', 'KKTSolver', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseSolver', 'Status', 'dense_cholesky', 'sparse_ldlt', 'sparse_ldlt_cond', 'sparse_ldlt_eq_cond', 'sparse_ldlt_ineq_cond', 'sparse_multistage']
 class DenseSolver:
-    def __init__(self: piqp.DenseSolver) -> None:
+    def __init__(self: DenseSolver) -> None:
         ...
-    def setup(self: piqp.DenseSolver, P: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous], c: numpy.ndarray[numpy.float64[m, 1]], A: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, h_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, h_u: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_u: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
+    def set_warm_start(self: DenseSolver, x: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], y: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, z_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, z_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, z_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, z_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
         ...
-    def solve(self: piqp.DenseSolver) -> piqp.Status:
+    def setup(self: DenseSolver, P: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"], c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], A: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
         ...
-    def update(self: piqp.DenseSolver, P: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, c: numpy.ndarray[numpy.float64[m, 1]] | None = None, A: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: numpy.ndarray[numpy.float64[m, n], numpy.ndarray.flags.f_contiguous] | None = None, h_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, h_u: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_u: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
+    def solve(self: DenseSolver) -> Status:
+        ...
+    def update(self: DenseSolver, P: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, A: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
         ...
     @property
-    def result(self) -> piqp.Result:
+    def result(self) -> Result:
         ...
     @property
-    def settings(self) -> piqp.Settings:
+    def settings(self) -> Settings:
         ...
     @settings.setter
-    def settings(self) -> piqp.Settings:
+    def settings(self) -> Settings:
         ...
 class Info:
-    delta: float
-    dual_obj: float
-    dual_prox_inf: float
-    dual_res: float
-    dual_res_reg: float
-    dual_res_reg_rel: float
-    dual_res_rel: float
-    dual_step: float
-    duality_gap: float
-    duality_gap_rel: float
-    factor_retires: int
-    iter: int
-    kkt_factor_time: float
-    kkt_solve_time: float
-    mu: float
-    no_dual_update: int
-    no_primal_update: int
-    prev_dual_res: float
-    prev_primal_res: float
-    primal_obj: float
-    primal_prox_inf: float
-    primal_res: float
-    primal_res_reg: float
-    primal_res_reg_rel: float
-    primal_res_rel: float
-    primal_step: float
-    reg_limit: float
-    rho: float
-    run_time: float
-    setup_time: float
-    sigma: float
-    solve_time: float
-    status: piqp.Status
-    update_time: float
-    def __init__(self: piqp.Info) -> None:
+    status: Status
+    def __init__(self: Info) -> None:
+        ...
+    @property
+    def delta(self) -> float:
+        ...
+    @delta.setter
+    def delta(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def dual_obj(self) -> float:
+        ...
+    @dual_obj.setter
+    def dual_obj(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def dual_prox_inf(self) -> float:
+        ...
+    @dual_prox_inf.setter
+    def dual_prox_inf(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def dual_res(self) -> float:
+        ...
+    @dual_res.setter
+    def dual_res(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def dual_res_reg(self) -> float:
+        ...
+    @dual_res_reg.setter
+    def dual_res_reg(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def dual_res_reg_rel(self) -> float:
+        ...
+    @dual_res_reg_rel.setter
+    def dual_res_reg_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def dual_res_rel(self) -> float:
+        ...
+    @dual_res_rel.setter
+    def dual_res_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def dual_step(self) -> float:
+        ...
+    @dual_step.setter
+    def dual_step(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def duality_gap(self) -> float:
+        ...
+    @duality_gap.setter
+    def duality_gap(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def duality_gap_rel(self) -> float:
+        ...
+    @duality_gap_rel.setter
+    def duality_gap_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def factor_retires(self) -> int:
+        ...
+    @factor_retires.setter
+    def factor_retires(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def init_admm_iter(self) -> int:
+        ...
+    @init_admm_iter.setter
+    def init_admm_iter(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def iter(self) -> int:
+        ...
+    @iter.setter
+    def iter(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def kkt_factor_time(self) -> float:
+        ...
+    @kkt_factor_time.setter
+    def kkt_factor_time(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def kkt_solve_time(self) -> float:
+        ...
+    @kkt_solve_time.setter
+    def kkt_solve_time(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def mu(self) -> float:
+        ...
+    @mu.setter
+    def mu(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def no_dual_update(self) -> int:
+        ...
+    @no_dual_update.setter
+    def no_dual_update(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def no_primal_update(self) -> int:
+        ...
+    @no_primal_update.setter
+    def no_primal_update(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def prev_dual_res(self) -> float:
+        ...
+    @prev_dual_res.setter
+    def prev_dual_res(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def prev_primal_res(self) -> float:
+        ...
+    @prev_primal_res.setter
+    def prev_primal_res(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def primal_obj(self) -> float:
+        ...
+    @primal_obj.setter
+    def primal_obj(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def primal_prox_inf(self) -> float:
+        ...
+    @primal_prox_inf.setter
+    def primal_prox_inf(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def primal_res(self) -> float:
+        ...
+    @primal_res.setter
+    def primal_res(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def primal_res_reg(self) -> float:
+        ...
+    @primal_res_reg.setter
+    def primal_res_reg(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def primal_res_reg_rel(self) -> float:
+        ...
+    @primal_res_reg_rel.setter
+    def primal_res_reg_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def primal_res_rel(self) -> float:
+        ...
+    @primal_res_rel.setter
+    def primal_res_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def primal_step(self) -> float:
+        ...
+    @primal_step.setter
+    def primal_step(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def reg_limit(self) -> float:
+        ...
+    @reg_limit.setter
+    def reg_limit(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def rho(self) -> float:
+        ...
+    @rho.setter
+    def rho(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def run_time(self) -> float:
+        ...
+    @run_time.setter
+    def run_time(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def setup_time(self) -> float:
+        ...
+    @setup_time.setter
+    def setup_time(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def sigma(self) -> float:
+        ...
+    @sigma.setter
+    def sigma(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def solve_time(self) -> float:
+        ...
+    @solve_time.setter
+    def solve_time(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def update_time(self) -> float:
+        ...
+    @update_time.setter
+    def update_time(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
         ...
 class KKTSolver:
     """
     Members:
-
+    
       dense_cholesky
-
+    
       sparse_ldlt
-
+    
       sparse_ldlt_eq_cond
-
+    
       sparse_ldlt_ineq_cond
-
+    
       sparse_ldlt_cond
-
+    
       sparse_multistage
     """
-    __members__: typing.ClassVar[dict[str, piqp.KKTSolver]]  # value = {'dense_cholesky': <KKTSolver.dense_cholesky: 0>, 'sparse_ldlt': <KKTSolver.sparse_ldlt: 1>, 'sparse_ldlt_eq_cond': <KKTSolver.sparse_ldlt_eq_cond: 2>, 'sparse_ldlt_ineq_cond': <KKTSolver.sparse_ldlt_ineq_cond: 3>, 'sparse_ldlt_cond': <KKTSolver.sparse_ldlt_cond: 4>, 'sparse_multistage': <KKTSolver.sparse_multistage: 5>}
-    dense_cholesky: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.dense_cholesky: 0>
-    sparse_ldlt: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_ldlt: 1>
-    sparse_ldlt_cond: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_ldlt_cond: 4>
-    sparse_ldlt_eq_cond: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_ldlt_eq_cond: 2>
-    sparse_ldlt_ineq_cond: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_ldlt_ineq_cond: 3>
-    sparse_multistage: typing.ClassVar[piqp.KKTSolver]  # value = <KKTSolver.sparse_multistage: 5>
+    __members__: typing.ClassVar[dict[str, KKTSolver]]  # value = {'dense_cholesky': <KKTSolver.dense_cholesky: 0>, 'sparse_ldlt': <KKTSolver.sparse_ldlt: 1>, 'sparse_ldlt_eq_cond': <KKTSolver.sparse_ldlt_eq_cond: 2>, 'sparse_ldlt_ineq_cond': <KKTSolver.sparse_ldlt_ineq_cond: 3>, 'sparse_ldlt_cond': <KKTSolver.sparse_ldlt_cond: 4>, 'sparse_multistage': <KKTSolver.sparse_multistage: 5>}
+    dense_cholesky: typing.ClassVar[KKTSolver]  # value = <KKTSolver.dense_cholesky: 0>
+    sparse_ldlt: typing.ClassVar[KKTSolver]  # value = <KKTSolver.sparse_ldlt: 1>
+    sparse_ldlt_cond: typing.ClassVar[KKTSolver]  # value = <KKTSolver.sparse_ldlt_cond: 4>
+    sparse_ldlt_eq_cond: typing.ClassVar[KKTSolver]  # value = <KKTSolver.sparse_ldlt_eq_cond: 2>
+    sparse_ldlt_ineq_cond: typing.ClassVar[KKTSolver]  # value = <KKTSolver.sparse_ldlt_ineq_cond: 3>
+    sparse_multistage: typing.ClassVar[KKTSolver]  # value = <KKTSolver.sparse_multistage: 5>
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
         ...
     def __hash__(self) -> int:
         ...
-    def __index__(self: piqp.KKTSolver) -> int:
+    def __index__(self: KKTSolver) -> int:
         ...
-    def __init__(self: piqp.KKTSolver, value: int) -> None:
+    def __init__(self: KKTSolver, value: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
-    def __int__(self: piqp.KKTSolver) -> int:
+    def __int__(self: KKTSolver) -> int:
         ...
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
         ...
-    def __setstate__(self: piqp.KKTSolver, state: int) -> None:
+    def __setstate__(self: KKTSolver, state: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
     def __str__(self) -> str:
         ...
@@ -110,107 +283,307 @@ class KKTSolver:
     def value(self) -> int:
         ...
 class Result:
-    info: piqp.Info
-    s_bl: numpy.ndarray[numpy.float64[m, 1]]
-    s_bu: numpy.ndarray[numpy.float64[m, 1]]
-    s_l: numpy.ndarray[numpy.float64[m, 1]]
-    s_u: numpy.ndarray[numpy.float64[m, 1]]
-    x: numpy.ndarray[numpy.float64[m, 1]]
-    y: numpy.ndarray[numpy.float64[m, 1]]
-    z_bl: numpy.ndarray[numpy.float64[m, 1]]
-    z_bu: numpy.ndarray[numpy.float64[m, 1]]
-    z_l: numpy.ndarray[numpy.float64[m, 1]]
-    z_u: numpy.ndarray[numpy.float64[m, 1]]
+    info: Info
+    @property
+    def s_bl(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @s_bl.setter
+    def s_bl(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
+    @property
+    def s_bu(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @s_bu.setter
+    def s_bu(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
+    @property
+    def s_l(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @s_l.setter
+    def s_l(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
+    @property
+    def s_u(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @s_u.setter
+    def s_u(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
+    @property
+    def x(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @x.setter
+    def x(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
+    @property
+    def y(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @y.setter
+    def y(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
+    @property
+    def z_bl(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @z_bl.setter
+    def z_bl(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
+    @property
+    def z_bu(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @z_bu.setter
+    def z_bu(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
+    @property
+    def z_l(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @z_l.setter
+    def z_l(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
+    @property
+    def z_u(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @z_u.setter
+    def z_u(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
+        ...
 class Settings:
     check_duality_gap: bool
     compute_timings: bool
-    delta_init: float
-    eps_abs: float
-    eps_duality_gap_abs: float
-    eps_duality_gap_rel: float
-    eps_rel: float
-    infeasibility_threshold: float
     iterative_refinement_always_enabled: bool
-    iterative_refinement_eps_abs: float
-    iterative_refinement_eps_rel: float
-    iterative_refinement_max_iter: int
-    iterative_refinement_min_improvement_rate: float
-    iterative_refinement_static_regularization_eps: float
-    iterative_refinement_static_regularization_rel: float
-    kkt_solver: piqp.KKTSolver
-    max_factor_retires: int
-    max_iter: int
-    preconditioner_iter: int
+    kkt_solver: KKTSolver
     preconditioner_reuse_on_update: bool
     preconditioner_scale_cost: bool
-    reg_finetune_dual_update_threshold: int
-    reg_finetune_lower_limit: float
-    reg_finetune_primal_update_threshold: int
-    reg_lower_limit: float
-    rho_init: float
-    tau: float
     verbose: bool
+    warm_start: bool
+    @property
+    def cold_start_alpha(self) -> float:
+        ...
+    @cold_start_alpha.setter
+    def cold_start_alpha(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def cold_start_sigma(self) -> float:
+        ...
+    @cold_start_sigma.setter
+    def cold_start_sigma(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def delta_eq_factor(self) -> float:
+        ...
+    @delta_eq_factor.setter
+    def delta_eq_factor(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def delta_init(self) -> float:
+        ...
+    @delta_init.setter
+    def delta_init(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def eps_abs(self) -> float:
+        ...
+    @eps_abs.setter
+    def eps_abs(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def eps_duality_gap_abs(self) -> float:
+        ...
+    @eps_duality_gap_abs.setter
+    def eps_duality_gap_abs(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def eps_duality_gap_rel(self) -> float:
+        ...
+    @eps_duality_gap_rel.setter
+    def eps_duality_gap_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def eps_rel(self) -> float:
+        ...
+    @eps_rel.setter
+    def eps_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def infeasibility_threshold(self) -> float:
+        ...
+    @infeasibility_threshold.setter
+    def infeasibility_threshold(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def init_mu_scale(self) -> float:
+        ...
+    @init_mu_scale.setter
+    def init_mu_scale(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def iterative_refinement_eps_abs(self) -> float:
+        ...
+    @iterative_refinement_eps_abs.setter
+    def iterative_refinement_eps_abs(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def iterative_refinement_eps_rel(self) -> float:
+        ...
+    @iterative_refinement_eps_rel.setter
+    def iterative_refinement_eps_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def iterative_refinement_max_iter(self) -> int:
+        ...
+    @iterative_refinement_max_iter.setter
+    def iterative_refinement_max_iter(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def iterative_refinement_min_improvement_rate(self) -> float:
+        ...
+    @iterative_refinement_min_improvement_rate.setter
+    def iterative_refinement_min_improvement_rate(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def iterative_refinement_static_regularization_eps(self) -> float:
+        ...
+    @iterative_refinement_static_regularization_eps.setter
+    def iterative_refinement_static_regularization_eps(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def iterative_refinement_static_regularization_rel(self) -> float:
+        ...
+    @iterative_refinement_static_regularization_rel.setter
+    def iterative_refinement_static_regularization_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def max_factor_retires(self) -> int:
+        ...
+    @max_factor_retires.setter
+    def max_factor_retires(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def max_init_admm_iter(self) -> int:
+        ...
+    @max_init_admm_iter.setter
+    def max_init_admm_iter(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def max_iter(self) -> int:
+        ...
+    @max_iter.setter
+    def max_iter(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def preconditioner_iter(self) -> int:
+        ...
+    @preconditioner_iter.setter
+    def preconditioner_iter(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def reg_finetune_dual_update_threshold(self) -> int:
+        ...
+    @reg_finetune_dual_update_threshold.setter
+    def reg_finetune_dual_update_threshold(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def reg_finetune_lower_limit(self) -> float:
+        ...
+    @reg_finetune_lower_limit.setter
+    def reg_finetune_lower_limit(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def reg_finetune_primal_update_threshold(self) -> int:
+        ...
+    @reg_finetune_primal_update_threshold.setter
+    def reg_finetune_primal_update_threshold(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def reg_lower_limit(self) -> float:
+        ...
+    @reg_lower_limit.setter
+    def reg_lower_limit(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def rho_eq_factor(self) -> float:
+        ...
+    @rho_eq_factor.setter
+    def rho_eq_factor(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def rho_init(self) -> float:
+        ...
+    @rho_init.setter
+    def rho_init(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def tau(self) -> float:
+        ...
+    @tau.setter
+    def tau(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def warm_start_sigma(self) -> float:
+        ...
+    @warm_start_sigma.setter
+    def warm_start_sigma(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
 class SparseSolver:
-    def __init__(self: piqp.SparseSolver) -> None:
+    def __init__(self: SparseSolver) -> None:
         ...
-    def setup(self: piqp.SparseSolver, P: scipy.sparse.csc_matrix, c: numpy.ndarray[numpy.float64[m, 1]], A: scipy.sparse.csc_matrix | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: scipy.sparse.csc_matrix | None = None, h_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, h_u: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_u: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
+    def set_warm_start(self: SparseSolver, x: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], y: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, z_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, z_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, z_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, z_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
         ...
-    def solve(self: piqp.SparseSolver) -> piqp.Status:
+    def setup(self: SparseSolver, P: scipy.sparse.csc_matrix, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], A: scipy.sparse.csc_matrix[numpy.float64] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: scipy.sparse.csc_matrix[numpy.float64] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
         ...
-    def update(self: piqp.SparseSolver, P: scipy.sparse.csc_matrix | None = None, c: numpy.ndarray[numpy.float64[m, 1]] | None = None, A: scipy.sparse.csc_matrix | None = None, b: numpy.ndarray[numpy.float64[m, 1]] | None = None, G: scipy.sparse.csc_matrix | None = None, h_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, h_u: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_l: numpy.ndarray[numpy.float64[m, 1]] | None = None, x_u: numpy.ndarray[numpy.float64[m, 1]] | None = None) -> None:
+    def solve(self: SparseSolver) -> Status:
+        ...
+    def update(self: SparseSolver, P: scipy.sparse.csc_matrix[numpy.float64] | None = None, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, A: scipy.sparse.csc_matrix[numpy.float64] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: scipy.sparse.csc_matrix[numpy.float64] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
         ...
     @property
-    def result(self) -> piqp.Result:
+    def result(self) -> Result:
         ...
     @property
-    def settings(self) -> piqp.Settings:
+    def settings(self) -> Settings:
         ...
     @settings.setter
-    def settings(self) -> piqp.Settings:
+    def settings(self) -> Settings:
         ...
 class Status:
     """
     Members:
-
+    
       PIQP_SOLVED
-
+    
       PIQP_MAX_ITER_REACHED
-
+    
       PIQP_PRIMAL_INFEASIBLE
-
+    
       PIQP_DUAL_INFEASIBLE
-
+    
       PIQP_NUMERICS
-
+    
       PIQP_UNSOLVED
-
+    
       PIQP_INVALID_SETTINGS
     """
-    PIQP_DUAL_INFEASIBLE: typing.ClassVar[piqp.Status]  # value = <Status.PIQP_DUAL_INFEASIBLE: -3>
-    PIQP_INVALID_SETTINGS: typing.ClassVar[piqp.Status]  # value = <Status.PIQP_INVALID_SETTINGS: -10>
-    PIQP_MAX_ITER_REACHED: typing.ClassVar[piqp.Status]  # value = <Status.PIQP_MAX_ITER_REACHED: -1>
-    PIQP_NUMERICS: typing.ClassVar[piqp.Status]  # value = <Status.PIQP_NUMERICS: -8>
-    PIQP_PRIMAL_INFEASIBLE: typing.ClassVar[piqp.Status]  # value = <Status.PIQP_PRIMAL_INFEASIBLE: -2>
-    PIQP_SOLVED: typing.ClassVar[piqp.Status]  # value = <Status.PIQP_SOLVED: 1>
-    PIQP_UNSOLVED: typing.ClassVar[piqp.Status]  # value = <Status.PIQP_UNSOLVED: -9>
-    __members__: typing.ClassVar[dict[str, piqp.Status]]  # value = {'PIQP_SOLVED': <Status.PIQP_SOLVED: 1>, 'PIQP_MAX_ITER_REACHED': <Status.PIQP_MAX_ITER_REACHED: -1>, 'PIQP_PRIMAL_INFEASIBLE': <Status.PIQP_PRIMAL_INFEASIBLE: -2>, 'PIQP_DUAL_INFEASIBLE': <Status.PIQP_DUAL_INFEASIBLE: -3>, 'PIQP_NUMERICS': <Status.PIQP_NUMERICS: -8>, 'PIQP_UNSOLVED': <Status.PIQP_UNSOLVED: -9>, 'PIQP_INVALID_SETTINGS': <Status.PIQP_INVALID_SETTINGS: -10>}
+    PIQP_DUAL_INFEASIBLE: typing.ClassVar[Status]  # value = <Status.PIQP_DUAL_INFEASIBLE: -3>
+    PIQP_INVALID_SETTINGS: typing.ClassVar[Status]  # value = <Status.PIQP_INVALID_SETTINGS: -10>
+    PIQP_MAX_ITER_REACHED: typing.ClassVar[Status]  # value = <Status.PIQP_MAX_ITER_REACHED: -1>
+    PIQP_NUMERICS: typing.ClassVar[Status]  # value = <Status.PIQP_NUMERICS: -8>
+    PIQP_PRIMAL_INFEASIBLE: typing.ClassVar[Status]  # value = <Status.PIQP_PRIMAL_INFEASIBLE: -2>
+    PIQP_SOLVED: typing.ClassVar[Status]  # value = <Status.PIQP_SOLVED: 1>
+    PIQP_UNSOLVED: typing.ClassVar[Status]  # value = <Status.PIQP_UNSOLVED: -9>
+    __members__: typing.ClassVar[dict[str, Status]]  # value = {'PIQP_SOLVED': <Status.PIQP_SOLVED: 1>, 'PIQP_MAX_ITER_REACHED': <Status.PIQP_MAX_ITER_REACHED: -1>, 'PIQP_PRIMAL_INFEASIBLE': <Status.PIQP_PRIMAL_INFEASIBLE: -2>, 'PIQP_DUAL_INFEASIBLE': <Status.PIQP_DUAL_INFEASIBLE: -3>, 'PIQP_NUMERICS': <Status.PIQP_NUMERICS: -8>, 'PIQP_UNSOLVED': <Status.PIQP_UNSOLVED: -9>, 'PIQP_INVALID_SETTINGS': <Status.PIQP_INVALID_SETTINGS: -10>}
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
         ...
     def __hash__(self) -> int:
         ...
-    def __index__(self: piqp.Status) -> int:
+    def __index__(self: Status) -> int:
         ...
-    def __init__(self: piqp.Status, value: int) -> None:
+    def __init__(self: Status, value: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
-    def __int__(self: piqp.Status) -> int:
+    def __int__(self: Status) -> int:
         ...
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
         ...
-    def __setstate__(self: piqp.Status, state: int) -> None:
+    def __setstate__(self: Status, state: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
     def __str__(self) -> str:
         ...
@@ -220,17 +593,17 @@ class Status:
     @property
     def value(self) -> int:
         ...
-PIQP_DUAL_INFEASIBLE: piqp.Status  # value = <Status.PIQP_DUAL_INFEASIBLE: -3>
-PIQP_INVALID_SETTINGS: piqp.Status  # value = <Status.PIQP_INVALID_SETTINGS: -10>
-PIQP_MAX_ITER_REACHED: piqp.Status  # value = <Status.PIQP_MAX_ITER_REACHED: -1>
-PIQP_NUMERICS: piqp.Status  # value = <Status.PIQP_NUMERICS: -8>
-PIQP_PRIMAL_INFEASIBLE: piqp.Status  # value = <Status.PIQP_PRIMAL_INFEASIBLE: -2>
-PIQP_SOLVED: piqp.Status  # value = <Status.PIQP_SOLVED: 1>
-PIQP_UNSOLVED: piqp.Status  # value = <Status.PIQP_UNSOLVED: -9>
+PIQP_DUAL_INFEASIBLE: Status  # value = <Status.PIQP_DUAL_INFEASIBLE: -3>
+PIQP_INVALID_SETTINGS: Status  # value = <Status.PIQP_INVALID_SETTINGS: -10>
+PIQP_MAX_ITER_REACHED: Status  # value = <Status.PIQP_MAX_ITER_REACHED: -1>
+PIQP_NUMERICS: Status  # value = <Status.PIQP_NUMERICS: -8>
+PIQP_PRIMAL_INFEASIBLE: Status  # value = <Status.PIQP_PRIMAL_INFEASIBLE: -2>
+PIQP_SOLVED: Status  # value = <Status.PIQP_SOLVED: 1>
+PIQP_UNSOLVED: Status  # value = <Status.PIQP_UNSOLVED: -9>
 __version__: str = '0.6.2'
-dense_cholesky: piqp.KKTSolver  # value = <KKTSolver.dense_cholesky: 0>
-sparse_ldlt: piqp.KKTSolver  # value = <KKTSolver.sparse_ldlt: 1>
-sparse_ldlt_cond: piqp.KKTSolver  # value = <KKTSolver.sparse_ldlt_cond: 4>
-sparse_ldlt_eq_cond: piqp.KKTSolver  # value = <KKTSolver.sparse_ldlt_eq_cond: 2>
-sparse_ldlt_ineq_cond: piqp.KKTSolver  # value = <KKTSolver.sparse_ldlt_ineq_cond: 3>
-sparse_multistage: piqp.KKTSolver  # value = <KKTSolver.sparse_multistage: 5>
+dense_cholesky: KKTSolver  # value = <KKTSolver.dense_cholesky: 0>
+sparse_ldlt: KKTSolver  # value = <KKTSolver.sparse_ldlt: 1>
+sparse_ldlt_cond: KKTSolver  # value = <KKTSolver.sparse_ldlt_cond: 4>
+sparse_ldlt_eq_cond: KKTSolver  # value = <KKTSolver.sparse_ldlt_eq_cond: 2>
+sparse_ldlt_ineq_cond: KKTSolver  # value = <KKTSolver.sparse_ldlt_ineq_cond: 3>
+sparse_multistage: KKTSolver  # value = <KKTSolver.sparse_multistage: 5>

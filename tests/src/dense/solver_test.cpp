@@ -420,3 +420,116 @@ TEST(DenseSolverTest, MoveConstructor)
 
     ASSERT_EQ(status2, Status::PIQP_SOLVED);
 }
+
+/*
+ * Warm-start test: solve a QP, perturb c, re-solve with warm-start.
+ * Verify correctness and fewer iterations than cold-start.
+ */
+TEST(DenseSolverTest, WarmStart)
+{
+    isize dim = 20;
+    isize n_eq = 10;
+    isize n_ineq = 12;
+
+    dense::Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
+
+    // Cold-start reference solver
+    DenseSolver<T> solver_cold;
+    solver_cold.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b,
+                      qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+
+    Status status = solver_cold.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+
+    // Warm-start solver
+    DenseSolver<T> solver_warm;
+    solver_warm.settings().warm_start = true;
+    solver_warm.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b,
+                      qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+
+    status = solver_warm.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+
+    // Perturb the linear cost slightly
+    Vec<T> c_new = qp_model.c + Vec<T>::Random(dim) * 0.01;
+
+    // Cold-start: setup fresh and solve
+    solver_cold.update(piqp::nullopt, c_new);
+    status = solver_cold.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    isize cold_iters = solver_cold.result().info.iter;
+
+    // Warm-start: update and solve
+    solver_warm.update(piqp::nullopt, c_new);
+    status = solver_warm.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    isize warm_iters = solver_warm.result().info.iter;
+
+    // Verify same solution
+    ASSERT_LT((solver_cold.result().x - solver_warm.result().x).norm(), 1e-6);
+
+    // Warm-start should use fewer iterations
+    EXPECT_LT(warm_iters, cold_iters);
+}
+
+TEST(DenseSolverTest, ManualWarmStart)
+{
+    isize dim = 20;
+    isize n_eq = 10;
+    isize n_ineq = 12;
+
+    dense::Model<T> qp_model = rand::dense_strongly_convex_qp<T>(dim, n_eq, n_ineq);
+
+    // Solve the original problem to get a reference solution
+    DenseSolver<T> solver_ref;
+    solver_ref.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b,
+                     qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+    Status status = solver_ref.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+
+    Vec<T> x_opt = solver_ref.result().x;
+    Vec<T> y_opt = solver_ref.result().y;
+
+    // Perturb the linear cost slightly
+    Vec<T> c_new = qp_model.c + Vec<T>::Random(dim) * 0.01;
+
+    // Cold-start solver
+    DenseSolver<T> solver_cold;
+    solver_cold.setup(qp_model.P, c_new, qp_model.A, qp_model.b,
+                      qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+    status = solver_cold.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    isize cold_iters = solver_cold.result().info.iter;
+
+    // Manual warm-start solver: provide only primal variables
+    DenseSolver<T> solver_warm;
+    solver_warm.setup(qp_model.P, c_new, qp_model.A, qp_model.b,
+                      qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+    solver_warm.set_warm_start(x_opt);
+    status = solver_warm.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    isize warm_iters_primal = solver_warm.result().info.iter;
+
+    // Verify same solution
+    ASSERT_LT((solver_cold.result().x - solver_warm.result().x).norm(), 1e-6);
+
+    // Primal-only warm-start should not be worse than cold-start
+    EXPECT_LE(warm_iters_primal, cold_iters);
+
+    // Manual warm-start solver: provide full primal-dual solution
+    DenseSolver<T> solver_warm_full;
+    solver_warm_full.setup(qp_model.P, c_new, qp_model.A, qp_model.b,
+                           qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+    solver_warm_full.set_warm_start(x_opt, y_opt,
+                                    solver_ref.result().z_l, solver_ref.result().z_u,
+                                    solver_ref.result().z_bl, solver_ref.result().z_bu);
+    status = solver_warm_full.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    isize warm_iters_full = solver_warm_full.result().info.iter;
+
+    // Verify same solution
+    ASSERT_LT((solver_cold.result().x - solver_warm_full.result().x).norm(), 1e-6);
+
+    // Full warm-start should use fewer iterations
+    EXPECT_LT(warm_iters_full, cold_iters);
+}

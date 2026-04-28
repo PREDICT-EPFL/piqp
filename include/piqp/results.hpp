@@ -47,6 +47,7 @@ struct Info
     Status status;
 
     isize iter;
+    isize init_admm_iter;
     T rho;
     T delta;
     T mu;

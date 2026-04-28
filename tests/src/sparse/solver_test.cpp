@@ -452,6 +452,61 @@ TEST_P(SparseSolverTest, MoveConstructor)
     ASSERT_EQ(status2, Status::PIQP_SOLVED);
 }
 
+/*
+ * Warm-start test: solve a QP, perturb c, re-solve with warm-start.
+ * Verify correctness and fewer iterations than cold-start.
+ */
+TEST_P(SparseSolverTest, WarmStart)
+{
+    isize dim = 20;
+    isize n_eq = 10;
+    isize n_ineq = 12;
+
+    T sparsity_factor = 0.2;
+
+    sparse::Model<T, I> qp_model = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
+
+    // Cold-start reference solver
+    SparseSolver<T, I> solver_cold;
+    solver_cold.settings().kkt_solver = GetParam();
+    solver_cold.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b,
+                      qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+
+    Status status = solver_cold.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+
+    // Warm-start solver
+    SparseSolver<T, I> solver_warm;
+    solver_warm.settings().kkt_solver = GetParam();
+    solver_warm.settings().warm_start = true;
+    solver_warm.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b,
+                      qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+
+    status = solver_warm.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+
+    // Perturb the linear cost slightly
+    Vec<T> c_new = qp_model.c + Vec<T>::Random(dim) * 0.01;
+
+    // Cold-start: update and solve
+    solver_cold.update(piqp::nullopt, c_new);
+    status = solver_cold.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    isize cold_iters = solver_cold.result().info.iter;
+
+    // Warm-start: update and solve
+    solver_warm.update(piqp::nullopt, c_new);
+    status = solver_warm.solve();
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    isize warm_iters = solver_warm.result().info.iter;
+
+    // Verify same solution
+    ASSERT_LT((solver_cold.result().x - solver_warm.result().x).norm(), 1e-6);
+
+    // Warm-start should use fewer iterations
+    EXPECT_LT(warm_iters, cold_iters);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     KKTSolver,
     SparseSolverTest,

@@ -146,3 +146,27 @@ This allows the solver to internally reuse memory and factorizations speeding up
 
 {: .warning }
 Note the dimension and sparsity pattern of the problem are not allowed to change when calling the `update` function.
+
+## Warm Starting
+
+To warm start the solver from the previous solution, enable the `warm_start` setting before solving:
+
+```c++
+solver.settings().warm_start = true;
+```
+
+When enabled, the solver automatically uses the previous solution as a starting point after calling `update` and `solve`.
+
+You can also manually set a warm start point using
+
+```c++
+solver.set_warm_start(x, y);
+```
+
+where `x` is the primal variable and `y` is the equality dual variable. Optionally, you can also provide the inequality dual variables:
+
+```c++
+solver.set_warm_start(x, y, z_l, z_u, z_bl, z_bu);
+```
+
+If the inequality duals are not provided, they default to zero and the solver computes the slack variables from `x`. For more details see the [warm starting documentation]({{site.baseurl}}/api/settings#warm-starting).

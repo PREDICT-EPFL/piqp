@@ -23,6 +23,7 @@ classdef piqp < handle
     %   setup             - configure solver with problem data
     %   solve             - solve the QP
     %   update            - modify problem data
+    %   set_warm_start    - set a warm start point for the next solve
     %
     %   get_settings      - get the current solver settings
     %   update_settings   - update the current solver settings
@@ -233,6 +234,37 @@ classdef piqp < handle
             settings = validateSettings(this, varargin{:});
 
             piqp_oct('setup',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h_l,h_u,x_l,x_u,settings);
+        end
+
+        %%
+        function set_warm_start(this, x, y, z_l, z_u, z_bl, z_bu)
+            % SET_WARM_START set a warm start point for the next solve.
+            %
+            %   set_warm_start(x)
+            %   set_warm_start(x, y)
+            %   set_warm_start(x, y, z_l, z_u, z_bl, z_bu)
+            %
+            %   x is required. y, z_l, z_u, z_bl, z_bu are optional
+            %   dual variables. If not provided, they default to zero.
+
+            assert(this.n ~= 0, 'Problem is not initialized.')
+
+            x = full(x(:));
+            assert(length(x) == this.n, 'Incorrect dimension of x');
+
+            if nargin < 3; y = []; else; y = full(y(:)); end
+            if nargin < 4; z_l = []; else; z_l = full(z_l(:)); end
+            if nargin < 5; z_u = []; else; z_u = full(z_u(:)); end
+            if nargin < 6; z_bl = []; else; z_bl = full(z_bl(:)); end
+            if nargin < 7; z_bu = []; else; z_bu = full(z_bu(:)); end
+
+            if ~isempty(y); assert(length(y) == this.p, 'Incorrect dimension of y'); end
+            if ~isempty(z_l); assert(length(z_l) == this.m, 'Incorrect dimension of z_l'); end
+            if ~isempty(z_u); assert(length(z_u) == this.m, 'Incorrect dimension of z_u'); end
+            if ~isempty(z_bl); assert(length(z_bl) == this.n, 'Incorrect dimension of z_bl'); end
+            if ~isempty(z_bu); assert(length(z_bu) == this.n, 'Incorrect dimension of z_bu'); end
+
+            piqp_oct('set_warm_start', this.objectHandle, x, y, z_l, z_u, z_bl, z_bu);
         end
 
         %%
