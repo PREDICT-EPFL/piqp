@@ -353,10 +353,10 @@ bool KKTSystem<T, I, MatrixType>::solve(const DataType& data, const Settings<T>&
 		isize i_l = 0;
 		isize i_u = 0;
 		for (isize i = 0; i < data.m; i++) {
+			while (i_l < data.n_h_l && data.h_l_idx(i_l) < i) { i_l++; }
 			Eigen::Index idx_l = i_l < data.n_h_l ? data.h_l_idx(i_l) : -1;
-			while (idx_l < i && i_l < data.n_h_l) { idx_l = data.h_l_idx(++i_l); }
+			while (i_u < data.n_h_u && data.h_u_idx(i_u) < i) { i_u++; }
 			Eigen::Index idx_u = i_u < data.n_h_u ? data.h_u_idx(i_u) : -1;
-			while (idx_u < i && i_u < data.n_h_u) { idx_u = data.h_u_idx(++i_u); }
 
 			if (idx_l == i && idx_u == i) {
 				T rz_l_bar = rhs.z_l(i) - m_z_l_inv(i) * rhs.s_l(i);
