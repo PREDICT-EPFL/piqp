@@ -146,3 +146,24 @@ This allows the solver to internally reuse memory and factorizations speeding up
 
 {: .warning }
 Note the dimension and sparsity pattern of the problem are not allowed to change when calling the `update` function.
+
+## Quadratic and cone constraints
+
+Include `piqp/constrained/solver.hpp` and use `ConstrainedDenseSolver<double>` or `ConstrainedSparseSolver<double, int>` with an owning `dense::Model` or `sparse::Model`. The existing QP solver remains separate.
+
+```c++
+piqp::dense::Model<double> model(P, c, A, b);
+model.quadratic_constraints.emplace_back(Q, q, upper, indices);
+model.cone_constraints.emplace_back(F, f, piqp::ConeType::second_order, indices);
+piqp::ConstrainedDenseSolver<double> solver;
+solver.setup(model);
+auto status = solver.solve();
+```
+
+The descriptors mean `0.5*v.transpose()*Q*v + q.dot(v) <= upper` and `F*v + f` in the selected cone, where `v = x[indices]`. Empty indices select all variables. Indices are unique and zero-based. `P` and `Q` must be positive semidefinite; their upper triangles define the symmetric matrices. Sparse descriptors store sparse matrices, including structural zeros that may change during updates. `ConeType::rotated_second_order` uses `(a,b,v)` with `a,b >= 0` and `2*a*b >= v.squaredNorm()`.
+
+Setup copies the model. `update(model)` changes numerical data with fixed dimensions, sparse patterns, indices, finite-bound masks, and cone types. It reuses the setup scales. `update_quadratic(i, upper)` and `update_cone(i, f)` change individual bounds or offsets. Invalid dimensions, indices, nonfinite coefficients, and incompatible updates throw `std::invalid_argument`; positive semidefiniteness is the caller's responsibility. Select a backend before setup; sparse multistage requires BLASFEO. Every solve initializes from scratch and reuses allocated storage.
+
+Results expose `x`, `y`, affine and bound duals, `quadratic_slack`, `quadratic_dual`, and flat `cone_slack` and `cone_dual` arrays with `cone_offsets`. All values use input coordinates. Cone duals contribute `-F.transpose()*z` to stationarity. `objective`, `primal_residual`, `dual_residual`, and `complementarity` describe the original model. Unresolved problems return an iteration limit or numerical failure; the extension does not produce infeasibility certificates. See `examples/cpp/cpp_constrained_example.cpp` for a complete mixed example.
+
+Primal stopping uses `eps_abs`. Stationarity also uses `eps_rel` relative to the objective's linear term. Complementarity is always checked using `eps_duality_gap_abs` and `eps_duality_gap_rel`. The regularization floor is `reg_finetune_lower_limit`. Refinement uses its absolute and relative tolerances and maximum iteration count. The QP-specific infeasibility heuristics, regularization update thresholds, `reg_lower_limit`, `check_duality_gap`, and remaining refinement controls do not apply. Set `compute_timings` to record timing fields.

@@ -47,3 +47,13 @@ target_link_libraries(dense_cholesky_factorization_benchmark PRIVATE piqp-benchm
 
 add_executable(dense_sparse_solver_benchmark src/dense_sparse_solver_benchmark.cpp)
 target_link_libraries(dense_sparse_solver_benchmark PRIVATE piqp-benchmark)
+
+add_executable(constrained_solver_benchmark src/constrained_solver_benchmark.cpp)
+target_link_libraries(constrained_solver_benchmark PRIVATE piqp)
+target_compile_options(constrained_solver_benchmark PRIVATE ${compiler_flags})
+target_link_options(constrained_solver_benchmark PRIVATE ${linker_flags})
+
+add_executable(constrained_qp_regression src/constrained_qp_regression.cpp)
+target_link_libraries(constrained_qp_regression PRIVATE piqp)
+target_compile_options(constrained_qp_regression PRIVATE ${compiler_flags})
+target_link_options(constrained_qp_regression PRIVATE ${linker_flags})

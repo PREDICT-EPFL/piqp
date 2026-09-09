@@ -1,0 +1,141 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{amsmath,amssymb,graphicx,booktabs}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Q}{\mathcal{Q}}
+\newcommand{\norm}[1]{\lVert#1\rVert}
+\title{Convex Quadratic and Second-Order Cone Constraints in PIQP}
+\author{\IEEEauthorblockN{Working draft}}
+\begin{document}
+\maketitle
+\begin{abstract}
+We describe an additive C++ extension of PIQP for convex quadratic inequalities and affine second-order cones. A separate primal--dual iteration retains native quadratic objectives and constraints, while reusing PIQP's dense, sparse, and multistage factorizations without changing their interfaces. Symmetric cone whitening converts regularized Nesterov--Todd blocks into scalar dual blocks. A spectral representation applies this transformation in linear time and avoids dense cone scaling matrices. We derive the mixed Newton system, quadratic corrector terms, and finite-precision recovery rules. Numerical tests check independently constructed optimality conditions and allocation-free solves and updates. Experiments compare native and conic representations, multistage horizon scaling, and public conic problems on an Apple Silicon laptop. The method is a practical extension; no general convergence or infeasibility-certificate claim is made.
+\end{abstract}
+
+\section{Introduction}
+Quadratic constraints occur in terminal sets, energy limits, and ellipsoidal regions in optimal control. Second-order cones also express norm limits and contact friction. Approximating these constraints with affine inequalities can increase model size or introduce conservatism. A solver that handles them directly can retain the original convex model.
+
+PIQP combines a primal--dual interior-point iteration with proximal regularization and specialized linear algebra~\cite{piqp}. Its multistage backend detects and factors block tridiagonal matrices with a dense border~\cite{multistage}. Native quadratic constraints have a direct precedent in HPIPM~\cite{hpipm}. ECOS~\cite{ecos}, QOCO~\cite{qoco}, and Clarabel~\cite{clarabel} provide complementary examples of conic scaling, regularization, and sparse implementation.
+
+This work asks how much of the existing PIQP implementation can be reused for mixed quadratic and conic constraints. The extension changes neither the QP iteration nor the backend interface. Its main numerical device is a regularized symmetric whitening transformation, evaluated without forming a dense cone block. The resulting Newton data can pass through every existing factorization. Whole-constraint sparsity, original-coordinate stopping tests, and finite-precision recovery require separate treatment.
+
+\section{Problem and proximal Newton system}
+Consider
+\begin{subequations}\label{eq:model}
+\begin{align}
+ \min_x\quad &\tfrac12x^TPx+c^Tx,\\
+ \text{subject to}\quad &Ax=b,\\
+ &g_i(x)=\tfrac12x^TQ_ix+q_i^Tx-u_i\leq0,\\
+ &F_jx+f_j\in\Q^{d_j},
+\end{align}
+\end{subequations}
+where $P,Q_i\succeq0$ and $\Q^d=\{(t,v):t\geq\norm{v}_2\}$. Affine inequalities and bounds are scalar constraints with zero curvature. Local index sets restrict a constraint to selected components of $x$. Rotated cones use the transformation
+\begin{equation}
+ T(a,b,v)=(a+b,a-b,\sqrt2v).
+\end{equation}
+If $s_o,z_o$ are ordinary-cone variables, the corresponding rotated variables are $s_r=T^{-1}s_o$ and $z_r=T^Tz_o$. The different transformations preserve $z_o^TTs_r$.
+
+Stack the scalar functions and cone rows $-F_jx-f_j$ in $g(x)$. With independent slacks $s$ and duals $z$ in the product cone, write $g(x)+s=0$. Let
+\begin{equation}
+ J=g'(x),\qquad H=P+\sum_i z_iQ_i.
+\end{equation}
+The unregularized Karush--Kuhn--Tucker (KKT) residuals are
+\begin{equation}
+ r_d=Px+c+A^Ty+J^Tz,\quad r_e=Ax-b,\quad r_g=g(x)+s.
+\end{equation}
+For centers $(\xi,\eta,\zeta)$ and positive $\rho,\delta$, use
+\begin{equation}\label{eq:prox}
+ \bar r_d=r_d+\rho(x-\xi),\quad
+ \bar r_e=r_e-\delta(y-\eta),\quad
+ \bar r_g=r_g-\delta(z-\zeta).
+\end{equation}
+The objective matrix $P$ remains separate from $H$ in storage and objective evaluation.
+
+\subsection{Scaling and elimination}
+For a Lorentz cone the Jordan product is
+\begin{equation}
+ (a,u)\circ(b,v)=(ab+u^Tv,av+bu),\qquad e=(1,0).
+\end{equation}
+We use the barrier $-\tfrac12\log(a^2-\norm{u}_2^2)$ and count one complementarity degree per cone and per scalar inequality~\cite{cvxopt}. Thus $\mu=s^Tz/\nu$, where $\nu$ is this number of blocks, not their total coordinate dimension.
+
+Let $W=W^T\succ0$ be the Nesterov--Todd scaling with $\lambda=Wz=W^{-1}s$. Define $L_\lambda v=\lambda\circ v$. A scaled complementarity right-hand side $r_c$ gives
+\begin{equation}
+ W^{-1}\Delta s+W\Delta z=h,\qquad h=L_\lambda^{-1}r_c.
+\end{equation}
+Eliminating slack yields
+\begin{equation}\label{eq:newton}
+ \begin{bmatrix}H+\rho I&A^T&J^T\\A&-\delta I&0\\J&0&-D\end{bmatrix}
+ \begin{bmatrix}\Delta x\\\Delta y\\\Delta z\end{bmatrix}
+ =\begin{bmatrix}-\bar r_d\\-\bar r_e\\-\bar r_g-Wh\end{bmatrix}.
+\end{equation}
+Here $D=W^2+\delta I$. For scalar constraints $D=s/z+\delta$. For cones it is positive definite. Eliminating the regularized dual variables produces
+\begin{equation}\label{eq:condensed}
+ H+\rho I+\delta^{-1}A^TA+J^TD^{-1}J\succ0.
+\end{equation}
+This explains compatibility with PIQP's factorizations in exact arithmetic. It does not establish convergence of the nonlinear iteration.
+
+\subsection{Predictor and corrector}
+The affine predictor uses $h_a=-\lambda$. From its admissible step, compute $\mu_a$ and set $\sigma=(\min\{1,\max\{0,\mu_a/\mu\}\})^3$. For a combined corrector use
+\begin{equation}\label{eq:corrector}
+ h=-\lambda+L_\lambda^{-1}\left(\sigma\mu e
+ -(W^{-1}\Delta s_a)\circ(W\Delta z_a)\right).
+\end{equation}
+Writing the predictor contribution explicitly avoids dividing the difference of nearly equal Jordan products.
+
+Native quadratic constraints have exact second-order residual terms
+\begin{equation}
+ \tfrac12\Delta x_a^TQ_i\Delta x_a,\qquad
+ \sum_i\Delta z_{a,i}Q_i\Delta x_a.
+\end{equation}
+Subtract these from the feasibility and stationarity right-hand sides, respectively. One common primal and dual step preserves these factors. A fraction-to-boundary rule keeps independent slacks and duals interior.
+
+Backtracking evaluates the actual nonlinear residuals in~\eqref{eq:prox}, with centers, target $\sigma\mu$, and scaling $W$ fixed. The complementarity merit uses $(W^{-1}s)\circ(Wz)-\sigma\mu e$. A rejected combined direction is replaced by a centered direction without predictor remainders. Centers move when the corresponding original residual decreases. Regularization decreases with complementarity; a failed factorization or inaccurate affine-predictor solve triggers increased regularization and another solve. These are practical safeguards, rather than conditions of a proved convergence theorem.
+
+\section{Numerical implementation}
+\subsection{Linear-time cone whitening}
+Set $B=(W^2+\delta I)^{-1/2}$. The substitutions
+\begin{equation}\label{eq:white}
+ \widetilde J=BJ,\quad v=B^{-1}\Delta z,\quad
+ \widetilde r_g=-B\bar r_g-BWh
+\end{equation}
+replace each cone dual block by $-I$. Recover $\Delta z=Bv$. The existing backend therefore receives only scalar dual scaling, with transformed Jacobian rows and right-hand sides.
+
+A Lorentz scaling has the form
+\begin{equation}
+ W=\beta\begin{bmatrix}w_0&w_v^T\\w_v&I+w_vw_v^T/(1+w_0)\end{bmatrix},
+ \quad w_0^2-\norm{w_v}_2^2=1.
+\end{equation}
+Let $r=\norm{w_v}_2$. If $r=0$, then $W=\beta I$. Otherwise set $u=w_v/r$. In the span of the leading axis and $(0,u)$, the eigenvalues are $\beta(w_0+r)$ and $\beta/(w_0+r)$. On the orthogonal complement the eigenvalue is $\beta$. Applying $W$, $W^{-1}$, $B$, or $BW$ therefore requires one tail inner product and a vector update. Storage and arithmetic are $O(d)$ per application. Rationalized coefficients avoid subtraction of nearly equal eigenvalues for small $r$.
+
+The order in~\eqref{eq:white} matters. The eigenvalues of $BW$ are $\omega/\sqrt{\omega^2+\delta}\leq1$. Applying this bounded product directly avoids first creating the potentially ill-conditioned vector $Wh$. Likewise, recover cone slack steps from the original affine feasibility equation,
+\begin{equation}\label{eq:recovery}
+ \Delta s=-\bar r_g-J\Delta x+\delta\Delta z,
+\end{equation}
+instead of subtracting $W^2\Delta z$ from $Wh$. Independent near-boundary Newton tests check both feasibility and scaled complementarity.
+
+\subsection{Sparse and multistage structure}
+A cone's transformed rows can depend on the union of all columns touched by that cone. Setup allocates this union, including stored zeros. A quadratic block reserves its Hessian pattern and every possible Jacobian entry. Numerical updates never infer support from current values, which could vanish at the initial iterate.
+
+The implementation retains sparse objective and equality matrices and small local constraint blocks. Dense Cholesky, sparse LDL$^T$, and the existing BLASFEO multistage factorization consume the same transformed equations. When each entire constraint is confined to neighboring stages and a bounded global-variable border,~\eqref{eq:condensed} retains the multistage structure. With bounded local dimensions and constraint work per stage, assembly and factorization have linear horizon complexity per iteration. A horizon-wide energy constraint or a cone joining distant stages can destroy this property.
+
+Whitening avoids dense $d\times d$ scaling matrices, but it can still fill a sparse cone's transformed rows. Its work is $O(dk)$ for support size $k$. The experiments separate cone dimension from support size to expose this cost. No alternative sparse expansion is assumed to be faster without measurement.
+
+\subsection{Scaling, initialization, and termination}
+Diagonal variable scaling $x=E\hat x$ and a positive objective multiplier $\gamma$ give $\hat P=\gamma E^TPE$. A scalar constraint multiplier $\alpha_i$ scales its entire quadratic expression, including $\hat Q_i=\alpha_iE^TQ_iE$. Each cone receives a common row multiplier $\beta_j$. Independent row scaling within a cone is not valid. Scale selection includes curvature, even when the current quadratic gradient is zero.
+
+An auxiliary regularized solve initializes the objective, affine constraints, and cones with unit slack scaling. Quadratic rows are excluded from that auxiliary model, then evaluated at its primal point. Scalar pairs are made positive, and cone pairs are shifted along their leading axis. Each solve starts from scratch while reusing symbolic factorizations and allocated memory.
+
+Return quadratic and cone slacks divided by their constraint scales and duals multiplied by their constraint scales divided by $\gamma$. Stopping evaluates the original model, including true quadratic values, cone membership, slack consistency, stationarity, and complementarity. The reported complementarity is not described as an unconditional objective gap. For singular Lagrangian Hessians, an exact dual objective would also require a range condition. Unresolved cases return an iteration limit or numerical failure, not an inferred conic infeasibility certificate.
+
+\section{Experiments}
+\input{results.tex}
+
+\newpage
+\section{Conclusion}
+The extension reuses PIQP's factorization implementations for mixed convex quadratic and Lorentz constraints. Its additional numerical work lies in nonlinear residuals and curvature, scaled complementarity, structure-preserving assembly, and accurate recovery. The measurements characterize this implementation on the tested problems; they do not establish a general performance ordering or convergence theorem.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+\end{document}

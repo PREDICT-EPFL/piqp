@@ -1,0 +1,100 @@
+\documentclass[10pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=24mm]{geometry}
+\begin{document}
+\noindent\textbf{Mixed quadratic and Lorentz constraints: implementation equations}\par\medskip
+Let $g(x)$ stack affine upper bounds, convex quadratic upper bounds
+$g_i(x)=\tfrac12x^TQ_ix+q_i^Tx-u_i$, and cone rows $-F_jx-f_j$.
+The model is $\min\tfrac12x^TPx+c^Tx$ subject to $Ax=b$ and
+$g(x)+s=0$, with $s,z$ in a product of positive rays and Lorentz cones.
+Write $J=g'(x)$ and $H=P+\sum_{i\in\mathrm{quadratic}}z_iQ_i$.
+The original residuals are
+\[
+r_d=Px+c+A^Ty+J^Tz,\quad r_e=Ax-b,\quad r_g=g(x)+s.
+\]
+With proximal centers $(\xi,\eta,\zeta)$, use
+$\bar r_d=r_d+\rho(x-\xi)$,
+$\bar r_e=r_e-\delta(y-\eta)$ and
+$\bar r_g=r_g-\delta(z-\zeta)$.
+The derivative has primal block $H+\rho I$ and negative dual regularization.
+
+For a Lorentz cone use $e=(1,0)$,
+$(a,u)\circ(b,v)=(ab+u^Tv,av+bu)$ and the barrier
+$-\tfrac12\log(a^2-\|u\|^2)$.
+Each scalar inequality and each cone contributes one to $\nu$.
+Set $\mu=s^Tz/\nu$. The symmetric Nesterov--Todd scaling satisfies
+$\lambda=Wz=W^{-1}s$, with $W=W^T\succ0$.
+For scalar rows $W=\sqrt{s/z}$. In scaled coordinates,
+\[
+ L_\lambda(W^{-1}\Delta s+W\Delta z)=r_c,
+ \qquad L_\lambda v=\lambda\circ v.
+\]
+Thus $\Delta s+W^2\Delta z=t$, where $t=W L_\lambda^{-1}r_c$.
+Eliminating slack gives
+\[
+\begin{bmatrix}H+\rho I&A^T&J^T\\
+ A&-\delta I&0\\J&0&-D\end{bmatrix}
+\begin{bmatrix}\Delta x\\\Delta y\\\Delta z\end{bmatrix}
+=\begin{bmatrix}-\bar r_d\\-\bar r_e\\-\bar r_g-t\end{bmatrix},
+\quad D=W^2+\delta I.
+\]
+Set $B=D^{-1/2}$ and replace each cone Jacobian by $BJ$,
+its right-hand side by $-B\bar r_g-BWh$, and its dual step by
+$v=B^{-1}\Delta z$, where $h=L_\lambda^{-1}r_c$.
+The resulting dual block is $-I$.
+This congruence leaves the existing PIQP backend interface unchanged.
+Apply $BW$ directly through its bounded eigenvalues. Recover the dual step
+as $\Delta z=Bv$ and the cone slack step from affine feasibility,
+$\Delta s=-\bar r_g-J\Delta x+\delta\Delta z$, to avoid cancellation.
+
+The affine predictor uses $r_c=-\lambda\circ\lambda$.
+For its direction $(\Delta x_a,\Delta s_a,\Delta z_a)$, estimate
+$\mu_a$ using admissible cone steps and set
+$\sigma=\min(1,\max(0,\mu_a/\mu))^3$.
+The combined corrector uses
+\[
+r_c=\sigma\mu e-\lambda\circ\lambda
+ -(W^{-1}\Delta s_a)\circ(W\Delta z_a).
+\]
+For native quadratics also subtract
+$\tfrac12\Delta x_a^TQ_i\Delta x_a$ from the feasibility right-hand side
+and $\sum_i\Delta z_{a,i}Q_i\Delta x_a$ from the stationarity right-hand side.
+These are the exact second-order Taylor remainders of the corresponding
+unregularized residuals. They are not extra Hessian terms.
+Use one common step for primal and dual variables to retain these factors.
+Fraction-to-boundary keeps scalar pairs positive and cone pairs interior.
+Backtracking evaluates the actual nonlinear residuals with fixed centers,
+fixed target $\sigma\mu$, and fixed $W$. Its complementarity residual is
+$(W^{-1}s_{\rm trial})\circ(Wz_{\rm trial})-\sigma\mu e$.
+Reject a direction if it cannot reduce this
+residual merit, and retry a centered direction without affine remainder terms.
+This safeguard is an implementation choice, not a convergence theorem.
+
+Equilibrate with $x=E\hat x$ and objective multiplier $\gamma>0$.
+A scalar constraint scale $\alpha_i>0$ gives
+$\hat Q_i=\alpha_iE^TQ_iE$, $\hat q_i=\alpha_iE^Tq_i$,
+and $\hat u_i=\alpha_i u_i$.
+A cone uses one common positive scale $\beta_j$ for all its rows.
+Return $s_i=\hat s_i/\alpha_i$ and
+$z_i=\alpha_i\hat z_i/\gamma$, with the analogous cone and equality maps.
+For a rotated cone use
+$T(a,b,v)=(a+b,a-b,\sqrt2v)$, return $s_r=T^{-1}s_o$,
+and return $z_r=T^Tz_o$. The latter preserves the dual pairing.
+
+Initialize affine rows and cone rows through PIQP's regularized auxiliary
+linear system with unit slack scaling. Exclude native quadratic rows from
+that auxiliary objective, evaluate them at its primal point, then choose
+positive slack-dual pairs. Repair Lorentz vectors by shifting their first
+coordinate. Allocate structural support before initialization.
+
+Termination uses original-coordinate stationarity, affine feasibility,
+true quadratic feasibility, slack consistency, primal and dual cone
+membership, and complementarity. No infeasibility certificate is inferred
+from proximal stagnation. A complementarity sum at an infeasible point is
+not an objective gap. Writing the Lagrangian as $\tfrac12x^THx+\ell^Tx+k$,
+for singular $H$ the exact dual objective requires
+$\ell\in\operatorname{range}(H)$ and is
+$k-\tfrac12\ell^TH^\dagger\ell$; otherwise it is $-\infty$.
+The implementation reports the primal objective and KKT residuals without
+claiming this expensive dual evaluation.
+\end{document}

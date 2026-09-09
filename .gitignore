@@ -10,3 +10,14 @@ cmake-build-*/
 *.oct
 *.asv
 *.pdb
+/papers/
+/paper/*.aux
+/paper/*.log
+/paper/*.out
+/paper/*.fls
+/paper/*.fdb_latexmk
+/paper/*.bbl
+/paper/*.blg
+/benchmarks/constrained/instances/
+/benchmarks/constrained/public/*.cbf.gz
+/benchmarks/constrained/results/

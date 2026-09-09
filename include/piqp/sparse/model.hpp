@@ -14,6 +14,7 @@
 #include "piqp/typedefs.hpp"
 #include "piqp/dense/model.hpp"
 #include "piqp/utils/optional.hpp"
+#include "piqp/constrained/constraints.hpp"
 
 namespace piqp
 {
@@ -37,6 +38,9 @@ struct Model
     Vec<T> h_u;
     Vec<T> x_l;
     Vec<T> x_u;
+
+    std::vector<QuadraticConstraint<T, SparseMat<T, I>>> quadratic_constraints;
+    std::vector<ConeConstraint<T, SparseMat<T, I>>> cone_constraints;
 
     Model(const SparseMat<T, I>& P,
           const CVecRef<T>& c,
@@ -75,7 +79,12 @@ struct Model
 
     dense::Model<T> dense_model()
     {
-        return dense::Model<T>(Mat<T>(P), c, Mat<T>(A), b, Mat<T>(G), h_l, h_u, x_l, x_u);
+        dense::Model<T> model(Mat<T>(P), c, Mat<T>(A), b, Mat<T>(G), h_l, h_u, x_l, x_u);
+        for (const auto& constraint : quadratic_constraints)
+            model.quadratic_constraints.emplace_back(Mat<T>(constraint.Q), constraint.q, constraint.upper, constraint.indices);
+        for (const auto& constraint : cone_constraints)
+            model.cone_constraints.emplace_back(Mat<T>(constraint.F), constraint.f, constraint.type, constraint.indices);
+        return model;
     }
 };
 

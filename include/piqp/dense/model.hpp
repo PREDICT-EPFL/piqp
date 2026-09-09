@@ -13,6 +13,7 @@
 
 #include "piqp/typedefs.hpp"
 #include "piqp/utils/optional.hpp"
+#include "piqp/constrained/constraints.hpp"
 
 namespace piqp
 {
@@ -35,6 +36,9 @@ struct Model
     Vec<T> h_u;
     Vec<T> x_l;
     Vec<T> x_u;
+
+    std::vector<QuadraticConstraint<T>> quadratic_constraints;
+    std::vector<ConeConstraint<T>> cone_constraints;
 
     Model(const CMatRef<T>& P,
           const CVecRef<T>& c,

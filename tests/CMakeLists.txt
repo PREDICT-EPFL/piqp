@@ -109,6 +109,16 @@ if (BUILD_NETLIB_TESTS)
 endif()
 
 include(GoogleTest)
+add_executable(constrained_test
+    src/constrained/cone_test.cpp
+    src/constrained/cone_transform_test.cpp
+    src/constrained/newton_test.cpp
+    src/constrained/solver_random_test.cpp
+    src/constrained/solver_edge_test.cpp
+    src/constrained/solver_math_test.cpp)
+target_link_libraries(constrained_test PRIVATE piqp-test)
+fix_test_dll(constrained_test)
+gtest_discover_tests(constrained_test)
 gtest_discover_tests(dense_ldlt_test)
 gtest_discover_tests(dense_kkt_test)
 gtest_discover_tests(dense_solver_test)

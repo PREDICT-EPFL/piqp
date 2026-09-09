@@ -1,0 +1,16 @@
+[
+  {
+    "name": "nql30",
+    "url": "https://cblib.zib.de/download/all/nql30.cbf.gz",
+    "sha256": "f926413ff08c1c296254f60c54cb7a4154f501ddb9d2f6948918d72d14f93739",
+    "continuous": true,
+    "downloaded_on": "2026-09-09"
+  },
+  {
+    "name": "nql60",
+    "url": "https://cblib.zib.de/download/all/nql60.cbf.gz",
+    "sha256": "a6c680874314566d5808ea8174b4e3c8705d8c9d450d8e8b0f21a3734e15a87b",
+    "continuous": true,
+    "downloaded_on": "2026-09-09"
+  }
+]

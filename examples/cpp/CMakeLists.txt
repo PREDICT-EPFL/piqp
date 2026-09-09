@@ -12,3 +12,6 @@ target_link_libraries(cpp_dense_example PRIVATE piqp::piqp)
 
 add_executable(cpp_sparse_example cpp_sparse_example.cpp)
 target_link_libraries(cpp_sparse_example PRIVATE piqp::piqp)
+
+add_executable(cpp_constrained_example cpp_constrained_example.cpp)
+target_link_libraries(cpp_constrained_example PRIVATE piqp::piqp)

@@ -1,0 +1,24 @@
+\begin{tikzpicture}
+\begin{loglogaxis}[width=.48\textwidth,height=4.6cm,xlabel={Horizon $N$},ylabel={Solve time [$\mu$s]},grid=major,xtick={10,20,40,80},xticklabels={10,20,40,80},legend style={font=\scriptsize},legend pos=north west]
+\addplot+[mark size=1.5pt] coordinates {(10,230.354) (20,864.646) (40,4016.31) (80,21337.3)};
+\addlegendentry{Dense}
+\addplot+[mark size=1.5pt] coordinates {(10,86.625) (20,200.166) (40,334.375) (80,660.604)};
+\addlegendentry{Sparse}
+\addplot+[mark size=1.5pt] coordinates {(10,105.645) (20,190.041) (40,356.333) (80,732.875)};
+\addlegendentry{Multistage}
+\addplot+[mark size=1.5pt] coordinates {(10,152.625) (20,278.771) (40,495.646) (80,986.208)};
+\addlegendentry{Clarabel}
+\end{loglogaxis}
+\end{tikzpicture}
+\begin{tikzpicture}
+\begin{loglogaxis}[width=.48\textwidth,height=4.6cm,xlabel={Cone dimension $d$},ylabel={Solve time [$\mu$s]},grid=major,xtick={8,32,128,512,2048},xticklabels={8,32,128,512,2048},legend style={font=\scriptsize},legend pos=north west]
+\addplot+[mark size=1.5pt] coordinates {(8,6.1045) (32,13.333) (128,37.0625) (512,167.896) (2048,664.98)};
+\addlegendentry{Dense}
+\addplot+[mark size=1.5pt] coordinates {(8,6.875) (32,16.7705) (128,54.2495) (512,250.75) (2048,967.375)};
+\addlegendentry{Sparse}
+\addplot+[mark size=1.5pt] coordinates {(8,6.334) (32,14.667) (128,45.1665) (512,200.5) (2048,791.729)};
+\addlegendentry{Multistage}
+\addplot+[mark size=1.5pt] coordinates {(8,16.291) (32,39.333) (128,132.562) (512,470.604) (2048,2553.94)};
+\addlegendentry{Clarabel}
+\end{loglogaxis}
+\end{tikzpicture}
