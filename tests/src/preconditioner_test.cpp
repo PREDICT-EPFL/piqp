@@ -271,6 +271,71 @@ TEST(RuizEquilibration, DenseSparseCompare)
     EXPECT_TRUE(data_sparse.x_u.head(data_sparse.n_x_u).isApprox(data_dense.x_u.head(data_dense.n_x_u), 1e-8));
 }
 
+TEST(RuizEquilibration, DenseSparseCompareScaleCost)
+{
+    isize dim = 10;
+    isize n_eq = 8;
+    isize n_ineq = 9;
+    T sparsity_factor = 0.2;
+    // enough iterations for the equilibration to actually reach its stopping criterion,
+    // which is where a cost scaling interfering with that criterion shows up
+    isize max_iter = 100;
+
+    for (unsigned int seed = 0; seed < 10; seed++)
+    {
+        rand::gen.seed(seed);
+
+        sparse::Model<T, I> qp_model_sparse = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
+        dense::Model<T> qp_model_dense = qp_model_sparse.dense_model();
+        sparse::Data<T, I> data_sparse(qp_model_sparse);
+        dense::Data<T> data_dense(qp_model_dense);
+
+        // empty a full column of P, i.e. a variable which carries no cost at all
+        for (isize k = 0; k < dim; k++)
+        {
+            data_sparse.P_utri.coeffRef((std::min)(k, isize(1)), (std::max)(k, isize(1))) = 0;
+            data_dense.P_utri((std::min)(k, isize(1)), (std::max)(k, isize(1))) = 0;
+        }
+        data_sparse.P_utri.prune(0.0);
+
+        sparse::RuizEquilibration<T, I> preconditioner_sparse;
+        preconditioner_sparse.init(data_sparse);
+        dense::RuizEquilibration<T> preconditioner_dense;
+        preconditioner_dense.init(data_dense);
+
+        PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+        preconditioner_sparse.scale_data(data_sparse, false, true, max_iter);
+        preconditioner_dense.scale_data(data_dense, false, true, max_iter);
+        PIQP_EIGEN_MALLOC_ALLOWED();
+
+        SCOPED_TRACE("seed " + std::to_string(seed));
+
+        // the cost scaling must not interfere with the convergence criterion of the
+        // equilibration, i.e. both backends have to run the same number of iterations
+        EXPECT_NEAR(preconditioner_sparse.scale_cost(T(1)), preconditioner_dense.scale_cost(T(1)), 1e-10);
+
+        Mat<T> P_utri_dense(dim, dim); P_utri_dense.setZero();
+        P_utri_dense.triangularView<Eigen::Upper>() = data_dense.P_utri.triangularView<Eigen::Upper>();
+        EXPECT_TRUE(Mat<T>(data_sparse.P_utri).isApprox(P_utri_dense, 1e-8));
+        EXPECT_TRUE(Mat<T>(data_sparse.AT).isApprox(data_dense.AT, 1e-8));
+        EXPECT_TRUE(Mat<T>(data_sparse.GT).isApprox(data_dense.GT, 1e-8));
+        EXPECT_TRUE(data_sparse.c.isApprox(data_dense.c, 1e-8));
+        EXPECT_TRUE(data_sparse.b.isApprox(data_dense.b, 1e-8));
+        EXPECT_TRUE(data_sparse.h_l.isApprox(data_dense.h_l, 1e-8));
+        EXPECT_TRUE(data_sparse.h_u.isApprox(data_dense.h_u, 1e-8));
+        EXPECT_TRUE(data_sparse.x_b_scaling.isApprox(data_dense.x_b_scaling, 1e-8));
+        EXPECT_TRUE(data_sparse.x_l.head(data_sparse.n_x_l).isApprox(data_dense.x_l.head(data_dense.n_x_l), 1e-8));
+        EXPECT_TRUE(data_sparse.x_u.head(data_sparse.n_x_u).isApprox(data_dense.x_u.head(data_dense.n_x_u), 1e-8));
+
+        PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+        preconditioner_sparse.unscale_data(data_sparse);
+        preconditioner_dense.unscale_data(data_dense);
+        PIQP_EIGEN_MALLOC_ALLOWED();
+
+        EXPECT_TRUE(data_sparse.c.isApprox(qp_model_sparse.c, 1e-8));
+    }
+}
+
 TEST(RuizEquilibration, DenseCostScalingIgnoresEmptyColumns)
 {
     isize dim = 4;

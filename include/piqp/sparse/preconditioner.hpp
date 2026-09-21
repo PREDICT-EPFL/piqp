@@ -40,6 +40,9 @@ class RuizEquilibration
     Vec<T> delta_inv;
     Vec<T> delta_b_inv;
 
+    // temporary storage for the column norms of P in the cost scaling
+    Vec<T> delta_cost;
+
 public:
     void init(const Data<T, I>& data);
 

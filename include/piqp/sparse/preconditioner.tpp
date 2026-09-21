@@ -30,6 +30,7 @@ void RuizEquilibration<T, I>::init(const Data<T, I>& data)
     delta_b.resize(n);
     delta_inv.resize(n + p + m);
     delta_b_inv.resize(n);
+    delta_cost.resize(n);
 
     c = T(1);
     delta.setConstant(1);
@@ -145,7 +146,7 @@ void RuizEquilibration<T, I>::scale_data(Data<T, I>& data, bool reuse_prev_scali
             {
                 PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::cost_scaling");
                 // scaling for the cost
-                Vec<T>& delta_iter_cost = delta_b_inv; // we use delta_l_inv as a temporary storage
+                Vec<T>& delta_iter_cost = delta_cost;
                 delta_iter_cost.setZero();
                 for (isize j = 0; j < n; j++)
                 {
