@@ -270,3 +270,74 @@ TEST(RuizEquilibration, DenseSparseCompare)
     EXPECT_TRUE(data_sparse.x_l.head(data_sparse.n_x_l).isApprox(data_dense.x_l.head(data_dense.n_x_l), 1e-8));
     EXPECT_TRUE(data_sparse.x_u.head(data_sparse.n_x_u).isApprox(data_dense.x_u.head(data_dense.n_x_u), 1e-8));
 }
+
+TEST(RuizEquilibration, DenseCostScalingIgnoresEmptyColumns)
+{
+    isize dim = 4;
+    isize n_empty = 12;
+    T weight = 4;
+
+    Mat<T> P = Mat<T>::Zero(dim, dim);
+    P.diagonal().setConstant(weight);
+    Mat<T> P_padded = Mat<T>::Zero(dim + n_empty, dim + n_empty);
+    P_padded.topLeftCorner(dim, dim) = P;
+
+    dense::Model<T> qp_model(P, Vec<T>::Zero(dim), nullopt, nullopt, nullopt, nullopt, nullopt,
+                             Vec<T>::Constant(dim, T(-1)), Vec<T>::Constant(dim, T(1)));
+    dense::Model<T> qp_model_padded(P_padded, Vec<T>::Zero(dim + n_empty), nullopt, nullopt, nullopt,
+                                    nullopt, nullopt, Vec<T>::Constant(dim + n_empty, T(-1)),
+                                    Vec<T>::Constant(dim + n_empty, T(1)));
+    dense::Data<T> data(qp_model);
+    dense::Data<T> data_padded(qp_model_padded);
+
+    dense::RuizEquilibration<T> preconditioner;
+    preconditioner.init(data);
+    dense::RuizEquilibration<T> preconditioner_padded;
+    preconditioner_padded.init(data_padded);
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    preconditioner.scale_data(data, false, true);
+    preconditioner_padded.scale_data(data_padded, false, true);
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    // columns without any cost must not influence the cost scaling
+    EXPECT_NEAR(preconditioner_padded.scale_cost(T(1)), preconditioner.scale_cost(T(1)), 1e-10);
+}
+
+TEST(RuizEquilibration, SparseCostScalingIgnoresEmptyColumns)
+{
+    isize dim = 4;
+    isize n_empty = 12;
+    T weight = 4;
+
+    SparseMat<T, I> P(dim, dim);
+    SparseMat<T, I> P_padded(dim + n_empty, dim + n_empty);
+    for (isize j = 0; j < dim; j++)
+    {
+        P.insert(j, j) = weight;
+        P_padded.insert(j, j) = weight;
+    }
+    P.makeCompressed();
+    P_padded.makeCompressed();
+
+    sparse::Model<T, I> qp_model(P, Vec<T>::Zero(dim), nullopt, nullopt, nullopt, nullopt, nullopt,
+                                 Vec<T>::Constant(dim, T(-1)), Vec<T>::Constant(dim, T(1)));
+    sparse::Model<T, I> qp_model_padded(P_padded, Vec<T>::Zero(dim + n_empty), nullopt, nullopt, nullopt,
+                                        nullopt, nullopt, Vec<T>::Constant(dim + n_empty, T(-1)),
+                                        Vec<T>::Constant(dim + n_empty, T(1)));
+    sparse::Data<T, I> data(qp_model);
+    sparse::Data<T, I> data_padded(qp_model_padded);
+
+    sparse::RuizEquilibration<T, I> preconditioner;
+    preconditioner.init(data);
+    sparse::RuizEquilibration<T, I> preconditioner_padded;
+    preconditioner_padded.init(data_padded);
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    preconditioner.scale_data(data, false, true);
+    preconditioner_padded.scale_data(data_padded, false, true);
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    // columns without any cost must not influence the cost scaling
+    EXPECT_NEAR(preconditioner_padded.scale_cost(T(1)), preconditioner.scale_cost(T(1)), 1e-10);
+}

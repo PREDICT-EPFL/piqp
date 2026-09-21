@@ -159,7 +159,19 @@ void RuizEquilibration<T, I>::scale_data(Data<T, I>& data, bool reuse_prev_scali
                         }
                     }
                 }
-                T gamma = delta_iter_cost.sum() / T(n);
+                // average over the columns of P which are actually populated, since empty
+                // columns carry no cost and would only drag the average towards zero
+                T gamma_sum = T(0);
+                isize n_populated = 0;
+                for (isize j = 0; j < n; j++)
+                {
+                    if (delta_iter_cost(j) > T(0))
+                    {
+                        gamma_sum += delta_iter_cost(j);
+                        n_populated++;
+                    }
+                }
+                T gamma = n_populated > 0 ? gamma_sum / T(n_populated) : T(0);
                 limit_scaling(gamma);
                 gamma = (std::max)(gamma, data.c.template lpNorm<Eigen::Infinity>());
                 limit_scaling(gamma);
