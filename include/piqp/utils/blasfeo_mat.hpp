@@ -8,6 +8,7 @@
 #ifndef PIQP_BLASFEO_MAT_HPP
 #define PIQP_BLASFEO_MAT_HPP
 
+#include <cassert>
 #include <cstring>
 
 #include "blasfeo.h"
