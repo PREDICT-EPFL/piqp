@@ -7,6 +7,7 @@
 #include "omp.h"
 #endif
 
+#include <memory>
 #include <vector>
 #include "piqp/utils/blasfeo_mat.hpp"
 #include "piqp/sparse/blocksparse/block_kkt.hpp"
@@ -33,37 +34,7 @@ namespace piqp {
 
             SubBlockKKTParallel(const SubBlockKKTParallel& other)
             {
-                index = other.index;
-                D.resize(other.D.size());
-                E.resize(other.E.size());
-                Bt.resize(other.Bt.size());
-                G.resize(other.G.size());
-                F = std::make_unique<BlasfeoMat>(*other.F);
-                A = std::make_unique<BlasfeoMat>(*other.A);
-                H = std::make_unique<BlasfeoMat>(*other.H);
-                Q = std::make_unique<BlasfeoMat>(*other.Q);
-                R = std::make_unique<BlasfeoMat>(*other.R);
-
-                for (std::size_t i = 0; i < other.D.size(); i++) {
-                    if (other.D[i]) {
-                         D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
-                    }
-                }
-                for (std::size_t i = 0; i < other.E.size(); i++) {
-                    if (other.E[i]) {
-                        E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
-                    }
-                }
-                for (std::size_t i = 0; i < other.Bt.size(); i++) {
-                    if (other.Bt[i]) {
-                        Bt[i] = std::make_unique<BlasfeoMat>(*other.Bt[i]);
-                    }
-                }
-                for (std::size_t i = 0; i < other.G.size(); i++) {
-                    if (other.G[i]) {
-                        G[i] = std::make_unique<BlasfeoMat>(*other.G[i]);
-                    }
-                }
+                *this = other;
             }
 
             SubBlockKKTParallel& operator=(SubBlockKKTParallel&&) = default;
@@ -73,112 +44,39 @@ namespace piqp {
                 if (this == &other) return *this;
 
                 index = other.index;
-
-                D.clear(); D.resize(other.D.size());
-                for (std::size_t i = 0; i < other.D.size(); i++) {
-                    if (other.D[i]) {
-                        if (!D[i]) {
-                            D[i] = std::make_unique<BlasfeoMat>(*other.D[i]);
-                        } else {
-                            *D[i] = *other.D[i];
-                        }
-                    } else {
-                        D[i] = nullptr;
-                    }
-                }
-
-                Bt.clear(); Bt.resize(other.Bt.size());
-                for (std::size_t i = 0; i < other.Bt.size(); i++) {
-                    if (other.Bt[i]) {
-                        if (!Bt[i]) {
-                            Bt[i] = std::make_unique<BlasfeoMat>(*other.Bt[i]);
-                        } else {
-                            *Bt[i] = *other.Bt[i];
-                        }
-                    } else {
-                        Bt[i] = nullptr;
-                    }
-                }
-
-                E.clear(); E.resize(other.E.size());
-                for (std::size_t i = 0; i < other.E.size(); i++) {
-                    if (other.E[i]) {
-                        if (!E[i]) {
-                            E[i] = std::make_unique<BlasfeoMat>(*other.E[i]);
-                        } else {
-                            *E[i] = *other.E[i];
-                        }
-                    } else {
-                        E[i] = nullptr;
-                    }
-                }
-
-                if (other.F) {
-                    if (!F) {
-                        F = std::make_unique<BlasfeoMat>(*other.F);
-                    } else {
-                        *F = *other.F;
-                    }
-                } else {
-                    F = nullptr;
-                }
-
-                if (other.A) {
-                    if (!A) {
-                        A = std::make_unique<BlasfeoMat>(*other.A);
-                    } else {
-                        *A = *other.A;
-                    }
-                } else {
-                    A = nullptr;
-                }
-
-                if (other.H) {
-                    if (!H) {
-                        H = std::make_unique<BlasfeoMat>(*other.H);
-                    } else {
-                        *H = *other.H;
-                    }
-                } else {
-                    H = nullptr;
-                }
-
-                G.clear(); G.resize(other.G.size());
-                for (std::size_t i = 0; i < other.G.size(); i++) {
-                    if (other.G[i]) {
-                        if (!G[i]) {
-                            G[i] = std::make_unique<BlasfeoMat>(*other.G[i]);
-                        } else {
-                            *G[i] = *other.G[i];
-                        }
-                    } else {
-                        G[i] = nullptr;
-                    }
-                }
-
-                if (other.Q) {
-                    if (!Q) {
-                        Q = std::make_unique<BlasfeoMat>(*other.Q);
-                    } else {
-                        *Q = *other.Q;
-                    }
-                } else {
-                    Q = nullptr;
-                }
-
-                if (other.R) {
-                    if (!R) {
-                        R = std::make_unique<BlasfeoMat>(*other.R);
-                    } else {
-                        *R = *other.R;
-                    }
-                } else {
-                    R = nullptr;
-                }
+                assign_mats(D, other.D);
+                assign_mats(E, other.E);
+                assign_mats(Bt, other.Bt);
+                assign_mat(Bt0_tmp, other.Bt0_tmp);
+                assign_mat(F, other.F);
+                assign_mat(A, other.A);
+                assign_mat(H, other.H);
+                assign_mats(G, other.G);
+                assign_mat(Q, other.Q);
+                assign_mat(R, other.R);
 
                 return *this;
             }
 
+        private:
+            static void assign_mat(std::unique_ptr<BlasfeoMat>& dst, const std::unique_ptr<BlasfeoMat>& src)
+            {
+                if (!src) {
+                    dst = nullptr;
+                } else if (!dst) {
+                    dst = std::make_unique<BlasfeoMat>(*src);
+                } else {
+                    *dst = *src;
+                }
+            }
+
+            static void assign_mats(std::vector<std::unique_ptr<BlasfeoMat>>& dst, const std::vector<std::unique_ptr<BlasfeoMat>>& src)
+            {
+                dst.resize(src.size());
+                for (std::size_t i = 0; i < src.size(); i++) {
+                    assign_mat(dst[i], src[i]);
+                }
+            }
         };
 
         // stores the lower triangular data of a permuted arrow KKT structure

@@ -280,6 +280,31 @@ TEST_P(BlocksparseStageParallelKKTTest, SolveQPNumThreads)
     }
 }
 
+TEST_P(BlocksparseStageParallelKKTTest, CopyConstructor)
+{
+    std::string path = "data/" + GetParam() + ".mat";
+    Model<T, I> model = load_sparse_model<T, I>(path);
+
+    SparseSolver<T, I> solver1;
+    solver1.settings().kkt_solver = KKTSolver::sparse_multistage_parallel;
+    solver1.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+    solver1.solve();
+
+    SparseSolver<T, I> solver2(solver1);
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    solver1.solve();
+    solver2.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(solver1.result().info.status, solver2.result().info.status);
+    ASSERT_EQ(solver1.result().info.iter, solver2.result().info.iter);
+    // the copy has to behave identically, also if both diverge to NaN
+    const auto& x1 = solver1.result().x.array();
+    const auto& x2 = solver2.result().x.array();
+    ASSERT_TRUE((x1 == x2 || (x1.isNaN() && x2.isNaN())).all());
+}
+
 INSTANTIATE_TEST_SUITE_P(FromFolder, BlocksparseStageParallelKKTTest,
                          ::testing::Values("scenario_mpc", "chain_mass_sqp", "race_line", "robot_arm_sqp",
                                            "robot_arm_sqp_constr_perm", "robot_arm_sqp_no_global"));

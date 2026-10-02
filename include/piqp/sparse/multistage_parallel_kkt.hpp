@@ -29,7 +29,7 @@ namespace sparse
         BlockKKTParallel kkt_fac_parallel;
         std::vector<size_t> pivots;
         std::vector<std::vector<size_t>> segments;
-        std::vector<std::unique_ptr<BlasfeoVec>> work_rhs_g;  // store the r_g for each thread in forward substitution
+        std::vector<BlasfeoVec> work_rhs_g;  // store the r_g for each thread in forward substitution
 
     public:
         explicit MultistageParallelKKT(const Data<T, I>& data, isize num_threads = 0)
@@ -37,6 +37,11 @@ namespace sparse
             PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::constructor");
 
             init();
+        }
+
+        std::unique_ptr<KKTSolverBase<T, I, PIQP_SPARSE>> clone() const override
+        {
+            return std::make_unique<MultistageParallelKKT>(*this);
         }
 
         void init() {
@@ -49,7 +54,7 @@ namespace sparse
             if (this->block_info.back().diag_size > 0) {
                 work_rhs_g.resize(kkt_solve_num_threads);
                 for (size_t i = 0; i < kkt_solve_num_threads; i++) {
-                    work_rhs_g[i] = std::make_unique<BlasfeoVec>(this->block_info.back().diag_size);
+                    work_rhs_g[i].resize(this->block_info.back().diag_size);
                 }
             }
 
@@ -1009,7 +1014,7 @@ namespace sparse
             solve_llt_in_place_backward(b_and_x);
         }
 
-        void solve_llt_in_place_forward(BlockVec& b_and_x) const {
+        void solve_llt_in_place_forward(BlockVec& b_and_x) {
             // --- Forward Substitution
             PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place:forward");
             const auto& sub_blocks = kkt_fac_parallel.sub_blocks;
@@ -1041,7 +1046,7 @@ namespace sparse
                     const auto& G_0 = sub_blocks[k].G[0];
 
                     T scaling = static_cast<T>(static_cast<T>(1.0) / static_cast<T>(segments.size()));
-                    blasfeo_dgemv_n(-1.0, *G_0, vec, scaling, vec_g, *work_rhs_g[k]);
+                    blasfeo_dgemv_n(-1.0, *G_0, vec, scaling, vec_g, work_rhs_g[k]);
                 }
 
                 for (size_t i = 1; i < segments[k].size(); i++) {
@@ -1067,7 +1072,7 @@ namespace sparse
 
                     if (arrow_width > 0) {
                         const auto& G_i = sub_blocks[k].G[i];
-                        blasfeo_dgemv_n(-1.0, *G_i, vec_i, 1.0, *work_rhs_g[k], *work_rhs_g[k]);
+                        blasfeo_dgemv_n(-1.0, *G_i, vec_i, 1.0, work_rhs_g[k], work_rhs_g[k]);
                     }
                 }
             }
@@ -1085,7 +1090,7 @@ namespace sparse
                     // get back vec_g
                     b_and_x.x.back().setZero();
                     for (size_t i = 0; i < segments.size(); i++) {
-                        blasfeo_dvecad(b_and_x.x.back().rows(), 1.0, work_rhs_g[i]->ref(), 0, b_and_x.x.back().ref(), 0);
+                        blasfeo_dvecad(b_and_x.x.back().rows(), 1.0, work_rhs_g[i].ref(), 0, b_and_x.x.back().ref(), 0);
                     }
                 }
 
