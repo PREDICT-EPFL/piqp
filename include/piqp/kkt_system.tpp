@@ -88,11 +88,11 @@ bool init_kkt_solver_impl(const sparse::Data<T, I>& data, const Settings<T>& set
 			break;
 #ifdef PIQP_HAS_BLASFEO
 		case KKTSolver::sparse_multistage:
-			kkt_solver = std::make_unique<sparse::MultistageKKT<T, I>>(data);
+			kkt_solver = std::make_unique<sparse::MultistageKKT<T, I>>(data, settings.num_threads);
 			break;
 #ifdef PIQP_HAS_OPENMP
 		case KKTSolver::sparse_multistage_parallel:
-			kkt_solver = std::make_unique<sparse::MultistageParallelKKT<T, I>>(data);
+			kkt_solver = std::make_unique<sparse::MultistageParallelKKT<T, I>>(data, settings.num_threads);
 			break;
 #endif
 #endif

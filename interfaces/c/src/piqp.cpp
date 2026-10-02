@@ -145,6 +145,7 @@ static void piqp_set_default_settings(piqp_settings* settings, Solver&& solver)
     settings->preconditioner_iter = (piqp_int) solver.settings().preconditioner_iter;
     settings->tau = solver.settings().tau;
     settings->kkt_solver = cpp_to_c_kkt_solver(solver.settings().kkt_solver);
+    settings->num_threads = (piqp_int) solver.settings().num_threads;
     settings->iterative_refinement_always_enabled = (piqp_int) solver.settings().iterative_refinement_always_enabled;
     settings->iterative_refinement_eps_abs = solver.settings().iterative_refinement_eps_abs;
     settings->iterative_refinement_eps_rel = solver.settings().iterative_refinement_eps_rel;
@@ -287,6 +288,7 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().preconditioner_iter = settings->preconditioner_iter;
         solver->settings().tau = settings->tau;
         solver->settings().kkt_solver = c_to_cpp_kkt_solver(settings->kkt_solver);
+        solver->settings().num_threads = settings->num_threads;
         solver->settings().iterative_refinement_always_enabled = settings->iterative_refinement_always_enabled;
         solver->settings().iterative_refinement_eps_abs = settings->iterative_refinement_eps_abs;
         solver->settings().iterative_refinement_eps_rel = settings->iterative_refinement_eps_rel;
@@ -320,6 +322,7 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().preconditioner_iter = settings->preconditioner_iter;
         solver->settings().tau = settings->tau;
         solver->settings().kkt_solver = c_to_cpp_kkt_solver(settings->kkt_solver);
+        solver->settings().num_threads = settings->num_threads;
         solver->settings().iterative_refinement_always_enabled = settings->iterative_refinement_always_enabled;
         solver->settings().iterative_refinement_eps_abs = settings->iterative_refinement_eps_abs;
         solver->settings().iterative_refinement_eps_rel = settings->iterative_refinement_eps_rel;

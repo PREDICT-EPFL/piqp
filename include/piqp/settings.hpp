@@ -72,6 +72,8 @@ struct Settings
 
     KKTSolver kkt_solver = KKTSolver::dense_cholesky;
 
+    isize num_threads = 0;
+
     bool iterative_refinement_always_enabled = false;
     T iterative_refinement_eps_abs = 1e-12;
     T iterative_refinement_eps_rel = 1e-12;
@@ -99,6 +101,7 @@ struct Settings
                max_factor_retires > 0 &&
                preconditioner_iter >= 0 &&
                tau > 0 && tau <= 1 &&
+               num_threads >= 0 &&
                iterative_refinement_eps_abs > 0 &&
                iterative_refinement_eps_rel >= 0 &&
                iterative_refinement_max_iter >= 0 &&

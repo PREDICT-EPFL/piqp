@@ -30,6 +30,7 @@ class MultistageKKT : public KKTSolverBase<T, I, PIQP_SPARSE>
 protected:
     static_assert(std::is_same<T, double>::value, "sparse_multistage only supports doubles");
 
+    int m_num_threads;
     T m_delta;
 
     Vec<T> m_z_reg_inv;
@@ -58,7 +59,7 @@ protected:
     BlockVec work_z_block_2;
 
 public:
-    MultistageKKT(const Data<T, I>& data);
+    explicit MultistageKKT(const Data<T, I>& data, isize num_threads = 0);
 
     std::unique_ptr<KKTSolverBase<T, I, PIQP_SPARSE>> clone() const override;
 

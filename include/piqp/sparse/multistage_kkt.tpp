@@ -23,6 +23,7 @@
 #include "piqp/utils/blasfeo_mat.hpp"
 #include "piqp/utils/blasfeo_vec.hpp"
 #include "piqp/utils/blasfeo_wrapper.hpp"
+#include "piqp/utils/openmp.hpp"
 #include "piqp/sparse/multistage_kkt.hpp"
 #include "piqp/utils/tracy.hpp"
 
@@ -33,7 +34,8 @@ namespace sparse
 {
 
 template<typename T, typename I>
-MultistageKKT<T, I>::MultistageKKT(const Data<T, I>& data)
+MultistageKKT<T, I>::MultistageKKT(const Data<T, I>& data, isize num_threads)
+    : m_num_threads(resolve_num_threads(num_threads))
 {
     PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::constructor");
 
@@ -65,7 +67,7 @@ MultistageKKT<T, I>::MultistageKKT(const Data<T, I>& data)
     GT_scaled = GT;
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
     PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::constructor:parallel");
 #endif
@@ -125,7 +127,7 @@ void MultistageKKT<T, I>::update_data(const Data<T, I>& data, int options)
     {
         transpose_to_block_mat<false>(data.AT, true, AT);
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
         {
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::update_data:parallel");
 #endif
@@ -160,7 +162,7 @@ bool MultistageKKT<T, I>::update_scalings_and_factor(const Data<T, I>&, const T&
         }
     }
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
     PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::update_scalings_and_factor:parallel");
 #endif
@@ -207,7 +209,7 @@ void MultistageKKT<T, I>::solve(const Data<T, I>&, const Vec<T>& rhs_x, const Ve
 
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
     PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve:parallel");
 #endif
@@ -263,7 +265,7 @@ void MultistageKKT<T, I>::eval_P_x(const Data<T, I>&, const T& alpha, const Vec<
     block_x.assign(x);
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::eval_P_x:parallel");
 
@@ -294,7 +296,7 @@ void MultistageKKT<T, I>::eval_A_xn_and_AT_xt(const Data<T, I>&, const T& alpha_
     block_xt.assign(xt, AT.perm_inv);
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::eval_A_xn_and_AT_xt:parallel");
 
@@ -329,7 +331,7 @@ void MultistageKKT<T, I>::eval_G_xn_and_GT_xt(const Data<T, I>&, const T& alpha_
     block_xt.assign(xt, GT.perm_inv);
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::eval_G_xn_and_GT_xt:parallel");
 

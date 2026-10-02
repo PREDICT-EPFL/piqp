@@ -260,6 +260,26 @@ TEST_P(BlocksparseStageParallelKKTTest, SolveQP)
     test_solve_qp(model, solver_multistage, solver_multistage_parallel);
 }
 
+TEST_P(BlocksparseStageParallelKKTTest, SolveQPNumThreads)
+{
+    std::string path = "data/" + GetParam() + ".mat";
+    Model<T, I> model = load_sparse_model<T, I>(path);
+
+    for (isize num_threads : {1, 2, 3})
+    {
+        SCOPED_TRACE("num_threads = " + std::to_string(num_threads));
+
+        SparseSolver<T, I> solver_multistage;
+        solver_multistage.settings().kkt_solver = KKTSolver::sparse_multistage;
+        solver_multistage.settings().num_threads = num_threads;
+        SparseSolver<T, I> solver_multistage_parallel;
+        solver_multistage_parallel.settings().kkt_solver = KKTSolver::sparse_multistage_parallel;
+        solver_multistage_parallel.settings().num_threads = num_threads;
+
+        test_solve_qp(model, solver_multistage, solver_multistage_parallel);
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P(FromFolder, BlocksparseStageParallelKKTTest,
                          ::testing::Values("scenario_mpc", "chain_mass_sqp", "race_line", "robot_arm_sqp",
                                            "robot_arm_sqp_constr_perm", "robot_arm_sqp_no_global"));

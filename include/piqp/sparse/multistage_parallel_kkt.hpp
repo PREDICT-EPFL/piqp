@@ -22,7 +22,7 @@ namespace sparse
     protected:
         static_assert(std::is_same<T, double>::value, "sparse_multistage_parallel only supports doubles");
 
-        // Max threads available from the current OpenMP environment.
+        // Max threads available from the num_threads setting (0 = OpenMP default).
         size_t max_num_threads = 1;
         // Solver-local thread count for KKT factorization and triangular solves.
         size_t kkt_solve_num_threads = 0;
@@ -32,20 +32,15 @@ namespace sparse
         std::vector<std::unique_ptr<BlasfeoVec>> work_rhs_g;  // store the r_g for each thread in forward substitution
 
     public:
-        explicit MultistageParallelKKT(const Data<T, I>& data)
-            : MultistageKKT<T, I>(data) {
+        explicit MultistageParallelKKT(const Data<T, I>& data, isize num_threads = 0)
+            : MultistageKKT<T, I>(data, num_threads) {
             PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::constructor");
 
             init();
         }
 
         void init() {
-#ifdef PIQP_HAS_OPENMP
-            const int max_threads = omp_get_max_threads();
-#else
-            const int max_threads = 1;
-#endif
-            max_num_threads = static_cast<size_t>(std::max(1, max_threads));
+            max_num_threads = static_cast<size_t>(std::max(1, this->m_num_threads));
             kkt_solve_num_threads = max_num_threads;
 
             generate_partitions();  // Generate partitions for multi-threads
@@ -689,7 +684,7 @@ namespace sparse
                 }
             }
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(this->m_num_threads)
             {
                 // PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::update_scalings_and_factor:parallel");
 #endif
@@ -736,7 +731,7 @@ namespace sparse
 
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(this->m_num_threads)
             {
                 PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve:parallel");
 #endif

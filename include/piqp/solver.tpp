@@ -18,6 +18,7 @@
 #include "piqp/timer.hpp"
 #include "piqp/solver.hpp"
 #include "piqp/sparse/utils.hpp"
+#include "piqp/utils/openmp.hpp"
 #include "piqp/utils/tracy.hpp"
 
 namespace piqp
@@ -896,7 +897,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::calculate_step(T& alpha_s, T&
     alpha_z = T(1);
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(resolve_num_threads(m_settings.num_threads))
     {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::calculate_step:parallel");
 
