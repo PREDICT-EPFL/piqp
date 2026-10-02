@@ -184,8 +184,10 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
     Settings<T> settings_multistage;
     settings_multistage.kkt_solver = KKTSolver::sparse_multistage;
 
+#ifdef PIQP_HAS_OPENMP
     Settings<T> settings_multistage_parallel;
     settings_multistage_parallel.kkt_solver = KKTSolver::sparse_multistage_parallel;
+#endif
 
     Settings<T> settings_sparse;
     settings_sparse.kkt_solver = KKTSolver::sparse_ldlt;
@@ -204,22 +206,31 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
 
     KKTSystem<T, I, PIQP_SPARSE> kkt_multistage;
     kkt_multistage.init(data, settings_multistage);
+#ifdef PIQP_HAS_OPENMP
     KKTSystem<T, I, PIQP_SPARSE> kkt_multistage_parallel;
     kkt_multistage_parallel.init(data, settings_multistage_parallel);
+#endif
     KKTSystem<T, I, PIQP_SPARSE> kkt_sparse;
     kkt_sparse.init(data, settings_sparse);
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
     kkt_multistage.update_scalings_and_factor(data, settings_multistage, false, rho, delta, scaling);
+#ifdef PIQP_HAS_OPENMP
     kkt_multistage_parallel.update_scalings_and_factor(data, settings_multistage_parallel, false, rho, delta, scaling);
+#endif
     kkt_sparse.update_scalings_and_factor(data, settings_sparse, false, rho, delta, scaling);
     PIQP_EIGEN_MALLOC_ALLOWED();
 
+#ifdef PIQP_HAS_OPENMP
     test_solve_multiply(data, settings_multistage_parallel, settings_sparse, kkt_multistage_parallel, kkt_sparse);
+#endif
     test_solve_multiply(data, settings_multistage, settings_sparse, kkt_multistage, kkt_sparse);
 }
 
 TEST(BlocksparseStageKKTTest, SolveIllConditionedQP)
 {
+#ifndef PIQP_HAS_BLASFEO
+    GTEST_SKIP() << "BLASFEO not available";
+#endif
     for (const std::string name : {"robot_arm_sqp", "robot_arm_sqp_no_global"})
     {
         SCOPED_TRACE(name);

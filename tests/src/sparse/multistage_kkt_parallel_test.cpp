@@ -157,6 +157,9 @@ void test_solve_qp(Model<T, I>& model, PIQPSolver1& solver1, PIQPSolver2& solver
 
 TEST(BlocksparseStageParallelKKTTest, FactorizeSolveSQPBlocksize1)
 {
+#if !defined(PIQP_HAS_BLASFEO) || !defined(PIQP_HAS_OPENMP)
+    GTEST_SKIP() << "BLASFEO or OpenMP not available";
+#endif
     Eigen::Index N = 35;
     SparseMat<T, I> P(N, N); P.setIdentity();
     for (Eigen::Index i = 0; i < N; ++i) {
@@ -217,6 +220,9 @@ TEST(BlocksparseStageParallelKKTTest, FactorizeSolveSQPBlocksize1)
 
 TEST_P(BlocksparseStageParallelKKTTest, FactorizeSolveSQP)
 {
+#if !defined(PIQP_HAS_BLASFEO) || !defined(PIQP_HAS_OPENMP)
+    GTEST_SKIP() << "BLASFEO or OpenMP not available";
+#endif
     std::string path = "data/" + GetParam() + ".mat";
     Model<T, I> model = load_sparse_model<T, I>(path);
     Data<T, I> data(model);
@@ -260,6 +266,9 @@ TEST_P(BlocksparseStageParallelKKTTest, FactorizeSolveSQP)
 
 TEST_P(BlocksparseStageParallelKKTTest, SolveQP)
 {
+#if !defined(PIQP_HAS_BLASFEO) || !defined(PIQP_HAS_OPENMP)
+    GTEST_SKIP() << "BLASFEO or OpenMP not available";
+#endif
     std::string path = "data/" + GetParam() + ".mat";
     Model<T, I> model = load_sparse_model<T, I>(path);
 
@@ -273,6 +282,9 @@ TEST_P(BlocksparseStageParallelKKTTest, SolveQP)
 
 TEST_P(BlocksparseStageParallelKKTTest, SolveQPNumThreads)
 {
+#if !defined(PIQP_HAS_BLASFEO) || !defined(PIQP_HAS_OPENMP)
+    GTEST_SKIP() << "BLASFEO or OpenMP not available";
+#endif
     std::string path = "data/" + GetParam() + ".mat";
     Model<T, I> model = load_sparse_model<T, I>(path);
 
@@ -293,6 +305,9 @@ TEST_P(BlocksparseStageParallelKKTTest, SolveQPNumThreads)
 
 TEST_P(BlocksparseStageParallelKKTTest, CopyConstructor)
 {
+#if !defined(PIQP_HAS_BLASFEO) || !defined(PIQP_HAS_OPENMP)
+    GTEST_SKIP() << "BLASFEO or OpenMP not available";
+#endif
     std::string path = "data/" + GetParam() + ".mat";
     Model<T, I> model = load_sparse_model<T, I>(path);
 
@@ -318,6 +333,9 @@ TEST_P(BlocksparseStageParallelKKTTest, CopyConstructor)
 
 TEST(BlocksparseStageParallelKKTTest, SolveIllConditionedQP)
 {
+#if !defined(PIQP_HAS_BLASFEO) || !defined(PIQP_HAS_OPENMP)
+    GTEST_SKIP() << "BLASFEO or OpenMP not available";
+#endif
     for (const std::string name : {"robot_arm_sqp", "robot_arm_sqp_no_global"})
     {
         SCOPED_TRACE(name);
