@@ -127,13 +127,21 @@ void RuizEquilibration<T>::scale_data(Data<T>& data, bool reuse_prev_scaling, bo
             {
                 PIQP_TRACY_ZoneScopedN("piqp::RuizEquilibration::scale_data::cost_scaling");
                 // scaling for the cost
+                // average over the columns of P which are actually populated, since empty
+                // columns carry no cost and would only drag the average towards zero
                 T gamma = 0;
+                isize n_populated = 0;
                 for (isize k = 0; k < n; k++)
                 {
-                    gamma += (std::max)(data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
-                                      data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>());
+                    T col_norm = (std::max)(data.P_utri.col(k).head(k).template lpNorm<Eigen::Infinity>(),
+                                            data.P_utri.row(k).tail(n - k).template lpNorm<Eigen::Infinity>());
+                    if (col_norm > T(0))
+                    {
+                        gamma += col_norm;
+                        n_populated++;
+                    }
                 }
-                gamma /= T(n);
+                gamma = n_populated > 0 ? gamma / T(n_populated) : T(0);
                 limit_scaling(gamma);
                 gamma = (std::max)(gamma, data.c.template lpNorm<Eigen::Infinity>());
                 limit_scaling(gamma);
