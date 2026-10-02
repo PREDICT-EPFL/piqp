@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Install `piqp.dll` and `piqpc.dll` on Windows
+
 ## [0.6.4] - 2026-08-28
 
 ### Fixed

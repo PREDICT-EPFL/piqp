@@ -400,6 +400,7 @@ if (ENABLE_INSTALL)
         EXPORT piqpTargets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
 
     # https://cmake.org/cmake/help/latest/guide/importing-exporting/index.html
