@@ -104,8 +104,34 @@ void test_solve_multiply(Data<T, I>& data, Settings<T> settings1, Settings<T> se
     }
 }
 
+// The robot arm problems are highly degenerate with non-unique minimizers. Different KKT backends
+// accumulate different rounding errors and converge to different minimizers with the same objective.
+bool has_unique_solution(const std::string& name)
+{
+    return name.rfind("robot_arm_sqp", 0) != 0;
+}
+
 template<typename PIQPSolver1, typename PIQPSolver2>
-void test_solve_qp(Model<T, I>& model, PIQPSolver1& solver1, PIQPSolver2& solver2)
+void compare_results(const PIQPSolver1& solver1, const PIQPSolver2& solver2, bool unique_solution)
+{
+    ASSERT_EQ(solver1.result().info.status, solver2.result().info.status);
+    if (!unique_solution) {
+        if (solver1.result().info.status == PIQP_SOLVED) {
+            ASSERT_NEAR(solver1.result().info.primal_obj, solver2.result().info.primal_obj, 1e-8);
+        }
+        return;
+    }
+    ASSERT_EQ(solver1.result().info.iter, solver2.result().info.iter);
+    if (solver1.result().info.status == PIQP_SOLVED) {
+        ASSERT_TRUE(solver1.result().x.isApprox(solver2.result().x, 1e-8));
+        ASSERT_TRUE(solver1.result().y.isApprox(solver2.result().y, 1e-8));
+        ASSERT_TRUE(solver1.result().z_l.isApprox(solver2.result().z_l, 1e-8));
+        ASSERT_TRUE(solver1.result().z_u.isApprox(solver2.result().z_u, 1e-8));
+    }
+}
+
+template<typename PIQPSolver1, typename PIQPSolver2>
+void test_solve_qp(Model<T, I>& model, PIQPSolver1& solver1, PIQPSolver2& solver2, bool unique_solution = true)
 {
     // setup and solve
     solver1.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
@@ -116,14 +142,7 @@ void test_solve_qp(Model<T, I>& model, PIQPSolver1& solver1, PIQPSolver2& solver
     solver2.solve();
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    ASSERT_EQ(solver1.result().info.status, solver2.result().info.status);
-    ASSERT_EQ(solver1.result().info.iter, solver2.result().info.iter);
-    if (solver1.result().info.status == PIQP_SOLVED) {
-        ASSERT_TRUE(solver1.result().x.isApprox(solver2.result().x, 1e-8));
-        ASSERT_TRUE(solver1.result().y.isApprox(solver2.result().y, 1e-8));
-        ASSERT_TRUE(solver1.result().z_l.isApprox(solver2.result().z_l, 1e-8));
-        ASSERT_TRUE(solver1.result().z_u.isApprox(solver2.result().z_u, 1e-8));
-    }
+    compare_results(solver1, solver2, unique_solution);
 
     // update and solve
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
@@ -133,16 +152,8 @@ void test_solve_qp(Model<T, I>& model, PIQPSolver1& solver1, PIQPSolver2& solver
     solver2.solve();
     PIQP_EIGEN_MALLOC_ALLOWED();
 
-    ASSERT_EQ(solver1.result().info.status, solver2.result().info.status);
-    ASSERT_EQ(solver1.result().info.iter, solver2.result().info.iter);
-    if (solver1.result().info.status == PIQP_SOLVED) {
-        ASSERT_TRUE(solver1.result().x.isApprox(solver2.result().x, 1e-8));
-        ASSERT_TRUE(solver1.result().y.isApprox(solver2.result().y, 1e-8));
-        ASSERT_TRUE(solver1.result().z_l.isApprox(solver2.result().z_l, 1e-8));
-        ASSERT_TRUE(solver1.result().z_u.isApprox(solver2.result().z_u, 1e-8));
-    }
+    compare_results(solver1, solver2, unique_solution);
 }
-
 
 TEST(BlocksparseStageParallelKKTTest, FactorizeSolveSQPBlocksize1)
 {
@@ -257,7 +268,7 @@ TEST_P(BlocksparseStageParallelKKTTest, SolveQP)
     SparseSolver<T, I> solver_multistage_parallel;
     solver_multistage_parallel.settings().kkt_solver = KKTSolver::sparse_multistage_parallel;
 
-    test_solve_qp(model, solver_multistage, solver_multistage_parallel);
+    test_solve_qp(model, solver_multistage, solver_multistage_parallel, has_unique_solution(GetParam()));
 }
 
 TEST_P(BlocksparseStageParallelKKTTest, SolveQPNumThreads)
@@ -276,7 +287,7 @@ TEST_P(BlocksparseStageParallelKKTTest, SolveQPNumThreads)
         solver_multistage_parallel.settings().kkt_solver = KKTSolver::sparse_multistage_parallel;
         solver_multistage_parallel.settings().num_threads = num_threads;
 
-        test_solve_qp(model, solver_multistage, solver_multistage_parallel);
+        test_solve_qp(model, solver_multistage, solver_multistage_parallel, has_unique_solution(GetParam()));
     }
 }
 
@@ -303,6 +314,21 @@ TEST_P(BlocksparseStageParallelKKTTest, CopyConstructor)
     const auto& x1 = solver1.result().x.array();
     const auto& x2 = solver2.result().x.array();
     ASSERT_TRUE((x1 == x2 || (x1.isNaN() && x2.isNaN())).all());
+}
+
+TEST(BlocksparseStageParallelKKTTest, SolveIllConditionedQP)
+{
+    for (const std::string name : {"robot_arm_sqp", "robot_arm_sqp_no_global"})
+    {
+        SCOPED_TRACE(name);
+        Model<T, I> model = load_sparse_model<T, I>("data/" + name + ".mat");
+
+        SparseSolver<T, I> solver;
+        solver.settings().kkt_solver = KKTSolver::sparse_multistage_parallel;
+        solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+
+        ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(FromFolder, BlocksparseStageParallelKKTTest,

@@ -39,8 +39,8 @@ public:
 
     BlasfeoMat(const BlasfeoMat& other)
     {
+        this->resize(other.rows(), other.cols());
         if (other.mat.mem) {
-            this->resize(other.rows(), other.cols());
             // B <= A
             blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
         }
@@ -57,17 +57,10 @@ public:
 
     BlasfeoMat& operator=(const BlasfeoMat& other)
     {
+        this->resize(other.rows(), other.cols());
         if (other.mat.mem) {
-            this->resize(other.rows(), other.cols());
             // B <= A
             blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
-        } else {
-            if (mat.mem) {
-                blasfeo_free_dmat(&mat);
-                mat.mem = nullptr;
-            }
-            mat.m = 0;
-            mat.n = 0;
         }
         return *this;
     }

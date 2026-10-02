@@ -203,15 +203,18 @@ static inline void blasfeo_dtrsm_lltn(double alpha, BlasfeoMat& A, BlasfeoMat& B
 }
 
 // D <= chol(C) ; C, D lower triangular
-static inline void blasfeo_dpotrf_l(BlasfeoMat& C)
+// returns false if C is not (numerically) positive definite
+static inline bool blasfeo_dpotrf_l(BlasfeoMat& C)
 {
     assert(C.rows() == C.cols() && "size mismatch");
     blasfeo_dpotrf_l(C.rows(), C.ref(), 0, 0, C.ref(), 0, 0);
     // if blasfeo take square root of negative number, it will just set the diagonal entry to 0.
     // therefore if we find a non-positive diagonal entry in the factorization, it implies the original matrix is not positive definite
     for (int i = 0; i < C.rows(); i++) {
-        assert(BLASFEO_DMATEL(C.ref(), i, i) > 0.0 && "matrix not positive definite");
+        // negated comparison to also catch NaNs
+        if (!(BLASFEO_DMATEL(C.ref(), i, i) > 0.0)) return false;
     }
+    return true;
 }
 
 // z <= beta * y + alpha * A * x

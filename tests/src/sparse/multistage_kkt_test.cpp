@@ -218,6 +218,21 @@ TEST_P(BlocksparseStageKKTTest, FactorizeSolveSQP)
     test_solve_multiply(data, settings_multistage, settings_sparse, kkt_multistage, kkt_sparse);
 }
 
+TEST(BlocksparseStageKKTTest, SolveIllConditionedQP)
+{
+    for (const std::string name : {"robot_arm_sqp", "robot_arm_sqp_no_global"})
+    {
+        SCOPED_TRACE(name);
+        Model<T, I> model = load_sparse_model<T, I>("data/" + name + ".mat");
+
+        SparseSolver<T, I> solver;
+        solver.settings().kkt_solver = KKTSolver::sparse_multistage;
+        solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+
+        ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P(FromFolder, BlocksparseStageKKTTest,
                          ::testing::Values("small_sparse_dual_inf", "small_dense", "scenario_mpc_small",
                                            "scenario_mpc", "chain_mass_sqp", "robot_arm_sqp",

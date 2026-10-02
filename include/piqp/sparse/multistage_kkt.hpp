@@ -118,7 +118,7 @@ protected:
     // sD = sA * diag(sB)
     void block_gemm_nd(BlockMat<I>& sA, BlockVec& sB, BlockMat<I>& sD);
 
-    void factor_kkt();
+    bool factor_kkt();
 
     // z = alpha * sA * x
     void block_symv_l(double alpha, BlockKKT& sA, BlockVec& x, BlockVec& z);

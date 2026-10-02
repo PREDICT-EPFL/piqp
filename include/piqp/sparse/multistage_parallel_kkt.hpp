@@ -688,6 +688,8 @@ namespace sparse
                     i++;
                 }
             }
+
+            bool success = true; // shared, set to false on factorization failure
 #ifdef PIQP_HAS_OPENMP
 #pragma omp parallel num_threads(this->m_num_threads)
             {
@@ -703,13 +705,13 @@ namespace sparse
 #pragma omp barrier
 #endif
                 populate_kkt_fac(x_reg);
-                factor_kkt();
+                factor_kkt(success);
 
 #ifdef PIQP_HAS_OPENMP
             } // end of parallel region
 #endif
 
-            return true;
+            return success;
         }
 
 
@@ -780,7 +782,7 @@ namespace sparse
 
 
 
-        void factor_kkt() {
+        void factor_kkt(bool& success) {
             auto& sub_blocks = kkt_fac_parallel.sub_blocks;
             const I arrow_width = this->block_info.back().diag_size;
 
@@ -794,12 +796,16 @@ namespace sparse
                 PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::factor_kkt::phase_1");
                 PIQP_TRACY_ZoneValue(index);
                 std::unique_ptr<BlasfeoMat>& R = sub_blocks[index].R;
+                bool segment_success = true;
                 for (size_t i = 0; i < sub_blocks[index].D.size() - 1; i++) {
                     std::unique_ptr<BlasfeoMat>& D_i = sub_blocks[index].D[i];
                     std::unique_ptr<BlasfeoMat>& E_i = sub_blocks[index].E[i];
                     std::unique_ptr<BlasfeoMat>& D_ip1 = sub_blocks[index].D[i + 1];
                     // D[i] = chol(D[i])
-                    blasfeo_dpotrf_l(*D_i);
+                    if (!blasfeo_dpotrf_l(*D_i)) {
+                        segment_success = false;
+                        break;
+                    }
                     assert(!D_i->hasNan() && "matrix has NaN values");
                     // E[i] = E[i] * D[i]^-T
                     assert(E_i->cols() == D_i->cols() && "size mismatch");
@@ -858,7 +864,16 @@ namespace sparse
 
                 // D[-1] = chol(D[-1])
                 std::unique_ptr<BlasfeoMat>& D_last = sub_blocks[index].D.back();
-                blasfeo_dpotrf_l(*D_last);
+                if (segment_success) {
+                    segment_success = blasfeo_dpotrf_l(*D_last);
+                }
+                if (!segment_success) {
+#ifdef PIQP_HAS_OPENMP
+#pragma omp atomic write
+#endif
+                    success = false;
+                    continue;
+                }
 
                 if (arrow_width > 0) {
                     // G[-1] = G[-1] * D[-1]^-T
@@ -921,8 +936,8 @@ namespace sparse
             {
 #endif
 
-                // Phase 2, sequential
-                {
+                // Phase 2, sequential, only if all segments have been factorized successfully
+                if (success) {
                     PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::factor_kkt::phase_2");
                     for (size_t k = 1; k < segments.size(); k++) {
                         std::unique_ptr<BlasfeoMat> &F_km1 = sub_blocks[k - 1].F;
@@ -935,8 +950,9 @@ namespace sparse
                                              A_k->ref(), 0, 0, A_k->ref(), 0, 0);
                         }
                         // A[k] = chol(A[k])
-                        if (A_k) {
-                            blasfeo_dpotrf_l(*A_k);
+                        if (A_k && !blasfeo_dpotrf_l(*A_k)) {
+                            success = false;
+                            break;
                         }
 
                         if (H_k) {
@@ -988,15 +1004,15 @@ namespace sparse
                         }
                     }
 
-                    if (arrow_width > 0) {
+                    if (success && arrow_width > 0) {
                         // R = sum(R_k), add all R_k onto R_1
                         for (size_t j = 1; j < segments.size(); ++j) {
                             blasfeo_dgead(1.0, *sub_blocks[j].R, *sub_blocks[0].R);
                             assert(!sub_blocks[0].R->hasNan() && "matrix has NaN values");
                         }
                         // chol(R)
-                        blasfeo_dpotrf_l(*sub_blocks[0].R);
-                        assert(!sub_blocks[0].R->hasNan() && "matrix has NaN values");
+                        success = blasfeo_dpotrf_l(*sub_blocks[0].R);
+                        assert((!success || !sub_blocks[0].R->hasNan()) && "matrix has NaN values");
                     }
 
 
