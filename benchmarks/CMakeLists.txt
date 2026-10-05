@@ -50,3 +50,8 @@ target_link_libraries(dense_cholesky_factorization_benchmark PRIVATE piqp-benchm
 
 add_executable(dense_sparse_solver_benchmark src/dense_sparse_solver_benchmark.cpp)
 target_link_libraries(dense_sparse_solver_benchmark PRIVATE piqp-benchmark)
+
+if (PIQP_WITH_OPENMP_TARGET)
+    add_executable(openmp_step_benchmark src/openmp_step_benchmark.cpp)
+    target_link_libraries(openmp_step_benchmark PRIVATE piqp-benchmark)
+endif ()

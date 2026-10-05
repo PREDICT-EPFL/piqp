@@ -16,191 +16,163 @@ using I = int;
 namespace piqp
 {
     template<typename T, typename I>
-    void generate_random_multistage_qp_data(
-            SparseMat<T, I>& P,
-            Vec<T>& c,
-            SparseMat<T, I>& A,
-            Vec<T>& b,
-            SparseMat<T, I>& G,
-            Vec<T>& h_l,
-            Vec<T>& h_u,
-            Vec<T>& x_l,
-            Vec<T>& x_u) {
-        static bool initialized = false;
+    sparse::Model<T, I> generate_random_multistage_qp(int N, int diag_block_size = 50)
+    {
+        const int offdiag_block_size = diag_block_size / 2;
 
-        static SparseMat<T, I> A_static;
-        static Vec<T> b_static;
-        static SparseMat<T, I> P_static;
-        static Vec<T> c_static;
-        static SparseMat<T, I> G_static;
-        static Vec<T> h_l_static, h_u_static;
-        static Vec<T> x_l_static, x_u_static;
+        const int n_total = N * diag_block_size;
+        const int m_total = N * offdiag_block_size;
 
-        if (!initialized) {
-            const int N = 100;
-            const int diag_block_size = 50;
-            const int offdiag_block_size = diag_block_size / 2;
+        std::mt19937 gen(42);
+        std::normal_distribution<T> dist(0.0, 1.0);
 
-            const int n_total = N * diag_block_size;
-            const int m_total = N * offdiag_block_size;
+        std::vector<Eigen::Triplet<T>> triplets;
 
-            std::mt19937 gen(42);
-            std::normal_distribution<T> dist(0.0, 1.0);
-
-            std::vector<Eigen::Triplet<T>> triplets;
-
-            for (int i = 0; i < N; ++i) {
-                int row_start = offdiag_block_size * i;
-                int col_start = diag_block_size * i;
-                for (int row = 0; row < offdiag_block_size; ++row) {
-                    for (int col = 0; col < diag_block_size; ++col) {
-                        triplets.emplace_back(row_start + row, col_start + col, dist(gen));
-                    }
+        for (int i = 0; i < N; ++i) {
+            int row_start = offdiag_block_size * i;
+            int col_start = diag_block_size * i;
+            for (int row = 0; row < offdiag_block_size; ++row) {
+                for (int col = 0; col < diag_block_size; ++col) {
+                    triplets.emplace_back(row_start + row, col_start + col, dist(gen));
                 }
             }
-
-            for (int i = 0; i < N - 1; ++i) {
-                int row_start = offdiag_block_size * (i + 1);
-                int col_start = diag_block_size * i;
-                for (int row = 0; row < offdiag_block_size; ++row) {
-                    for (int col = 0; col < diag_block_size; ++col) {
-                        triplets.emplace_back(row_start + row, col_start + col, dist(gen));
-                    }
-                }
-            }
-
-            A_static.resize(m_total, n_total);
-            A_static.setFromTriplets(triplets.begin(), triplets.end());
-
-            P_static.resize(n_total, n_total);
-            P_static.setIdentity();
-
-            c_static = Vec<T>::Zero(n_total);
-            h_l_static = Vec<T>::Zero(0, 1);
-            h_u_static = Vec<T>::Zero(0, 1);
-            G_static.resize(0, n_total);
-
-            x_l_static = Vec<T>::Constant(n_total, -1e8);
-            x_u_static = Vec<T>::Constant(n_total,  1e8);
-
-            Vec<T> ones = Vec<T>::Ones(n_total);
-            b_static = A_static * ones;
-
-            initialized = true;
         }
 
-        // Copy out
-        A     = A_static;
-        b     = b_static;
-        P     = P_static;
-        c     = c_static;
-        G     = G_static;
-        h_l   = h_l_static;
-        h_u   = h_u_static;
-        x_l   = x_l_static;
-        x_u   = x_u_static;
+        for (int i = 0; i < N - 1; ++i) {
+            int row_start = offdiag_block_size * (i + 1);
+            int col_start = diag_block_size * i;
+            for (int row = 0; row < offdiag_block_size; ++row) {
+                for (int col = 0; col < diag_block_size; ++col) {
+                    triplets.emplace_back(row_start + row, col_start + col, dist(gen));
+                }
+            }
+        }
+
+        SparseMat<T, I> A(m_total, n_total);
+        A.setFromTriplets(triplets.begin(), triplets.end());
+
+        SparseMat<T, I> P(n_total, n_total);
+        P.setIdentity();
+
+        Vec<T> c = Vec<T>::Zero(n_total);
+        Vec<T> b = A * Vec<T>::Ones(n_total);
+
+        SparseMat<T, I> G(0, n_total);
+        Vec<T> h_l = Vec<T>::Zero(0);
+        Vec<T> h_u = Vec<T>::Zero(0);
+
+        Vec<T> x_l = Vec<T>::Constant(n_total, -10);
+        Vec<T> x_u = Vec<T>::Constant(n_total, 10);
+
+        return sparse::Model<T, I>(P, c, A, b, G, h_l, h_u, x_l, x_u);
     }
 } // namespace piqp
 
-static void BM_ROBOT_ARM_SQP_MULTISTAGE_KKT(benchmark::State& state)
+static std::vector<int64_t> thread_counts()
 {
-    piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/robot_arm_sqp.mat");
+    // 0 uses the OpenMP default, i.e., omp_get_max_threads()
+    std::vector<int64_t> counts = {0};
+#ifdef PIQP_HAS_OPENMP
+    const int max_threads = omp_get_max_threads();
+    for (int t : {1, 2, 4, 6, 8, 12, 16}) {
+        if (t < max_threads) counts.push_back(t);
+    }
+    counts.push_back(max_threads);
+#endif
+    return counts;
+}
+
+static void run_multistage_benchmark(benchmark::State& state, const piqp::sparse::Model<T, I>& model,
+                                     piqp::KKTSolver kkt_solver, piqp::isize num_threads)
+{
     piqp::SparseSolver<T, I> solver;
-    solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage;
+    solver.settings().kkt_solver = kkt_solver;
+    solver.settings().num_threads = num_threads;
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
 
+    piqp::Status status = piqp::Status::PIQP_UNSOLVED;
     for (auto _ : state)
     {
-        // solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-        solver.solve();
+        status = solver.solve();
+    }
+
+    state.counters["iter"] = static_cast<double>(solver.result().info.iter);
+    state.SetLabel(piqp::status_to_string(status));
+}
+
+// Arguments: {threads}
+static void thread_args(benchmark::internal::Benchmark* b)
+{
+    for (int64_t t : thread_counts()) b->Args({t});
+}
+
+// Robot arm and chain mass have too few stages to be representative for the
+// parallel backend, uncomment to include them.
+// static void BM_ROBOT_ARM_SQP_MULTISTAGE_KKT(benchmark::State& state)
+// {
+//     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/robot_arm_sqp.mat");
+//     run_multistage_benchmark(state, model, piqp::KKTSolver::sparse_multistage, state.range(0));
+// }
+//
+// static void BM_ROBOT_ARM_SQP_MULTISTAGE_PARALLEL_KKT(benchmark::State& state)
+// {
+//     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/robot_arm_sqp.mat");
+//     run_multistage_benchmark(state, model, piqp::KKTSolver::sparse_multistage_parallel, state.range(0));
+// }
+//
+// static void BM_CHAIN_MASS_SQP_MULTISTAGE_KKT(benchmark::State& state)
+// {
+//     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
+//     run_multistage_benchmark(state, model, piqp::KKTSolver::sparse_multistage, state.range(0));
+// }
+//
+// static void BM_CHAIN_MASS_SQP_MULTISTAGE_PARALLEL_KKT(benchmark::State& state)
+// {
+//     piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
+//     run_multistage_benchmark(state, model, piqp::KKTSolver::sparse_multistage_parallel, state.range(0));
+// }
+
+static void BM_RACE_LINE_MULTISTAGE_KKT(benchmark::State& state)
+{
+    piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/race_line.mat");
+    run_multistage_benchmark(state, model, piqp::KKTSolver::sparse_multistage, state.range(0));
+}
+
+static void BM_RACE_LINE_MULTISTAGE_PARALLEL_KKT(benchmark::State& state)
+{
+    piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/race_line.mat");
+    run_multistage_benchmark(state, model, piqp::KKTSolver::sparse_multistage_parallel, state.range(0));
+}
+
+// Arguments: {N, threads}
+static void random_args(benchmark::internal::Benchmark* b)
+{
+    for (int64_t N : {50, 100, 200, 500, 1000}) {
+        for (int64_t t : thread_counts()) b->Args({N, t});
     }
 }
 
-
-static void BM_ROBOT_ARM_SQP_MULTISTAGE_PARALLEL_KKT(benchmark::State& state)
+static void BM_RANDOM_MULTISTAGE_KKT(benchmark::State& state)
 {
-    piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/robot_arm_sqp.mat");
-    piqp::SparseSolver<T, I> solver;
-    solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage_parallel;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-
-    for (auto _ : state)
-    {
-        // solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-        solver.solve();
-    }
+    piqp::sparse::Model<T, I> model = piqp::generate_random_multistage_qp<T, I>(static_cast<int>(state.range(0)));
+    run_multistage_benchmark(state, model, piqp::KKTSolver::sparse_multistage, state.range(1));
 }
 
-
-static void BM_CHAIN_MASS_SQP_MULTISTAGE_KKT(benchmark::State& state)
+static void BM_RANDOM_MULTISTAGE_PARALLEL_KKT(benchmark::State& state)
 {
-    piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
-    piqp::SparseSolver<T, I> solver;
-    solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-
-    for (auto _ : state)
-    {
-        // solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-        solver.solve();
-    }
+    piqp::sparse::Model<T, I> model = piqp::generate_random_multistage_qp<T, I>(static_cast<int>(state.range(0)));
+    run_multistage_benchmark(state, model, piqp::KKTSolver::sparse_multistage_parallel, state.range(1));
 }
 
+// BENCHMARK(BM_ROBOT_ARM_SQP_MULTISTAGE_KKT)->Apply(thread_args)->ArgNames({"threads"})->UseRealTime()->Unit(benchmark::kMillisecond);
+// BENCHMARK(BM_ROBOT_ARM_SQP_MULTISTAGE_PARALLEL_KKT)->Apply(thread_args)->ArgNames({"threads"})->UseRealTime()->Unit(benchmark::kMillisecond);
+// BENCHMARK(BM_CHAIN_MASS_SQP_MULTISTAGE_KKT)->Apply(thread_args)->ArgNames({"threads"})->UseRealTime()->Unit(benchmark::kMillisecond);
+// BENCHMARK(BM_CHAIN_MASS_SQP_MULTISTAGE_PARALLEL_KKT)->Apply(thread_args)->ArgNames({"threads"})->UseRealTime()->Unit(benchmark::kMillisecond);
 
-static void BM_CHAIN_MASS_SQP_MULTISTAGE_PARALLEL_KKT(benchmark::State& state)
-{
-    piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
-    piqp::SparseSolver<T, I> solver;
-    solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage_parallel;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+BENCHMARK(BM_RACE_LINE_MULTISTAGE_KKT)->Apply(thread_args)->ArgNames({"threads"})->UseRealTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_RACE_LINE_MULTISTAGE_PARALLEL_KKT)->Apply(thread_args)->ArgNames({"threads"})->UseRealTime()->Unit(benchmark::kMillisecond);
 
-    for (auto _ : state)
-    {
-        // solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-        solver.solve();
-    }
-}
-
-
-static void BM_RANDOM_SQP_MULTISTAGE_KKT(benchmark::State& state)
-{
-    piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
-    piqp::generate_random_multistage_qp_data<T, I>(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    piqp::SparseSolver<T, I> solver;
-    solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-
-    for (auto _ : state)
-    {
-        solver.solve();
-    }
-}
-
-
-static void BM_RANDOM_SQP_MULTISTAGE_PARALLEL_KKT(benchmark::State& state)
-{
-    piqp::sparse::Model<T, I> model = piqp::load_sparse_model<T, I>("data/chain_mass_sqp.mat");
-    piqp::generate_random_multistage_qp_data<T, I>(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    piqp::SparseSolver<T, I> solver;
-    solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage_parallel;
-    solver.settings().verbose = false;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    solver.update(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-
-    for (auto _ : state)
-    {
-        solver.solve();
-    }
-}
-
-BENCHMARK(BM_ROBOT_ARM_SQP_MULTISTAGE_KKT)->Unit(benchmark::kMillisecond);
-BENCHMARK(BM_ROBOT_ARM_SQP_MULTISTAGE_PARALLEL_KKT)->Unit(benchmark::kMillisecond);
-
-BENCHMARK(BM_CHAIN_MASS_SQP_MULTISTAGE_KKT)->Unit(benchmark::kMillisecond);
-BENCHMARK(BM_CHAIN_MASS_SQP_MULTISTAGE_PARALLEL_KKT)->Unit(benchmark::kMillisecond);
-
-BENCHMARK(BM_RANDOM_SQP_MULTISTAGE_KKT)->Unit(benchmark::kMillisecond);
-BENCHMARK(BM_RANDOM_SQP_MULTISTAGE_PARALLEL_KKT)->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_RANDOM_MULTISTAGE_KKT)->Apply(random_args)->ArgNames({"N", "threads"})->UseRealTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_RANDOM_MULTISTAGE_PARALLEL_KKT)->Apply(random_args)->ArgNames({"N", "threads"})->UseRealTime()->Unit(benchmark::kMillisecond);
 
 BENCHMARK_MAIN();

@@ -896,64 +896,69 @@ void SolverBase<T, I, Preconditioner, MatrixType>::calculate_step(T& alpha_s, T&
     alpha_s = T(1);
     alpha_z = T(1);
 
-#ifdef PIQP_HAS_OPENMP
-#pragma omp parallel num_threads(resolve_num_threads(m_settings.num_threads))
-    {
-    PIQP_TRACY_ZoneScopedN("piqp::Solver::calculate_step:parallel");
-
-    #pragma omp for reduction(min:alpha_s,alpha_z)
-#endif
-    for (isize i = 0; i < m_data.m; i++)
-    {
+    auto step_ineq = [&](isize i, T& a_s, T& a_z) {
         if (step.s_l(i) < 0)
         {
-            alpha_s = (std::min)(alpha_s, -m_result.s_l(i) / step.s_l(i));
+            a_s = (std::min)(a_s, -m_result.s_l(i) / step.s_l(i));
         }
         if (step.s_u(i) < 0)
         {
-            alpha_s = (std::min)(alpha_s, -m_result.s_u(i) / step.s_u(i));
+            a_s = (std::min)(a_s, -m_result.s_u(i) / step.s_u(i));
         }
         if (step.z_l(i) < 0)
         {
-            alpha_z = (std::min)(alpha_z, -m_result.z_l(i) / step.z_l(i));
+            a_z = (std::min)(a_z, -m_result.z_l(i) / step.z_l(i));
         }
         if (step.z_u(i) < 0)
         {
-            alpha_z = (std::min)(alpha_z, -m_result.z_u(i) / step.z_u(i));
+            a_z = (std::min)(a_z, -m_result.z_u(i) / step.z_u(i));
         }
-    }
-#ifdef PIQP_HAS_OPENMP
-    #pragma omp for reduction(min:alpha_s,alpha_z)
-#endif
-    for (isize i = 0; i < m_data.n_x_l; i++)
-    {
+    };
+    auto step_box_l = [&](isize i, T& a_s, T& a_z) {
         if (step.s_bl(i) < 0)
         {
-            alpha_s = (std::min)(alpha_s, -m_result.s_bl(i) / step.s_bl(i));
+            a_s = (std::min)(a_s, -m_result.s_bl(i) / step.s_bl(i));
         }
         if (step.z_bl(i) < 0)
         {
-            alpha_z = (std::min)(alpha_z, -m_result.z_bl(i) / step.z_bl(i));
+            a_z = (std::min)(a_z, -m_result.z_bl(i) / step.z_bl(i));
         }
-    }
-#ifdef PIQP_HAS_OPENMP
-    #pragma omp for reduction(min:alpha_s,alpha_z)
-#endif
-    for (isize i = 0; i < m_data.n_x_u; i++)
-    {
+    };
+    auto step_box_u = [&](isize i, T& a_s, T& a_z) {
         if (step.s_bu(i) < 0)
         {
-            alpha_s = (std::min)(alpha_s, -m_result.s_bu(i) / step.s_bu(i));
+            a_s = (std::min)(a_s, -m_result.s_bu(i) / step.s_bu(i));
         }
         if (step.z_bu(i) < 0)
         {
-            alpha_z = (std::min)(alpha_z, -m_result.z_bu(i) / step.z_bu(i));
+            a_z = (std::min)(a_z, -m_result.z_bu(i) / step.z_bu(i));
         }
-    }
+    };
 
 #ifdef PIQP_HAS_OPENMP
-    } // end of parallel region
+    // opening a parallel region is only worth it for large problems,
+    // and a single threaded parallel region is slower than the plain loops
+    const int num_threads = resolve_elementwise_num_threads(m_settings.num_threads, m_data.m + m_data.n_x_l + m_data.n_x_u);
+    if (num_threads > 1)
+    {
+        #pragma omp parallel num_threads(num_threads)
+        {
+            PIQP_TRACY_ZoneScopedN("piqp::Solver::calculate_step:parallel");
+
+            #pragma omp for reduction(min:alpha_s,alpha_z)
+            for (isize i = 0; i < m_data.m; i++) step_ineq(i, alpha_s, alpha_z);
+            #pragma omp for reduction(min:alpha_s,alpha_z)
+            for (isize i = 0; i < m_data.n_x_l; i++) step_box_l(i, alpha_s, alpha_z);
+            #pragma omp for reduction(min:alpha_s,alpha_z)
+            for (isize i = 0; i < m_data.n_x_u; i++) step_box_u(i, alpha_s, alpha_z);
+        }
+        return;
+    }
 #endif
+
+    for (isize i = 0; i < m_data.m; i++) step_ineq(i, alpha_s, alpha_z);
+    for (isize i = 0; i < m_data.n_x_l; i++) step_box_l(i, alpha_s, alpha_z);
+    for (isize i = 0; i < m_data.n_x_u; i++) step_box_u(i, alpha_s, alpha_z);
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
