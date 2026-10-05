@@ -137,7 +137,7 @@ static void BM_CALCULATE_STEP(benchmark::State& state)
     }
 
     state.SetItemsProcessed(state.iterations() * total);
-    state.counters["elems_per_thread"] = static_cast<double>(total) / std::max(1, num_threads);
+    state.counters["elems_per_thread"] = static_cast<double>(total) / (std::max)(1, num_threads);
 }
 
 // Same as BM_CALCULATE_STEP, but every iteration first runs a parallel region on
@@ -182,7 +182,7 @@ static void BM_CALCULATE_STEP_AFTER_PARALLEL_REGION(benchmark::State& state)
     }
 
     state.SetItemsProcessed(state.iterations() * total);
-    state.counters["elems_per_thread"] = static_cast<double>(total) / std::max(1, num_threads);
+    state.counters["elems_per_thread"] = static_cast<double>(total) / (std::max)(1, num_threads);
 }
 
 static void calculate_step_args(benchmark::internal::Benchmark* b)

@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <stdexcept>
 #include "blasfeo.h"
 
@@ -161,7 +162,7 @@ void MultistageParallelKKT<T, I>::solve(const Data<T, I>&, const Vec<T>& rhs_x, 
 template<typename T, typename I>
 void MultistageParallelKKT<T, I>::init()
 {
-    max_num_threads = static_cast<size_t>(std::max(1, this->m_num_threads));
+    max_num_threads = static_cast<size_t>((std::max)(1, this->m_num_threads));
     kkt_solve_num_threads = max_num_threads;
 
     generate_partitions();  // Generate partitions for multi-threads
@@ -230,7 +231,7 @@ void MultistageParallelKKT<T, I>::generate_partitions()
             auto cost_parallel_part = [N, P](size_t Ni) -> T {
                 size_t N1 = N - (P - 1) * (Ni + 1);
                 // 7/3 * N1  vs  19/3 * Ni
-                return std::max(T(7.0)/T(3.0)*static_cast<T>(N1),
+                return (std::max)(T(7.0)/T(3.0)*static_cast<T>(N1),
                                 T(19.0)/T(3.0)*static_cast<T>(Ni));
             };
             Ni = cost_parallel_part(Ni_ceil) < cost_parallel_part(Ni_floor)? Ni_ceil : Ni_floor;
