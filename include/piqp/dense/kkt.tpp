@@ -29,7 +29,14 @@ KKT<T>::KKT(const Data<T>& data)
     work_z.resize(data.m);
 
     kkt_mat.resize(data.n, data.n);
-    llt = Eigen::LLT<Mat<T>, Eigen::Lower>(data.n);
+    // Initialize the Cholesky object by factorizing an empty matrix rather
+    // than move-assigning a freshly constructed Eigen::LLT. Released Eigen
+    // (3.4.x and 5.0.x) does not initialize LLT::m_info in its constructors,
+    // so the implicit move assignment reads an indeterminate enum value
+    // (reported by UBSan as "load of value ..., which is not a valid value
+    // for type 'ComputationInfo'"). compute() resizes the internal storage
+    // on first use, so no preallocation is lost.
+    llt.compute(Mat<T>(0, 0));
 
     if (data.p > 0) {
         AT_A.resize(data.n, data.n);
