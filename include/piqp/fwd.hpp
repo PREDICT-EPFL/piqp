@@ -56,13 +56,16 @@
 #ifdef MATLAB
 #define piqp_print mexPrintf
 #define piqp_eprint mexPrintf
+#define piqp_flush() ((void)0)
 #elif defined R_LANG
 #include <R_ext/Print.h>
 #define piqp_print Rprintf
 #define piqp_eprint REprintf
+#define piqp_flush() R_FlushConsole()
 #else
 #define piqp_print printf
 #define piqp_eprint(...) fprintf(stderr, __VA_ARGS__)
+#define piqp_flush() fflush(stdout)
 #endif
 
 #endif //PIQP_FWD_HPP

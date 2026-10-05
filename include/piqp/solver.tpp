@@ -596,7 +596,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
                 static_cast<double>(m_result.info.primal_step),
                 static_cast<double>(m_result.info.dual_step)
             );
-            fflush(stdout);
+            piqp_flush();
         }
 
         if ((m_result.info.primal_res < m_settings.eps_abs || m_result.info.primal_res_rel < m_settings.eps_rel) &&

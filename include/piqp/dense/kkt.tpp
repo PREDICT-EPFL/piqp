@@ -28,8 +28,11 @@ KKT<T>::KKT(const Data<T>& data)
     W_delta_inv_G.resize(data.m, data.n);
     work_z.resize(data.m);
 
-    kkt_mat.resize(data.n, data.n);
-    llt = Eigen::LLT<Mat<T>, Eigen::Lower>(data.n);
+    kkt_mat.setZero(data.n, data.n);
+    // Eigen's LLT leaves m_info uninitialized until the first compute(), so copying
+    // or move-assigning it before then is UB. Factorizing the zero matrix allocates
+    // the storage and sets m_info, but exits at the first pivot, i.e., costs only O(n^2).
+    llt.compute(kkt_mat);
 
     if (data.p > 0) {
         AT_A.resize(data.n, data.n);
