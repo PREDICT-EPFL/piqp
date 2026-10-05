@@ -36,6 +36,8 @@ git clone https://github.com/PREDICT-EPFL/piqp.git
 cd piqp
 # to build with Blasfeo (needed for sparse_multistage backend)
 # export CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON"
+# to additionally build with OpenMP (needed for sparse_multistage_parallel backend)
+# export CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBUILD_WITH_OPENMP=ON"
 python3 -m pip install .
 ```
 This will build and install piqp. Alternatively, also a wheel can be build using

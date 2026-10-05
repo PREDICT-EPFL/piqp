@@ -96,3 +96,22 @@ solver.settings.kkt_solver = piqp.KKTSolver.sparse_multistage
 ```
 solver.update_settings('kkt_solver', 'sparse_multistage');
 ```
+
+## Multithreading
+
+The `sparse_multistage_parallel` backend factorizes the KKT system in parallel by splitting the horizon into segments, which can significantly speed up problems with long horizons. It requires PIQP to be built with OpenMP and Blasfeo (`-DBUILD_WITH_OPENMP=ON -DBUILD_WITH_BLASFEO=ON`).
+
+{: .note }
+The prebuilt packages (e.g. `pip install piqp`) are built without OpenMP, i.e., PIQP has to be built from source.
+
+```c++
+solver.settings().kkt_solver = piqp::KKTSolver::sparse_multistage_parallel;
+solver.settings().num_threads = 6;
+```
+
+The default `num_threads = 0` uses the OpenMP default, usually all logical cores, which is rarely the fastest choice. We recommend setting `num_threads` to the number of performance cores.
+
+### OpenMP runtime settings
+
+* On CPUs with performance and efficiency cores (e.g. Apple Silicon, Intel 12th gen or newer), LLVM OpenMP (Clang, macOS) puts idle threads to sleep immediately, which slows down short horizons considerably. Setting `KMP_BLOCKTIME=200ms` (or `OMP_WAIT_POLICY=active`) keeps the threads active and can make the solver several times faster.
+* On Linux, binding threads to cores (`OMP_PLACES=cores OMP_PROC_BIND=close`), ideally restricted to performance cores, further improves performance. Thread binding is not supported on macOS.
