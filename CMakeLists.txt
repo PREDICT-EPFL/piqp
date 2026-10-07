@@ -292,8 +292,9 @@ if (BUILD_WITH_OPENMP)
         target_compile_definitions(piqp_header_only_no_blasfeo_linked INTERFACE PIQP_HAS_OPENMP)
         target_link_libraries(piqp_header_only_no_blasfeo_linked INTERFACE OpenMP::OpenMP_CXX)
     else ()
-        message(STATUS "OpenMP NOT found.")
-        set(PIQP_WITH_OPENMP_TARGET OFF)
+        message(FATAL_ERROR "BUILD_WITH_OPENMP is ON, but OpenMP was not found. "
+                            "On macOS with AppleClang, install libomp (e.g. brew install libomp) "
+                            "and pass -DOpenMP_ROOT=$(brew --prefix libomp).")
     endif ()
 endif ()
 
