@@ -288,7 +288,7 @@ TEST_P(BlocksparseStageParallelKKTTest, SolveQPNumThreads)
     std::string path = "data/" + GetParam() + ".mat";
     Model<T, I> model = load_sparse_model<T, I>(path);
 
-    for (isize num_threads : {1, 2, 3})
+    for (isize num_threads : {1, 2, 3, 4, 6, 8})
     {
         SCOPED_TRACE("num_threads = " + std::to_string(num_threads));
 

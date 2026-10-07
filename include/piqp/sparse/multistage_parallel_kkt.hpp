@@ -8,6 +8,7 @@
 #ifndef PIQP_SPARSE_MULTISTAGE_PARALLEL_KKT_HPP
 #define PIQP_SPARSE_MULTISTAGE_PARALLEL_KKT_HPP
 
+#include <cassert>
 #include <memory>
 #include <vector>
 
@@ -15,6 +16,7 @@
 #include "piqp/kkt_solver_base.hpp"
 #include "piqp/sparse/data.hpp"
 #include "piqp/sparse/multistage_kkt.hpp"
+#include "piqp/sparse/multistage_partition.hpp"
 #include "piqp/sparse/blocksparse/block_kkt_parallel.hpp"
 #include "piqp/sparse/blocksparse/block_vec.hpp"
 #include "piqp/utils/blasfeo_vec.hpp"
@@ -36,8 +38,9 @@ protected:
     // Solver-local thread count for KKT factorization and triangular solves.
     size_t kkt_solve_num_threads = 0;
     BlockKKTParallel kkt_fac_parallel;
-    std::vector<size_t> pivots;
     std::vector<std::vector<size_t>> segments;
+    // separators[k] is the separator block preceding segment k, or -1 if there is none
+    std::vector<isize> separators;
     std::vector<BlasfeoVec> work_rhs_g;  // store the r_g for each thread in forward substitution
 
 public:
@@ -54,6 +57,16 @@ protected:
 
     // Generate partitions for multi-threads
     void generate_partitions();
+
+    bool has_separator_before(size_t k) const { return separators[k] >= 0; }
+
+    size_t separator_before(size_t k) const
+    {
+        assert(has_separator_before(k));
+        return static_cast<size_t>(separators[k]);
+    }
+
+    bool has_separator_after(size_t k) const { return k + 1 < segments.size() && has_separator_before(k + 1); }
 
     void init_kkt_fac();
 

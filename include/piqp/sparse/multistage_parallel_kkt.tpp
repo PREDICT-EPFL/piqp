@@ -180,110 +180,21 @@ void MultistageParallelKKT<T, I>::init()
 template<typename T, typename I>
 void MultistageParallelKKT<T, I>::generate_partitions()
 {
-    pivots.clear();
-    segments.clear();
-
     const size_t N = this->block_info.size() - 1;  // number of diagonal blocks excluding arrow head
 
-    // this->print_info();
-
-    // Detect scenerio mpc structure
-    std::vector<size_t> idx_empty_off_diag_blocks;
-    idx_empty_off_diag_blocks.clear();
+    // the cost of a block is dominated by its Cholesky factorization
+    std::vector<double> weights(N);
+    std::vector<bool> decoupled(N);
     for (size_t i = 0; i < N; i++) {
-        if (this->block_info[i].off_diag_size == 0) {
-            idx_empty_off_diag_blocks.push_back(i);
-        }
+        double b = static_cast<double>(this->block_info[i].diag_size);
+        weights[i] = b * b * b;
+        decoupled[i] = this->block_info[i].off_diag_size == 0;
     }
 
-    if (idx_empty_off_diag_blocks.size() <= 1) {
-        const size_t max_possible_threads = (N > 1) ? std::max<size_t>(1, (N - 1) / 2) : size_t(1);
-        if (kkt_solve_num_threads > max_possible_threads) {
-            piqp_eprint("Warning: multistage parallel KKT requested %zu OpenMP threads for %zu stages; using %zu threads for KKT factorization/solve instead.\n",
-                        kkt_solve_num_threads, N, max_possible_threads);
-            kkt_solve_num_threads = max_possible_threads;
-        }
-        const size_t P = kkt_solve_num_threads;
-        if (P <= 1) {
-            std::vector<size_t> segment_i;
-            segment_i.reserve(N);
-            for (size_t i = 0; i < N; ++i) { segment_i.push_back(i); }
-            segments.push_back(segment_i);
-            return;
-        }
-        // Compute segment size such that first segment is ~19/7 times others
-        T ratio = T(19.0) / T(7.0);  // the optimal ratio of first segment length over intermediate segments lengths
-        T Ni_ideal = T(N - P + 1) / (T(P - 1) + ratio);
-        auto Ni_ceil = static_cast<size_t>(std::ceil(Ni_ideal));
-        auto Ni_floor = static_cast<size_t>(std::floor(Ni_ideal));
-
-        size_t Ni = 0, N1 = 0;
-        if (N <= (P - 1) * (Ni_ceil + 1) ) {
-            // If ceiling Ni makes the left N1 zero or negative, we have to pick flooring
-            Ni = Ni_floor;
-            if ((P - 1) * (Ni + 1) >= N) {
-                throw std::runtime_error("The multistage problem's horizon is too short for given number thread to use parallel multistage kkt solver. Please decrease the number of threads of use serial solver instead.");
-            }
-            N1 = N - (P - 1) * (Ni + 1);
-        } else {
-            // Compare ceiling and floor
-            // lambda: time complexity of the parallel part if we pick Ni
-            auto cost_parallel_part = [N, P](size_t Ni) -> T {
-                size_t N1 = N - (P - 1) * (Ni + 1);
-                // 7/3 * N1  vs  19/3 * Ni
-                return (std::max)(T(7.0)/T(3.0)*static_cast<T>(N1),
-                                T(19.0)/T(3.0)*static_cast<T>(Ni));
-            };
-            Ni = cost_parallel_part(Ni_ceil) < cost_parallel_part(Ni_floor)? Ni_ceil : Ni_floor;
-            N1 = N - (P - 1) * (Ni + 1);
-        }
-
-        // Compute pivot indices
-        pivots.reserve(P - 1);
-        for (size_t j = 0; j < P - 1; ++j) {
-            size_t pivot_j = N1 + Ni * j + j;
-            pivots.push_back(pivot_j);
-        }
-
-        std::vector<size_t> segment_i;
-        for (size_t i = 0; i < N1; i++) { segment_i.push_back(i); }
-        segments.push_back(segment_i);
-        for (size_t j = 0; j < P-1; ++j) {
-            segment_i.clear();
-            for (size_t i = 0; i < Ni; i++) { segment_i.push_back(pivots[j] + 1 + i); }
-            segments.push_back(segment_i);
-        }
-    } else {
-        // Scenario MPC, naturally parallelizable structure
-        const size_t max_possible_threads = std::max<size_t>(1, idx_empty_off_diag_blocks.size());
-        if (kkt_solve_num_threads > max_possible_threads) {
-            piqp_eprint("Warning: multistage parallel KKT requested %zu OpenMP threads for %zu scenario partitions; using %zu threads for KKT factorization/solve instead.\n",
-                        kkt_solve_num_threads, idx_empty_off_diag_blocks.size(), max_possible_threads);
-            kkt_solve_num_threads = max_possible_threads;
-        }
-
-        std::vector<size_t> pivots_tmp = idx_empty_off_diag_blocks;
-        pivots_tmp.insert(pivots_tmp.begin(), static_cast<size_t>(-1));  // underflows to max size_t
-        for (size_t i = 0; i < kkt_solve_num_threads; ++i) {
-            std::vector<size_t> segment;
-            const size_t segment_end = (i + 1 < kkt_solve_num_threads) ? pivots_tmp[i + 1] : (N - 1);
-            for (size_t j = pivots_tmp[i] + 1; j <= segment_end; ++j) {
-                segment.push_back(j);
-            }
-            segments.push_back(segment);
-        }
-    }
-
-
-    // std::cout << "segments:";
-    // for (size_t i = 0; i < segments.size(); i++) {
-    //     std::cout << "\n  segment " << i << ": ";
-    //     for (size_t j = 0; j < segments[i].size(); j++) {
-    //         std::cout << segments[i][j] << " ";
-    //     }
-    // }
-
-
+    MultistagePartition partition = partition_multistage(weights, decoupled, max_num_threads);
+    segments = std::move(partition.segments);
+    separators.assign(partition.separators.begin(), partition.separators.end());
+    kkt_solve_num_threads = segments.size();
 }
 
 template<typename T, typename I>
@@ -322,7 +233,7 @@ void MultistageParallelKKT<T, I>::construct_kkt_fac(const Vec<T>& x_reg)
             sub_block.E.clear();
             sub_block.E.resize(segments[k].size() - 1);
             sub_block.Bt.clear();
-            k > 0 && !pivots.empty() ? sub_block.Bt.resize(segments[k].size()) : sub_block.Bt.resize(0);
+            has_separator_before(k) ? sub_block.Bt.resize(segments[k].size()) : sub_block.Bt.resize(0);
             sub_block.G.clear();
             arrow_width > 0 ? sub_block.G.resize(segments[k].size()) : sub_block.G.resize(0);
         }
@@ -346,31 +257,31 @@ void MultistageParallelKKT<T, I>::construct_kkt_fac(const Vec<T>& x_reg)
             }
 
             // F
-            if (k < segments.size() - 1 && !pivots.empty()) {
-                I m_F = this->block_info[pivots[k]-1].off_diag_size;
-                I n_F = this->block_info[pivots[k]-1].diag_size;
+            if (has_separator_after(k)) {
+                I m_F = this->block_info[segment_k.back()].off_diag_size;
+                I n_F = this->block_info[segment_k.back()].diag_size;
                 sub_block.F = std::make_unique<BlasfeoMat>(m_F, n_F);
             } else {
                 sub_block.F = nullptr;  // The last sub-block does not have an F matrix
             }
 
             // A
-            if (k > 0 && !pivots.empty()) {
-                I m_A = this->block_info[pivots[k-1]].diag_size;
+            if (has_separator_before(k)) {
+                I m_A = this->block_info[separator_before(k)].diag_size;
                 sub_block.A = std::make_unique<BlasfeoMat>(m_A, m_A);
             } else {
                 sub_block.A = nullptr;  // The first sub-block does not have an A matrix
             }
 
             // H
-            if (k > 0 && k < segments.size() - 1 && !pivots.empty()) {
+            if (has_separator_before(k) && has_separator_after(k)) {
                 sub_block.H = std::make_unique<BlasfeoMat>(sub_block.F->rows(), sub_block.A->cols());
             } else {
                 sub_block.H = nullptr;  // The first and last sub-blocks do not have an H matrix
             }
 
             // B
-            if (k > 0 && !pivots.empty()) {
+            if (has_separator_before(k)) {
                 sub_block.Bt[0] = std::make_unique<BlasfeoMat>(sub_block.A->rows(), sub_block.D[0]->cols());
                 sub_block.Bt0_tmp = std::make_unique<BlasfeoMat>(sub_block.A->rows(), sub_block.D[0]->cols());
                 for (size_t i = 1; i < segments[k].size(); i++) {
@@ -386,7 +297,7 @@ void MultistageParallelKKT<T, I>::construct_kkt_fac(const Vec<T>& x_reg)
                     sub_block.G[i] = std::make_unique<BlasfeoMat>(arrow_width, sub_block.D[i]->cols());
                 }
                 // Q
-                if (k > 0 && !pivots.empty()) { sub_block.Q = std::make_unique<BlasfeoMat>(arrow_width, sub_block.A->cols()); }
+                if (has_separator_before(k)) { sub_block.Q = std::make_unique<BlasfeoMat>(arrow_width, sub_block.A->cols()); }
                 // R
                 sub_block.R = std::make_unique<BlasfeoMat>(arrow_width, arrow_width);
             }
@@ -461,44 +372,44 @@ void MultistageParallelKKT<T, I>::construct_kkt_fac(const Vec<T>& x_reg)
 
             // ----- A -----
             if (sub_block_k.A) {
-                assert(k > 0 && !pivots.empty());
+                assert(has_separator_before(k));
                 bool A_mat_set = false;
-                if (this->P.D[pivots[k-1]]) {
-                    assert(this->P.D[pivots[k-1]]->rows() <= sub_block_k.A->rows() && "size mismatch");
-                    assert(this->P.D[pivots[k-1]]->cols() <= sub_block_k.A->cols() && "size mismatch");
-                    blasfeo_dtrcp_l(*this->P.D[pivots[k-1]], *sub_block_k.A);
+                if (this->P.D[separator_before(k)]) {
+                    assert(this->P.D[separator_before(k)]->rows() <= sub_block_k.A->rows() && "size mismatch");
+                    assert(this->P.D[separator_before(k)]->cols() <= sub_block_k.A->cols() && "size mismatch");
+                    blasfeo_dtrcp_l(*this->P.D[separator_before(k)], *sub_block_k.A);
                     A_mat_set = true;
                 }
 
-                if (this->AtA.D[pivots[k-1]]) {
-                    assert(this->AtA.D[pivots[k-1]]->rows() <= sub_block_k.A->rows() && "size mismatch");
-                    assert(this->AtA.D[pivots[k-1]]->cols() <= sub_block_k.A->cols() && "size mismatch");
+                if (this->AtA.D[separator_before(k)]) {
+                    assert(this->AtA.D[separator_before(k)]->rows() <= sub_block_k.A->rows() && "size mismatch");
+                    assert(this->AtA.D[separator_before(k)]->cols() <= sub_block_k.A->cols() && "size mismatch");
                     if (A_mat_set) {
-                        blasfeo_dgead(delta_inv, *this->AtA.D[pivots[k-1]], *sub_block_k.A);
+                        blasfeo_dgead(delta_inv, *this->AtA.D[separator_before(k)], *sub_block_k.A);
                     } else {
-                        blasfeo_dtrcpsc_l(delta_inv, *this->AtA.D[pivots[k-1]], *sub_block_k.A);
+                        blasfeo_dtrcpsc_l(delta_inv, *this->AtA.D[separator_before(k)], *sub_block_k.A);
                         A_mat_set = true;
                     }
                 }
 
-                if (this->GtG.D[pivots[k-1]]) {
-                    assert(this->GtG.D[pivots[k-1]]->rows() <= sub_block_k.A->rows() && "size mismatch");
-                    assert(this->GtG.D[pivots[k-1]]->cols() <= sub_block_k.A->cols() && "size mismatch");
+                if (this->GtG.D[separator_before(k)]) {
+                    assert(this->GtG.D[separator_before(k)]->rows() <= sub_block_k.A->rows() && "size mismatch");
+                    assert(this->GtG.D[separator_before(k)]->cols() <= sub_block_k.A->cols() && "size mismatch");
                     if (A_mat_set) {
-                        blasfeo_dgead(1.0, *this->GtG.D[pivots[k-1]], *sub_block_k.A);
+                        blasfeo_dgead(1.0, *this->GtG.D[separator_before(k)], *sub_block_k.A);
                     } else {
-                        blasfeo_dtrcp_l(*this->GtG.D[pivots[k-1]], *sub_block_k.A);
+                        blasfeo_dtrcp_l(*this->GtG.D[separator_before(k)], *sub_block_k.A);
                         A_mat_set = true;
                     }
                 }
 
                 if (A_mat_set) {
                     // diag(D_i) += diag
-                    blasfeo_ddiaad(1.0, x_reg_block.x[pivots[k-1]], *sub_block_k.A);
+                    blasfeo_ddiaad(1.0, x_reg_block.x[separator_before(k)], *sub_block_k.A);
                 } else {
                     // D_i = diag
                     sub_block_k.A->setZero();
-                    blasfeo_ddiain(1.0, x_reg_block.x[pivots[k-1]], *sub_block_k.A);
+                    blasfeo_ddiain(1.0, x_reg_block.x[separator_before(k)], *sub_block_k.A);
                 }
 
                 assert(!sub_block_k.A->hasNan() && "A matrix has NaN values");
@@ -550,33 +461,33 @@ void MultistageParallelKKT<T, I>::construct_kkt_fac(const Vec<T>& x_reg)
 
             // ----- F -----
             if (sub_block_k.F) {
-                assert(k < segments.size() - 1 && !pivots.empty());
+                assert(has_separator_after(k));
                 bool F_mat_set = false;
-                if (this->P.B[pivots[k]-1]) {
-                    assert(this->P.B[pivots[k]-1]->rows() <= sub_block_k.F->rows() && "size mismatch");
-                    assert(this->P.B[pivots[k]-1]->cols() <= sub_block_k.F->cols() && "size mismatch");
-                    blasfeo_dgecp(*this->P.B[pivots[k]-1], *sub_block_k.F);
+                if (this->P.B[segment_k.back()]) {
+                    assert(this->P.B[segment_k.back()]->rows() <= sub_block_k.F->rows() && "size mismatch");
+                    assert(this->P.B[segment_k.back()]->cols() <= sub_block_k.F->cols() && "size mismatch");
+                    blasfeo_dgecp(*this->P.B[segment_k.back()], *sub_block_k.F);
                     F_mat_set = true;
                 }
 
-                if (this->AtA.B[pivots[k]-1]) {
-                    assert(this->AtA.B[pivots[k]-1]->rows() <= sub_block_k.F->rows() && "size mismatch");
-                    assert(this->AtA.B[pivots[k]-1]->cols() <= sub_block_k.F->cols() && "size mismatch");
+                if (this->AtA.B[segment_k.back()]) {
+                    assert(this->AtA.B[segment_k.back()]->rows() <= sub_block_k.F->rows() && "size mismatch");
+                    assert(this->AtA.B[segment_k.back()]->cols() <= sub_block_k.F->cols() && "size mismatch");
                     if (F_mat_set) {
-                        blasfeo_dgead(delta_inv, *this->AtA.B[pivots[k]-1], *sub_block_k.F);
+                        blasfeo_dgead(delta_inv, *this->AtA.B[segment_k.back()], *sub_block_k.F);
                     } else {
-                        blasfeo_dgecpsc(delta_inv, *this->AtA.B[pivots[k]-1], *sub_block_k.F);
+                        blasfeo_dgecpsc(delta_inv, *this->AtA.B[segment_k.back()], *sub_block_k.F);
                         F_mat_set = true;
                     }
                 }
 
-                if (this->GtG.B[pivots[k]-1]) {
-                    assert(this->GtG.B[pivots[k]-1]->rows() <= sub_block_k.F->rows() && "size mismatch");
-                    assert(this->GtG.B[pivots[k]-1]->cols() <= sub_block_k.F->cols() && "size mismatch");
+                if (this->GtG.B[segment_k.back()]) {
+                    assert(this->GtG.B[segment_k.back()]->rows() <= sub_block_k.F->rows() && "size mismatch");
+                    assert(this->GtG.B[segment_k.back()]->cols() <= sub_block_k.F->cols() && "size mismatch");
                     if (F_mat_set) {
-                        blasfeo_dgead(1.0, *this->GtG.B[pivots[k]-1], *sub_block_k.F);
+                        blasfeo_dgead(1.0, *this->GtG.B[segment_k.back()], *sub_block_k.F);
                     } else {
-                        blasfeo_dgecp(*this->GtG.B[pivots[k]-1], *sub_block_k.F);
+                        blasfeo_dgecp(*this->GtG.B[segment_k.back()], *sub_block_k.F);
                         F_mat_set = true;
                     }
                 }
@@ -587,13 +498,13 @@ void MultistageParallelKKT<T, I>::construct_kkt_fac(const Vec<T>& x_reg)
 
             // ----- H -----
             if (sub_block_k.H) {
-                assert(k < segments.size() - 1 && !pivots.empty() && !pivots.empty());
+                assert(has_separator_before(k) && has_separator_after(k));
                 sub_block_k.H->setZero();
             }
 
             // ----- B -----
-            if (k > 0 && !pivots.empty()) {  // TODO:
-                assert(k > 0 && !pivots.empty());
+            if (has_separator_before(k)) {
+                assert(has_separator_before(k));
                 // B_1 - B_end are all zeros. Also set B_0 to zeros hereby.
                 for (size_t i = 0; i < segments[k].size(); i++) {
                     sub_block_k.Bt[i]->setZero();
@@ -601,39 +512,39 @@ void MultistageParallelKKT<T, I>::construct_kkt_fac(const Vec<T>& x_reg)
 
                 // B0
                 bool B0_mat_set = false;
-                if (this->P.B[pivots[k-1]]) {
-                    assert(this->P.B[pivots[k-1]]->rows() <= sub_block_k.Bt[0]->cols() && "size mismatch");
-                    assert(this->P.B[pivots[k-1]]->cols() <= sub_block_k.Bt[0]->rows() && "size mismatch");
+                if (this->P.B[separator_before(k)]) {
+                    assert(this->P.B[separator_before(k)]->rows() <= sub_block_k.Bt[0]->cols() && "size mismatch");
+                    assert(this->P.B[separator_before(k)]->cols() <= sub_block_k.Bt[0]->rows() && "size mismatch");
                     // B_0t = P.B_
-                    blasfeo_dgetr(*this->P.B[pivots[k-1]], *sub_block_k.Bt[0]);
+                    blasfeo_dgetr(*this->P.B[separator_before(k)], *sub_block_k.Bt[0]);
                     B0_mat_set = true;
                 }
 
-                if (this->AtA.B[pivots[k-1]]) {
-                    assert(this->AtA.B[pivots[k-1]]->rows() <= sub_block_k.Bt[0]->cols() && "size mismatch");
-                    assert(this->AtA.B[pivots[k-1]]->cols() <= sub_block_k.Bt[0]->rows() && "size mismatch");
+                if (this->AtA.B[separator_before(k)]) {
+                    assert(this->AtA.B[separator_before(k)]->rows() <= sub_block_k.Bt[0]->cols() && "size mismatch");
+                    assert(this->AtA.B[separator_before(k)]->cols() <= sub_block_k.Bt[0]->rows() && "size mismatch");
                     if (B0_mat_set) {
                         // B_0 += delta^{-1} * AtA.B_
-                        blasfeo_dgetr(*this->AtA.B[pivots[k-1]], *sub_block_k.Bt0_tmp);
+                        blasfeo_dgetr(*this->AtA.B[separator_before(k)], *sub_block_k.Bt0_tmp);
                         blasfeo_dgead(delta_inv, *sub_block_k.Bt0_tmp, *sub_block_k.Bt[0]);
                     } else {
                         // B_0 = delta^{-1} * AtA.B_
-                        blasfeo_dgetr(*this->AtA.B[pivots[k-1]], *sub_block_k.Bt0_tmp);
+                        blasfeo_dgetr(*this->AtA.B[separator_before(k)], *sub_block_k.Bt0_tmp);
                         blasfeo_dgecpsc(delta_inv, *sub_block_k.Bt0_tmp, *sub_block_k.Bt[0]);
                         B0_mat_set = true;
                     }
                 }
 
-                if (this->GtG.B[pivots[k-1]]) {
-                    assert(this->GtG.B[pivots[k-1]]->rows() <= sub_block_k.Bt[0]->cols() && "size mismatch");
-                    assert(this->GtG.B[pivots[k-1]]->cols() <= sub_block_k.Bt[0]->rows() && "size mismatch");
+                if (this->GtG.B[separator_before(k)]) {
+                    assert(this->GtG.B[separator_before(k)]->rows() <= sub_block_k.Bt[0]->cols() && "size mismatch");
+                    assert(this->GtG.B[separator_before(k)]->cols() <= sub_block_k.Bt[0]->rows() && "size mismatch");
                     if (B0_mat_set) {
                         // B_0 += GtG.B_
-                        blasfeo_dgetr(*this->GtG.B[pivots[k-1]], *sub_block_k.Bt0_tmp);
+                        blasfeo_dgetr(*this->GtG.B[separator_before(k)], *sub_block_k.Bt0_tmp);
                         blasfeo_dgead(1.0, *sub_block_k.Bt0_tmp, *sub_block_k.Bt[0]);
                     } else {
                         // B_0 = GtG.B_
-                        blasfeo_dgetr(*this->GtG.B[pivots[k-1]], *sub_block_k.Bt0_tmp);
+                        blasfeo_dgetr(*this->GtG.B[separator_before(k)], *sub_block_k.Bt0_tmp);
                         blasfeo_dgecp(*sub_block_k.Bt0_tmp, *sub_block_k.Bt[0]);
                         B0_mat_set = true;
                     }
@@ -694,12 +605,12 @@ void MultistageParallelKKT<T, I>::construct_kkt_fac(const Vec<T>& x_reg)
 
                 // ----- Q -----
                 if (sub_block_k.Q) {
-                    assert(k > 0 && !pivots.empty());
+                    assert(has_separator_before(k));
                     bool Q_mat_set = false;
-                    if (this->P.E[pivots[k-1]]) {
-                        assert(this->P.E[pivots[k-1]]->rows() <= sub_block_k.Q->rows() && "size mismatch");
-                        assert(this->P.E[pivots[k-1]]->cols() <= sub_block_k.Q->cols() && "size mismatch");
-                        blasfeo_dgecp(*this->P.E[pivots[k-1]], *sub_block_k.Q);
+                    if (this->P.E[separator_before(k)]) {
+                        assert(this->P.E[separator_before(k)]->rows() <= sub_block_k.Q->rows() && "size mismatch");
+                        assert(this->P.E[separator_before(k)]->cols() <= sub_block_k.Q->cols() && "size mismatch");
+                        blasfeo_dgecp(*this->P.E[separator_before(k)], *sub_block_k.Q);
                         Q_mat_set = true;
                     }
 
@@ -709,24 +620,24 @@ void MultistageParallelKKT<T, I>::construct_kkt_fac(const Vec<T>& x_reg)
                         sub_block_k.Q->setZero();
                     }
 
-                    if (this->AtA.E[pivots[k-1]]) {
-                        assert(this->AtA.E[pivots[k-1]]->rows() <= sub_block_k.Q->rows() && "size mismatch");
-                        assert(this->AtA.E[pivots[k-1]]->cols() <= sub_block_k.Q->cols() && "size mismatch");
+                    if (this->AtA.E[separator_before(k)]) {
+                        assert(this->AtA.E[separator_before(k)]->rows() <= sub_block_k.Q->rows() && "size mismatch");
+                        assert(this->AtA.E[separator_before(k)]->cols() <= sub_block_k.Q->cols() && "size mismatch");
                         if (Q_mat_set) {
-                            blasfeo_dgead(delta_inv, *this->AtA.E[pivots[k-1]], *sub_block_k.Q);
+                            blasfeo_dgead(delta_inv, *this->AtA.E[separator_before(k)], *sub_block_k.Q);
                         } else {
-                            blasfeo_dgecpsc(delta_inv, *this->AtA.E[pivots[k-1]], *sub_block_k.Q);
+                            blasfeo_dgecpsc(delta_inv, *this->AtA.E[separator_before(k)], *sub_block_k.Q);
                             Q_mat_set = true;
                         }
                     }
 
-                    if (this->GtG.E[pivots[k-1]]) {
-                        assert(this->GtG.E[pivots[k-1]]->rows() <= sub_block_k.Q->rows() && "size mismatch");
-                        assert(this->GtG.E[pivots[k-1]]->cols() <= sub_block_k.Q->cols() && "size mismatch");
+                    if (this->GtG.E[separator_before(k)]) {
+                        assert(this->GtG.E[separator_before(k)]->rows() <= sub_block_k.Q->rows() && "size mismatch");
+                        assert(this->GtG.E[separator_before(k)]->cols() <= sub_block_k.Q->cols() && "size mismatch");
                         if (Q_mat_set) {
-                            blasfeo_dgead(1.0, *this->GtG.E[pivots[k-1]], *sub_block_k.Q);
+                            blasfeo_dgead(1.0, *this->GtG.E[separator_before(k)], *sub_block_k.Q);
                         } else {
-                            blasfeo_dgecp(*this->GtG.E[pivots[k-1]], *sub_block_k.Q);
+                            blasfeo_dgecp(*this->GtG.E[separator_before(k)], *sub_block_k.Q);
                             Q_mat_set = true;
                         }
                     }
@@ -844,7 +755,7 @@ void MultistageParallelKKT<T, I>::factor_kkt(bool& success)
             }
 
             if (!sub_blocks[index].Bt.empty()) {
-                assert(index > 0 && !pivots.empty());
+                assert(has_separator_before(index));
                 // TODO: check if B[i] and B[i+1] are nullptr or not
                 std::unique_ptr<BlasfeoMat>& Bt_i = sub_blocks[index].Bt[i];
                 std::unique_ptr<BlasfeoMat>& Bt_ip1 = sub_blocks[index].Bt[i + 1];
@@ -899,7 +810,7 @@ void MultistageParallelKKT<T, I>::factor_kkt(bool& success)
 
 
         if (!sub_blocks[index].Bt.empty()) {
-            assert(index > 0 && !pivots.empty());
+            assert(has_separator_before(index));
             std::unique_ptr<BlasfeoMat>& Bt_last = sub_blocks[index].Bt.back();
             // B[-1].T = B[-1].T * D[-1]^-T
             assert(Bt_last->cols() == D_last->cols() && "size mismatch");
@@ -921,7 +832,7 @@ void MultistageParallelKKT<T, I>::factor_kkt(bool& success)
         }
 
         if (sub_blocks[index].F) {
-            assert(index < segments.size() - 1 && !pivots.empty());
+            assert(has_separator_after(index));
             // F = F * D[-1]^-T
             std::unique_ptr<BlasfeoMat>& F = sub_blocks[index].F;
             assert(F->cols() == D_last->cols() && "size mismatch");
@@ -929,8 +840,8 @@ void MultistageParallelKKT<T, I>::factor_kkt(bool& success)
         }
 
         if (sub_blocks[index].H) {
-            assert(index > 0 && index < segments.size() - 1);
-            assert(!pivots.empty() && !sub_blocks[index].Bt.empty() && sub_blocks[index].F);
+            assert(has_separator_before(index) && has_separator_after(index));
+            assert(!sub_blocks[index].Bt.empty() && sub_blocks[index].F);
             // H = -F * B[-1]
             std::unique_ptr<BlasfeoMat>& Bt_last = sub_blocks[index].Bt.back();
             std::unique_ptr<BlasfeoMat>& F = sub_blocks[index].F;
@@ -1063,8 +974,8 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_forward(BlockVec& b_and_x)
             assert(k > 0);
             const auto& Bt_0 = sub_blocks[k].Bt[0];
             assert(vec.rows() == Bt_0->cols() && "size mismatch");
-            assert(b_and_x.x[pivots[k-1]].rows() == Bt_0->rows() && "size mismatch");
-            blasfeo_dgemv_n(-1.0, *Bt_0, vec, 1.0, b_and_x.x[pivots[k-1]], b_and_x.x[pivots[k-1]]);
+            assert(b_and_x.x[separator_before(k)].rows() == Bt_0->rows() && "size mismatch");
+            blasfeo_dgemv_n(-1.0, *Bt_0, vec, 1.0, b_and_x.x[separator_before(k)], b_and_x.x[separator_before(k)]);
         }
         assert(!vec.hasNan() && "vector has NaN values");
 
@@ -1093,8 +1004,8 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_forward(BlockVec& b_and_x)
                 assert(k > 0);
                 const auto& Bt_i = sub_blocks[k].Bt[i];
                 assert(vec_i.rows() == Bt_i->cols() && "size mismatch");
-                assert(b_and_x.x[pivots[k-1]].rows() == Bt_i->rows() && "size mismatch");
-                blasfeo_dgemv_n(-1.0, *Bt_i, vec_i, 1.0, b_and_x.x[pivots[k-1]], b_and_x.x[pivots[k-1]]);
+                assert(b_and_x.x[separator_before(k)].rows() == Bt_i->rows() && "size mismatch");
+                blasfeo_dgemv_n(-1.0, *Bt_i, vec_i, 1.0, b_and_x.x[separator_before(k)], b_and_x.x[separator_before(k)]);
             }
             assert(!vec_i.hasNan() && "vector has NaN values");
 
@@ -1105,14 +1016,14 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_forward(BlockVec& b_and_x)
         }
     }
 
-    // deal with pivots
+    // deal with separators
 #ifdef PIQP_HAS_OPENMP
 #pragma omp barrier
 #pragma omp master
 {
 #endif
     {
-        PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place:forward:pivots");
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place:forward:separators");
 
         if (arrow_width > 0) {
             // get back vec_g
@@ -1126,9 +1037,9 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_forward(BlockVec& b_and_x)
             // r[k] -= F[k-1] * r[k-1][-1]
             const std::unique_ptr<BlasfeoMat> &F_km1 = sub_blocks[k - 1].F;
             if (F_km1) {
-                assert(!pivots.empty() && k < segments.size());
+                assert(has_separator_before(k));
                 BlasfeoVec& r_km1_last = b_and_x.x[segments[k - 1].back()];
-                BlasfeoVec& r_k = b_and_x.x[pivots[k - 1]];
+                BlasfeoVec& r_k = b_and_x.x[separator_before(k)];
                 assert(r_k.rows() >= F_km1->rows() && "size mismatch");  // r[k] might have more rows than F[k-1]
                 assert(r_km1_last.rows() == F_km1->cols() && "size mismatch");
                 blasfeo_dgemv_n(-1.0, *F_km1, r_km1_last, 1.0, r_k, r_k);
@@ -1137,9 +1048,9 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_forward(BlockVec& b_and_x)
             // r[k+1] -= H[k] * r[k]
             const std::unique_ptr<BlasfeoMat> &H_k = sub_blocks[k - 1].H;
             if (H_k) {
-                assert(!pivots.empty() && k > 1);
-                BlasfeoVec& r_k = b_and_x.x[pivots[k - 2]];
-                BlasfeoVec& r_kp1 = b_and_x.x[pivots[k - 1]];
+                assert(has_separator_before(k - 1) && has_separator_before(k));
+                BlasfeoVec& r_k = b_and_x.x[separator_before(k - 1)];
+                BlasfeoVec& r_kp1 = b_and_x.x[separator_before(k)];
                 assert(r_k.rows() == H_k->cols() && "size mismatch");
                 assert(r_kp1.rows() >= H_k->rows() && "size mismatch");  // r[k+1] might have more rows than H[k-1]
                 blasfeo_dgemv_n(-1.0, *H_k, r_k, 1.0, r_kp1, r_kp1);
@@ -1148,7 +1059,7 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_forward(BlockVec& b_and_x)
             // r[k] = A[k]^-1 * r[k]
             const std::unique_ptr<BlasfeoMat> &A_k = sub_blocks[k].A;
             if (A_k) {
-                BlasfeoVec& r_k = b_and_x.x[pivots[k - 1]];
+                BlasfeoVec& r_k = b_and_x.x[separator_before(k)];
                 assert(r_k.rows() == A_k->rows() && "size mismatch");
                 blasfeo_dtrsv_lnn(*A_k, r_k, r_k);
                 assert(!r_k.hasNan() && "vector has NaN values");
@@ -1157,7 +1068,7 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_forward(BlockVec& b_and_x)
             // r[-1] -= Q[k] * r[k]
             const auto& Q_k = sub_blocks[k].Q;
             if (arrow_width > 0 && Q_k) {
-                BlasfeoVec& r_k = b_and_x.x[pivots[k - 1]];
+                BlasfeoVec& r_k = b_and_x.x[separator_before(k)];
                 BlasfeoVec& r_g = b_and_x.x.back();
                 blasfeo_dgemv_n(-1.0, *Q_k, r_k, 1.0, r_g, r_g);
             }
@@ -1190,7 +1101,7 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_backward(BlockVec& b_and_x)
 #endif
 
     {
-        PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place:backward:pivots");
+        PIQP_TRACY_ZoneScopedN("piqp::MultistageParallelKKT::solve_llt_in_place:backward:separators");
 
         if (arrow_width > 0) {
             // r_g = R^-T * r_g
@@ -1198,41 +1109,34 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_backward(BlockVec& b_and_x)
             if (sub_blocks[0].R) {
                 blasfeo_dtrsv_ltn(*sub_blocks[0].R, r_g, r_g);
             }
+        }
 
-            if (sub_blocks.back().Q) {
-                assert(!pivots.empty());
-                // r_p -= Q[-1]^T * r_g
-                BlasfeoVec& r_p = b_and_x.x[pivots.back()];
-                blasfeo_dgemv_t(-1.0, *sub_blocks.back().Q, r_g, 1.0, r_p, r_p);
+        for (size_t k = segments.size() - 1; k > 0; k--) {
+            if (!has_separator_before(k)) continue;
+            BlasfeoVec& r_k = b_and_x.x[separator_before(k)];
+
+            if (arrow_width > 0 && sub_blocks[k].Q) {
+                // r[k] -= Q[k]^T * r_g
+                BlasfeoVec& r_g = b_and_x.x.back();
+                blasfeo_dgemv_t(-1.0, *sub_blocks[k].Q, r_g, 1.0, r_k, r_k);
             }
-        }
 
-        if (sub_blocks.back().A) {
-            // r_p = A_p^-T * r_p
-            assert(sub_blocks.back().A->rows() == b_and_x.x[pivots.back()].rows() && "size mismatch");
-            blasfeo_dtrsv_ltn(*sub_blocks.back().A, b_and_x.x[pivots.back()], b_and_x.x[pivots.back()]);
-        }
-
-        if (pivots.size() >= 1) {
-            for (size_t k = pivots.size() - 2; k != SIZE_MAX; k--) {
-                if (arrow_width > 0) {
-                    // r_k -= Q[k]^T * r_g
-                    auto& vec_g = b_and_x.x.back();
-                    blasfeo_dgemv_t(-1.0, *sub_blocks[k+1].Q, vec_g, 1.0, b_and_x.x[pivots[k]], b_and_x.x[pivots[k]]);
-                }
+            if (sub_blocks[k].H) {
+                assert(has_separator_after(k));
                 // r[k] -= H[k]^T * r[k+1]
-                assert(sub_blocks[k + 1].H->rows() <= b_and_x.x[pivots[k + 1]].rows() && "size mismatch");
-                assert(sub_blocks[k + 1].H->cols() == b_and_x.x[pivots[k]].rows() && "size mismatch");
-                // blasfeo_dgemv_t(-1.0, *sub_blocks[k + 1].H, b_and_x.x[pivots[k + 1]], 1.0, b_and_x.x[pivots[k]], b_and_x.x[pivots[k]]);
+                BlasfeoVec& r_kp1 = b_and_x.x[separator_before(k + 1)];
+                assert(sub_blocks[k].H->rows() <= r_kp1.rows() && "size mismatch");
+                assert(sub_blocks[k].H->cols() == r_k.rows() && "size mismatch");
                 // NOTICE that if the original off-diagonal block B[i] has less rows than D[i+1], then H[k] will
                 // also have less rows than A[k+1]. This will cause H[k].T to have less cols than r[k+1]
-                blasfeo_dgemv_t(sub_blocks[k + 1].H->rows(), sub_blocks[k + 1].H->cols(), -1.0,
-                        sub_blocks[k + 1].H->ref(), 0, 0, b_and_x.x[pivots[k + 1]].ref(), 0, 1.0,
-                        b_and_x.x[pivots[k]].ref(), 0, b_and_x.x[pivots[k]].ref(), 0);
-                // r[k] = A[k]^-T * r[k]
-                assert(sub_blocks[k + 1].A->rows() == b_and_x.x[pivots[k]].rows() && "size mismatch");
-                blasfeo_dtrsv_ltn(*sub_blocks[k+1].A, b_and_x.x[pivots[k]], b_and_x.x[pivots[k]]);
+                blasfeo_dgemv_t(sub_blocks[k].H->rows(), sub_blocks[k].H->cols(), -1.0,
+                        sub_blocks[k].H->ref(), 0, 0, r_kp1.ref(), 0, 1.0,
+                        r_k.ref(), 0, r_k.ref(), 0);
             }
+
+            // r[k] = A[k]^-T * r[k]
+            assert(sub_blocks[k].A->rows() == r_k.rows() && "size mismatch");
+            blasfeo_dtrsv_ltn(*sub_blocks[k].A, r_k, r_k);
         }
     }
 
@@ -1248,9 +1152,9 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_backward(BlockVec& b_and_x)
             if (!sub_blocks[k].Bt.empty()) {
                 for (size_t i = segments[k].size() - 1; i != SIZE_MAX; i--) {
                     const std::unique_ptr<BlasfeoMat>& Bt_i = sub_blocks[k].Bt[i];
-                    assert(Bt_i->rows() == b_and_x.x[pivots[k-1]].rows() && "size mismatch");
+                    assert(Bt_i->rows() == b_and_x.x[separator_before(k)].rows() && "size mismatch");
                     assert(Bt_i->cols() == b_and_x.x[segments[k][i]].rows() && "size mismatch");
-                    blasfeo_dgemv_t(-1.0, *Bt_i, b_and_x.x[pivots[k-1]], 1.0, b_and_x.x[segments[k][i]], b_and_x.x[segments[k][i]]);
+                    blasfeo_dgemv_t(-1.0, *Bt_i, b_and_x.x[separator_before(k)], 1.0, b_and_x.x[segments[k][i]], b_and_x.x[segments[k][i]]);
                 }
             }
         }
@@ -1270,9 +1174,10 @@ void MultistageParallelKKT<T, I>::solve_llt_in_place_backward(BlockVec& b_and_x)
 
         if (k < segments.size() - 1) {
             if (sub_blocks[k].F) {
-                assert(sub_blocks[k].F->rows() <= b_and_x.x[pivots[k]].rows() && "size mismatch");
+                assert(has_separator_after(k));
+                assert(sub_blocks[k].F->rows() <= b_and_x.x[separator_before(k + 1)].rows() && "size mismatch");
                 assert(sub_blocks[k].F->cols() == b_and_x.x[segments[k].back()].rows() && "size mismatch");
-                blasfeo_dgemv_t(sub_blocks[k].F->rows(), sub_blocks[k].F->cols(), -1.0, sub_blocks[k].F->ref(), 0, 0, b_and_x.x[pivots[k]].ref(), 0, 1.0, b_and_x.x[segments[k].back()].ref(), 0, b_and_x.x[segments[k].back()].ref(), 0);
+                blasfeo_dgemv_t(sub_blocks[k].F->rows(), sub_blocks[k].F->cols(), -1.0, sub_blocks[k].F->ref(), 0, 0, b_and_x.x[separator_before(k + 1)].ref(), 0, 1.0, b_and_x.x[segments[k].back()].ref(), 0, b_and_x.x[segments[k].back()].ref(), 0);
             }
         }
 
