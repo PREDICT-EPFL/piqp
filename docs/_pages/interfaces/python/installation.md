@@ -38,6 +38,7 @@ cd piqp
 # export CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON"
 # to additionally build with OpenMP (needed for sparse_multistage_parallel backend)
 # export CMAKE_ARGS="-DBUILD_WITH_BLASFEO=ON -DBUILD_WITH_OPENMP=ON"
+# on macOS with AppleClang, additionally pass -DOpenMP_ROOT=$(brew --prefix libomp) after installing libomp with brew
 python3 -m pip install .
 ```
 This will build and install piqp. Alternatively, also a wheel can be build using

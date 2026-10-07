@@ -115,3 +115,27 @@ The default `num_threads = 0` uses the OpenMP default, usually all logical cores
 
 * On CPUs with performance and efficiency cores (e.g. Apple Silicon, Intel 12th gen or newer), LLVM OpenMP (Clang, macOS) puts idle threads to sleep immediately, which slows down short horizons considerably. Setting `KMP_BLOCKTIME=200ms` (or `OMP_WAIT_POLICY=active`) keeps the threads active and can make the solver several times faster.
 * On Linux, binding threads to cores (`OMP_PLACES=cores OMP_PROC_BIND=close`), ideally restricted to performance cores, further improves performance. Thread binding is not supported on macOS.
+
+### Partition strategy
+
+The horizon is split into segments, one per thread, which are separated by single stage blocks. By permuting these separators together with the global variable to the end of the KKT matrix, the segments become decoupled and can be factorized in parallel. Only the remaining reduced system of the separators and the global variable has to be factorized sequentially. Forward and backward substitutions follow the same parallel/sequential pattern. Since the segments get coupled to their preceding separator, some fill-in is introduced. To compensate for that, the first segment, which has no fill-in, is chosen longer than the others.
+
+![Partitioning of the KKT matrix]({{site.baseurl}}/assets/multistage_partitioning.svg)
+
+Due to the fill-in and the sequential reduced system, the speedup is limited. The theoretical maximum speedup of the factorization for long horizons is
+
+| Threads $$p$$ | Max speedup |
+|---|---|
+| 2 | 1.37 |
+| 4 | 2.11 |
+| 6 | 2.84 |
+| 8 | 3.58 |
+| 10 | 4.32 |
+| 12 | 5.05 |
+| 14 | 5.79 |
+| 16 | 6.53 |
+
+{: .note }
+The partition strategy assumes that the factorization dominates the computation time and estimates the cost of each stage block by the cube of its size. The speedups additionally assume that all stage blocks have the same size. More details can be found in the [paper](https://arxiv.org/abs/2511.00946).
+
+If consecutive stages are decoupled, e.g., between scenarios in [scenario MPC]({{site.baseurl}}/examples/scenario_example), segments can also be split there without a separator and fill-in. The segments and separators are chosen automatically by minimizing the estimated factorization time, i.e., the maximum segment cost plus the sequential cost of the separators. Hence, scenarios are grouped evenly over the threads, and if there are fewer scenarios than threads, scenarios are further split using separators.

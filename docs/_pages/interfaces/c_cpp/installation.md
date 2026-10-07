@@ -30,6 +30,7 @@ mkdir build
 cd build
 # add -DBUILD_WITH_BLASFEO=ON to build with Blasfeo (needed for sparse_multistage backend)
 # add -DBUILD_WITH_OPENMP=ON to build with OpenMP (needed for sparse_multistage_parallel backend)
+# on macOS with AppleClang, additionally add -DOpenMP_ROOT=$(brew --prefix libomp) after installing libomp with brew
 cmake .. -DCMAKE_CXX_FLAGS="-march=native" -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF
 cmake --build . --config Release
 ```
