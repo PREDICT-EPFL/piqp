@@ -23,6 +23,7 @@
 #include "piqp/utils/blasfeo_mat.hpp"
 #include "piqp/utils/blasfeo_vec.hpp"
 #include "piqp/utils/blasfeo_wrapper.hpp"
+#include "piqp/utils/openmp.hpp"
 #include "piqp/sparse/multistage_kkt.hpp"
 #include "piqp/utils/tracy.hpp"
 
@@ -33,7 +34,8 @@ namespace sparse
 {
 
 template<typename T, typename I>
-MultistageKKT<T, I>::MultistageKKT(const Data<T, I>& data)
+MultistageKKT<T, I>::MultistageKKT(const Data<T, I>& data, isize num_threads)
+    : m_num_threads(resolve_num_threads(num_threads))
 {
     PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::constructor");
 
@@ -65,7 +67,7 @@ MultistageKKT<T, I>::MultistageKKT(const Data<T, I>& data)
     GT_scaled = GT;
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
     PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::constructor:parallel");
 #endif
@@ -125,7 +127,7 @@ void MultistageKKT<T, I>::update_data(const Data<T, I>& data, int options)
     {
         transpose_to_block_mat<false>(data.AT, true, AT);
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
         {
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::update_data:parallel");
 #endif
@@ -160,7 +162,7 @@ bool MultistageKKT<T, I>::update_scalings_and_factor(const Data<T, I>&, const T&
         }
     }
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
     PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::update_scalings_and_factor:parallel");
 #endif
@@ -178,9 +180,8 @@ bool MultistageKKT<T, I>::update_scalings_and_factor(const Data<T, I>&, const T&
 #ifdef PIQP_HAS_OPENMP
     } // end of parallel region
 #endif
-    factor_kkt();
 
-    return true;
+    return factor_kkt();
 }
 
 template<typename T, typename I>
@@ -207,7 +208,7 @@ void MultistageKKT<T, I>::solve(const Data<T, I>&, const Vec<T>& rhs_x, const Ve
 
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
     PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::solve:parallel");
 #endif
@@ -263,7 +264,7 @@ void MultistageKKT<T, I>::eval_P_x(const Data<T, I>&, const T& alpha, const Vec<
     block_x.assign(x);
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::eval_P_x:parallel");
 
@@ -294,7 +295,7 @@ void MultistageKKT<T, I>::eval_A_xn_and_AT_xt(const Data<T, I>&, const T& alpha_
     block_xt.assign(xt, AT.perm_inv);
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::eval_A_xn_and_AT_xt:parallel");
 
@@ -329,7 +330,7 @@ void MultistageKKT<T, I>::eval_G_xn_and_GT_xt(const Data<T, I>&, const T& alpha_
     block_xt.assign(xt, GT.perm_inv);
 
 #ifdef PIQP_HAS_OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
         PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::eval_G_xn_and_GT_xt:parallel");
 
@@ -1234,7 +1235,7 @@ void MultistageKKT<T, I>::block_gemm_nd(BlockMat<I>& sA, BlockVec& sB, BlockMat<
 }
 
 template<typename T, typename I>
-void MultistageKKT<T, I>::factor_kkt()
+bool MultistageKKT<T, I>::factor_kkt()
 {
     PIQP_TRACY_ZoneScopedN("piqp::MultistageKKT::factor_kkt");
 
@@ -1244,7 +1245,7 @@ void MultistageKKT<T, I>::factor_kkt()
     int m = kkt_fac.D[0]->rows();
     int n, k;
     // L_1 = chol(D_1)
-    blasfeo_dpotrf_l(m, kkt_fac.D[0]->ref(), 0, 0, kkt_fac.D[0]->ref(), 0, 0);
+    if (!blasfeo_dpotrf_l(*kkt_fac.D[0])) return false;
 
     if (N > 2 && kkt_fac.B[0]) {
         m = kkt_fac.B[0]->rows();
@@ -1278,13 +1279,10 @@ void MultistageKKT<T, I>::factor_kkt()
             assert(kkt_fac.D[i]->rows() >= m && kkt_fac.D[i]->cols() >= m && "size mismatch");
             // L_i = chol(D_i - C_{i-1} * C_{i-1}^T)
             blasfeo_dsyrk_ln(m, k, -1.0, kkt_fac.B[i-1]->ref(), 0, 0, kkt_fac.B[i-1]->ref(), 0, 0, 1.0, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.D[i]->ref(), 0, 0);
-            m = kkt_fac.D[i]->rows();
-            blasfeo_dpotrf_l(m, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.D[i]->ref(), 0, 0);
+            if (!blasfeo_dpotrf_l(*kkt_fac.D[i])) return false;
         } else {
-            m = kkt_fac.D[i]->rows();
-            assert(kkt_fac.D[i]->rows() == m && "size mismatch");
             // L_i = chol(D_i)
-            blasfeo_dpotrf_l(m, kkt_fac.D[i]->ref(), 0, 0, kkt_fac.D[i]->ref(), 0, 0);
+            if (!blasfeo_dpotrf_l(*kkt_fac.D[i])) return false;
         }
 
         if (i < N - 2 && kkt_fac.B[i]) {
@@ -1332,7 +1330,8 @@ void MultistageKKT<T, I>::factor_kkt()
 
     // L_N = chol(D_N - sum F_i * F_i^T)
     // note that inner is also computed and stored in L_N
-    blasfeo_dpotrf_l(arrow_width, kkt_fac.D[N-1]->ref(), 0, 0, kkt_fac.D[N-1]->ref(), 0, 0);
+    assert(kkt_fac.D[N-1]->rows() == arrow_width && "size mismatch");
+    return blasfeo_dpotrf_l(*kkt_fac.D[N-1]);
 }
 
 // z = alpha * sA * x

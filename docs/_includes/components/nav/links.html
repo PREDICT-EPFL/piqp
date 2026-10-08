@@ -31,7 +31,7 @@ node, nav_children, nav_ancestors.
 
     <li class="nav-list-item{% if node.expand_nav %} active{% endif %}">
         {%- if nav_children.size >= 1 -%}
-        <button class="nav-list-expander btn-reset" aria-label="toggle items in {{ node.title }} category" aria-pressed="false">
+        <button class="nav-list-expander btn-reset" aria-label="{{ node.title }} submenu" aria-expanded="false">
             <svg viewBox="0 0 24 24" aria-hidden="true"><use xlink:href="#svg-arrow-right"></use></svg>
         </button>
         {%- endif -%}

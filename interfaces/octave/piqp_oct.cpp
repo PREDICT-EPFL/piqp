@@ -85,6 +85,7 @@ piqp::KKTSolver kkt_solver_from_string(const std::string& kkt_solver, bool is_de
     if (kkt_solver == "sparse_ldlt_ineq_cond") return piqp::KKTSolver::sparse_ldlt_ineq_cond;
     if (kkt_solver == "sparse_ldlt_cond") return piqp::KKTSolver::sparse_ldlt_cond;
     if (kkt_solver == "sparse_multistage") return piqp::KKTSolver::sparse_multistage;
+    if (kkt_solver == "sparse_multistage_parallel") return piqp::KKTSolver::sparse_multistage_parallel;
     if (is_dense) {
         warning("Unknown kkt_solver, using dense_cholesky as a fallback.");
         return piqp::KKTSolver::dense_cholesky;
@@ -116,6 +117,7 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     ov_struct.assign("preconditioner_iter", octave_value(settings.preconditioner_iter));
     ov_struct.assign("tau", octave_value(settings.tau));
     ov_struct.assign("kkt_solver", octave_value(piqp::kkt_solver_to_string(settings.kkt_solver)));
+    ov_struct.assign("num_threads", octave_value(settings.num_threads));
     ov_struct.assign("iterative_refinement_always_enabled", octave_value(settings.iterative_refinement_always_enabled));
     ov_struct.assign("iterative_refinement_eps_abs", octave_value(settings.iterative_refinement_eps_abs));
     ov_struct.assign("iterative_refinement_eps_rel", octave_value(settings.iterative_refinement_eps_rel));
@@ -150,6 +152,7 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
     settings.preconditioner_iter = ov_struct.getfield("preconditioner_iter").int_value();
     settings.tau = ov_struct.getfield("tau").double_value();
     settings.kkt_solver = kkt_solver_from_string(ov_struct.getfield("kkt_solver").string_value(), is_dense);
+    settings.num_threads = ov_struct.getfield("num_threads").int_value();
     settings.iterative_refinement_always_enabled = ov_struct.getfield("iterative_refinement_always_enabled").bool_value();
     settings.iterative_refinement_eps_abs = ov_struct.getfield("iterative_refinement_eps_abs").double_value();
     settings.iterative_refinement_eps_rel = ov_struct.getfield("iterative_refinement_eps_rel").double_value();

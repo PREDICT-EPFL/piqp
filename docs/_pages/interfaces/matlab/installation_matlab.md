@@ -14,6 +14,9 @@ websave('install_piqp.m','https://raw.githubusercontent.com/PREDICT-EPFL/piqp/ma
 install_piqp
 ```
 
+{: .note }
+The prebuilt packages are built without OpenMP, i.e., the `sparse_multistage_parallel` KKT solver backend is not available. To use it, PIQP has to be [built from source](#building-and-installing-from-source) with OpenMP. See [Multithreading]({{site.baseurl}}/multistage#multithreading) for details.
+
 ## Building and Installing from Source
 
 {% root_include _common/building_from_source_deps.md %}

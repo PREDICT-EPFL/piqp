@@ -45,6 +45,7 @@ const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "preconditioner_iter",
                                       "tau",
                                       "kkt_solver",
+                                      "num_threads",
                                       "iterative_refinement_always_enabled",
                                       "iterative_refinement_eps_abs",
                                       "iterative_refinement_eps_rel",
@@ -167,6 +168,7 @@ piqp::KKTSolver kkt_solver_from_string(const char* kkt_solver, bool is_dense)
     if (kkt_solver_str == "sparse_ldlt_ineq_cond") return piqp::KKTSolver::sparse_ldlt_ineq_cond;
     if (kkt_solver_str == "sparse_ldlt_cond") return piqp::KKTSolver::sparse_ldlt_cond;
     if (kkt_solver_str == "sparse_multistage") return piqp::KKTSolver::sparse_multistage;
+    if (kkt_solver_str == "sparse_multistage_parallel") return piqp::KKTSolver::sparse_multistage_parallel;
     if (is_dense) {
         mexWarnMsgTxt("Unknown kkt_solver, using dense_cholesky as a fallback.");
         return piqp::KKTSolver::dense_cholesky;
@@ -199,6 +201,7 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     mxSetField(mx_ptr, 0, "preconditioner_iter", mxCreateDoubleScalar((double) settings.preconditioner_iter));
     mxSetField(mx_ptr, 0, "tau", mxCreateDoubleScalar(settings.tau));
     mxSetField(mx_ptr, 0, "kkt_solver", mxCreateString(piqp::kkt_solver_to_string(settings.kkt_solver)));
+    mxSetField(mx_ptr, 0, "num_threads", mxCreateDoubleScalar((double) settings.num_threads));
     mxSetField(mx_ptr, 0, "iterative_refinement_always_enabled", mxCreateDoubleScalar(settings.iterative_refinement_always_enabled));
     mxSetField(mx_ptr, 0, "iterative_refinement_eps_abs", mxCreateDoubleScalar(settings.iterative_refinement_eps_abs));
     mxSetField(mx_ptr, 0, "iterative_refinement_eps_rel", mxCreateDoubleScalar(settings.iterative_refinement_eps_rel));
@@ -235,6 +238,7 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
     char kkt_solver[30];
     mxGetString(mxGetField(mx_ptr, 0, "kkt_solver"), kkt_solver, 30);
     settings.kkt_solver = kkt_solver_from_string(kkt_solver, is_dense);
+    settings.num_threads = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "num_threads"));
     settings.iterative_refinement_always_enabled = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_always_enabled"));
     settings.iterative_refinement_eps_abs = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_eps_abs"));
     settings.iterative_refinement_eps_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_eps_rel"));

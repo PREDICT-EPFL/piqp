@@ -8,6 +8,7 @@
 #ifndef PIQP_BLASFEO_MAT_HPP
 #define PIQP_BLASFEO_MAT_HPP
 
+#include <cassert>
 #include <cstring>
 
 #include "blasfeo.h"
@@ -38,8 +39,8 @@ public:
 
     BlasfeoMat(const BlasfeoMat& other)
     {
+        this->resize(other.rows(), other.cols());
         if (other.mat.mem) {
-            this->resize(other.rows(), other.cols());
             // B <= A
             blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
         }
@@ -56,17 +57,10 @@ public:
 
     BlasfeoMat& operator=(const BlasfeoMat& other)
     {
+        this->resize(other.rows(), other.cols());
         if (other.mat.mem) {
-            this->resize(other.rows(), other.cols());
             // B <= A
             blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
-        } else {
-            if (mat.mem) {
-                blasfeo_free_dmat(&mat);
-                mat.mem = nullptr;
-            }
-            mat.m = 0;
-            mat.n = 0;
         }
         return *this;
     }
@@ -118,6 +112,66 @@ public:
     void print()
     {
         blasfeo_print_dmat(rows(), cols(), ref(), 0, 0);
+    }
+
+    double getEntry(size_t i, size_t j) const
+    {
+        if (static_cast<int>(i) >= mat.m || static_cast<int>(j) >= mat.n) {
+            throw std::out_of_range("BlasfeoMat::getEntry: index (" + std::to_string(i) + ", " + std::to_string(j) +
+                                    ") out of bounds for matrix of size (" + std::to_string(mat.m) + ", " +
+                                    std::to_string(mat.n) + ")");
+        }
+        return BLASFEO_DMATEL(&mat, i, j);
+    }
+
+    void setEntry(size_t i, size_t j, double val)
+    {
+        if (static_cast<int>(i) >= mat.m || static_cast<int>(j) >= mat.n) {
+            throw std::out_of_range("BlasfeoMat::getEntry: index (" + std::to_string(i) + ", " + std::to_string(j) +
+                                    ") out of bounds for matrix of size (" + std::to_string(mat.m) + ", " +
+                                    std::to_string(mat.n) + ")");
+        }
+        BLASFEO_DMATEL(&mat, i, j) = val;
+    }
+
+    void load(Mat<double>& A) const
+    {
+        assert(A.rows() == rows() && A.cols() == cols() && "size mismatch");
+        for (int r = 0; r < rows(); r++)
+            for (int c = 0; c < cols(); c++)
+                A(r, c) = BLASFEO_DMATEL(&this->mat, r, c);
+    }
+
+    void assign(const Mat<double>& A)
+    {
+        assert(A.rows() == rows() && A.cols() == cols() && "size mismatch");
+        for (int r = 0; r < rows(); r++)
+            for (int c = 0; c < cols(); c++)
+                BLASFEO_DMATEL(&this->mat, r, c) = A(r, c);
+    }
+
+    bool hasNan() const {
+        for (int j = 0; j < mat.n; ++j) {
+            for (int i = 0; i < mat.m; ++i) {
+                if (std::isnan(BLASFEO_DMATEL(&mat, i, j))) {
+                    // std::cerr << "BlasfeoMat contains NaN at (" + std::to_string(i) + ", " + std::to_string(j) + ")\n";
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool hasInf() const {
+        for (int j = 0; j < mat.n; ++j) {
+            for (int i = 0; i < mat.m; ++i) {
+                if (std::isinf(BLASFEO_DMATEL(&mat, i, j))) {
+                    // std::cerr << "BlasfeoMat contains Inf at (" + std::to_string(i) + ", " + std::to_string(j) + ")\n";
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 };
 

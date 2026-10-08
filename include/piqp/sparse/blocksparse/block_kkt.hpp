@@ -10,6 +10,8 @@
 
 #include <memory>
 
+#include <iomanip>
+
 #include "piqp/utils/blasfeo_mat.hpp"
 
 namespace piqp
@@ -124,6 +126,55 @@ struct BlockKKT
             }
         }
     }
+
+    // Store the BlockKKT data into a dense Eigen matrix. FOR TESTING PURPOSE ONLY.
+    void load(Mat<double>& kkt) const {
+        int rows = 0;
+        for (const auto& D_i : D) {
+            rows += D_i->rows();
+        }
+        kkt.resize(rows, rows);
+        kkt.setZero();
+
+        int start_row = 0, start_col = 0;
+
+        // fill the diagonal blocks D
+        for (const auto& D_i : D) {
+            if (D_i) {
+                for (int r = 0; r < D_i->rows(); r++)
+                    for (int c = 0; c < D_i->cols(); c++)
+                        kkt(start_row + r, start_row + c) = BLASFEO_DMATEL(D_i->ref(), r, c);
+
+                start_row += D_i->rows();
+            }
+        }
+
+        // fill the off-diagonal blocks B
+        start_row = D[0]->rows();
+        start_col = 0;
+        for (size_t i = 0; i < B.size(); i++) {
+            if (B[i]) {
+                for (int r = 0; r < B[i]->rows(); r++)
+                    for (int c = 0; c < B[i]->cols(); c++)
+                        kkt(start_row + r, start_col + c) = BLASFEO_DMATEL(B[i]->ref(), r, c);
+            }
+            start_row += D[i]->rows();
+            start_col += D[i]->cols();
+        }
+
+        // fill the arrow blocks E
+        start_row = rows - D.back()->rows();
+        start_col = 0;
+        for (size_t i = 0; i < E.size(); i++) {
+            if (E[i]) {
+                for (int r = 0; r < E[i]->rows(); r++)
+                    for (int c = 0; c < E[i]->cols(); c++)
+                        kkt(start_row + r, start_col + c) = BLASFEO_DMATEL(E[i]->ref(), r, c);
+            }
+            start_col += D[i]->cols();
+        }
+    }
+
 };
 
 } // namespace sparse

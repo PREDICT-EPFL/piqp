@@ -13,6 +13,9 @@ PIQP can be directly installed via anaconda/miniconda:
 conda install -c conda-forge piqp
 ```
 
+{: .note }
+The prebuilt packages are built without OpenMP, i.e., the `sparse_multistage_parallel` KKT solver backend is not available. To use it, PIQP has to be [built from source](#building-and-installing-from-source) with OpenMP. See [Multithreading]({{site.baseurl}}/multistage#multithreading) for details.
+
 ## Building and Installing from Source
 
 {% root_include _common/building_from_source_deps.md %}
@@ -29,6 +32,8 @@ cd piqp
 mkdir build
 cd build
 # add -DBUILD_WITH_BLASFEO=ON to build with Blasfeo (needed for sparse_multistage backend)
+# add -DBUILD_WITH_OPENMP=ON to build with OpenMP (needed for sparse_multistage_parallel backend)
+# on macOS with AppleClang, additionally add -DOpenMP_ROOT=$(brew --prefix libomp) after installing libomp with brew
 cmake .. -DCMAKE_CXX_FLAGS="-march=native" -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF
 cmake --build . --config Release
 ```
