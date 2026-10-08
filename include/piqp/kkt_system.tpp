@@ -94,7 +94,18 @@ bool init_kkt_solver_impl(const sparse::Data<T, I>& data, const Settings<T>& set
 		case KKTSolver::sparse_multistage_parallel:
 			kkt_solver = std::make_unique<sparse::MultistageParallelKKT<T, I>>(data, settings.num_threads);
 			break;
+#else
+		case KKTSolver::sparse_multistage_parallel:
+			piqp_eprint("kkt solver sparse_multistage_parallel not supported, PIQP has to be built with OpenMP (-DBUILD_WITH_OPENMP=ON), note that the prebuilt packages are built without OpenMP\n");
+			return false;
 #endif
+#else
+		case KKTSolver::sparse_multistage:
+			piqp_eprint("kkt solver sparse_multistage not supported, PIQP has to be built with Blasfeo (-DBUILD_WITH_BLASFEO=ON)\n");
+			return false;
+		case KKTSolver::sparse_multistage_parallel:
+			piqp_eprint("kkt solver sparse_multistage_parallel not supported, PIQP has to be built with Blasfeo and OpenMP (-DBUILD_WITH_BLASFEO=ON -DBUILD_WITH_OPENMP=ON), note that the prebuilt packages are built without OpenMP\n");
+			return false;
 #endif
 		default:
 			piqp_eprint("kkt solver not supported\n");
