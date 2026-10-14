@@ -268,6 +268,12 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_impl(const optional<CM
                                 m_settings.preconditioner_scale_cost,
                                 m_settings.preconditioner_iter);
 
+    if (!reuse_preconditioner)
+    {
+        // Rescaling can change all matrices, including those omitted from the update.
+        update_options = KKTUpdateOptions::KKT_UPDATE_P | KKTUpdateOptions::KKT_UPDATE_A | KKTUpdateOptions::KKT_UPDATE_G;
+    }
+
     m_kkt_system.update_data(m_data, update_options);
 
     if (m_settings.compute_timings)
