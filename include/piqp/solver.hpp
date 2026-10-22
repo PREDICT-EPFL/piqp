@@ -142,6 +142,10 @@ protected:
 
     Status check_infeasibility_certificates();
 
+    void store_primal_infeasibility_certificate(const T& norm);
+
+    void store_dual_infeasibility_certificate(const T& norm);
+
     void unscale_results();
 
     void restore_dual();

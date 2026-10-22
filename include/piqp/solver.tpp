@@ -1275,6 +1275,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_dual_prox_center()
 // Checks if the displacement from the proximal centers, i.e., the proximal step,
 // is a certificate of primal or dual infeasibility, similar to OSQP. All conditions
 // are evaluated on the unscaled problem and are relative to the norm of the candidate.
+// If a certificate is found, it is stored in the result (see below).
 //
 // primal infeasibility (Farkas): dy, dz >= 0 with
 //   A^T dy + G^T (dz_u - dz_l) - dz_bl + dz_bu = 0,
@@ -1379,6 +1380,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::check_infeasibility_certifi
         }
         if (m_preconditioner.unscale_dual_res(cert_work_n_1).template lpNorm<Eigen::Infinity>() <= eps_p)
         {
+            store_primal_infeasibility_certificate(norm_dual);
             return Status::PIQP_PRIMAL_INFEASIBLE;
         }
     }
@@ -1400,11 +1402,45 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::check_infeasibility_certifi
         m_kkt_system.eval_P_x(m_data, T(1), delta_vars.x, cert_work_n_1);
         if (m_preconditioner.unscale_dual_res(cert_work_n_1).template lpNorm<Eigen::Infinity>() <= eps_d)
         {
+            store_dual_infeasibility_certificate(norm_dx);
             return Status::PIQP_DUAL_INFEASIBLE;
         }
     }
 
     return Status::PIQP_UNSOLVED;
+}
+
+// Stores the primal infeasibility certificate (dy, dz_l, dz_u, dz_bl, dz_bu) in the dual
+// variables of the result, normalized such that the unscaled certificate has unit infinity norm.
+// The primal variables are left at the last iterate.
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::store_primal_infeasibility_certificate(const T& norm)
+{
+    m_result.y.noalias() = delta_vars.y / norm;
+    // only constraints with finite bounds are part of the certificate
+    m_result.z_l.setZero();
+    m_result.z_u.setZero();
+    for (isize i = 0; i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        m_result.z_l(idx) = delta_vars.z_l(idx) / norm;
+    }
+    for (isize i = 0; i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        m_result.z_u(idx) = delta_vars.z_u(idx) / norm;
+    }
+    m_result.z_bl.head(m_data.n_x_l).noalias() = delta_vars.z_bl.head(m_data.n_x_l) / norm;
+    m_result.z_bu.head(m_data.n_x_u).noalias() = delta_vars.z_bu.head(m_data.n_x_u) / norm;
+}
+
+// Stores the dual infeasibility certificate dx in the primal variables of the result,
+// normalized such that the unscaled certificate has unit infinity norm.
+// The dual variables are left at the last iterate.
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::store_dual_infeasibility_certificate(const T& norm)
+{
+    m_result.x.noalias() = delta_vars.x / norm;
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>

@@ -13,6 +13,7 @@
 #include "piqp/utils/io_utils.hpp"
 
 #include "gtest/gtest.h"
+#include "utils.hpp"
 
 using T = double;
 using I = int;
@@ -50,6 +51,11 @@ TEST_P(SparseNetlibInfeasibleTest, NetlibInfeasible)
 
     piqp::Status status = solver.solve();
     ASSERT_TRUE(status == piqp::Status::PIQP_PRIMAL_INFEASIBLE || status == piqp::Status::PIQP_DUAL_INFEASIBLE);
+    if (status == piqp::Status::PIQP_PRIMAL_INFEASIBLE) {
+        assert_primal_infeasibility_certificate(model, solver.result(), solver.settings().eps_primal_inf);
+    } else {
+        assert_dual_infeasibility_certificate(model, solver.result(), solver.settings().eps_dual_inf);
+    }
 }
 
 std::vector<std::string> get_netlib_lp_feas_problems()

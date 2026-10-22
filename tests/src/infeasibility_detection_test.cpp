@@ -11,6 +11,7 @@
 #include "piqp/utils/io_utils.hpp"
 
 #include "gtest/gtest.h"
+#include "utils.hpp"
 
 using T = double;
 using I = int;
@@ -111,6 +112,7 @@ void run_issue49(const std::string& name, int preconditioner_iter)
 
     piqp::Status status = solve_model(solver, model);
     ASSERT_EQ(status, piqp::Status::PIQP_DUAL_INFEASIBLE);
+    assert_dual_infeasibility_certificate(model, solver.result(), solver.settings().eps_dual_inf);
 }
 
 TEST_P(Issue49Test, DenseDualInfeasible)
@@ -132,3 +134,60 @@ INSTANTIATE_TEST_SUITE_P(
     [](const testing::TestParamInfo<Issue49Test::ParamType>& info) {
         return std::get<0>(info.param) + "_prec" + std::to_string(std::get<1>(info.param));
     });
+
+/*
+ * min x1^2 + x2^2 + x1
+ * s.t. x1 + x2 = 3, 1 <= x1 - x2, x1 + 2 x2 <= 10, 0 <= x <= 1
+ * The certificate has to combine the equality, the inequalities, and the bounds.
+ */
+piqp::sparse::Model<T, I> primal_infeasible_model()
+{
+    T inf = std::numeric_limits<T>::infinity();
+
+    piqp::Mat<T> P(2, 2); P << 2, 0, 0, 2;
+    piqp::Vec<T> c(2); c << 1, 0;
+
+    piqp::Mat<T> A(1, 2); A << 1, 1;
+    piqp::Vec<T> b(1); b << 3;
+
+    piqp::Mat<T> G(2, 2); G << 1, -1, 1, 2;
+    piqp::Vec<T> h_l(2); h_l << 1, -inf;
+    piqp::Vec<T> h_u(2); h_u << inf, 10;
+
+    piqp::Vec<T> x_l(2); x_l << 0, 0;
+    piqp::Vec<T> x_u(2); x_u << 1, 1;
+
+    return piqp::sparse::Model<T, I>(P.sparseView(), c, A.sparseView(), b, G.sparseView(), h_l, h_u, x_l, x_u);
+}
+
+// preconditioner_iter
+class PrimalInfeasibleTest : public testing::TestWithParam<int> {};
+
+template<typename Solver>
+void run_primal_infeasible(int preconditioner_iter)
+{
+    piqp::sparse::Model<T, I> model = primal_infeasible_model();
+
+    Solver solver;
+    solver.settings().verbose = true;
+    solver.settings().preconditioner_iter = preconditioner_iter;
+
+    piqp::Status status = solve_model(solver, model);
+    ASSERT_EQ(status, piqp::Status::PIQP_PRIMAL_INFEASIBLE);
+    assert_primal_infeasibility_certificate(model, solver.result(), solver.settings().eps_primal_inf);
+}
+
+TEST_P(PrimalInfeasibleTest, Dense)
+{
+    run_primal_infeasible<piqp::DenseSolver<T>>(GetParam());
+}
+
+TEST_P(PrimalInfeasibleTest, Sparse)
+{
+    run_primal_infeasible<piqp::SparseSolver<T, I>>(GetParam());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Settings,
+    PrimalInfeasibleTest,
+    testing::Values(10, 0));
