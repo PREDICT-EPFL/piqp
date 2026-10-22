@@ -56,10 +56,25 @@ protected:
     bool m_setup_done = false;
     bool m_enable_iterative_refinement = false;
 
-    BasicVariables<T> res_nr;    // non-regularized residuals
-    Variables<T> res;            // residuals
-    Variables<T> step;           // primal and dual steps
-    BasicVariables<T> prox_vars; // proximal variables (xi, lambda, nu)
+    BasicVariables<T> res_nr;     // non-regularized residuals
+    Variables<T> res;             // residuals
+    Variables<T> step;            // primal and dual steps
+    BasicVariables<T> prox_vars;  // proximal variables (xi, lambda, nu)
+    BasicVariables<T> delta_vars; // displacement from the proximal variables (infeasibility certificate candidates)
+
+    // work vectors for the infeasibility certificate check
+    Vec<T> cert_work_n_1;
+    Vec<T> cert_work_n_2;
+    Vec<T> cert_work_p;
+    Vec<T> cert_work_m_1;
+    Vec<T> cert_work_m_2;
+
+    T cert_c_x = 0;
+    T cert_dual_lin = 0;
+    T prox_c_x = 0;
+    T prox_dual_lin = 0;
+    T delta_c_x = 0;
+    T delta_dual_lin = 0;
 
 public:
     SolverBase();
@@ -120,6 +135,12 @@ protected:
     T dual_res_r();
 
     T dual_prox_inf();
+
+    void update_primal_prox_center();
+
+    void update_dual_prox_center();
+
+    Status check_infeasibility_certificates();
 
     void unscale_results();
 

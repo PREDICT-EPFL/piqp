@@ -27,7 +27,6 @@ TEST_P(SparseNetlibFeasibleTest, NetlibFeasible)
 
     piqp::SparseSolver<T, I> solver;
     solver.settings().verbose = true;
-    solver.settings().infeasibility_threshold = 0.01;
     solver.setup(model.P, model.c,
                  model.A, model.b,
                  model.G, model.h_l, model.h_u,
@@ -44,7 +43,6 @@ TEST_P(SparseNetlibInfeasibleTest, NetlibInfeasible)
 
     piqp::SparseSolver<T, I> solver;
     solver.settings().verbose = true;
-    solver.settings().infeasibility_threshold = 0.01;
     solver.setup(model.P, model.c,
                  model.A, model.b,
                  model.G, model.h_l, model.h_u,

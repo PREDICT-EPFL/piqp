@@ -95,7 +95,7 @@ Mat<T> dense_positive_definite_upper_triangular_rand(isize n, T rho = T(1e-2))
     Vec<T> eig_h = mat.template selfadjointView<Eigen::Upper>().eigenvalues();
     T min = eig_h.minCoeff();
     for (isize i = 0; i < n; i++) {
-        mat(i, i) += (rho + abs(min));
+        mat(i, i) += (rho + std::abs(min));
     }
 
     return mat;
@@ -120,7 +120,7 @@ SparseMat<T, I> sparse_positive_definite_upper_triangular_rand(isize n, T p, T r
     Vec<T> eig_h = P_dense.template selfadjointView<Eigen::Upper>().eigenvalues();
     T min = eig_h.minCoeff();
     for (isize i = 0; i < n; i++) {
-        P.coeffRef(i, i) += (rho + abs(min));
+        P.coeffRef(i, i) += (rho + std::abs(min));
     }
 
     P.makeCompressed();
