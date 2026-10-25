@@ -9,4 +9,6 @@
 
 echo "Downloading blasfeo..."
 
+# pinned, upstream 0a3df868 breaks the armv8a build (blasfeo_target.h moved)
 git clone https://github.com/giaf/blasfeo.git blasfeo
+git -C blasfeo checkout 6b182bd8c6b5358a8eadc0604dc7b830d39028b1
