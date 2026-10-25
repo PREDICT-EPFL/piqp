@@ -370,6 +370,12 @@ void SolverBase<T, I, Preconditioner, MatrixType>::init_workspace()
     res.resize(m_data.n, m_data.p, m_data.m);
     step.resize(m_data.n, m_data.p, m_data.m);
     prox_vars.resize(m_data.n, m_data.p, m_data.m);
+    delta_vars.resize(m_data.n, m_data.p, m_data.m);
+    cert_work_n_1.resize(m_data.n);
+    cert_work_n_2.resize(m_data.n);
+    cert_work_p.resize(m_data.p);
+    cert_work_m_1.resize(m_data.m);
+    cert_work_m_2.resize(m_data.m);
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
@@ -578,6 +584,8 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
         if (m_result.info.iter == 0)
         {
             update_residuals_nr();
+            prox_c_x = cert_c_x;
+            prox_dual_lin = cert_dual_lin;
             m_result.info.prev_primal_res = m_result.info.primal_res;
             m_result.info.prev_dual_res = m_result.info.dual_res;
         }
@@ -610,20 +618,34 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
 
         update_residuals_r();
 
-        if (m_result.info.no_dual_update > (std::min)(static_cast<isize>(5), m_settings.reg_finetune_dual_update_threshold) &&
-            m_result.info.primal_prox_inf > m_settings.infeasibility_threshold &&
-            (m_result.info.primal_res_reg < m_settings.eps_abs || m_result.info.primal_res_reg_rel < m_settings.eps_rel))
+        if (m_result.info.iter > 0)
         {
-            m_result.info.status = Status::PIQP_PRIMAL_INFEASIBLE;
-            return m_result.info.status;
-        }
+            Status status = check_infeasibility_certificates();
+            if (status != Status::PIQP_UNSOLVED)
+            {
+                m_result.info.status = status;
+                return m_result.info.status;
+            }
 
-        if (m_result.info.no_primal_update > (std::min)(static_cast<isize>(5), m_settings.reg_finetune_primal_update_threshold) &&
-            m_result.info.dual_prox_inf > m_settings.infeasibility_threshold &&
-            (m_result.info.dual_res_reg < m_settings.eps_abs || m_result.info.dual_res_reg_rel < m_settings.eps_rel))
-        {
-            m_result.info.status = Status::PIQP_DUAL_INFEASIBLE;
-            return m_result.info.status;
+            // If the regularized subproblem is solved, but the non-regularized residuals
+            // stall, we still move the proximal centers. This keeps the outer proximal
+            // point iteration going, such that the proximal steps converge to an
+            // infeasibility certificate.
+            bool prox_moved = false;
+            if (m_result.info.primal_res_reg < T(0.1) * m_result.info.primal_res)
+            {
+                update_dual_prox_center();
+                prox_moved = true;
+            }
+            if (m_result.info.dual_res_reg < T(0.1) * m_result.info.dual_res)
+            {
+                update_primal_prox_center();
+                prox_moved = true;
+            }
+            if (prox_moved)
+            {
+                update_residuals_r();
+            }
         }
 
         m_result.info.iter++;
@@ -784,18 +806,29 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
             s_bl += m_result.info.primal_step * step.s_bl.head(m_data.n_x_l);
             s_bu += m_result.info.primal_step * step.s_bu.head(m_data.n_x_u);
 
+            // displacement from the proximal centers, i.e., the proximal step,
+            // used as candidate for the infeasibility certificates
+            delta_vars.x.noalias() = m_result.x - prox_vars.x;
+            delta_vars.y.noalias() = m_result.y - prox_vars.y;
+            delta_vars.z_l.noalias() = m_result.z_l - prox_vars.z_l;
+            delta_vars.z_u.noalias() = m_result.z_u - prox_vars.z_u;
+            delta_vars.z_bl.head(m_data.n_x_l).noalias() = z_bl - nu_bl;
+            delta_vars.z_bu.head(m_data.n_x_u).noalias() = z_bu - nu_bu;
+
             T mu_prev = m_result.info.mu;
             m_result.info.mu = calculate_mu();
             T mu_rate = (std::max)(T(0), (mu_prev - m_result.info.mu) / mu_prev);
 
             // ------------------ update regularization ------------------
             update_residuals_nr();
+            delta_c_x = cert_c_x - prox_c_x;
+            delta_dual_lin = cert_dual_lin - prox_dual_lin;
 
             if (m_result.info.dual_res < 0.95 * m_result.info.prev_dual_res ||
                 (m_result.info.dual_res < m_settings.eps_abs || m_result.info.dual_res_rel < m_settings.eps_rel) ||
-                (m_result.info.rho == m_settings.reg_finetune_lower_limit && m_result.info.dual_prox_inf < m_settings.infeasibility_threshold))
+                m_result.info.rho == m_settings.reg_finetune_lower_limit)
             {
-                prox_vars.x = m_result.x;
+                update_primal_prox_center();
                 m_result.info.rho = (std::max)(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.rho);
             }
             else
@@ -808,13 +841,9 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
 
             if (m_result.info.primal_res < 0.95 * m_result.info.prev_primal_res ||
                 (m_result.info.primal_res < m_settings.eps_abs || m_result.info.primal_res_rel < m_settings.eps_rel) ||
-                (m_result.info.delta == m_settings.reg_finetune_lower_limit && m_result.info.primal_prox_inf < m_settings.infeasibility_threshold))
+                m_result.info.delta == m_settings.reg_finetune_lower_limit)
             {
-                prox_vars.y = m_result.y;
-                prox_vars.z_l = m_result.z_l;
-                prox_vars.z_u = m_result.z_u;
-                nu_bl = z_bl;
-                nu_bu = z_bu;
+                update_dual_prox_center();
                 m_result.info.delta = (std::max)(m_result.info.reg_limit, (T(1) - mu_rate) * m_result.info.delta);
             }
             else
@@ -843,12 +872,17 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
             m_result.x += m_result.info.primal_step * step.x;
             m_result.y += m_result.info.dual_step * step.y;
 
+            delta_vars.x.noalias() = m_result.x - prox_vars.x;
+            delta_vars.y.noalias() = m_result.y - prox_vars.y;
+
             // ------------------ update regularization ------------------
             update_residuals_nr();
+            delta_c_x = cert_c_x - prox_c_x;
+            delta_dual_lin = cert_dual_lin - prox_dual_lin;
 
             if (m_result.info.dual_res < 0.95 * m_result.info.prev_dual_res || (m_result.info.dual_res < m_settings.eps_abs || m_result.info.dual_res_rel < m_settings.eps_rel))
             {
-                prox_vars.x = m_result.x;
+                update_primal_prox_center();
                 m_result.info.rho = (std::max)(m_result.info.reg_limit, T(0.1) * m_result.info.rho);
             }
             else
@@ -861,7 +895,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
 
             if (m_result.info.primal_res < 0.95 * m_result.info.prev_primal_res || (m_result.info.primal_res < m_settings.eps_abs || m_result.info.primal_res_rel < m_settings.eps_rel))
             {
-                prox_vars.y = m_result.y;
+                update_dual_prox_center();
                 m_result.info.delta = (std::max)(m_result.info.reg_limit, T(0.1) * m_result.info.delta);
             }
             else
@@ -993,27 +1027,33 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_residuals_nr()
     T tmp = -m_result.x.dot(res_nr.x); // x'Px
     m_result.info.primal_obj = T(0.5) * tmp;
     m_result.info.dual_obj = -T(0.5) * tmp;
-    T duality_gap_rel_norm = m_preconditioner.unscale_cost(abs(tmp));
+    T duality_gap_rel_norm = m_preconditioner.unscale_cost(std::abs(tmp));
     tmp = m_data.c.dot(m_result.x);
     m_result.info.primal_obj += tmp;
-    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(abs(tmp)));
+    cert_c_x = tmp;
+    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
     tmp = m_data.b.dot(m_result.y);
     m_result.info.dual_obj -= tmp;
-    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(abs(tmp)));
+    cert_dual_lin = tmp;
+    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
     tmp = -m_data.h_l.dot(m_result.z_l);
     m_result.info.dual_obj -= tmp;
-    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(abs(tmp)));
+    cert_dual_lin += tmp;
+    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
     tmp = m_data.h_u.dot(m_result.z_u);
     m_result.info.dual_obj -= tmp;
-    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(abs(tmp)));
+    cert_dual_lin += tmp;
+    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
     tmp = -m_data.x_l.head(m_data.n_x_l).dot(m_result.z_bl.head(m_data.n_x_l));
     m_result.info.dual_obj -= tmp;
-    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(abs(tmp)));
+    cert_dual_lin += tmp;
+    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
     tmp = m_data.x_u.head(m_data.n_x_u).dot(m_result.z_bu.head(m_data.n_x_u));
     m_result.info.dual_obj -= tmp;
-    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(abs(tmp)));
+    cert_dual_lin += tmp;
+    duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
 
-    m_result.info.duality_gap = abs(m_result.info.primal_obj - m_result.info.dual_obj);
+    m_result.info.duality_gap = std::abs(m_result.info.primal_obj - m_result.info.dual_obj);
 
     m_result.info.primal_obj = m_preconditioner.unscale_cost(m_result.info.primal_obj);
     m_result.info.dual_obj = m_preconditioner.unscale_cost(m_result.info.dual_obj);
@@ -1212,6 +1252,195 @@ T SolverBase<T, I, Preconditioner, MatrixType>::dual_prox_inf()
     PIQP_TRACY_ZoneScopedN("piqp::Solver::dual_prox_inf");
 
     return m_preconditioner.unscale_primal(m_result.x - prox_vars.x).template lpNorm<Eigen::Infinity>();
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::update_primal_prox_center()
+{
+    prox_vars.x = m_result.x;
+    prox_c_x = cert_c_x;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::update_dual_prox_center()
+{
+    prox_vars.y = m_result.y;
+    prox_vars.z_l = m_result.z_l;
+    prox_vars.z_u = m_result.z_u;
+    prox_vars.z_bl.head(m_data.n_x_l) = m_result.z_bl.head(m_data.n_x_l);
+    prox_vars.z_bu.head(m_data.n_x_u) = m_result.z_bu.head(m_data.n_x_u);
+    prox_dual_lin = cert_dual_lin;
+}
+
+// Checks if the displacement from the proximal centers, i.e., the proximal step,
+// is a certificate of primal or dual infeasibility, similar to OSQP. All conditions
+// are evaluated on the unscaled problem and are relative to the norm of the candidate.
+// If a certificate is found, it is stored in the result (see below).
+//
+// primal infeasibility (Farkas): dy, dz >= 0 with
+//   A^T dy + G^T (dz_u - dz_l) - dz_bl + dz_bu = 0,
+//   b^T dy - h_l^T dz_l + h_u^T dz_u - x_l^T dz_bl + x_u^T dz_bu < 0
+//
+// dual infeasibility (unbounded direction): dx with
+//   P dx = 0, c^T dx < 0, A dx = 0,
+//   (G dx)_i >= 0 for finite h_l, (G dx)_i <= 0 for finite h_u,
+//   dx_i >= 0 for finite x_l, dx_i <= 0 for finite x_u
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::check_infeasibility_certificates()
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::check_infeasibility_certificates");
+
+    // ------------------ primal infeasibility candidate ------------------
+    T norm_dual = m_preconditioner.unscale_dual_eq(delta_vars.y).template lpNorm<Eigen::Infinity>();
+    // b^T dy - h_l^T dz_l + h_u^T dz_u - x_l^T dz_bl + x_u^T dz_bu, reused from the residual calculation
+    T farkas_obj = m_preconditioner.unscale_cost(delta_dual_lin);
+    // dz_u - dz_l restricted to finite bounds
+    cert_work_m_1.setZero();
+    for (isize i = 0; i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        norm_dual = (std::max)(norm_dual, std::abs(m_preconditioner.unscale_dual_ineq(delta_vars.z_l)(idx)));
+        cert_work_m_1(idx) -= delta_vars.z_l(idx);
+    }
+    for (isize i = 0; i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        norm_dual = (std::max)(norm_dual, std::abs(m_preconditioner.unscale_dual_ineq(delta_vars.z_u)(idx)));
+        cert_work_m_1(idx) += delta_vars.z_u(idx);
+    }
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        norm_dual = (std::max)(norm_dual, std::abs(m_preconditioner.unscale_dual_b_i(delta_vars.z_bl(i), m_data.x_l_idx(i))));
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        norm_dual = (std::max)(norm_dual, std::abs(m_preconditioner.unscale_dual_b_i(delta_vars.z_bu(i), m_data.x_u_idx(i))));
+    }
+    T eps_p = m_settings.eps_primal_inf * norm_dual;
+    // Large dual ascent steps of a converging method can look like a certificate,
+    // hence, we only accept a certificate if the primal residual stalls.
+    bool primal_stalled = m_result.info.primal_res >= T(0.95) * m_result.info.prev_primal_res;
+    bool primal_candidate = primal_stalled && norm_dual > 0 && farkas_obj < -eps_p;
+    // dual cone: dz >= 0
+    for (isize i = 0; primal_candidate && i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        primal_candidate = m_preconditioner.unscale_dual_ineq(delta_vars.z_l)(idx) >= -eps_p;
+    }
+    for (isize i = 0; primal_candidate && i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        primal_candidate = m_preconditioner.unscale_dual_ineq(delta_vars.z_u)(idx) >= -eps_p;
+    }
+    for (isize i = 0; primal_candidate && i < m_data.n_x_l; i++)
+    {
+        primal_candidate = m_preconditioner.unscale_dual_b_i(delta_vars.z_bl(i), m_data.x_l_idx(i)) >= -eps_p;
+    }
+    for (isize i = 0; primal_candidate && i < m_data.n_x_u; i++)
+    {
+        primal_candidate = m_preconditioner.unscale_dual_b_i(delta_vars.z_bu(i), m_data.x_u_idx(i)) >= -eps_p;
+    }
+
+    // ------------------ dual infeasibility candidate ------------------
+    T norm_dx = m_preconditioner.unscale_primal(delta_vars.x).template lpNorm<Eigen::Infinity>();
+    T eps_d = m_settings.eps_dual_inf * norm_dx;
+    bool dual_stalled = m_result.info.dual_res >= T(0.95) * m_result.info.prev_dual_res;
+    bool dual_candidate = dual_stalled && norm_dx > 0 && m_preconditioner.unscale_cost(delta_c_x) < -eps_d;
+    // recession cone of the variable bounds
+    for (isize i = 0; dual_candidate && i < m_data.n_x_l; i++)
+    {
+        Eigen::Index idx = m_data.x_l_idx(i);
+        dual_candidate = m_preconditioner.unscale_primal(delta_vars.x)(idx) >= -eps_d;
+    }
+    for (isize i = 0; dual_candidate && i < m_data.n_x_u; i++)
+    {
+        Eigen::Index idx = m_data.x_u_idx(i);
+        dual_candidate = m_preconditioner.unscale_primal(delta_vars.x)(idx) <= eps_d;
+    }
+
+    if (!primal_candidate && !dual_candidate) return Status::PIQP_UNSOLVED;
+
+    // cert_work_p = A dx, cert_work_n_1 = A^T dy
+    m_kkt_system.eval_A_xn_and_AT_xt(m_data, T(1), T(1), delta_vars.x, delta_vars.y, cert_work_p, cert_work_n_1);
+    // cert_work_m_2 = G dx, cert_work_n_2 = G^T (dz_u - dz_l)
+    m_kkt_system.eval_G_xn_and_GT_xt(m_data, T(1), T(1), delta_vars.x, cert_work_m_1, cert_work_m_2, cert_work_n_2);
+
+    if (primal_candidate)
+    {
+        cert_work_n_1.noalias() += cert_work_n_2;
+        for (isize i = 0; i < m_data.n_x_l; i++)
+        {
+            Eigen::Index idx = m_data.x_l_idx(i);
+            cert_work_n_1(idx) -= m_data.x_b_scaling(idx) * delta_vars.z_bl(i);
+        }
+        for (isize i = 0; i < m_data.n_x_u; i++)
+        {
+            Eigen::Index idx = m_data.x_u_idx(i);
+            cert_work_n_1(idx) += m_data.x_b_scaling(idx) * delta_vars.z_bu(i);
+        }
+        if (m_preconditioner.unscale_dual_res(cert_work_n_1).template lpNorm<Eigen::Infinity>() <= eps_p)
+        {
+            store_primal_infeasibility_certificate(norm_dual);
+            return Status::PIQP_PRIMAL_INFEASIBLE;
+        }
+    }
+
+    if (dual_candidate)
+    {
+        if (m_preconditioner.unscale_primal_res_eq(cert_work_p).template lpNorm<Eigen::Infinity>() > eps_d) return Status::PIQP_UNSOLVED;
+        for (isize i = 0; i < m_data.n_h_l; i++)
+        {
+            Eigen::Index idx = m_data.h_l_idx(i);
+            if (m_preconditioner.unscale_primal_res_ineq(cert_work_m_2)(idx) < -eps_d) return Status::PIQP_UNSOLVED;
+        }
+        for (isize i = 0; i < m_data.n_h_u; i++)
+        {
+            Eigen::Index idx = m_data.h_u_idx(i);
+            if (m_preconditioner.unscale_primal_res_ineq(cert_work_m_2)(idx) > eps_d) return Status::PIQP_UNSOLVED;
+        }
+        // cert_work_n_1 = P dx
+        m_kkt_system.eval_P_x(m_data, T(1), delta_vars.x, cert_work_n_1);
+        if (m_preconditioner.unscale_dual_res(cert_work_n_1).template lpNorm<Eigen::Infinity>() <= eps_d)
+        {
+            store_dual_infeasibility_certificate(norm_dx);
+            return Status::PIQP_DUAL_INFEASIBLE;
+        }
+    }
+
+    return Status::PIQP_UNSOLVED;
+}
+
+// Stores the primal infeasibility certificate (dy, dz_l, dz_u, dz_bl, dz_bu) in the dual
+// variables of the result, normalized such that the unscaled certificate has unit infinity norm.
+// The primal variables are left at the last iterate.
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::store_primal_infeasibility_certificate(const T& norm)
+{
+    m_result.y.noalias() = delta_vars.y / norm;
+    // only constraints with finite bounds are part of the certificate
+    m_result.z_l.setZero();
+    m_result.z_u.setZero();
+    for (isize i = 0; i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        m_result.z_l(idx) = delta_vars.z_l(idx) / norm;
+    }
+    for (isize i = 0; i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        m_result.z_u(idx) = delta_vars.z_u(idx) / norm;
+    }
+    m_result.z_bl.head(m_data.n_x_l).noalias() = delta_vars.z_bl.head(m_data.n_x_l) / norm;
+    m_result.z_bu.head(m_data.n_x_u).noalias() = delta_vars.z_bu.head(m_data.n_x_u) / norm;
+}
+
+// Stores the dual infeasibility certificate dx in the primal variables of the result,
+// normalized such that the unscaled certificate has unit infinity norm.
+// The dual variables are left at the last iterate.
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::store_dual_infeasibility_certificate(const T& norm)
+{
+    m_result.x.noalias() = delta_vars.x / norm;
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>

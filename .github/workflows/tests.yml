@@ -32,7 +32,8 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-version: latest
+          # pinned, conda init fails on Windows with 26.9.4-0 (conda-forge/miniforge#913)
+          miniforge-version: 26.7.2-0
           channels: conda-forge
           activate-environment: piqp
 

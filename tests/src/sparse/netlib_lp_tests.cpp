@@ -13,6 +13,7 @@
 #include "piqp/utils/io_utils.hpp"
 
 #include "gtest/gtest.h"
+#include "utils.hpp"
 
 using T = double;
 using I = int;
@@ -27,7 +28,6 @@ TEST_P(SparseNetlibFeasibleTest, NetlibFeasible)
 
     piqp::SparseSolver<T, I> solver;
     solver.settings().verbose = true;
-    solver.settings().infeasibility_threshold = 0.01;
     solver.setup(model.P, model.c,
                  model.A, model.b,
                  model.G, model.h_l, model.h_u,
@@ -44,7 +44,6 @@ TEST_P(SparseNetlibInfeasibleTest, NetlibInfeasible)
 
     piqp::SparseSolver<T, I> solver;
     solver.settings().verbose = true;
-    solver.settings().infeasibility_threshold = 0.01;
     solver.setup(model.P, model.c,
                  model.A, model.b,
                  model.G, model.h_l, model.h_u,
@@ -52,6 +51,11 @@ TEST_P(SparseNetlibInfeasibleTest, NetlibInfeasible)
 
     piqp::Status status = solver.solve();
     ASSERT_TRUE(status == piqp::Status::PIQP_PRIMAL_INFEASIBLE || status == piqp::Status::PIQP_DUAL_INFEASIBLE);
+    if (status == piqp::Status::PIQP_PRIMAL_INFEASIBLE) {
+        assert_primal_infeasibility_certificate(model, solver.result(), solver.settings().eps_primal_inf);
+    } else {
+        assert_dual_infeasibility_certificate(model, solver.result(), solver.settings().eps_dual_inf);
+    }
 }
 
 std::vector<std::string> get_netlib_lp_feas_problems()
