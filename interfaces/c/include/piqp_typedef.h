@@ -82,6 +82,8 @@ typedef struct {
     piqp_float       eps_duality_gap_abs;
     piqp_float       eps_duality_gap_rel;
     piqp_float       infeasibility_threshold;
+    piqp_float       eps_primal_inf;
+    piqp_float       eps_dual_inf;
     piqp_float       reg_lower_limit;
     piqp_float       reg_finetune_lower_limit;
     piqp_int        reg_finetune_primal_update_threshold;

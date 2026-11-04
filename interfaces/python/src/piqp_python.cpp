@@ -107,6 +107,8 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("eps_duality_gap_abs", &piqp::Settings<T>::eps_duality_gap_abs)
         .def_readwrite("eps_duality_gap_rel", &piqp::Settings<T>::eps_duality_gap_rel)
         .def_readwrite("infeasibility_threshold", &piqp::Settings<T>::infeasibility_threshold)
+        .def_readwrite("eps_primal_inf", &piqp::Settings<T>::eps_primal_inf)
+        .def_readwrite("eps_dual_inf", &piqp::Settings<T>::eps_dual_inf)
         .def_readwrite("reg_lower_limit", &piqp::Settings<T>::reg_lower_limit)
         .def_readwrite("reg_finetune_lower_limit", &piqp::Settings<T>::reg_finetune_lower_limit)
         .def_readwrite("reg_finetune_primal_update_threshold", &piqp::Settings<T>::reg_finetune_primal_update_threshold)

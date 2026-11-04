@@ -79,10 +79,10 @@ void RuizEquilibration<T, I>::scale_data(Data<T, I>& data, bool reuse_prev_scali
                     for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
                     {
                         I i_row = P_utri_it.index();
-                        delta_iter(j) = (std::max)(delta_iter(j), abs(P_utri_it.value()));
+                        delta_iter(j) = (std::max)(delta_iter(j), std::abs(P_utri_it.value()));
                         if (i_row != j)
                         {
-                            delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(P_utri_it.value()));
+                            delta_iter(i_row) = (std::max)(delta_iter(i_row), std::abs(P_utri_it.value()));
                         }
                     }
                     delta_iter(j) = (std::max)(delta_iter(j), data.x_b_scaling(j));
@@ -92,8 +92,8 @@ void RuizEquilibration<T, I>::scale_data(Data<T, I>& data, bool reuse_prev_scali
                     for (typename SparseMat<T, I>::InnerIterator AT_it(data.AT, j); AT_it; ++AT_it)
                     {
                         I i_row = AT_it.index();
-                        delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(AT_it.value()));
-                        delta_iter(n + j) = (std::max)(delta_iter(n + j), abs(AT_it.value()));
+                        delta_iter(i_row) = (std::max)(delta_iter(i_row), std::abs(AT_it.value()));
+                        delta_iter(n + j) = (std::max)(delta_iter(n + j), std::abs(AT_it.value()));
                     }
                 }
                 for (isize j = 0; j < m; j++)
@@ -101,8 +101,8 @@ void RuizEquilibration<T, I>::scale_data(Data<T, I>& data, bool reuse_prev_scali
                     for (typename SparseMat<T, I>::InnerIterator GT_it(data.GT, j); GT_it; ++GT_it)
                     {
                         I i_row = GT_it.index();
-                        delta_iter(i_row) = (std::max)(delta_iter(i_row), abs(GT_it.value()));
-                        delta_iter(n + p + j) = (std::max)(delta_iter(n + p + j), abs(GT_it.value()));
+                        delta_iter(i_row) = (std::max)(delta_iter(i_row), std::abs(GT_it.value()));
+                        delta_iter(n + p + j) = (std::max)(delta_iter(n + p + j), std::abs(GT_it.value()));
                     }
                 }
                 delta_iter_b.array() = data.x_b_scaling.array();
@@ -153,10 +153,10 @@ void RuizEquilibration<T, I>::scale_data(Data<T, I>& data, bool reuse_prev_scali
                     for (typename SparseMat<T, I>::InnerIterator P_utri_it(data.P_utri, j); P_utri_it; ++P_utri_it)
                     {
                         I i_row = P_utri_it.index();
-                        delta_iter_cost(j) = (std::max)(delta_iter_cost(j), abs(P_utri_it.value()));
+                        delta_iter_cost(j) = (std::max)(delta_iter_cost(j), std::abs(P_utri_it.value()));
                         if (i_row != j)
                         {
-                            delta_iter_cost(i_row) = (std::max)(delta_iter_cost(i_row), abs(P_utri_it.value()));
+                            delta_iter_cost(i_row) = (std::max)(delta_iter_cost(i_row), std::abs(P_utri_it.value()));
                         }
                     }
                 }

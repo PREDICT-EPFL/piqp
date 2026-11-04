@@ -28,3 +28,11 @@ nav_order: 2
 
 {: .warning }
 Timing information `info.xxx_time` is only measured if `compute_timings` is set to `true` in the settings.
+
+{: .note }
+If the problem is detected to be infeasible, the result contains a certificate of infeasibility, normalized to an infinity norm of one.
+If `info.status` is `PIQP_PRIMAL_INFEASIBLE`, the dual variables `y`, `z_l`, `z_u`, `z_bl`, and `z_bu` contain a certificate of primal infeasibility, i.e.,
+$$A^\top y + G^\top (z_u - z_l) - z_{bl} + z_{bu} = 0$$, $$z_l, z_u, z_{bl}, z_{bu} \geq 0$$, and $$b^\top y - h_l^\top z_l + h_u^\top z_u - x_l^\top z_{bl} + x_u^\top z_{bu} < 0$$, where only finite bounds are taken into account.
+If `info.status` is `PIQP_DUAL_INFEASIBLE`, the primal variable `x` contains a certificate of dual infeasibility, i.e.,
+$$P x = 0$$, $$A x = 0$$, $$c^\top x < 0$$, and $$x$$ lies in the recession cone of the inequality and bound constraints.
+The remaining variables are not meaningful in both cases.
