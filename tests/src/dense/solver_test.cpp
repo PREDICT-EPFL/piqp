@@ -18,6 +18,32 @@ using namespace piqp;
 using T = double;
 using I = int;
 
+TEST(DenseSolverTest, PartialUpdateWithRescaling)
+{
+    Mat<T> P = Mat<T>::Identity(2, 2);
+    Vec<T> c = Vec<T>::Zero(2);
+    Mat<T> A = Mat<T>::Ones(1, 2);
+    Vec<T> b = Vec<T>::Ones(1);
+
+    DenseSolver<T> solver;
+    solver.setup(P, c, A, b);
+    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
+
+    P(1, 1) = 2;
+
+    PIQP_EIGEN_MALLOC_NOT_ALLOWED();
+    solver.update(P);
+    Status status = solver.solve();
+    PIQP_EIGEN_MALLOC_ALLOWED();
+
+    ASSERT_EQ(status, Status::PIQP_SOLVED);
+    EXPECT_NEAR(solver.result().x(0), T(2) / T(3), 1e-8);
+    EXPECT_NEAR(solver.result().x(1), T(1) / T(3), 1e-8);
+    EXPECT_NEAR(solver.result().y(0), T(-2) / T(3), 1e-8);
+    EXPECT_NEAR(solver.result().info.primal_obj, T(1) / T(3), 1e-8);
+    EXPECT_NEAR((A * solver.result().x - b).norm(), 0, 1e-8);
+}
+
 /*
  * first QP:
  * min 3 x1^2 + 2 x2^2 - x1 - 4 x2
