@@ -8,7 +8,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(piqp
-    VERSION 0.6.4
+    VERSION 0.7.0
     LANGUAGES C CXX
 )
 

@@ -7,8 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-05
+
+### Added
+- New KKT solver backend `sparse_multistage_parallel`, which factorizes multistage KKT systems in parallel using OpenMP and Blasfeo [#46](https://github.com/PREDICT-EPFL/piqp/pull/46)
+- New setting `num_threads` to override the default number of OpenMP threads [#46](https://github.com/PREDICT-EPFL/piqp/pull/46)
+- New settings `eps_primal_inf` and `eps_dual_inf` for the tolerances of the certificate-based infeasibility detection [#50](https://github.com/PREDICT-EPFL/piqp/pull/50)
+
+### Changed
+- On primal or dual infeasibility, the result now contains a normalized certificate of infeasibility in the dual or primal variables respectively [#50](https://github.com/PREDICT-EPFL/piqp/pull/50)
+- Replace the heuristic infeasibility detection with certificate-based detection on the proximal steps. `infeasibility_threshold` now only guards the regularization updates [#50](https://github.com/PREDICT-EPFL/piqp/pull/50)
+- The C settings struct `piqp_settings` has new fields, so code compiled against the C interface must be recompiled
+- Building with `BUILD_WITH_OPENMP=ON` now fails if OpenMP cannot be found [#46](https://github.com/PREDICT-EPFL/piqp/pull/46)
+- The Blasfeo backends now recover from failed factorizations [#46](https://github.com/PREDICT-EPFL/piqp/pull/46)
+- All memory in the dense KKT solver is now allocated during setup [#45](https://github.com/PREDICT-EPFL/piqp/pull/45)
+
 ### Fixed
-- Install `piqp.dll` and `piqpc.dll` on Windows
+- Fix false infeasibility detection in some feasible problems [#37](https://github.com/PREDICT-EPFL/piqp/issues/37) [#49](https://github.com/PREDICT-EPFL/piqp/issues/49)
+- Fix stale KKT matrices after partial matrix updates that recompute the scaling, which could lead to wrong solutions or false infeasibility [#48](https://github.com/PREDICT-EPFL/piqp/pull/48)
+- Average the cost scaling over the populated columns of P and fix aliasing between cost scaling and box scaling scratch storage [#43](https://github.com/PREDICT-EPFL/piqp/pull/43)
+- Fix UBSan invalid enum load in dense KKT constructor and flush output in the R interface [#45](https://github.com/PREDICT-EPFL/piqp/pull/45)
+- Install `piqp.dll` and `piqpc.dll` on Windows [#44](https://github.com/PREDICT-EPFL/piqp/pull/44)
 
 ## [0.6.4] - 2026-08-28
 
@@ -153,8 +172,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.4...HEAD
-[0.6.4]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.2...v0.6.4
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.4...v0.7.0
+[0.6.4]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.0...v0.6.1
