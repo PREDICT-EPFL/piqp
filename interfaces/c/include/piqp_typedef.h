@@ -103,6 +103,11 @@ typedef struct {
     piqp_float       iterative_refinement_min_improvement_rate;
     piqp_float       iterative_refinement_static_regularization_eps;
     piqp_float       iterative_refinement_static_regularization_rel;
+    piqp_int        enable_backward;
+    piqp_int        gradient_smoothing;
+    piqp_float       gradient_smoothing_mu;
+    piqp_float       gradient_smoothing_tol;
+    piqp_int        gradient_smoothing_max_iter;
     piqp_int        verbose;
     piqp_int        compute_timings;
 } piqp_settings;
@@ -116,6 +121,14 @@ typedef enum {
     PIQP_UNSOLVED          = -9,
     PIQP_INVALID_SETTINGS  = -10
 } piqp_status;
+
+typedef enum {
+    PIQP_BWD_SOLVED                 = 1,
+    PIQP_BWD_INVALID_SETTINGS       = -1,
+    PIQP_BWD_INVALID_FORWARD_RESULT = -2,
+    PIQP_BWD_NUMERICS               = -3,
+    PIQP_BWD_MAX_ITER_REACHED       = -4
+} piqp_backward_status;
 
 typedef struct {
     piqp_status status;
@@ -177,6 +190,21 @@ typedef struct {
     piqp_info info;
 } piqp_result;
 
+typedef struct {
+    const piqp_float* P;   // dense interface: gradient w.r.t. P (size n x n, row-major, symmetric), NULL for sparse
+    const piqp_float* A;   // dense interface: gradient w.r.t. A (size p x n, row-major), NULL for sparse
+    const piqp_float* G;   // dense interface: gradient w.r.t. G (size m x n, row-major), NULL for sparse
+    const piqp_csc* P_csc; // sparse interface: gradient w.r.t. P (size n x n, both triangles), NULL for dense
+    const piqp_csc* A_csc; // sparse interface: gradient w.r.t. A (size p x n, sparsity pattern of A), NULL for dense
+    const piqp_csc* G_csc; // sparse interface: gradient w.r.t. G (size m x n, sparsity pattern of G), NULL for dense
+    const piqp_float* c;   // gradient w.r.t. c (size n)
+    const piqp_float* b;   // gradient w.r.t. b (size p)
+    const piqp_float* h_l; // gradient w.r.t. h_l (size m), zero for infinite bounds
+    const piqp_float* h_u; // gradient w.r.t. h_u (size m), zero for infinite bounds
+    const piqp_float* x_l; // gradient w.r.t. x_l (size n), zero for infinite bounds
+    const piqp_float* x_u; // gradient w.r.t. x_u (size n), zero for infinite bounds
+} piqp_gradients;
+
 struct piqp_solver_handle; // An opaque type that we'll use as a handle for the C++ solver object
 typedef struct piqp_solver_handle piqp_solver_handle;
 
@@ -191,6 +219,7 @@ typedef struct {
     piqp_solver_handle* solver_handle;
     piqp_solver_info    solver_info;
     piqp_result*        result;
+    piqp_gradients*     gradients; // NULL if settings->enable_backward was not set in the setup
 } piqp_workspace;
 
 # ifdef __cplusplus
