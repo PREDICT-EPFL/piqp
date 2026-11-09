@@ -77,6 +77,19 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
 
     Status status = solve_impl();
 
+    // keep a copy of the final iterate in scaled space and compressed box layout for backward()
+    m_result_scaled.x = m_result.x;
+    m_result_scaled.y = m_result.y;
+    m_result_scaled.z_l = m_result.z_l;
+    m_result_scaled.z_u = m_result.z_u;
+    m_result_scaled.z_bl = m_result.z_bl;
+    m_result_scaled.z_bu = m_result.z_bu;
+    m_result_scaled.s_l = m_result.s_l;
+    m_result_scaled.s_u = m_result.s_u;
+    m_result_scaled.s_bl = m_result.s_bl;
+    m_result_scaled.s_bu = m_result.s_bu;
+    m_backward_ready = (status == Status::PIQP_SOLVED || status == Status::PIQP_MAX_ITER_REACHED);
+
     unscale_results();
     restore_dual();
 
@@ -136,6 +149,9 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
     }
 
     m_data.resize(P.rows(), A.has_value() ? A->rows() : 0, G.has_value() ? G->rows() : 0);
+
+    m_backward_ready = false;
+    m_gradients_allocated = false;
 
     if (P.rows() != m_data.n || P.cols() != m_data.n) { piqp_eprint("P must be square\n"); return; }
     if (A.has_value() && (A->rows() != m_data.p || A->cols() != m_data.n)) { piqp_eprint("A must have correct dimensions\n"); return; }
@@ -208,6 +224,8 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_impl(const optional<CM
     {
         update_timer.start();
     }
+
+    m_backward_ready = false;
 
     m_preconditioner.unscale_data(m_data);
 
@@ -382,6 +400,20 @@ void SolverBase<T, I, Preconditioner, MatrixType>::init_workspace()
     cert_work_p.resize(m_data.p);
     cert_work_m_1.resize(m_data.m);
     cert_work_m_2.resize(m_data.m);
+
+    // for backward
+    m_result_scaled.resize(m_data.n, m_data.p, m_data.m);
+    m_adjoint_rhs.resize(m_data.n, m_data.p, m_data.m);
+    m_adjoint.resize(m_data.n, m_data.p, m_data.m);
+    m_smoothed_scaled.resize(m_data.n, m_data.p, m_data.m);
+    m_smoothed.resize(m_data.n, m_data.p, m_data.m);
+    m_linearization_point_scaled.resize(m_data.n, m_data.p, m_data.m);
+    m_linearization_point.resize(m_data.n, m_data.p, m_data.m);
+    m_gradients_allocated = m_settings.enable_backward;
+    if (m_gradients_allocated)
+    {
+        m_gradients.resize(m_data);
+    }
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
@@ -929,9 +961,11 @@ T SolverBase<T, I, Preconditioner, MatrixType>::calculate_mu()
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
-void SolverBase<T, I, Preconditioner, MatrixType>::calculate_step(T& alpha_s, T& alpha_z)
+void SolverBase<T, I, Preconditioner, MatrixType>::calculate_step(T& alpha_s, T& alpha_z, const Variables<T>* vars_ptr)
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::calculate_step");
+
+    const Variables<T>& vars = vars_ptr != nullptr ? *vars_ptr : m_result;
 
     alpha_s = T(1);
     alpha_z = T(1);
@@ -939,39 +973,39 @@ void SolverBase<T, I, Preconditioner, MatrixType>::calculate_step(T& alpha_s, T&
     auto step_ineq = [&](isize i, T& a_s, T& a_z) {
         if (step.s_l(i) < 0)
         {
-            a_s = (std::min)(a_s, -m_result.s_l(i) / step.s_l(i));
+            a_s = (std::min)(a_s, -vars.s_l(i) / step.s_l(i));
         }
         if (step.s_u(i) < 0)
         {
-            a_s = (std::min)(a_s, -m_result.s_u(i) / step.s_u(i));
+            a_s = (std::min)(a_s, -vars.s_u(i) / step.s_u(i));
         }
         if (step.z_l(i) < 0)
         {
-            a_z = (std::min)(a_z, -m_result.z_l(i) / step.z_l(i));
+            a_z = (std::min)(a_z, -vars.z_l(i) / step.z_l(i));
         }
         if (step.z_u(i) < 0)
         {
-            a_z = (std::min)(a_z, -m_result.z_u(i) / step.z_u(i));
+            a_z = (std::min)(a_z, -vars.z_u(i) / step.z_u(i));
         }
     };
     auto step_box_l = [&](isize i, T& a_s, T& a_z) {
         if (step.s_bl(i) < 0)
         {
-            a_s = (std::min)(a_s, -m_result.s_bl(i) / step.s_bl(i));
+            a_s = (std::min)(a_s, -vars.s_bl(i) / step.s_bl(i));
         }
         if (step.z_bl(i) < 0)
         {
-            a_z = (std::min)(a_z, -m_result.z_bl(i) / step.z_bl(i));
+            a_z = (std::min)(a_z, -vars.z_bl(i) / step.z_bl(i));
         }
     };
     auto step_box_u = [&](isize i, T& a_s, T& a_z) {
         if (step.s_bu(i) < 0)
         {
-            a_s = (std::min)(a_s, -m_result.s_bu(i) / step.s_bu(i));
+            a_s = (std::min)(a_s, -vars.s_bu(i) / step.s_bu(i));
         }
         if (step.z_bu(i) < 0)
         {
-            a_z = (std::min)(a_z, -m_result.z_bu(i) / step.z_bu(i));
+            a_z = (std::min)(a_z, -vars.z_bu(i) / step.z_bu(i));
         }
     };
 
@@ -1450,27 +1484,29 @@ void SolverBase<T, I, Preconditioner, MatrixType>::store_dual_infeasibility_cert
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
-void SolverBase<T, I, Preconditioner, MatrixType>::unscale_results()
+void SolverBase<T, I, Preconditioner, MatrixType>::unscale_results(Variables<T>* vars_ptr)
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::unscale_results");
 
-    m_result.x = m_preconditioner.unscale_primal(m_result.x);
-    m_result.y = m_preconditioner.unscale_dual_eq(m_result.y);
-    m_result.z_l = m_preconditioner.unscale_dual_ineq(m_result.z_l);
-    m_result.z_u = m_preconditioner.unscale_dual_ineq(m_result.z_u);
-    m_result.s_l = m_preconditioner.unscale_slack_ineq(m_result.s_l);
-    m_result.s_u = m_preconditioner.unscale_slack_ineq(m_result.s_u);
+    Variables<T>& vars = vars_ptr != nullptr ? *vars_ptr : m_result;
+
+    vars.x = m_preconditioner.unscale_primal(vars.x);
+    vars.y = m_preconditioner.unscale_dual_eq(vars.y);
+    vars.z_l = m_preconditioner.unscale_dual_ineq(vars.z_l);
+    vars.z_u = m_preconditioner.unscale_dual_ineq(vars.z_u);
+    vars.s_l = m_preconditioner.unscale_slack_ineq(vars.s_l);
+    vars.s_u = m_preconditioner.unscale_slack_ineq(vars.s_u);
     for (isize i = 0; i < m_data.n_x_l; i++)
     {
         Eigen::Index idx = m_data.x_l_idx(i);
-        m_result.z_bl(i) = m_preconditioner.unscale_dual_b_i(m_result.z_bl(i), idx);
-        m_result.s_bl(i) = m_preconditioner.unscale_slack_b_i(m_result.s_bl(i), idx);
+        vars.z_bl(i) = m_preconditioner.unscale_dual_b_i(vars.z_bl(i), idx);
+        vars.s_bl(i) = m_preconditioner.unscale_slack_b_i(vars.s_bl(i), idx);
     }
     for (isize i = 0; i < m_data.n_x_u; i++)
     {
         Eigen::Index idx = m_data.x_u_idx(i);
-        m_result.z_bu(i) = m_preconditioner.unscale_dual_b_i(m_result.z_bu(i), idx);
-        m_result.s_bu(i) = m_preconditioner.unscale_slack_b_i(m_result.s_bu(i), idx);
+        vars.z_bu(i) = m_preconditioner.unscale_dual_b_i(vars.z_bu(i), idx);
+        vars.s_bu(i) = m_preconditioner.unscale_slack_b_i(vars.s_bu(i), idx);
     }
 }
 
@@ -1504,6 +1540,618 @@ void SolverBase<T, I, Preconditioner, MatrixType>::restore_dual()
         Eigen::Index idx = m_data.x_u_idx(i);
         std::swap(m_result.z_bu(i), m_result.z_bu(idx));
         std::swap(m_result.s_bu(i), m_result.s_bu(idx));
+    }
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::backward(const optional<CVecRef<T>>& grad_x,
+                                                              const optional<CVecRef<T>>& grad_y,
+                                                              const optional<CVecRef<T>>& grad_z_l,
+                                                              const optional<CVecRef<T>>& grad_z_u,
+                                                              const optional<CVecRef<T>>& grad_z_bl,
+                                                              const optional<CVecRef<T>>& grad_z_bu,
+                                                              const optional<CVecRef<T>>& grad_s_l,
+                                                              const optional<CVecRef<T>>& grad_s_u,
+                                                              const optional<CVecRef<T>>& grad_s_bl,
+                                                              const optional<CVecRef<T>>& grad_s_bu,
+                                                              const optional<Result<T>>& forward_result)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::backward");
+
+    if (!m_setup_done)
+    {
+        piqp_eprint("Solver not setup yet\n");
+        return Status::PIQP_UNSOLVED;
+    }
+
+    if (!m_gradients_allocated)
+    {
+        piqp_eprint("backward() requires settings.enable_backward to be set before setup()\n");
+        return Status::PIQP_INVALID_SETTINGS;
+    }
+
+    if (!forward_result.has_value() && !m_backward_ready)
+    {
+        piqp_eprint("backward() requires a solve() of the current problem data which returned PIQP_SOLVED or PIQP_MAX_ITER_REACHED\n");
+        return Status::PIQP_UNSOLVED;
+    }
+
+    if (grad_x.has_value() && grad_x->size() != m_data.n)
+    {
+        piqp_eprint("grad_x has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+    if (grad_y.has_value() && grad_y->size() != m_data.p)
+    {
+        piqp_eprint("grad_y has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+    if (grad_z_l.has_value() && grad_z_l->size() != m_data.m)
+    {
+        piqp_eprint("grad_z_l has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+    if (grad_z_u.has_value() && grad_z_u->size() != m_data.m)
+    {
+        piqp_eprint("grad_z_u has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+    if (grad_z_bl.has_value() && grad_z_bl->size() != m_data.n)
+    {
+        piqp_eprint("grad_z_bl has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+    if (grad_z_bu.has_value() && grad_z_bu->size() != m_data.n)
+    {
+        piqp_eprint("grad_z_bu has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+    if (grad_s_l.has_value() && grad_s_l->size() != m_data.m)
+    {
+        piqp_eprint("grad_s_l has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+    if (grad_s_u.has_value() && grad_s_u->size() != m_data.m)
+    {
+        piqp_eprint("grad_s_u has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+    if (grad_s_bl.has_value() && grad_s_bl->size() != m_data.n)
+    {
+        piqp_eprint("grad_s_bl has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+    if (grad_s_bu.has_value() && grad_s_bu->size() != m_data.n)
+    {
+        piqp_eprint("grad_s_bu has wrong dimensions\n");
+        return Status::PIQP_UNSOLVED;
+    }
+
+    // Linearization point: the stored solution or the provided forward result.
+    const Variables<T>* linearization_point_scaled = &m_result_scaled;
+    const Variables<T>* linearization_point = &m_result;
+    T rho = m_result.info.rho;
+    T delta = m_result.info.delta;
+    if (forward_result.has_value())
+    {
+        if (!scale_backward_point(*forward_result)) 
+        { 
+            return Status::PIQP_UNSOLVED; 
+        }
+        linearization_point_scaled = &m_linearization_point_scaled;
+        linearization_point = &m_linearization_point;
+        rho = forward_result->info.rho;
+        delta = forward_result->info.delta;
+    }
+
+    if (m_settings.gradient_smoothing)
+    {
+        // move the linearization point to the relaxed point s * z = mu nearby
+        Status smoothing_status = run_gradient_smoothing(*linearization_point_scaled, rho, delta);
+        if (smoothing_status != Status::PIQP_SOLVED)
+        {
+            return smoothing_status;
+        }
+        linearization_point_scaled = &m_smoothed_scaled;
+        linearization_point = &m_smoothed;
+    }
+    else
+    {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::backward::factor");
+
+        if (!factor_backward_kkt(*linearization_point_scaled, rho, delta))
+        {
+            piqp_eprint("backward(): KKT factorization at the linearization point failed\n");
+            return Status::PIQP_NUMERICS;
+        }
+    }
+
+    assemble_adjoint_rhs(grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
+                         grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, *linearization_point_scaled);
+
+    {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::backward::solve");
+
+        if (!m_kkt_system.solve(m_data, m_settings, m_adjoint_rhs, m_adjoint))
+        {
+            piqp_eprint("backward(): adjoint KKT solve failed\n");
+            return Status::PIQP_NUMERICS;
+        }
+    }
+
+    unscale_adjoint();
+    {
+        PIQP_TRACY_ZoneScopedN("piqp::Solver::backward::assemble_gradients");
+        m_gradients.compute_from_adjoint(m_data, *linearization_point, m_adjoint);
+    }
+
+    return Status::PIQP_SOLVED;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+bool SolverBase<T, I, Preconditioner, MatrixType>::factor_backward_kkt(const Variables<T>& vars_scaled, const T& rho, const T& delta)
+{
+    bool ok = m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement, rho, delta, vars_scaled);
+    if (!ok && !m_enable_iterative_refinement)
+    {
+        ok = m_kkt_system.update_scalings_and_factor(m_data, m_settings, true, rho, delta, vars_scaled);
+    }
+    return ok;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+bool SolverBase<T, I, Preconditioner, MatrixType>::scale_backward_point(const Result<T>& forward_result)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::scale_backward_point");
+
+    if (forward_result.info.status != Status::PIQP_SOLVED && forward_result.info.status != Status::PIQP_MAX_ITER_REACHED)
+    {
+        piqp_eprint("backward(): the provided forward result must have status PIQP_SOLVED or PIQP_MAX_ITER_REACHED\n");
+        return false;
+    }
+    if (forward_result.x.size() != m_data.n || forward_result.y.size() != m_data.p
+        || forward_result.z_l.size() != m_data.m || forward_result.z_u.size() != m_data.m
+        || forward_result.s_l.size() != m_data.m || forward_result.s_u.size() != m_data.m
+        || forward_result.z_bl.size() != m_data.n || forward_result.z_bu.size() != m_data.n
+        || forward_result.s_bl.size() != m_data.n || forward_result.s_bu.size() != m_data.n)
+    {
+        piqp_eprint("backward(): the provided forward result has wrong dimensions\n");
+        return false;
+    }
+    if (!(forward_result.info.rho > 0) || !(forward_result.info.delta > 0) || !std::isfinite(forward_result.info.rho) || !std::isfinite(forward_result.info.delta))
+    {
+        piqp_eprint("backward(): the provided forward result has an invalid regularization (info.rho, info.delta)\n");
+        return false;
+    }
+
+    using std::isfinite;
+    auto interior = [](const T& s_i, const T& z_i) { return s_i > 0 && z_i > 0 && isfinite(s_i) && isfinite(z_i); };
+
+    Variables<T>& ps = m_linearization_point_scaled;
+    ps.x = m_preconditioner.scale_primal(forward_result.x);
+    ps.y = m_preconditioner.scale_dual_eq(forward_result.y);
+    ps.z_l.setZero();
+    ps.z_u.setZero();
+    ps.s_l.setZero();
+    ps.s_u.setZero();
+    ps.z_bl.setZero();
+    ps.z_bu.setZero();
+    ps.s_bl.setZero();
+    ps.s_bu.setZero();
+
+    // Only finite bounds carry slacks and duals. Rows disabled by disable_inf_constraints() are
+    // internally finite, decoupled from x (zero row in G), and their gradients are zeroed, so any
+    // interior point is admissible for them.
+    for (isize i = 0; i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        if (m_data.G_row_disabled(idx) && !interior(forward_result.s_l(idx), forward_result.z_l(idx)))
+        { 
+            ps.s_l(idx) = T(1);
+            ps.z_l(idx) = T(1); 
+            continue; 
+        }
+        if (!interior(forward_result.s_l(idx), forward_result.z_l(idx)))
+        { 
+            piqp_eprint("backward(): s_l and z_l of the provided forward result must be strictly positive on finite bounds\n");
+            return false;
+        }
+        ps.s_l(idx) = forward_result.s_l(idx);
+        ps.z_l(idx) = forward_result.z_l(idx);
+    }
+    for (isize i = 0; i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        if (m_data.G_row_disabled(idx) && !interior(forward_result.s_u(idx), forward_result.z_u(idx)))
+        {
+            ps.s_u(idx) = T(1);
+            ps.z_u(idx) = T(1);
+            continue;
+        }
+        if (!interior(forward_result.s_u(idx), forward_result.z_u(idx)))
+        {
+            piqp_eprint("backward(): s_u and z_u of the provided forward result must be strictly positive on finite bounds\n");
+            return false;
+        }
+        ps.s_u(idx) = forward_result.s_u(idx);
+        ps.z_u(idx) = forward_result.z_u(idx);
+    }
+    // user space copy (zero on infinite bounds), the box variables are not needed in user space
+    m_linearization_point.x = forward_result.x;
+    m_linearization_point.y = forward_result.y;
+    m_linearization_point.z_l = ps.z_l;
+    m_linearization_point.z_u = ps.z_u;
+    m_linearization_point.s_l = ps.s_l;
+    m_linearization_point.s_u = ps.s_u;
+    ps.z_l = m_preconditioner.scale_dual_ineq(ps.z_l);
+    ps.z_u = m_preconditioner.scale_dual_ineq(ps.z_u);
+    ps.s_l = m_preconditioner.scale_slack_ineq(ps.s_l);
+    ps.s_u = m_preconditioner.scale_slack_ineq(ps.s_u);
+
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        Eigen::Index idx = m_data.x_l_idx(i);
+        if (!interior(forward_result.s_bl(idx), forward_result.z_bl(idx)))
+        {
+            piqp_eprint("backward(): s_bl and z_bl of the provided forward result must be strictly positive on finite bounds\n");
+            return false;
+        }
+        ps.z_bl(i) = m_preconditioner.scale_dual_b_i(forward_result.z_bl(idx), idx);
+        ps.s_bl(i) = m_preconditioner.scale_slack_b_i(forward_result.s_bl(idx), idx);
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        Eigen::Index idx = m_data.x_u_idx(i);
+        if (!interior(forward_result.s_bu(idx), forward_result.z_bu(idx)))
+        {
+            piqp_eprint("backward(): s_bu and z_bu of the provided forward result must be strictly positive on finite bounds\n");
+            return false;
+        }
+        ps.z_bu(i) = m_preconditioner.scale_dual_b_i(forward_result.z_bu(idx), idx);
+        ps.s_bu(i) = m_preconditioner.scale_slack_b_i(forward_result.s_bu(idx), idx);
+    }
+
+    return true;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::run_gradient_smoothing(const Variables<T>& start_scaled, const T& rho, const T& delta)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::run_gradient_smoothing");
+
+    Variables<T>& rv = m_smoothed_scaled;
+    rv.x = start_scaled.x;
+    rv.y = start_scaled.y;
+    rv.z_l = start_scaled.z_l;
+    rv.z_u = start_scaled.z_u;
+    rv.z_bl = start_scaled.z_bl;
+    rv.z_bu = start_scaled.z_bu;
+    rv.s_l = start_scaled.s_l;
+    rv.s_u = start_scaled.s_u;
+    rv.s_bl = start_scaled.s_bl;
+    rv.s_bu = start_scaled.s_bu;
+
+    // mu in scaled space: s_scaled * z_scaled = c * s * z, where c is the cost scaling
+    T mu = m_preconditioner.scale_cost(m_settings.gradient_smoothing_mu);
+
+    // floor s and z at sqrt(mu) on finite bounds to keep the first factorization well conditioned
+    T floor = std::sqrt(mu);
+    for (isize i = 0; i < m_data.n_h_l; i++)
+    {
+        Eigen::Index idx = m_data.h_l_idx(i);
+        rv.s_l(idx) = (std::max)(rv.s_l(idx), floor);
+        rv.z_l(idx) = (std::max)(rv.z_l(idx), floor);
+    }
+    for (isize i = 0; i < m_data.n_h_u; i++)
+    {
+        Eigen::Index idx = m_data.h_u_idx(i);
+        rv.s_u(idx) = (std::max)(rv.s_u(idx), floor);
+        rv.z_u(idx) = (std::max)(rv.z_u(idx), floor);
+    }
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        rv.s_bl(i) = (std::max)(rv.s_bl(i), floor);
+        rv.z_bl(i) = (std::max)(rv.z_bl(i), floor);
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        rv.s_bu(i) = (std::max)(rv.s_bu(i), floor);
+        rv.z_bu(i) = (std::max)(rv.z_bu(i), floor);
+    }
+
+    bool converged = false;
+    for (isize iter = 0; iter < m_settings.gradient_smoothing_max_iter; iter++)
+    {
+        if (!factor_backward_kkt(rv, rho, delta))
+        {
+            piqp_eprint("backward(): KKT factorization failed during gradient smoothing\n");
+            return Status::PIQP_NUMERICS;
+        }
+
+        T norm = smoothing_residual(rv, mu);
+        if (norm < m_settings.gradient_smoothing_tol)
+        {
+            converged = true;
+            break;
+        }
+
+        if (!m_kkt_system.solve(m_data, m_settings, res, step))
+        {
+            piqp_eprint("backward(): KKT solve failed during gradient smoothing\n");
+            return Status::PIQP_NUMERICS;
+        }
+
+        // damped common step for all variables, keeping s and z positive
+        T alpha_s, alpha_z;
+        calculate_step(alpha_s, alpha_z, &rv);
+        T tau = m_settings.tau;
+        T alpha = tau * (std::min)((std::min)(alpha_s, tau), (std::min)(alpha_z, tau));
+
+        rv.x += alpha * step.x;
+        rv.y += alpha * step.y;
+        rv.z_l += alpha * step.z_l;
+        rv.z_u += alpha * step.z_u;
+        rv.s_l += alpha * step.s_l;
+        rv.s_u += alpha * step.s_u;
+        rv.z_bl.head(m_data.n_x_l) += alpha * step.z_bl.head(m_data.n_x_l);
+        rv.z_bu.head(m_data.n_x_u) += alpha * step.z_bu.head(m_data.n_x_u);
+        rv.s_bl.head(m_data.n_x_l) += alpha * step.s_bl.head(m_data.n_x_l);
+        rv.s_bu.head(m_data.n_x_u) += alpha * step.s_bu.head(m_data.n_x_u);
+    }
+
+    if (!converged)
+    {
+        // check the iterate left by the last step
+        if (!factor_backward_kkt(rv, rho, delta))
+        {
+            piqp_eprint("backward(): KKT factorization failed during gradient smoothing\n");
+            return Status::PIQP_NUMERICS;
+        }
+        T norm = smoothing_residual(rv, mu);
+        if (!(norm < m_settings.gradient_smoothing_tol))
+        {
+            piqp_eprint("backward(): gradient smoothing did not converge, the relaxed KKT residual is %.3e after %zd iterations. "
+                        "Increase gradient_smoothing_max_iter or relax gradient_smoothing_tol.\n",
+                        static_cast<double>(norm), m_settings.gradient_smoothing_max_iter);
+            return Status::PIQP_MAX_ITER_REACHED;
+        }
+    }
+
+    // user space copy of the relaxed point
+    m_smoothed.x = rv.x;
+    m_smoothed.y = rv.y;
+    m_smoothed.z_l = rv.z_l;
+    m_smoothed.z_u = rv.z_u;
+    m_smoothed.z_bl = rv.z_bl;
+    m_smoothed.z_bu = rv.z_bu;
+    m_smoothed.s_l = rv.s_l;
+    m_smoothed.s_u = rv.s_u;
+    m_smoothed.s_bl = rv.s_bl;
+    m_smoothed.s_bu = rv.s_bu;
+    unscale_results(&m_smoothed);
+
+    return Status::PIQP_SOLVED;
+}
+
+// Assembles the (negative, non-regularized) KKT residual at vars with relaxed complementarity
+// target mu into res, with the sign convention of the forward KKT right-hand side, i.e.
+//   res.x   = -(P x + c + A^T y + G^T (z_u - z_l) + x_b_scaling (z_bu - z_bl))
+//   res.y   = -A x + b
+//   res.z_l = G x - s_l - h_l,   res.z_u = -G x - s_u + h_u            (finite bounds, 0 otherwise)
+//   res.z_b = +/- x_b_scaling x - s_b -/+ x_b                          (compressed box layout)
+//   res.s   = mu - s z                                                 (finite bounds, 0 otherwise)
+// Returns the infinity norm of the residual (in scaled space).
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+T SolverBase<T, I, Preconditioner, MatrixType>::smoothing_residual(const Variables<T>& vars, const T& mu)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::smoothing_residual");
+
+    Vec<T>& work_x = m_adjoint_rhs.x;
+    Vec<T>& work_x_2 = m_adjoint.x;
+    Vec<T>& work_z = m_adjoint_rhs.z_l;
+
+    // res.y = -A x, work_x = A^T y
+    m_kkt_system.eval_A_xn_and_AT_xt(m_data, T(-1), T(1), vars.x, vars.y, res.y, work_x);
+    // res.z_l = G x, work_x_2 = G^T (z_u - z_l)
+    work_z.noalias() = vars.z_u - vars.z_l;
+    m_kkt_system.eval_G_xn_and_GT_xt(m_data, T(1), T(1), vars.x, work_z, res.z_l, work_x_2);
+    res.z_u.noalias() = -res.z_l;
+    // res.x = -P x
+    m_kkt_system.eval_P_x(m_data, T(-1), vars.x, res.x);
+
+    res.x.noalias() -= m_data.c;
+    res.x.noalias() -= work_x;
+    res.x.noalias() -= work_x_2;
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        Eigen::Index idx = m_data.x_l_idx(i);
+        res.x(idx) += m_data.x_b_scaling(idx) * vars.z_bl(i);
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        Eigen::Index idx = m_data.x_u_idx(i);
+        res.x(idx) -= m_data.x_b_scaling(idx) * vars.z_bu(i);
+    }
+
+    res.y.noalias() += m_data.b;
+
+    T norm = res.x.template lpNorm<Eigen::Infinity>();
+    norm = (std::max)(norm, res.y.template lpNorm<Eigen::Infinity>());
+
+    // inequality rows: only finite bounds carry a residual
+    res.s_l.setZero();
+    res.s_u.setZero();
+    {
+        isize i = 0;
+        for (isize ii = 0; ii < m_data.n_h_l; ii++)
+        {
+            Eigen::Index idx = m_data.h_l_idx(ii);
+            while (i < idx) { res.z_l(i++) = T(0); }
+            res.z_l(i) += -m_data.h_l(i) - vars.s_l(i);
+            res.s_l(i) = mu - vars.s_l(i) * vars.z_l(i);
+            norm = (std::max)(norm, (std::max)(std::abs(res.z_l(i)), std::abs(res.s_l(i))));
+            i++;
+        }
+        while (i < m_data.m) { res.z_l(i++) = T(0); }
+    }
+    {
+        isize i = 0;
+        for (isize ii = 0; ii < m_data.n_h_u; ii++)
+        {
+            Eigen::Index idx = m_data.h_u_idx(ii);
+            while (i < idx) { res.z_u(i++) = T(0); }
+            res.z_u(i) += m_data.h_u(i) - vars.s_u(i);
+            res.s_u(i) = mu - vars.s_u(i) * vars.z_u(i);
+            norm = (std::max)(norm, (std::max)(std::abs(res.z_u(i)), std::abs(res.s_u(i))));
+            i++;
+        }
+        while (i < m_data.m) { res.z_u(i++) = T(0); }
+    }
+
+    // box rows (compressed layout)
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        Eigen::Index idx = m_data.x_l_idx(i);
+        res.z_bl(i) = m_data.x_b_scaling(idx) * vars.x(idx) - vars.s_bl(i) - m_data.x_l(i);
+        res.s_bl(i) = mu - vars.s_bl(i) * vars.z_bl(i);
+        norm = (std::max)(norm, (std::max)(std::abs(res.z_bl(i)), std::abs(res.s_bl(i))));
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        Eigen::Index idx = m_data.x_u_idx(i);
+        res.z_bu(i) = -m_data.x_b_scaling(idx) * vars.x(idx) - vars.s_bu(i) + m_data.x_u(i);
+        res.s_bu(i) = mu - vars.s_bu(i) * vars.z_bu(i);
+        norm = (std::max)(norm, (std::max)(std::abs(res.z_bu(i)), std::abs(res.s_bu(i))));
+    }
+
+    return norm;
+}
+
+
+// Assembles the right-hand side of the adjoint system K^T lambda = -g in scaled space and compressed
+// box layout into m_adjoint_rhs, where g are the gradients of the loss with respect to the solution.
+// K^T differs from K only in the slack blocks; solving K^T lambda = g with the forward KKT solve is
+// equivalent to replacing the slack part of the right-hand side g_s by S * g_s, with S the slacks of
+// the linearization point. The resulting slack components of lambda are not meaningful and are not used.
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::assemble_adjoint_rhs(const optional<CVecRef<T>>& grad_x,
+                                                                        const optional<CVecRef<T>>& grad_y,
+                                                                        const optional<CVecRef<T>>& grad_z_l,
+                                                                        const optional<CVecRef<T>>& grad_z_u,
+                                                                        const optional<CVecRef<T>>& grad_z_bl,
+                                                                        const optional<CVecRef<T>>& grad_z_bu,
+                                                                        const optional<CVecRef<T>>& grad_s_l,
+                                                                        const optional<CVecRef<T>>& grad_s_u,
+                                                                        const optional<CVecRef<T>>& grad_s_bl,
+                                                                        const optional<CVecRef<T>>& grad_s_bu,
+                                                                        const Variables<T>& linearization_point_scaled)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::backward::assemble_adjoint_rhs");
+
+    Variables<T>& rhs = m_adjoint_rhs;
+
+    if (grad_x.has_value())
+    {
+        rhs.x = -m_preconditioner.unscale_primal(*grad_x);
+    }
+    else
+    {
+        rhs.x.setZero();
+    }
+    if (grad_y.has_value())
+    {
+        rhs.y = -m_preconditioner.unscale_dual_eq(*grad_y);
+    }
+    else
+    {
+        rhs.y.setZero();
+    }
+    if (grad_z_l.has_value())
+    {
+        rhs.z_l = -m_preconditioner.unscale_dual_ineq(*grad_z_l);
+    }
+    else
+    {
+        rhs.z_l.setZero();
+    }
+    if (grad_z_u.has_value())
+    {
+        rhs.z_u = -m_preconditioner.unscale_dual_ineq(*grad_z_u);
+    }
+    else
+    {
+        rhs.z_u.setZero();
+    }
+    // s = 0 for infinite bounds, i.e. the corresponding entries vanish
+    if (grad_s_l.has_value())
+    {
+        rhs.s_l = -m_preconditioner.unscale_slack_ineq(*grad_s_l);
+        rhs.s_l.array() *= linearization_point_scaled.s_l.array();
+    }
+    else
+    {
+        rhs.s_l.setZero();
+    }
+    if (grad_s_u.has_value())
+    {
+        rhs.s_u = -m_preconditioner.unscale_slack_ineq(*grad_s_u);
+        rhs.s_u.array() *= linearization_point_scaled.s_u.array();
+    }
+    else
+    {
+        rhs.s_u.setZero();
+    }
+
+    rhs.z_bl.setZero();
+    rhs.z_bu.setZero();
+    rhs.s_bl.setZero();
+    rhs.s_bu.setZero();
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        Eigen::Index idx = m_data.x_l_idx(i);
+        if (grad_z_bl.has_value())
+        {
+            rhs.z_bl(i) = -m_preconditioner.unscale_dual_b_i((*grad_z_bl)(idx), idx);
+        }
+        if (grad_s_bl.has_value())
+        {
+            rhs.s_bl(i) = -m_preconditioner.unscale_slack_b_i((*grad_s_bl)(idx), idx) * linearization_point_scaled.s_bl(i);
+        }
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        Eigen::Index idx = m_data.x_u_idx(i);
+        if (grad_z_bu.has_value())
+        {
+            rhs.z_bu(i) = -m_preconditioner.unscale_dual_b_i((*grad_z_bu)(idx), idx);
+        }
+        if (grad_s_bu.has_value())
+        {
+            rhs.s_bu(i) = -m_preconditioner.unscale_slack_b_i((*grad_s_bu)(idx), idx) * linearization_point_scaled.s_bu(i);
+        }
+    }
+}
+
+// Unscales the adjoint variables in m_adjoint from scaled to user space,
+// they scale like the KKT residuals. The box duals are in compressed layout.
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::unscale_adjoint()
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::backward::unscale_adjoint");
+
+    m_adjoint.x = m_preconditioner.scale_dual_res(m_adjoint.x);
+    m_adjoint.y = m_preconditioner.scale_primal_res_eq(m_adjoint.y);
+    m_adjoint.z_l = m_preconditioner.scale_primal_res_ineq(m_adjoint.z_l);
+    m_adjoint.z_u = m_preconditioner.scale_primal_res_ineq(m_adjoint.z_u);
+    for (isize i = 0; i < m_data.n_x_l; i++)
+    {
+        Eigen::Index idx = m_data.x_l_idx(i);
+        m_adjoint.z_bl(i) = m_preconditioner.scale_primal_res_b_i(m_adjoint.z_bl(i), idx);
+    }
+    for (isize i = 0; i < m_data.n_x_u; i++)
+    {
+        Eigen::Index idx = m_data.x_u_idx(i);
+        m_adjoint.z_bu(i) = m_preconditioner.scale_primal_res_b_i(m_adjoint.z_bu(i), idx);
     }
 }
 

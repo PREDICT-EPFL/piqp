@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- New method `backward()` on the dense and sparse solvers which computes the gradients of a loss with respect to the problem data (P, c, A, b, G, h_l, h_u, x_l, x_u) by implicit differentiation of the KKT conditions at the solution, given the gradients with respect to the solution (x, y, z, s). The gradients are available via `gradients()` (C++ interface only for now). By passing a stored `forward_result`, the gradients can be computed at the result of an earlier solve, e.g. for rollouts
+- New setting `enable_backward`, which has to be set before `setup()` to use `backward()`. It allocates the gradient storage in `setup()`, such that `backward()` does not allocate
+- New settings `gradient_smoothing`, `gradient_smoothing_mu`, `gradient_smoothing_tol` and `gradient_smoothing_max_iter`: with `gradient_smoothing` enabled, `backward()` differentiates at a relaxed point with `s * z = mu`, which makes the gradient smooth across active-set changes
+
 ## [0.7.0] - 2026-11-05
 
 ### Added
