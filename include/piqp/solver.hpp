@@ -90,6 +90,7 @@ protected:
     GradientsType m_gradients;
     bool m_backward_ready = false;               // a valid solve of the current data is available
     bool m_gradients_allocated = false;
+    bool m_gradients_valid = false;              // gradients() holds the result of a successful backward()
 
 public:
     SolverBase();
@@ -124,23 +125,33 @@ public:
      * settings.enable_backward has to be set before setup(), which allocates the gradient storage,
      * such that backward() does not allocate.
      *
-     * @return PIQP_SOLVED on success, PIQP_INVALID_SETTINGS if settings.enable_backward was not set
-     *         before setup(), PIQP_UNSOLVED if no valid solution is available or the dimensions mismatch,
-     *         PIQP_NUMERICS if the KKT factorization or solve failed.
+     * gradients() must only be consumed if gradients_valid() is true. Every call first invalidates
+     * the gradients, which only become valid again once the call returns BackwardStatus::PIQP_BWD_SOLVED.
+     *
+     * @return PIQP_BWD_SOLVED on success,
+     *         PIQP_BWD_INVALID_SETTINGS if settings.enable_backward was not set before setup() or a gradient
+     *         vector has wrong dimensions,
+     *         PIQP_BWD_INVALID_FORWARD_RESULT if no forward_result is provided and the solver is not setup or no
+     *         valid solve() of the current data is available, or if forward_result has an invalid status,
+     *         dimensions, regularization, or non-interior slacks/duals on finite bounds,
+     *         PIQP_BWD_NUMERICS if a KKT factorization or solve failed,
+     *         PIQP_BWD_MAX_ITER_REACHED if gradient smoothing did not converge.
      */
-    Status backward(const optional<CVecRef<T>>& grad_x = nullopt,
-                    const optional<CVecRef<T>>& grad_y = nullopt,
-                    const optional<CVecRef<T>>& grad_z_l = nullopt,
-                    const optional<CVecRef<T>>& grad_z_u = nullopt,
-                    const optional<CVecRef<T>>& grad_z_bl = nullopt,
-                    const optional<CVecRef<T>>& grad_z_bu = nullopt,
-                    const optional<CVecRef<T>>& grad_s_l = nullopt,
-                    const optional<CVecRef<T>>& grad_s_u = nullopt,
-                    const optional<CVecRef<T>>& grad_s_bl = nullopt,
-                    const optional<CVecRef<T>>& grad_s_bu = nullopt,
-                    const optional<Result<T>>& forward_result = nullopt);
+    BackwardStatus backward(const optional<CVecRef<T>>& grad_x = nullopt,
+                            const optional<CVecRef<T>>& grad_y = nullopt,
+                            const optional<CVecRef<T>>& grad_z_l = nullopt,
+                            const optional<CVecRef<T>>& grad_z_u = nullopt,
+                            const optional<CVecRef<T>>& grad_z_bl = nullopt,
+                            const optional<CVecRef<T>>& grad_z_bu = nullopt,
+                            const optional<CVecRef<T>>& grad_s_l = nullopt,
+                            const optional<CVecRef<T>>& grad_s_u = nullopt,
+                            const optional<CVecRef<T>>& grad_s_bl = nullopt,
+                            const optional<CVecRef<T>>& grad_s_bu = nullopt,
+                            const optional<Result<T>>& forward_result = nullopt);
 
     const GradientsType& gradients() const { return m_gradients; }
+
+    bool gradients_valid() const { return m_gradients_valid; }
 
 protected:
     void setup_impl(const CMatRefType& P,
@@ -213,7 +224,7 @@ protected:
 
     bool factor_backward_kkt(const Variables<T>& vars_scaled, const T& rho, const T& delta);
 
-    Status run_gradient_smoothing(const Variables<T>& start_scaled, const T& rho, const T& delta);
+    BackwardStatus run_gradient_smoothing(const Variables<T>& start_scaled, const T& rho, const T& delta);
 
     T smoothing_residual(const Variables<T>& vars, const T& mu);
 

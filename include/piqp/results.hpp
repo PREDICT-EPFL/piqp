@@ -41,6 +41,28 @@ constexpr const char* status_to_string(Status status)
     }
 }
 
+enum BackwardStatus
+{
+    PIQP_BWD_SOLVED = 1,
+    PIQP_BWD_INVALID_SETTINGS = -1,
+    PIQP_BWD_INVALID_FORWARD_RESULT = -2,
+    PIQP_BWD_NUMERICS = -3,
+    PIQP_BWD_MAX_ITER_REACHED = -4
+};
+
+constexpr const char* backward_status_to_string(BackwardStatus status)
+{
+    switch (status)
+    {
+        case BackwardStatus::PIQP_BWD_SOLVED: return "success";
+        case BackwardStatus::PIQP_BWD_INVALID_SETTINGS: return "invalid settings";
+        case BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT: return "invalid forward result";
+        case BackwardStatus::PIQP_BWD_NUMERICS: return "numerics issue";
+        case BackwardStatus::PIQP_BWD_MAX_ITER_REACHED: return "smoothing not converged";
+        default: return "unknown";
+    }
+}
+
 template<typename T>
 struct Info
 {
