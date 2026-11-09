@@ -5,7 +5,8 @@ import numpy.typing
 from piqp import instruction_set
 import scipy.sparse
 import typing
-__all__: list[str] = ['DenseSolver', 'Info', 'KKTSolver', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseSolver', 'Status', 'dense_cholesky', 'instruction_set', 'sparse_ldlt', 'sparse_ldlt_cond', 'sparse_ldlt_eq_cond', 'sparse_ldlt_ineq_cond', 'sparse_multistage', 'sparse_multistage_parallel']
+__all__: list[str] = ['DenseGradients', 'DenseSolver', 'Info', 'KKTSolver', 'PIQP_BWD_INVALID_FORWARD_RESULT', 'PIQP_BWD_INVALID_SETTINGS', 'PIQP_BWD_MAX_ITER_REACHED', 'PIQP_BWD_NUMERICS', 'PIQP_BWD_SOLVED', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseGradients', 'SparseSolver', 'Status', 'BackwardStatus', 'dense_cholesky', 'instruction_set', 'sparse_ldlt', 'sparse_ldlt_cond', 'sparse_ldlt_eq_cond', 'sparse_ldlt_ineq_cond', 'sparse_multistage', 'sparse_multistage_parallel']
+
 class DenseSolver:
     def __init__(self: DenseSolver) -> None:
         ...
@@ -14,6 +15,14 @@ class DenseSolver:
     def solve(self: DenseSolver) -> Status:
         ...
     def update(self: DenseSolver, P: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, A: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
+        ...
+    def backward(self: DenseSolver, grad_x: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_y: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, forward_result: Result | None = None) -> BackwardStatus:
+        ...
+    @property
+    def gradients(self) -> DenseGradients:
+        ...
+    @property
+    def gradients_valid(self) -> bool:
         ...
     @property
     def result(self) -> Result:
@@ -280,6 +289,8 @@ class KKTSolver:
         ...
 class Result:
     info: Info
+    def __init__(self: Result) -> None:
+        ...
     @property
     def s_bl(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
         ...
@@ -343,6 +354,8 @@ class Result:
 class Settings:
     check_duality_gap: bool
     compute_timings: bool
+    enable_backward: bool
+    gradient_smoothing: bool
     iterative_refinement_always_enabled: bool
     kkt_solver: KKTSolver
     preconditioner_reuse_on_update: bool
@@ -389,6 +402,24 @@ class Settings:
         ...
     @eps_rel.setter
     def eps_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def gradient_smoothing_max_iter(self) -> int:
+        ...
+    @gradient_smoothing_max_iter.setter
+    def gradient_smoothing_max_iter(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def gradient_smoothing_mu(self) -> float:
+        ...
+    @gradient_smoothing_mu.setter
+    def gradient_smoothing_mu(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def gradient_smoothing_tol(self) -> float:
+        ...
+    @gradient_smoothing_tol.setter
+    def gradient_smoothing_tol(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
         ...
     @property
     def infeasibility_threshold(self) -> float:
@@ -492,6 +523,34 @@ class Settings:
     @tau.setter
     def tau(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
         ...
+class SparseGradients:
+    @property
+    def A(self) -> scipy.sparse.csc_matrix[numpy.float64]:
+        ...
+    @property
+    def G(self) -> scipy.sparse.csc_matrix[numpy.float64]:
+        ...
+    @property
+    def P(self) -> scipy.sparse.csc_matrix[numpy.float64]:
+        ...
+    @property
+    def b(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def c(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def h_l(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def h_u(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def x_l(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def x_u(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
 class SparseSolver:
     def __init__(self: SparseSolver) -> None:
         ...
@@ -500,6 +559,14 @@ class SparseSolver:
     def solve(self: SparseSolver) -> Status:
         ...
     def update(self: SparseSolver, P: scipy.sparse.csc_matrix[numpy.float64] | None = None, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, A: scipy.sparse.csc_matrix[numpy.float64] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: scipy.sparse.csc_matrix[numpy.float64] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
+        ...
+    def backward(self: SparseSolver, grad_x: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_y: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, forward_result: Result | None = None) -> BackwardStatus:
+        ...
+    @property
+    def gradients(self) -> SparseGradients:
+        ...
+    @property
+    def gradients_valid(self) -> bool:
         ...
     @property
     def result(self) -> Result:
@@ -562,6 +629,80 @@ class Status:
     @property
     def value(self) -> int:
         ...
+class BackwardStatus:
+    """
+    Members:
+    
+      PIQP_BWD_SOLVED
+    
+      PIQP_BWD_INVALID_SETTINGS
+    
+      PIQP_BWD_INVALID_FORWARD_RESULT
+    
+      PIQP_BWD_NUMERICS
+    
+      PIQP_BWD_MAX_ITER_REACHED
+    """
+    PIQP_BWD_INVALID_FORWARD_RESULT: typing.ClassVar[BackwardStatus]  # value = <BackwardStatus.PIQP_BWD_INVALID_FORWARD_RESULT: -2>
+    PIQP_BWD_INVALID_SETTINGS: typing.ClassVar[BackwardStatus]  # value = <BackwardStatus.PIQP_BWD_INVALID_SETTINGS: -1>
+    PIQP_BWD_MAX_ITER_REACHED: typing.ClassVar[BackwardStatus]  # value = <BackwardStatus.PIQP_BWD_MAX_ITER_REACHED: -4>
+    PIQP_BWD_NUMERICS: typing.ClassVar[BackwardStatus]  # value = <BackwardStatus.PIQP_BWD_NUMERICS: -3>
+    PIQP_BWD_SOLVED: typing.ClassVar[BackwardStatus]  # value = <BackwardStatus.PIQP_BWD_SOLVED: 1>
+    __members__: typing.ClassVar[dict[str, BackwardStatus]]  # value = {'PIQP_BWD_SOLVED': <BackwardStatus.PIQP_BWD_SOLVED: 1>, 'PIQP_BWD_INVALID_SETTINGS': <BackwardStatus.PIQP_BWD_INVALID_SETTINGS: -1>, 'PIQP_BWD_INVALID_FORWARD_RESULT': <BackwardStatus.PIQP_BWD_INVALID_FORWARD_RESULT: -2>, 'PIQP_BWD_NUMERICS': <BackwardStatus.PIQP_BWD_NUMERICS: -3>, 'PIQP_BWD_MAX_ITER_REACHED': <BackwardStatus.PIQP_BWD_MAX_ITER_REACHED: -4>}
+    def __eq__(self, other: typing.Any) -> bool:
+        ...
+    def __getstate__(self) -> int:
+        ...
+    def __hash__(self) -> int:
+        ...
+    def __index__(self: BackwardStatus) -> int:
+        ...
+    def __init__(self: BackwardStatus, value: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    def __int__(self: BackwardStatus) -> int:
+        ...
+    def __ne__(self, other: typing.Any) -> bool:
+        ...
+    def __repr__(self) -> str:
+        ...
+    def __setstate__(self: BackwardStatus, state: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    def __str__(self) -> str:
+        ...
+    @property
+    def name(self) -> str:
+        ...
+    @property
+    def value(self) -> int:
+        ...
+class DenseGradients:
+    @property
+    def A(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
+        ...
+    @property
+    def G(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
+        ...
+    @property
+    def P(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
+        ...
+    @property
+    def b(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def c(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def h_l(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def h_u(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def x_l(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
+    @property
+    def x_u(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
+        ...
 PIQP_DUAL_INFEASIBLE: Status  # value = <Status.PIQP_DUAL_INFEASIBLE: -3>
 PIQP_INVALID_SETTINGS: Status  # value = <Status.PIQP_INVALID_SETTINGS: -10>
 PIQP_MAX_ITER_REACHED: Status  # value = <Status.PIQP_MAX_ITER_REACHED: -1>
@@ -569,6 +710,11 @@ PIQP_NUMERICS: Status  # value = <Status.PIQP_NUMERICS: -8>
 PIQP_PRIMAL_INFEASIBLE: Status  # value = <Status.PIQP_PRIMAL_INFEASIBLE: -2>
 PIQP_SOLVED: Status  # value = <Status.PIQP_SOLVED: 1>
 PIQP_UNSOLVED: Status  # value = <Status.PIQP_UNSOLVED: -9>
+PIQP_BWD_INVALID_FORWARD_RESULT: BackwardStatus  # value = <BackwardStatus.PIQP_BWD_INVALID_FORWARD_RESULT: -2>
+PIQP_BWD_INVALID_SETTINGS: BackwardStatus  # value = <BackwardStatus.PIQP_BWD_INVALID_SETTINGS: -1>
+PIQP_BWD_MAX_ITER_REACHED: BackwardStatus  # value = <BackwardStatus.PIQP_BWD_MAX_ITER_REACHED: -4>
+PIQP_BWD_NUMERICS: BackwardStatus  # value = <BackwardStatus.PIQP_BWD_NUMERICS: -3>
+PIQP_BWD_SOLVED: BackwardStatus  # value = <BackwardStatus.PIQP_BWD_SOLVED: 1>
 __version__: str = '0.7.0'
 dense_cholesky: KKTSolver  # value = <KKTSolver.dense_cholesky: 0>
 sparse_ldlt: KKTSolver  # value = <KKTSolver.sparse_ldlt: 1>

@@ -38,6 +38,14 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .value("PIQP_INVALID_SETTINGS", piqp::Status::PIQP_INVALID_SETTINGS)
         .export_values();
 
+    py::enum_<piqp::BackwardStatus>(m, "BackwardStatus", py::module_local())
+        .value("PIQP_BWD_SOLVED", piqp::BackwardStatus::PIQP_BWD_SOLVED)
+        .value("PIQP_BWD_INVALID_SETTINGS", piqp::BackwardStatus::PIQP_BWD_INVALID_SETTINGS)
+        .value("PIQP_BWD_INVALID_FORWARD_RESULT", piqp::BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT)
+        .value("PIQP_BWD_NUMERICS", piqp::BackwardStatus::PIQP_BWD_NUMERICS)
+        .value("PIQP_BWD_MAX_ITER_REACHED", piqp::BackwardStatus::PIQP_BWD_MAX_ITER_REACHED)
+        .export_values();
+
     py::class_<piqp::Info<T>>(m, "Info", py::module_local())
         .def(py::init<>())
         .def_readwrite("status", &piqp::Info<T>::status)
@@ -76,6 +84,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("run_time", &piqp::Info<T>::run_time);
 
     py::class_<piqp::Result<T>>(m, "Result", py::module_local())
+        .def(py::init<>())
         .def_readwrite("x", &piqp::Result<T>::x)
         .def_readwrite("y", &piqp::Result<T>::y)
         .def_readwrite("z_l", &piqp::Result<T>::z_l)
@@ -128,8 +137,37 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("iterative_refinement_min_improvement_rate", &piqp::Settings<T>::iterative_refinement_min_improvement_rate)
         .def_readwrite("iterative_refinement_static_regularization_eps", &piqp::Settings<T>::iterative_refinement_static_regularization_eps)
         .def_readwrite("iterative_refinement_static_regularization_rel", &piqp::Settings<T>::iterative_refinement_static_regularization_rel)
+        .def_readwrite("enable_backward", &piqp::Settings<T>::enable_backward)
+        .def_readwrite("gradient_smoothing", &piqp::Settings<T>::gradient_smoothing)
+        .def_readwrite("gradient_smoothing_mu", &piqp::Settings<T>::gradient_smoothing_mu)
+        .def_readwrite("gradient_smoothing_tol", &piqp::Settings<T>::gradient_smoothing_tol)
+        .def_readwrite("gradient_smoothing_max_iter", &piqp::Settings<T>::gradient_smoothing_max_iter)
         .def_readwrite("verbose", &piqp::Settings<T>::verbose)
         .def_readwrite("compute_timings", &piqp::Settings<T>::compute_timings);
+
+    using DenseGradients = piqp::dense::Gradients<T>;
+    py::class_<DenseGradients>(m, "DenseGradients", py::module_local())
+        .def_readonly("P", &DenseGradients::P)
+        .def_readonly("c", &DenseGradients::c)
+        .def_readonly("A", &DenseGradients::A)
+        .def_readonly("b", &DenseGradients::b)
+        .def_readonly("G", &DenseGradients::G)
+        .def_readonly("h_l", &DenseGradients::h_l)
+        .def_readonly("h_u", &DenseGradients::h_u)
+        .def_readonly("x_l", &DenseGradients::x_l)
+        .def_readonly("x_u", &DenseGradients::x_u);
+
+    using SparseGradients = piqp::sparse::Gradients<T, I>;
+    py::class_<SparseGradients>(m, "SparseGradients", py::module_local())
+        .def_readonly("P", &SparseGradients::P)
+        .def_readonly("c", &SparseGradients::c)
+        .def_readonly("A", &SparseGradients::A)
+        .def_readonly("b", &SparseGradients::b)
+        .def_readonly("G", &SparseGradients::G)
+        .def_readonly("h_l", &SparseGradients::h_l)
+        .def_readonly("h_u", &SparseGradients::h_u)
+        .def_readonly("x_l", &SparseGradients::x_l)
+        .def_readonly("x_u", &SparseGradients::x_u);
 
     using SparseSolver = piqp::SparseSolver<T, I>;
     py::class_<SparseSolver>(m, "SparseSolver", py::module_local())
@@ -172,7 +210,16 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
              py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
              py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
-        .def("solve", &SparseSolver::solve);
+        .def("solve", &SparseSolver::solve)
+        .def("backward", &SparseSolver::backward,
+             py::arg("grad_x") = piqp::nullopt, py::arg("grad_y") = piqp::nullopt,
+             py::arg("grad_z_l") = piqp::nullopt, py::arg("grad_z_u") = piqp::nullopt,
+             py::arg("grad_z_bl") = piqp::nullopt, py::arg("grad_z_bu") = piqp::nullopt,
+             py::arg("grad_s_l") = piqp::nullopt, py::arg("grad_s_u") = piqp::nullopt,
+             py::arg("grad_s_bl") = piqp::nullopt, py::arg("grad_s_bu") = piqp::nullopt,
+             py::arg("forward_result") = piqp::nullopt)
+        .def_property_readonly("gradients", &SparseSolver::gradients)
+        .def_property_readonly("gradients_valid", &SparseSolver::gradients_valid);
 
     using DenseSolver = piqp::DenseSolver<T>;
     py::class_<DenseSolver>(m, "DenseSolver", py::module_local())
@@ -189,7 +236,16 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
              py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
              py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
-        .def("solve", &DenseSolver::solve);
+        .def("solve", &DenseSolver::solve)
+        .def("backward", &DenseSolver::backward,
+             py::arg("grad_x") = piqp::nullopt, py::arg("grad_y") = piqp::nullopt,
+             py::arg("grad_z_l") = piqp::nullopt, py::arg("grad_z_u") = piqp::nullopt,
+             py::arg("grad_z_bl") = piqp::nullopt, py::arg("grad_z_bu") = piqp::nullopt,
+             py::arg("grad_s_l") = piqp::nullopt, py::arg("grad_s_u") = piqp::nullopt,
+             py::arg("grad_s_bl") = piqp::nullopt, py::arg("grad_s_bu") = piqp::nullopt,
+             py::arg("forward_result") = piqp::nullopt)
+        .def_property_readonly("gradients", &DenseSolver::gradients)
+        .def_property_readonly("gradients_valid", &DenseSolver::gradients_valid);
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
