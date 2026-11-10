@@ -357,10 +357,11 @@ classdef piqp < handle
         function grads = backward(this, varargin)
             % BACKWARD compute the gradients of a scalar loss L w.r.t. the problem data.
             %
-            %   grads = backward('x', dL_dx, 'y', dL_dy, ...) or backward(struct)
+            %   grads = backward('grad_x', dL_dx, 'grad_y', dL_dy, ...) or backward(struct)
             %
-            %   Allowed fields are the gradients of L w.r.t. the solution
-            %   x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu (missing ones are zero)
+            %   Allowed fields are the gradients of L w.r.t. the solution grad_x, grad_y,
+            %   grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl,
+            %   grad_s_bu (missing ones are zero)
             %   and forward_result, a result returned by solve() at which the
             %   gradients are computed (default: the result of the last solve()).
             %   Requires the setting enable_backward to be set in setup().
@@ -370,7 +371,7 @@ classdef piqp < handle
 
             assert(this.n ~= 0, 'Problem is not initialized.')
 
-            gradFields = {'x','y','z_l','z_u','z_bl','z_bu','s_l','s_u','s_bl','s_bu'};
+            gradFields = {'grad_x','grad_y','grad_z_l','grad_z_u','grad_z_bl','grad_z_bu','grad_s_l','grad_s_u','grad_s_bl','grad_s_bu'};
             gradSizes = [this.n, this.p, this.m, this.m, this.n, this.n, this.m, this.m, this.n, this.n];
             allowedFields = [gradFields, {'forward_result'}];
 

@@ -125,8 +125,8 @@ solver.update_settings('enable_backward', true);
 solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
 result = solver.solve();
 
-% name/value pairs or a struct with the fields x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu, forward_result
-grads = solver.backward('x', dL_dx);
+% name/value pairs or a struct with the fields grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, forward_result
+grads = solver.backward('grad_x', dL_dx);
 if grads.status_val == 1  % PIQP_SOLVED
     dL_dc = grads.c;  % P, c, A, b, G, h_l, h_u, x_l, x_u
 end

@@ -183,9 +183,7 @@ typedef struct {
 } piqp_result;
 
 typedef struct {
-    // the gradients are only valid if status is PIQP_SOLVED; status of the last piqp_backward(),
-    // PIQP_UNSOLVED if piqp_backward() was not called yet or the problem changed since (setup, update)
-    piqp_status status;
+    piqp_status status;    // the gradients are only valid if status is PIQP_SOLVED
 
     const piqp_float* P;   // dense interface: gradient w.r.t. P (size n x n, row-major, symmetric), NULL for sparse
     const piqp_float* A;   // dense interface: gradient w.r.t. A (size p x n, row-major), NULL for sparse

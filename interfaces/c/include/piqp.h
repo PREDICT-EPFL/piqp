@@ -40,7 +40,6 @@ void piqp_update_sparse(piqp_workspace* workspace,
 
 piqp_status piqp_solve(piqp_workspace* workspace);
 
-// The returned status is also stored in workspace->gradients->status (if workspace->gradients is not NULL).
 piqp_status piqp_backward(piqp_workspace* workspace,
                           const piqp_float* grad_x, const piqp_float* grad_y,
                           const piqp_float* grad_z_l, const piqp_float* grad_z_u,

@@ -137,7 +137,7 @@ classdef simple_tests < matlab.unittest.TestCase
 
         function backward_not_enabled(testCase)
             testCase.solver_dense.solve();
-            grads = testCase.solver_dense.backward('x', [1; 2]);
+            grads = testCase.solver_dense.backward('grad_x', [1; 2]);
             testCase.verifyEqual(grads.status_val, -10) % PIQP_INVALID_SETTINGS
             testCase.verifyEmpty(grads.c)
         end
@@ -156,12 +156,12 @@ classdef simple_tests < matlab.unittest.TestCase
         function check_backward(testCase, backend)
             % loss L = x1 + 2 x2 + y
             solver = setup_backward_solver(testCase, backend, testCase.c);
-            grads = solver.backward('x', [1; 2], 'y', 1);
+            grads = solver.backward('grad_x', [1; 2], 'grad_y', 1);
             testCase.verifyEqual(grads.status_val, -9) % PIQP_UNSOLVED (no forward solution)
             testCase.verifyEmpty(grads.c)
 
             res = solver.solve();
-            grads = solver.backward('x', [1; 2], 'y', 1);
+            grads = solver.backward('grad_x', [1; 2], 'grad_y', 1);
             testCase.verifyEqual(grads.status_val, 1) % PIQP_SOLVED
 
             % finite differences w.r.t. c
@@ -180,12 +180,12 @@ classdef simple_tests < matlab.unittest.TestCase
 
             % gradients at a provided forward result; the default call reuses the factorization of the
             % forward solve (second-to-last iterate), the forward result is refactorized
-            grads_fr = solver.backward(struct('x', [1; 2], 'y', 1, 'forward_result', res));
+            grads_fr = solver.backward(struct('grad_x', [1; 2], 'grad_y', 1, 'forward_result', res));
             testCase.verifyEqual(grads_fr.status_val, 1)
             testCase.verifyEqual(grads_fr.c, grads.c, 'AbsTol', 1e-6)
 
             res.info.rho = 0;
-            grads_fr = solver.backward('x', [1; 2], 'forward_result', res);
+            grads_fr = solver.backward('grad_x', [1; 2], 'forward_result', res);
             testCase.verifyEqual(grads_fr.status_val, -10) % PIQP_INVALID_SETTINGS (invalid forward result)
         end
 
