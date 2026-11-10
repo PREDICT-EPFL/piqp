@@ -472,6 +472,29 @@ T inner(const piqp::SparseMat<T, I>& g, const piqp::SparseMat<T, I>& d)
     return sum;
 }
 
+// the gradient w.r.t. P is symmetric: dense matrices are symmetric, sparse ones (on the sparsity pattern
+// of the P passed to setup()) have equal values on mirrored entries if both are stored
+template<typename T>
+void expect_symmetric_values(const piqp::Mat<T>& P)
+{
+    EXPECT_TRUE(P.isApprox(P.transpose(), 1e-12));
+}
+
+template<typename T, typename I>
+void expect_symmetric_values(const piqp::SparseMat<T, I>& P)
+{
+    for (piqp::isize j = 0; j < P.outerSize(); j++)
+    {
+        for (typename piqp::SparseMat<T, I>::InnerIterator it(P, j); it; ++it)
+        {
+            for (typename piqp::SparseMat<T, I>::InnerIterator it_t(P, it.row()); it_t; ++it_t)
+            {
+                if (it_t.row() == it.col()) EXPECT_NEAR(it_t.value(), it.value(), 1e-12);
+            }
+        }
+    }
+}
+
 // <gradients, d>; the upper triangular dP acts as the symmetric perturbation dP + dP^T - diag(dP)
 template<typename Grads, typename Model>
 typename Model::T directional_derivative(const Grads& g, const Model& d)
@@ -574,8 +597,7 @@ void run_finite_difference_test(Solver& solver, const Model& model, const Active
     e.x(0) = T(0);
     const auto& g = solver.gradients();
 
-    decltype(g.P) P_T = g.P.transpose();
-    EXPECT_TRUE(g.P.isApprox(P_T, 1e-12));
+    expect_symmetric_values(g.P);
 
     // infinite bounds and disabled rows have zero gradients
     for (piqp::isize i = 0; i < model.G.rows(); i++)

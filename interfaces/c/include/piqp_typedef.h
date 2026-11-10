@@ -190,9 +190,9 @@ typedef struct {
     const piqp_float* P;   // dense interface: gradient w.r.t. P (size n x n, row-major, symmetric), NULL for sparse
     const piqp_float* A;   // dense interface: gradient w.r.t. A (size p x n, row-major), NULL for sparse
     const piqp_float* G;   // dense interface: gradient w.r.t. G (size m x n, row-major), NULL for sparse
-    const piqp_csc* P_csc; // sparse interface: gradient w.r.t. P (size n x n, both triangles), NULL for dense
-    const piqp_csc* A_csc; // sparse interface: gradient w.r.t. A (size p x n, sparsity pattern of A), NULL for dense
-    const piqp_csc* G_csc; // sparse interface: gradient w.r.t. G (size m x n, sparsity pattern of G), NULL for dense
+    const piqp_csc* P_csc; // sparse interface: gradient w.r.t. P (size n x n, sparsity pattern of the P passed to setup), NULL for dense
+    const piqp_csc* A_csc; // sparse interface: gradient w.r.t. A (size p x n, sparsity pattern of the A passed to setup), NULL for dense
+    const piqp_csc* G_csc; // sparse interface: gradient w.r.t. G (size m x n, sparsity pattern of the G passed to setup), NULL for dense
     const piqp_float* c;   // gradient w.r.t. c (size n)
     const piqp_float* b;   // gradient w.r.t. b (size p)
     const piqp_float* h_l; // gradient w.r.t. h_l (size m), zero for infinite bounds

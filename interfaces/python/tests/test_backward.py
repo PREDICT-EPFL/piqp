@@ -106,7 +106,9 @@ def test_backward_finite_differences(dense):
                     if j < i:
                         continue
                     expected = finite_difference(dense, name, (i, j), symmetric=True)
-                    analytic = grad[i, j] + grad[j, i] if i != j else grad[i, j]
+                    # the gradient w.r.t. the symmetric P is 0.5 * (lam_x x^T + x lam_x^T), the symmetric perturbation
+                    # of the entries (i, j) and (j, i) counts it twice (the sparse gradient is upper triangular here)
+                    analytic = 2.0 * grad[i, j] if i != j else grad[i, j]
                 else:
                     expected = finite_difference(dense, name, (i, j))
                     analytic = grad[i, j]
@@ -184,6 +186,43 @@ def test_backward_failures(dense):
     solver.update(c=c)
     assert solver.gradients.status == piqp.PIQP_UNSOLVED
     assert solver.backward(grad_x=w_x) == piqp.PIQP_UNSOLVED
+
+
+
+def test_sparse_gradients_are_views():
+    data = base_data()
+    solver = make_solver(False, data)
+    assert solver.solve() == piqp.PIQP_SOLVED
+    assert solver.backward(grad_x=w_x) == piqp.PIQP_SOLVED
+    grads = solver.gradients
+    gP, gA, gG = grads.P, grads.A, grads.G
+    for M in (gP, gA, gG):
+        assert isinstance(M, sparse.csc_matrix)
+        assert not M.data.flags.writeable
+    # the sparsity pattern of the P passed to setup(), here upper triangular
+    P_triu = sparse.csc_matrix(np.triu(data["P"]))
+    np.testing.assert_array_equal(gP.indptr, P_triu.indptr)
+    np.testing.assert_array_equal(gP.indices, P_triu.indices)
+    # read-only, but the usual operations work on the views
+    with pytest.raises(ValueError):
+        gP.data[0] = 1.0
+    np.testing.assert_allclose(gP.sum(), gP.toarray().sum())
+    np.testing.assert_allclose(gG @ np.ones(3), gG.toarray() @ np.ones(3))
+
+    # the held matrices reflect the next backward(), which is linear in the gradients w.r.t. the solution
+    gP_before, gG_before = gP.toarray(), gG.toarray()
+    assert solver.backward(grad_x=-w_x) == piqp.PIQP_SOLVED
+    np.testing.assert_allclose(gP.toarray(), -gP_before, atol=1e-12)
+    np.testing.assert_allclose(gG.toarray(), -gG_before, atol=1e-12)
+
+    # setup() with the same sparsity pattern keeps the storage, the views stay valid
+    data["c"] = 2.0 * c
+    solver.setup(sparse.csc_matrix(np.triu(data["P"])), data["c"], sparse.csc_matrix(data["A"]),
+                 data["b"], sparse.csc_matrix(data["G"]), data["h_l"], data["h_u"], data["x_l"], data["x_u"])
+    assert np.shares_memory(gP.data, solver.gradients.P.data)
+    assert solver.solve() == piqp.PIQP_SOLVED
+    assert solver.backward(grad_x=w_x) == piqp.PIQP_SOLVED
+    np.testing.assert_array_equal(gP.toarray(), solver.gradients.P.toarray())
 
 
 if __name__ == "__main__":

@@ -181,6 +181,13 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
 
     init_workspace();
 
+    // the gradients take over the sparsity patterns of the matrices passed by the user
+    m_gradients_allocated = m_settings.enable_backward;
+    if (m_gradients_allocated)
+    {
+        m_gradients.resize(m_data, P, A, G);
+    }
+
     m_preconditioner.init(m_data);
     m_preconditioner.scale_data(m_data,
                                 false,
@@ -414,11 +421,6 @@ void SolverBase<T, I, Preconditioner, MatrixType>::init_workspace()
     m_smoothed.resize(m_data.n, m_data.p, m_data.m);
     m_linearization_point_scaled.resize(m_data.n, m_data.p, m_data.m);
     m_linearization_point.resize(m_data.n, m_data.p, m_data.m);
-    m_gradients_allocated = m_settings.enable_backward;
-    if (m_gradients_allocated)
-    {
-        m_gradients.resize(m_data);
-    }
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>

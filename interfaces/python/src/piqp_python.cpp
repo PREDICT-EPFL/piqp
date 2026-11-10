@@ -27,6 +27,49 @@ struct py::detail::type_caster<tl::nullopt_t> : public py::detail::void_caster<t
 using T = double;
 using I = int;
 
+// scipy.sparse.csc_matrix returned by sparse_matrix_view(), the class gives the correct type in the signature
+template<typename Scalar>
+class ScipyCscMatrix : public py::object
+{
+    static bool check(PyObject*) { return true; }
+public:
+    PYBIND11_OBJECT_DEFAULT(ScipyCscMatrix, object, check)
+};
+
+// same type name as pybind11's Eigen sparse caster, e.g. scipy.sparse.csc_matrix[numpy.float64]
+template<typename Scalar>
+struct py::detail::handle_type_name<ScipyCscMatrix<Scalar>>
+{
+    static constexpr auto name = py::detail::const_name("scipy.sparse.csc_matrix[")
+                                 + py::detail::npy_format_descriptor<Scalar>::name
+                                 + py::detail::const_name("]");
+};
+
+// Read-only scipy.sparse.csc_matrix view into the compressed sparse matrix mat, which is owned by base.
+// The view stays valid as long as the storage of mat is not reallocated.
+template<typename SparseMatType>
+ScipyCscMatrix<typename SparseMatType::Scalar> sparse_matrix_view(const SparseMatType& mat, py::handle base)
+{
+    using Scalar = typename SparseMatType::Scalar;
+    using StorageIndex = typename SparseMatType::StorageIndex;
+    static_assert(!SparseMatType::IsRowMajor, "sparse_matrix_view requires a column-major matrix");
+    if (!mat.isCompressed()) throw std::runtime_error("sparse_matrix_view requires a compressed matrix");
+
+    py::array data = py::array_t<Scalar>(mat.nonZeros(), mat.valuePtr(), base);
+    py::array indices = py::array_t<StorageIndex>(mat.nonZeros(), mat.innerIndexPtr(), base);
+    py::array indptr = py::array_t<StorageIndex>(mat.outerSize() + 1, mat.outerIndexPtr(), base);
+    
+    data.attr("flags").attr("writeable") = false;
+    indices.attr("flags").attr("writeable") = false;
+    indptr.attr("flags").attr("writeable") = false;
+
+    py::object csc = py::module_::import("scipy.sparse").attr("csc_matrix")(
+        py::make_tuple(data, indices, indptr),
+        py::arg("shape") = py::make_tuple(mat.rows(), mat.cols()),
+        py::arg("copy") = false);
+    return csc.cast<ScipyCscMatrix<Scalar>>();
+}
+
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     py::enum_<piqp::Status>(m, "Status", py::module_local())
         .value("PIQP_SOLVED", piqp::Status::PIQP_SOLVED)
@@ -153,11 +196,11 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     using SparseGradients = piqp::sparse::Gradients<T, I>;
     py::class_<SparseGradients>(m, "SparseGradients", py::module_local())
         .def_readonly("status", &SparseGradients::status)
-        .def_readonly("P", &SparseGradients::P)
+        .def_property_readonly("P", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseGradients&>().P, self); })
         .def_readonly("c", &SparseGradients::c)
-        .def_readonly("A", &SparseGradients::A)
+        .def_property_readonly("A", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseGradients&>().A, self); })
         .def_readonly("b", &SparseGradients::b)
-        .def_readonly("G", &SparseGradients::G)
+        .def_property_readonly("G", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseGradients&>().G, self); })
         .def_readonly("h_l", &SparseGradients::h_l)
         .def_readonly("h_u", &SparseGradients::h_u)
         .def_readonly("x_l", &SparseGradients::x_l)

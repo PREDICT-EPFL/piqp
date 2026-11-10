@@ -33,8 +33,8 @@ Let $$K$$ be the Jacobian of the KKT conditions with respect to the primal-dual 
 | $$x_l$$ | $$\lambda_{z_{bl}}$$                                                    |
 | $$x_u$$ | $$-\lambda_{z_{bu}}$$                                                   |
 
-* The gradient with respect to $$P$$ is symmetric and contains both triangles, also if only the upper triangular part of $$P$$ is passed to the solver.
-* The gradients of the sparse solver have the sparsity pattern of the problem data, for $$P$$ the pattern of the full symmetric matrix.
+* The gradient with respect to $$P$$ is the symmetric matrix $$\frac{1}{2}(\lambda_x x^\top + x \lambda_x^\top)$$, i.e., the gradient with respect to $$P$$ as a symmetric matrix, as in, e.g., ProxQP, qpth, and OSQP. The dense solver returns both triangles.
+* The gradients of the sparse solver have the sparsity patterns of the matrices passed to `setup`. In particular, if only the upper triangular part of $$P$$ is passed, the gradient with respect to $$P$$ is upper triangular, and its off-diagonal entries are half of the derivative with respect to the corresponding passed entry, since that entry also sets the lower triangular part of $$P$$.
 * The gradients with respect to infinite bounds, and with respect to the rows of $$G$$ whose bounds are both infinite, are zero. Gradients with respect to infinite slacks are ignored.
 * The gradients with respect to $$z_{bl}, z_{bu}, s_{bl}, s_{bu}$$ have dimension $$n$$, as in the [result]({{site.baseurl}}/api/result).
 
@@ -89,6 +89,8 @@ status = solver.backward(grad_x=dL_dx)
 if status == piqp.PIQP_SOLVED:  # also available as solver.gradients.status
     dL_dc = solver.gradients.c  # P, c, A, b, G, h_l, h_u, x_l, x_u (scipy CSC matrices for the sparse solver)
 ```
+
+The fields of `solver.gradients` are read-only views into the memory of the solver, i.e., no data is copied, also not for the scipy CSC matrices of the sparse solver. They reflect the results of later `backward` calls, and stay valid across `setup` as long as the problem dimensions (dense) or the sparsity patterns of `P`, `A`, and `G` (sparse) do not change. Otherwise, or to keep the gradients of a `backward` call, copy them, e.g., `solver.gradients.c.copy()`.
 
 A result for `forward_result` has to be copied, since `solver.result` refers to the internal memory of the solver:
 

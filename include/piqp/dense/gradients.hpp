@@ -9,6 +9,8 @@
 #define PIQP_DENSE_GRADIENTS_HPP
 
 #include "piqp/typedefs.hpp"
+#include "piqp/utils/optional.hpp"
+#include "piqp/utils/unused.hpp"
 #include "piqp/results.hpp"
 #include "piqp/variables.hpp"
 #include "piqp/dense/data.hpp"
@@ -50,8 +52,12 @@ struct Gradients
     Vec<T> x_l;
     Vec<T> x_u;
 
-    void resize(const Data<T>& data)
+    void resize(const Data<T>& data,
+                const CMatRef<T>& P_in,
+                const optional<CMatRef<T>>& A_in,
+                const optional<CMatRef<T>>& G_in)
     {
+        unused(P_in, A_in, G_in);
         P.resize(data.n, data.n);
         A.resize(data.p, data.n);
         G.resize(data.m, data.n);

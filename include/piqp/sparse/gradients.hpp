@@ -8,7 +8,10 @@
 #ifndef PIQP_SPARSE_GRADIENTS_HPP
 #define PIQP_SPARSE_GRADIENTS_HPP
 
+#include <algorithm>
+
 #include "piqp/typedefs.hpp"
+#include "piqp/utils/optional.hpp"
 #include "piqp/results.hpp"
 #include "piqp/variables.hpp"
 #include "piqp/sparse/data.hpp"
@@ -28,10 +31,10 @@ namespace sparse
  * backward() otherwise.
  *
  * All quantities are in the user's (unscaled) coordinates:
- *   P: n x n, symmetric, dL/dP = 0.5 * (lam_x x^T + x lam_x^T),
- *      sparsity pattern triu(P) + triu(P)^T of the P passed to setup()
- *   A: p x n, sparsity pattern of A
- *   G: m x n, sparsity pattern of G, rows with both bounds infinite are zero
+ *   P: n x n, dL/dP = 0.5 * (lam_x x^T + x lam_x^T) on the sparsity pattern of the P passed to setup(),
+ *      i.e., upper triangular if only the upper triangular part of P is passed
+ *   A: p x n, sparsity pattern of the A passed to setup()
+ *   G: m x n, sparsity pattern of the G passed to setup(), rows with both bounds infinite are zero
  *   c, b, h_l, h_u: entries of infinite bounds are zero
  *   x_l, x_u: full n-length, entries of infinite bounds are zero
  */
@@ -51,21 +54,44 @@ struct Gradients
     Vec<T> x_l;
     Vec<T> x_u;
 
-    // copies the sparsity patterns from data, values are overwritten by compute_from_adjoint()
-    void resize(const Data<T, I>& data)
+    // Takes over the sparsity patterns of the matrices passed to setup(), the values are overwritten by
+    // compute_from_adjoint(). The storage is kept if a pattern is unchanged, such that views into it
+    // (e.g., in the Python interface) stay valid across setup() calls.
+    void resize(const Data<T, I>& data,
+                const CSparseMatRef<T, I>& P_in,
+                const optional<CSparseMatRef<T, I>>& A_in,
+                const optional<CSparseMatRef<T, I>>& G_in)
     {
-        P = data.P_utri.template selfadjointView<Eigen::Upper>();
-        P.makeCompressed();
-        A = data.AT.transpose();
-        A.makeCompressed();
-        G = data.GT.transpose();
-        G.makeCompressed();
+        assign_pattern(P, P_in);
+        if (A_in.has_value()) { assign_pattern(A, *A_in); } else { assign_empty(A, data.p, data.n); }
+        if (G_in.has_value()) { assign_pattern(G, *G_in); } else { assign_empty(G, data.m, data.n); }
         c.resize(data.n);
         b.resize(data.p);
         h_l.resize(data.m);
         h_u.resize(data.m);
         x_l.resize(data.n);
         x_u.resize(data.n);
+    }
+
+    // copies the sparsity pattern (and values) of src into dst, unless dst already has the same pattern
+    static void assign_pattern(SparseMat<T, I>& dst, const CSparseMatRef<T, I>& src)
+    {
+        if (src.isCompressed() && dst.isCompressed()
+            && dst.rows() == src.rows() && dst.cols() == src.cols() && dst.nonZeros() == src.nonZeros()
+            && std::equal(src.outerIndexPtr(), src.outerIndexPtr() + src.outerSize() + 1, dst.outerIndexPtr())
+            && std::equal(src.innerIndexPtr(), src.innerIndexPtr() + src.nonZeros(), dst.innerIndexPtr()))
+        {
+            return;
+        }
+        dst = src;
+        dst.makeCompressed();
+    }
+
+    static void assign_empty(SparseMat<T, I>& dst, isize rows, isize cols)
+    {
+        if (dst.isCompressed() && dst.rows() == rows && dst.cols() == cols && dst.nonZeros() == 0) return;
+        dst.resize(rows, cols);
+        dst.makeCompressed();
     }
 
     // Computes the gradients at the linearization point (user space) from the adjoint variables lambda
