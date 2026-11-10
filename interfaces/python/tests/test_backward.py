@@ -77,8 +77,8 @@ def to_dense(mat):
 def test_backward_finite_differences(dense):
     solver = make_solver(dense, base_data())
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward(grad_x=w_x, grad_y=w_y, grad_z_u=w_z) == piqp.PIQP_BWD_SOLVED
-    assert solver.gradients_valid
+    assert solver.backward(grad_x=w_x, grad_y=w_y, grad_z_u=w_z) == piqp.PIQP_SOLVED
+    assert solver.gradients.status == piqp.PIQP_SOLVED
     grads = solver.gradients
 
     for name in ["c", "b", "h_l", "h_u", "x_l", "x_u"]:
@@ -117,7 +117,7 @@ def test_backward_finite_differences(dense):
 def test_backward_forward_result(dense):
     solver = make_solver(dense, base_data())
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward(grad_x=w_x) == piqp.PIQP_BWD_SOLVED
+    assert solver.backward(grad_x=w_x) == piqp.PIQP_SOLVED
     expected = np.array(solver.gradients.c)
 
     result = piqp.Result()
@@ -127,7 +127,7 @@ def test_backward_forward_result(dense):
 
     # the default call reuses the factorization of the forward solve (second-to-last iterate),
     # the forward result is refactorized, so both agree up to the solver accuracy
-    assert solver.backward(grad_x=w_x, forward_result=result) == piqp.PIQP_BWD_SOLVED
+    assert solver.backward(grad_x=w_x, forward_result=result) == piqp.PIQP_SOLVED
     np.testing.assert_allclose(solver.gradients.c, expected, rtol=1e-6, atol=1e-6)
 
 
@@ -137,7 +137,7 @@ def test_backward_smoothing(dense):
     solver.settings.gradient_smoothing = True
     solver.settings.gradient_smoothing_mu = 1e-3
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward(grad_x=w_x) == piqp.PIQP_BWD_SOLVED
+    assert solver.backward(grad_x=w_x) == piqp.PIQP_SOLVED
     assert np.all(np.isfinite(solver.gradients.c))
 
 
@@ -151,30 +151,39 @@ def test_backward_requires_enable_backward(dense):
     else:
         solver.setup(sparse.csc_matrix(np.triu(data["P"])), data["c"])
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward(grad_x=w_x) == piqp.PIQP_BWD_INVALID_SETTINGS
-    assert not solver.gradients_valid
+    assert solver.backward(grad_x=w_x) == piqp.PIQP_INVALID_SETTINGS
+    assert solver.gradients.status == piqp.PIQP_INVALID_SETTINGS
 
 
 @pytest.mark.parametrize("dense", [True, False])
 def test_backward_failures(dense):
     solver = make_solver(dense, base_data())
-    assert solver.backward(grad_x=w_x) == piqp.PIQP_BWD_INVALID_FORWARD_RESULT
+    assert solver.gradients.status == piqp.PIQP_UNSOLVED
+    assert solver.backward(grad_x=w_x) == piqp.PIQP_UNSOLVED
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward(grad_x=w_x) == piqp.PIQP_BWD_SOLVED
-    assert solver.gradients_valid
+    assert solver.backward(grad_x=w_x) == piqp.PIQP_SOLVED
+    grads = solver.gradients
+    assert grads.status == piqp.PIQP_SOLVED
 
-    # a failed call invalidates the previously computed gradients
-    assert solver.backward(grad_x=np.zeros(4)) == piqp.PIQP_BWD_INVALID_SETTINGS
-    assert not solver.gradients_valid
+    # a failed call invalidates the previously computed gradients, also in previously obtained references
+    assert solver.backward(grad_x=np.zeros(4)) == piqp.PIQP_INVALID_SETTINGS
+    assert grads.status == piqp.PIQP_INVALID_SETTINGS
 
+    # a forward result which is not solved
     result = piqp.Result()
-    assert solver.backward(grad_x=w_x, forward_result=result) == piqp.PIQP_BWD_INVALID_FORWARD_RESULT
-    assert not solver.gradients_valid
+    result.info.status = piqp.PIQP_PRIMAL_INFEASIBLE
+    assert solver.backward(grad_x=w_x, forward_result=result) == piqp.PIQP_UNSOLVED
+    assert solver.gradients.status == piqp.PIQP_UNSOLVED
 
-    assert solver.backward(grad_x=w_x) == piqp.PIQP_BWD_SOLVED
+    # a malformed forward result
+    result.info = solver.result.info
+    assert solver.backward(grad_x=w_x, forward_result=result) == piqp.PIQP_INVALID_SETTINGS
+    assert solver.gradients.status == piqp.PIQP_INVALID_SETTINGS
+
+    assert solver.backward(grad_x=w_x) == piqp.PIQP_SOLVED
     solver.update(c=c)
-    assert not solver.gradients_valid
-    assert solver.backward(grad_x=w_x) == piqp.PIQP_BWD_INVALID_FORWARD_RESULT
+    assert solver.gradients.status == piqp.PIQP_UNSOLVED
+    assert solver.backward(grad_x=w_x) == piqp.PIQP_UNSOLVED
 
 
 if __name__ == "__main__":

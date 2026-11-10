@@ -9,6 +9,7 @@
 #define PIQP_SPARSE_GRADIENTS_HPP
 
 #include "piqp/typedefs.hpp"
+#include "piqp/results.hpp"
 #include "piqp/variables.hpp"
 #include "piqp/sparse/data.hpp"
 
@@ -22,6 +23,10 @@ namespace sparse
  * Gradients of a scalar loss L with respect to the problem data,
  * as computed by SolverBase::backward().
  *
+ * The gradients are only valid if status is PIQP_SOLVED. status is PIQP_UNSOLVED if backward() was not
+ * called yet or the problem changed since (setup(), update()), and the status returned by the last
+ * backward() otherwise.
+ *
  * All quantities are in the user's (unscaled) coordinates:
  *   P: n x n, symmetric, dL/dP = 0.5 * (lam_x x^T + x lam_x^T),
  *      sparsity pattern triu(P) + triu(P)^T of the P passed to setup()
@@ -33,6 +38,8 @@ namespace sparse
 template<typename T, typename I>
 struct Gradients
 {
+    Status status = Status::PIQP_UNSOLVED;
+
     SparseMat<T, I> P;
     SparseMat<T, I> A;
     SparseMat<T, I> G;

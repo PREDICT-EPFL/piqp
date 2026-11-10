@@ -310,14 +310,14 @@ octave_value run_backward(Solver& solver, const octave_value_list& args)
         forward_result = ov_struct_to_result(args(12).scalar_map_value());
     }
 
-    piqp::BackwardStatus status = solver.backward(grads[0], grads[1], grads[2], grads[3], grads[4],
-                                                  grads[5], grads[6], grads[7], grads[8], grads[9],
-                                                  forward_result);
+    piqp::Status status = solver.backward(grads[0], grads[1], grads[2], grads[3], grads[4],
+                                          grads[5], grads[6], grads[7], grads[8], grads[9],
+                                          forward_result);
 
     octave_scalar_map ov_struct;
-    ov_struct.assign("status", octave_value(piqp::backward_status_to_string(status)));
+    ov_struct.assign("status", octave_value(piqp::status_to_string(status)));
     ov_struct.assign("status_val", octave_value((int) status));
-    if (solver.gradients_valid()) {
+    if (status == piqp::Status::PIQP_SOLVED) {
         const auto& g = solver.gradients();
         ov_struct.assign("P", eigen_to_ov(g.P));
         ov_struct.assign("c", eigen_to_ov(g.c));

@@ -138,7 +138,7 @@ classdef simple_tests < matlab.unittest.TestCase
         function backward_not_enabled(testCase)
             testCase.solver_dense.solve();
             grads = testCase.solver_dense.backward('x', [1; 2]);
-            testCase.verifyEqual(grads.status_val, -1) % invalid settings
+            testCase.verifyEqual(grads.status_val, -10) % PIQP_INVALID_SETTINGS
             testCase.verifyEmpty(grads.c)
         end
     end
@@ -157,12 +157,12 @@ classdef simple_tests < matlab.unittest.TestCase
             % loss L = x1 + 2 x2 + y
             solver = setup_backward_solver(testCase, backend, testCase.c);
             grads = solver.backward('x', [1; 2], 'y', 1);
-            testCase.verifyEqual(grads.status_val, -2) % invalid forward result (no forward solution)
+            testCase.verifyEqual(grads.status_val, -9) % PIQP_UNSOLVED (no forward solution)
             testCase.verifyEmpty(grads.c)
 
             res = solver.solve();
             grads = solver.backward('x', [1; 2], 'y', 1);
-            testCase.verifyEqual(grads.status_val, 1) % solved
+            testCase.verifyEqual(grads.status_val, 1) % PIQP_SOLVED
 
             % finite differences w.r.t. c
             eps = 1e-6;
@@ -186,7 +186,7 @@ classdef simple_tests < matlab.unittest.TestCase
 
             res.info.rho = 0;
             grads_fr = solver.backward('x', [1; 2], 'forward_result', res);
-            testCase.verifyEqual(grads_fr.status_val, -2) % invalid forward result
+            testCase.verifyEqual(grads_fr.status_val, -10) % PIQP_INVALID_SETTINGS (invalid forward result)
         end
 
         function L = backward_loss(testCase, backend, c)

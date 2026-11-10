@@ -366,7 +366,7 @@ classdef piqp < handle
             %   Requires the setting enable_backward to be set in setup().
             %
             %   grads has the fields P, c, A, b, G, h_l, h_u, x_l, x_u, which are
-            %   only set if grads.status_val is 1 (PIQP_BWD_SOLVED), and status, status_val.
+            %   only set if grads.status_val is 1 (PIQP_SOLVED), and status, status_val.
 
             assert(this.n ~= 0, 'Problem is not initialized.')
 

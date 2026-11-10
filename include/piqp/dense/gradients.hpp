@@ -9,6 +9,7 @@
 #define PIQP_DENSE_GRADIENTS_HPP
 
 #include "piqp/typedefs.hpp"
+#include "piqp/results.hpp"
 #include "piqp/variables.hpp"
 #include "piqp/dense/data.hpp"
 
@@ -22,6 +23,10 @@ namespace dense
  * Gradients of a scalar loss L with respect to the problem data,
  * as computed by SolverBase::backward().
  *
+ * The gradients are only valid if status is PIQP_SOLVED. status is PIQP_UNSOLVED if backward() was not
+ * called yet or the problem changed since (setup(), update()), and the status returned by the last
+ * backward() otherwise.
+ *
  * All quantities are in the user's (unscaled) coordinates:
  *   P: n x n, symmetric, dL/dP = 0.5 * (lam_x x^T + x lam_x^T)
  *   A: p x n
@@ -32,6 +37,8 @@ namespace dense
 template<typename T>
 struct Gradients
 {
+    Status status = Status::PIQP_UNSOLVED;
+
     Mat<T> P;
     Mat<T> A;
     Mat<T> G;

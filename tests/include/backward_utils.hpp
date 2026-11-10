@@ -132,10 +132,10 @@ void run_no_side_effects_test(Solver& solver, Solver& reference, Model& model)
         SCOPED_TRACE(smoothing ? "with smoothing" : "without smoothing");
         solver.settings().gradient_smoothing = smoothing;
 
-        ASSERT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu), piqp::BackwardStatus::PIQP_BWD_SOLVED);
+        ASSERT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu), piqp::Status::PIQP_SOLVED);
         expect_results_identical(solver.result(), result_before);
 
-        ASSERT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, forward_result), piqp::BackwardStatus::PIQP_BWD_SOLVED);
+        ASSERT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, forward_result), piqp::Status::PIQP_SOLVED);
         expect_results_identical(solver.result(), result_before);
         expect_results_identical(*forward_result, result_before);
     }
@@ -149,7 +149,8 @@ void run_no_side_effects_test(Solver& solver, Solver& reference, Model& model)
     expect_results_identical(solver.result(), reference.result());
 }
 
-// Invalid provided results are rejected.
+// Invalid provided results are rejected: a forward result which is not solved with PIQP_UNSOLVED,
+// a malformed one with PIQP_INVALID_SETTINGS.
 template<typename Solver, typename Model>
 void run_invalid_result_test(Solver& solver, Model& model)
 {
@@ -161,15 +162,15 @@ void run_invalid_result_test(Solver& solver, Model& model)
 
     piqp::optional<piqp::Result<T>> r = solver.result();
     r->info.status = piqp::Status::PIQP_PRIMAL_INFEASIBLE;
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT);
+    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_UNSOLVED);
 
     r = solver.result();
     r->x.resize(r->x.size() + 1);
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT);
+    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
 
     r = solver.result();
     r->info.rho = T(0);
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT);
+    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
 
     // non-positive dual on a finite bound
     piqp::isize i_finite = 0;
@@ -177,16 +178,16 @@ void run_invalid_result_test(Solver& solver, Model& model)
     ASSERT_LT(i_finite, model.h_l.rows());
     r = solver.result();
     r->z_l(i_finite) = T(0);
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT);
+    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
 
     r = solver.result();
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::BackwardStatus::PIQP_BWD_SOLVED);
-    EXPECT_TRUE(solver.gradients_valid());
+    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.gradients().status, piqp::Status::PIQP_SOLVED);
 
     // a rejected forward result invalidates the previously computed gradients
     r->info.delta = T(-1);
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT);
-    EXPECT_FALSE(solver.gradients_valid());
+    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.gradients().status, piqp::Status::PIQP_INVALID_SETTINGS);
 }
 
 /*
@@ -567,8 +568,8 @@ void run_finite_difference_test(Solver& solver, const Model& model, const Active
 
     // gradients are preallocated in setup(), backward() must not allocate
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    ASSERT_EQ(solver.backward(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::BackwardStatus::PIQP_BWD_SOLVED);
-    ASSERT_EQ(solver.backward(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::BackwardStatus::PIQP_BWD_SOLVED);
+    ASSERT_EQ(solver.backward(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::Status::PIQP_SOLVED);
+    ASSERT_EQ(solver.backward(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::Status::PIQP_SOLVED);
     PIQP_EIGEN_MALLOC_ALLOWED();
     e.x(0) = T(0);
     const auto& g = solver.gradients();
@@ -598,7 +599,7 @@ void run_finite_difference_test(Solver& solver, const Model& model, const Active
             if ((result.*f.field)(k) >= PIQP_INF) continue;
 
             e_f(k) = T(1);
-            ASSERT_EQ(solver.backward(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::BackwardStatus::PIQP_BWD_SOLVED);
+            ASSERT_EQ(solver.backward(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::Status::PIQP_SOLVED);
             e_f(k) = T(0);
 
             // the directions have unit norm, i.e. |<g - g_exact, d>| <= ||g - g_exact||, so the tolerance is relative to ||g||
@@ -658,8 +659,8 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
                 piqp::Vec<T> grad_x = piqp::Vec<T>::Constant(1, w_x);
                 piqp::Vec<T> grad_s_bl = piqp::Vec<T>::Constant(1, w_s);
                 ASSERT_EQ(solver.backward(grad_x, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt,
-                                          piqp::nullopt, piqp::nullopt, grad_s_bl), piqp::BackwardStatus::PIQP_BWD_SOLVED);
-                ASSERT_TRUE(solver.gradients_valid());
+                                          piqp::nullopt, piqp::nullopt, grad_s_bl), piqp::Status::PIQP_SOLVED);
+                ASSERT_EQ(solver.gradients().status, piqp::Status::PIQP_SOLVED);
 
                 T D = std::sqrt(a * a + 4 * mu);
                 T x = (a + D) / 2;

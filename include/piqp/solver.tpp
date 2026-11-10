@@ -154,7 +154,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
     m_backward_ready = false;
     m_forward_factor_valid = false;
     m_gradients_allocated = false;
-    m_gradients_valid = false;
+    m_gradients.status = Status::PIQP_UNSOLVED;
 
     if (P.rows() != m_data.n || P.cols() != m_data.n) { piqp_eprint("P must be square\n"); return; }
     if (A.has_value() && (A->rows() != m_data.p || A->cols() != m_data.n)) { piqp_eprint("A must have correct dimensions\n"); return; }
@@ -230,7 +230,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_impl(const optional<CM
 
     m_backward_ready = false;
     m_forward_factor_valid = false;
-    m_gradients_valid = false;
+    m_gradients.status = Status::PIQP_UNSOLVED;
 
     m_preconditioner.unscale_data(m_data);
 
@@ -1549,89 +1549,105 @@ void SolverBase<T, I, Preconditioner, MatrixType>::restore_dual()
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
-BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::backward(const optional<CVecRef<T>>& grad_x,
-                                                                      const optional<CVecRef<T>>& grad_y,
-                                                                      const optional<CVecRef<T>>& grad_z_l,
-                                                                      const optional<CVecRef<T>>& grad_z_u,
-                                                                      const optional<CVecRef<T>>& grad_z_bl,
-                                                                      const optional<CVecRef<T>>& grad_z_bu,
-                                                                      const optional<CVecRef<T>>& grad_s_l,
-                                                                      const optional<CVecRef<T>>& grad_s_u,
-                                                                      const optional<CVecRef<T>>& grad_s_bl,
-                                                                      const optional<CVecRef<T>>& grad_s_bu,
-                                                                      const optional<Result<T>>& forward_result)
+Status SolverBase<T, I, Preconditioner, MatrixType>::backward(const optional<CVecRef<T>>& grad_x,
+                                                              const optional<CVecRef<T>>& grad_y,
+                                                              const optional<CVecRef<T>>& grad_z_l,
+                                                              const optional<CVecRef<T>>& grad_z_u,
+                                                              const optional<CVecRef<T>>& grad_z_bl,
+                                                              const optional<CVecRef<T>>& grad_z_bu,
+                                                              const optional<CVecRef<T>>& grad_s_l,
+                                                              const optional<CVecRef<T>>& grad_s_u,
+                                                              const optional<CVecRef<T>>& grad_s_bl,
+                                                              const optional<CVecRef<T>>& grad_s_bu,
+                                                              const optional<Result<T>>& forward_result)
+{
+    m_gradients.status = backward_impl(grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
+                                       grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, forward_result);
+    return m_gradients.status;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::backward_impl(const optional<CVecRef<T>>& grad_x,
+                                                                   const optional<CVecRef<T>>& grad_y,
+                                                                   const optional<CVecRef<T>>& grad_z_l,
+                                                                   const optional<CVecRef<T>>& grad_z_u,
+                                                                   const optional<CVecRef<T>>& grad_z_bl,
+                                                                   const optional<CVecRef<T>>& grad_z_bu,
+                                                                   const optional<CVecRef<T>>& grad_s_l,
+                                                                   const optional<CVecRef<T>>& grad_s_u,
+                                                                   const optional<CVecRef<T>>& grad_s_bl,
+                                                                   const optional<CVecRef<T>>& grad_s_bu,
+                                                                   const optional<Result<T>>& forward_result)
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::backward");
-
-    m_gradients_valid = false;
 
     if (!m_setup_done)
     {
         piqp_eprint("Solver not setup yet\n");
-        return BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT;
+        return Status::PIQP_INVALID_SETTINGS;
     }
 
     if (!m_gradients_allocated)
     {
         piqp_eprint("backward() requires settings.enable_backward to be set before setup()\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
 
     if (!forward_result.has_value() && !m_backward_ready)
     {
         piqp_eprint("backward() requires a solve() of the current problem data which returned PIQP_SOLVED or PIQP_MAX_ITER_REACHED\n");
-        return BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT;
+        return Status::PIQP_UNSOLVED;
     }
 
     if (grad_x.has_value() && grad_x->size() != m_data.n)
     {
         piqp_eprint("grad_x has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (grad_y.has_value() && grad_y->size() != m_data.p)
     {
         piqp_eprint("grad_y has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (grad_z_l.has_value() && grad_z_l->size() != m_data.m)
     {
         piqp_eprint("grad_z_l has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (grad_z_u.has_value() && grad_z_u->size() != m_data.m)
     {
         piqp_eprint("grad_z_u has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (grad_z_bl.has_value() && grad_z_bl->size() != m_data.n)
     {
         piqp_eprint("grad_z_bl has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (grad_z_bu.has_value() && grad_z_bu->size() != m_data.n)
     {
         piqp_eprint("grad_z_bu has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (grad_s_l.has_value() && grad_s_l->size() != m_data.m)
     {
         piqp_eprint("grad_s_l has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (grad_s_u.has_value() && grad_s_u->size() != m_data.m)
     {
         piqp_eprint("grad_s_u has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (grad_s_bl.has_value() && grad_s_bl->size() != m_data.n)
     {
         piqp_eprint("grad_s_bl has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (grad_s_bu.has_value() && grad_s_bu->size() != m_data.n)
     {
         piqp_eprint("grad_s_bu has wrong dimensions\n");
-        return BackwardStatus::PIQP_BWD_INVALID_SETTINGS;
+        return Status::PIQP_INVALID_SETTINGS;
     }
 
     // Linearization point: the stored solution or the provided forward result.
@@ -1641,9 +1657,10 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::backward(const opti
     T delta = m_result.info.delta;
     if (forward_result.has_value())
     {
-        if (!scale_backward_point(*forward_result))
+        Status scale_status = scale_backward_point(*forward_result);
+        if (scale_status != Status::PIQP_SOLVED)
         {
-            return BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT;
+            return scale_status;
         }
         linearization_point_scaled = &m_linearization_point_scaled;
         linearization_point = &m_linearization_point;
@@ -1658,8 +1675,8 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::backward(const opti
     if (m_settings.gradient_smoothing)
     {
         // move the linearization point to the relaxed point s * z = mu nearby
-        BackwardStatus smoothing_status = run_gradient_smoothing(*linearization_point_scaled, rho, delta);
-        if (smoothing_status != BackwardStatus::PIQP_BWD_SOLVED)
+        Status smoothing_status = run_gradient_smoothing(*linearization_point_scaled, rho, delta);
+        if (smoothing_status != Status::PIQP_SOLVED)
         {
             return smoothing_status;
         }
@@ -1673,7 +1690,7 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::backward(const opti
         if (!factor_backward_kkt(*linearization_point_scaled, rho, delta))
         {
             piqp_eprint("backward(): KKT factorization at the linearization point failed\n");
-            return BackwardStatus::PIQP_BWD_NUMERICS;
+            return Status::PIQP_NUMERICS;
         }
     }
 
@@ -1686,7 +1703,7 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::backward(const opti
         if (!m_kkt_system.solve(m_data, m_settings, m_adjoint_rhs, m_adjoint))
         {
             piqp_eprint("backward(): adjoint KKT solve failed\n");
-            return BackwardStatus::PIQP_BWD_NUMERICS;
+            return Status::PIQP_NUMERICS;
         }
     }
 
@@ -1696,9 +1713,7 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::backward(const opti
         m_gradients.compute_from_adjoint(m_data, *linearization_point, m_adjoint);
     }
 
-    m_gradients_valid = true;
-
-    return BackwardStatus::PIQP_BWD_SOLVED;
+    return Status::PIQP_SOLVED;
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
@@ -1715,14 +1730,14 @@ bool SolverBase<T, I, Preconditioner, MatrixType>::factor_backward_kkt(const Var
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
-bool SolverBase<T, I, Preconditioner, MatrixType>::scale_backward_point(const Result<T>& forward_result)
+Status SolverBase<T, I, Preconditioner, MatrixType>::scale_backward_point(const Result<T>& forward_result)
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::scale_backward_point");
 
     if (forward_result.info.status != Status::PIQP_SOLVED && forward_result.info.status != Status::PIQP_MAX_ITER_REACHED)
     {
         piqp_eprint("backward(): the provided forward result must have status PIQP_SOLVED or PIQP_MAX_ITER_REACHED\n");
-        return false;
+        return Status::PIQP_UNSOLVED;
     }
     if (forward_result.x.size() != m_data.n || forward_result.y.size() != m_data.p
         || forward_result.z_l.size() != m_data.m || forward_result.z_u.size() != m_data.m
@@ -1731,12 +1746,12 @@ bool SolverBase<T, I, Preconditioner, MatrixType>::scale_backward_point(const Re
         || forward_result.s_bl.size() != m_data.n || forward_result.s_bu.size() != m_data.n)
     {
         piqp_eprint("backward(): the provided forward result has wrong dimensions\n");
-        return false;
+        return Status::PIQP_INVALID_SETTINGS;
     }
     if (!(forward_result.info.rho > 0) || !(forward_result.info.delta > 0) || !std::isfinite(forward_result.info.rho) || !std::isfinite(forward_result.info.delta))
     {
         piqp_eprint("backward(): the provided forward result has an invalid regularization (info.rho, info.delta)\n");
-        return false;
+        return Status::PIQP_INVALID_SETTINGS;
     }
 
     using std::isfinite;
@@ -1769,7 +1784,7 @@ bool SolverBase<T, I, Preconditioner, MatrixType>::scale_backward_point(const Re
         if (!interior(forward_result.s_l(idx), forward_result.z_l(idx)))
         { 
             piqp_eprint("backward(): s_l and z_l of the provided forward result must be strictly positive on finite bounds\n");
-            return false;
+            return Status::PIQP_INVALID_SETTINGS;
         }
         ps.s_l(idx) = forward_result.s_l(idx);
         ps.z_l(idx) = forward_result.z_l(idx);
@@ -1786,7 +1801,7 @@ bool SolverBase<T, I, Preconditioner, MatrixType>::scale_backward_point(const Re
         if (!interior(forward_result.s_u(idx), forward_result.z_u(idx)))
         {
             piqp_eprint("backward(): s_u and z_u of the provided forward result must be strictly positive on finite bounds\n");
-            return false;
+            return Status::PIQP_INVALID_SETTINGS;
         }
         ps.s_u(idx) = forward_result.s_u(idx);
         ps.z_u(idx) = forward_result.z_u(idx);
@@ -1809,7 +1824,7 @@ bool SolverBase<T, I, Preconditioner, MatrixType>::scale_backward_point(const Re
         if (!interior(forward_result.s_bl(idx), forward_result.z_bl(idx)))
         {
             piqp_eprint("backward(): s_bl and z_bl of the provided forward result must be strictly positive on finite bounds\n");
-            return false;
+            return Status::PIQP_INVALID_SETTINGS;
         }
         ps.z_bl(i) = m_preconditioner.scale_dual_b_i(forward_result.z_bl(idx), idx);
         ps.s_bl(i) = m_preconditioner.scale_slack_b_i(forward_result.s_bl(idx), idx);
@@ -1820,17 +1835,17 @@ bool SolverBase<T, I, Preconditioner, MatrixType>::scale_backward_point(const Re
         if (!interior(forward_result.s_bu(idx), forward_result.z_bu(idx)))
         {
             piqp_eprint("backward(): s_bu and z_bu of the provided forward result must be strictly positive on finite bounds\n");
-            return false;
+            return Status::PIQP_INVALID_SETTINGS;
         }
         ps.z_bu(i) = m_preconditioner.scale_dual_b_i(forward_result.z_bu(idx), idx);
         ps.s_bu(i) = m_preconditioner.scale_slack_b_i(forward_result.s_bu(idx), idx);
     }
 
-    return true;
+    return Status::PIQP_SOLVED;
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
-BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::run_gradient_smoothing(const Variables<T>& start_scaled, const T& rho, const T& delta)
+Status SolverBase<T, I, Preconditioner, MatrixType>::run_gradient_smoothing(const Variables<T>& start_scaled, const T& rho, const T& delta)
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::run_gradient_smoothing");
 
@@ -1880,7 +1895,7 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::run_gradient_smooth
         if (!factor_backward_kkt(rv, rho, delta))
         {
             piqp_eprint("backward(): KKT factorization failed during gradient smoothing\n");
-            return BackwardStatus::PIQP_BWD_NUMERICS;
+            return Status::PIQP_NUMERICS;
         }
 
         T norm = smoothing_residual(rv, mu);
@@ -1893,7 +1908,7 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::run_gradient_smooth
         if (!m_kkt_system.solve(m_data, m_settings, res, step))
         {
             piqp_eprint("backward(): KKT solve failed during gradient smoothing\n");
-            return BackwardStatus::PIQP_BWD_NUMERICS;
+            return Status::PIQP_NUMERICS;
         }
 
         // damped common step for all variables, keeping s and z positive
@@ -1920,7 +1935,7 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::run_gradient_smooth
         if (!factor_backward_kkt(rv, rho, delta))
         {
             piqp_eprint("backward(): KKT factorization failed during gradient smoothing\n");
-            return BackwardStatus::PIQP_BWD_NUMERICS;
+            return Status::PIQP_NUMERICS;
         }
         T norm = smoothing_residual(rv, mu);
         if (!(norm < m_settings.gradient_smoothing_tol))
@@ -1928,7 +1943,7 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::run_gradient_smooth
             piqp_eprint("backward(): gradient smoothing did not converge, the relaxed KKT residual is %.3e after %zd iterations. "
                         "Increase gradient_smoothing_max_iter or relax gradient_smoothing_tol.\n",
                         static_cast<double>(norm), m_settings.gradient_smoothing_max_iter);
-            return BackwardStatus::PIQP_BWD_MAX_ITER_REACHED;
+            return Status::PIQP_MAX_ITER_REACHED;
         }
     }
 
@@ -1945,7 +1960,7 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::run_gradient_smooth
     m_smoothed.s_bu = rv.s_bu;
     unscale_results(&m_smoothed);
 
-    return BackwardStatus::PIQP_BWD_SOLVED;
+    return Status::PIQP_SOLVED;
 }
 
 // Assembles the (negative, non-regularized) KKT residual at vars with relaxed complementarity

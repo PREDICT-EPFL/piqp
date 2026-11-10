@@ -45,9 +45,9 @@ The solution map is differentiable if the solution is strictly complementary (ev
 1. Set `enable_backward` **before** `setup`. This allocates the storage for the gradients, such that `backward` does not allocate.
 2. Call `setup` (or `update`) and `solve`. The solve has to return `PIQP_SOLVED` or `PIQP_MAX_ITER_REACHED`.
 3. Call `backward` with the gradients of the loss with respect to the solution. Missing gradients are treated as zero.
-4. If `backward` returns `PIQP_BWD_SOLVED`, the gradients with respect to the problem data are available in the gradients object.
+4. If `backward` returns `PIQP_SOLVED`, the gradients with respect to the problem data are available in the gradients object.
 
-The gradients are valid until the next `setup`, `update`, or `backward` call, and a failed `backward` invalidates them as well. Whether they are valid can be queried with `gradients_valid`. `backward` does not change the result of the solve, so `backward` can be called multiple times with different gradients after one `solve`.
+The gradients are valid until the next `setup`, `update`, or `backward` call, and a failed `backward` invalidates them as well. The status of the gradients object is the status returned by the last `backward`, and is reset to `PIQP_UNSOLVED` by `setup` and `update`, i.e., the gradients are valid if and only if it is `PIQP_SOLVED`. `backward` does not change the result of the solve, so `backward` can be called multiple times with different gradients after one `solve`.
 
 The argument `forward_result` is optional and selects the point at which the gradients are computed:
 
@@ -69,9 +69,9 @@ solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
 solver.solve();
 
 // gradients w.r.t. x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu (optional, nullopt is zero), and forward_result
-piqp::BackwardStatus status = solver.backward(dL_dx);
-if (status == piqp::BackwardStatus::PIQP_BWD_SOLVED) {
-    const auto& grads = solver.gradients();
+piqp::Status status = solver.backward(dL_dx);
+if (status == piqp::Status::PIQP_SOLVED) {
+    const auto& grads = solver.gradients();  // grads.status == status
     // grads.P, grads.c, grads.A, grads.b, grads.G, grads.h_l, grads.h_u, grads.x_l, grads.x_u
 }
 ```
@@ -86,7 +86,7 @@ solver.solve()
 
 # keyword arguments grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, forward_result
 status = solver.backward(grad_x=dL_dx)
-if status == piqp.PIQP_BWD_SOLVED:
+if status == piqp.PIQP_SOLVED:  # also available as solver.gradients.status
     dL_dc = solver.gradients.c  # P, c, A, b, G, h_l, h_u, x_l, x_u (scipy CSC matrices for the sparse solver)
 ```
 
@@ -107,8 +107,8 @@ piqp_setup_dense(&work, data, settings);  // or piqp_setup_sparse
 piqp_solve(work);
 
 // gradients w.r.t. x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu (NULL is zero), and forward_result (NULL: last solve)
-piqp_backward_status status = piqp_backward(work, dL_dx, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-if (status == PIQP_BWD_SOLVED) {
+piqp_status status = piqp_backward(work, dL_dx, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+if (status == PIQP_SOLVED) {  // also available as work->gradients->status
     const piqp_float* dL_dc = work->gradients->c;
 }
 ```
@@ -125,7 +125,7 @@ result = solver.solve();
 
 % name/value pairs or a struct with the fields x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu, forward_result
 grads = solver.backward('x', dL_dx);
-if grads.status_val == 1  % PIQP_BWD_SOLVED
+if grads.status_val == 1  % PIQP_SOLVED
     dL_dc = grads.c;  % P, c, A, b, G, h_l, h_u, x_l, x_u
 end
 ```
@@ -143,4 +143,4 @@ With `gradient_smoothing` enabled, `backward` differentiates at a relaxed point 
 | `gradient_smoothing_tol`      | `1e-5`  | Tolerance on the residual of the relaxed KKT conditions.            |
 | `gradient_smoothing_max_iter` | `5`     | Maximum number of Newton iterations.                                |
 
-If the Newton iterations do not converge, `backward` returns `PIQP_BWD_MAX_ITER_REACHED`.
+If the Newton iterations do not converge, `backward` returns `PIQP_MAX_ITER_REACHED`.

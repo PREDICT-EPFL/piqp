@@ -40,16 +40,14 @@ void piqp_update_sparse(piqp_workspace* workspace,
 
 piqp_status piqp_solve(piqp_workspace* workspace);
 
-piqp_backward_status piqp_backward(piqp_workspace* workspace,
-                                   const piqp_float* grad_x, const piqp_float* grad_y,
-                                   const piqp_float* grad_z_l, const piqp_float* grad_z_u,
-                                   const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
-                                   const piqp_float* grad_s_l, const piqp_float* grad_s_u,
-                                   const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
-                                   const piqp_result* forward_result);
-
-// Returns 1 if workspace->gradients holds the result of a successful piqp_backward() of the current problem, 0 otherwise.
-piqp_int piqp_gradients_valid(const piqp_workspace* workspace);
+// The returned status is also stored in workspace->gradients->status (if workspace->gradients is not NULL).
+piqp_status piqp_backward(piqp_workspace* workspace,
+                          const piqp_float* grad_x, const piqp_float* grad_y,
+                          const piqp_float* grad_z_l, const piqp_float* grad_z_u,
+                          const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
+                          const piqp_float* grad_s_l, const piqp_float* grad_s_u,
+                          const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
+                          const piqp_result* forward_result);
 
 void piqp_cleanup(piqp_workspace* workspace);
 

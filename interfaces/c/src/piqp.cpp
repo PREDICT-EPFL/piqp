@@ -217,6 +217,7 @@ static piqp::optional<Eigen::Map<CSparseMat>> piqp_optional_sparse_mat_map(piqp_
 template<typename Gradients>
 static void piqp_set_gradient_vectors(piqp_gradients* gradients, const Gradients& solver_gradients)
 {
+    gradients->status = (piqp_status) solver_gradients.status;
     gradients->c = solver_gradients.c.data();
     gradients->b = solver_gradients.b.data();
     gradients->h_l = solver_gradients.h_l.data();
@@ -468,6 +469,8 @@ void piqp_update_dense(piqp_workspace* workspace,
 
     auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
     solver->update(P_, c_, A_, b_, G_, h_l_, h_u_, x_l_, x_u_);
+
+    if (workspace->gradients) workspace->gradients->status = (piqp_status) solver->gradients().status;
 }
 
 void piqp_update_sparse(piqp_workspace* workspace,
@@ -488,6 +491,8 @@ void piqp_update_sparse(piqp_workspace* workspace,
 
     auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
     solver->update(P_, c_, A_, b_, G_, h_l_, h_u_, x_l_, x_u_);
+
+    if (workspace->gradients) workspace->gradients->status = (piqp_status) solver->gradients().status;
 }
 
 piqp_status piqp_solve(piqp_workspace* workspace)
@@ -534,13 +539,13 @@ static piqp::Result<piqp_float> piqp_result_from_c(const piqp_workspace* workspa
 }
 
 template<typename Solver>
-static piqp::BackwardStatus piqp_backward_impl(Solver& solver, const piqp_workspace* workspace,
-                                               const piqp_float* grad_x, const piqp_float* grad_y,
-                                               const piqp_float* grad_z_l, const piqp_float* grad_z_u,
-                                               const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
-                                               const piqp_float* grad_s_l, const piqp_float* grad_s_u,
-                                               const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
-                                               const piqp_result* forward_result)
+static piqp::Status piqp_backward_impl(Solver& solver, const piqp_workspace* workspace,
+                                       const piqp_float* grad_x, const piqp_float* grad_y,
+                                       const piqp_float* grad_z_l, const piqp_float* grad_z_u,
+                                       const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
+                                       const piqp_float* grad_s_l, const piqp_float* grad_s_u,
+                                       const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
+                                       const piqp_result* forward_result)
 {
     const piqp_int n = workspace->solver_info.n;
     const piqp_int p = workspace->solver_info.p;
@@ -565,21 +570,21 @@ static piqp::BackwardStatus piqp_backward_impl(Solver& solver, const piqp_worksp
                            cpp_forward_result);
 }
 
-piqp_backward_status piqp_backward(piqp_workspace* workspace,
-                                   const piqp_float* grad_x, const piqp_float* grad_y,
-                                   const piqp_float* grad_z_l, const piqp_float* grad_z_u,
-                                   const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
-                                   const piqp_float* grad_s_l, const piqp_float* grad_s_u,
-                                   const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
-                                   const piqp_result* forward_result)
+piqp_status piqp_backward(piqp_workspace* workspace,
+                          const piqp_float* grad_x, const piqp_float* grad_y,
+                          const piqp_float* grad_z_l, const piqp_float* grad_z_u,
+                          const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
+                          const piqp_float* grad_s_l, const piqp_float* grad_s_u,
+                          const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
+                          const piqp_result* forward_result)
 {
-    piqp::BackwardStatus status;
+    piqp::Status status;
     if (workspace->solver_info.is_dense)
     {
         auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
         status = piqp_backward_impl(*solver, workspace, grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
                                     grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, forward_result);
-        if (status == piqp::BackwardStatus::PIQP_BWD_SOLVED)
+        if (status == piqp::Status::PIQP_SOLVED)
         {
             piqp_copy_gradients_dense(workspace, *solver);
         }
@@ -591,16 +596,9 @@ piqp_backward_status piqp_backward(piqp_workspace* workspace,
                                     grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, forward_result);
     }
 
-    return (piqp_backward_status) status;
-}
+    if (workspace->gradients) workspace->gradients->status = (piqp_status) status;
 
-piqp_int piqp_gradients_valid(const piqp_workspace* workspace)
-{
-    if (workspace->solver_info.is_dense)
-    {
-        return reinterpret_cast<const DenseSolver*>(workspace->solver_handle)->gradients_valid();
-    }
-    return reinterpret_cast<const SparseSolver*>(workspace->solver_handle)->gradients_valid();
+    return (piqp_status) status;
 }
 
 void piqp_cleanup(piqp_workspace* workspace)

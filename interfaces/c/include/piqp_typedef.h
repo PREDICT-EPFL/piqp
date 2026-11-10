@@ -122,14 +122,6 @@ typedef enum {
     PIQP_INVALID_SETTINGS  = -10
 } piqp_status;
 
-typedef enum {
-    PIQP_BWD_SOLVED                 = 1,
-    PIQP_BWD_INVALID_SETTINGS       = -1,
-    PIQP_BWD_INVALID_FORWARD_RESULT = -2,
-    PIQP_BWD_NUMERICS               = -3,
-    PIQP_BWD_MAX_ITER_REACHED       = -4
-} piqp_backward_status;
-
 typedef struct {
     piqp_status status;
 
@@ -191,6 +183,10 @@ typedef struct {
 } piqp_result;
 
 typedef struct {
+    // the gradients are only valid if status is PIQP_SOLVED; status of the last piqp_backward(),
+    // PIQP_UNSOLVED if piqp_backward() was not called yet or the problem changed since (setup, update)
+    piqp_status status;
+
     const piqp_float* P;   // dense interface: gradient w.r.t. P (size n x n, row-major, symmetric), NULL for sparse
     const piqp_float* A;   // dense interface: gradient w.r.t. A (size p x n, row-major), NULL for sparse
     const piqp_float* G;   // dense interface: gradient w.r.t. G (size m x n, row-major), NULL for sparse

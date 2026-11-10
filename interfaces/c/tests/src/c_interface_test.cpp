@@ -289,15 +289,16 @@ TEST(CInterfaceTest, DenseBackward)
     piqp_workspace* work = setup_backward_dense(qp);
     ASSERT_NE(work->gradients, nullptr);
     EXPECT_EQ(work->gradients->P_csc, nullptr);
+    EXPECT_EQ(work->gradients->status, PIQP_UNSOLVED);
 
     EXPECT_EQ(piqp_backward(work, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_BWD_INVALID_FORWARD_RESULT);
-    EXPECT_EQ(piqp_gradients_valid(work), 0);
+              PIQP_UNSOLVED);
+    EXPECT_EQ(work->gradients->status, PIQP_UNSOLVED);
 
     ASSERT_EQ(piqp_solve(work), PIQP_SOLVED);
     ASSERT_EQ(piqp_backward(work, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_BWD_SOLVED);
-    EXPECT_EQ(piqp_gradients_valid(work), 1);
+              PIQP_SOLVED);
+    EXPECT_EQ(work->gradients->status, PIQP_SOLVED);
 
     const piqp_gradients* g = work->gradients;
     const double tol = 1e-5;
@@ -319,19 +320,22 @@ TEST(CInterfaceTest, DenseBackward)
     // the factorization of the forward solve (second-to-last iterate), the forward result is refactorized
     piqp_float c0 = g->c[0];
     ASSERT_EQ(piqp_backward(work, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, work->result),
-              PIQP_BWD_SOLVED);
+              PIQP_SOLVED);
     EXPECT_NEAR(g->c[0], c0, 1e-6);
 
     // a failed call invalidates the gradients
     piqp_result invalid = *work->result;
     invalid.info.rho = 0;
     EXPECT_EQ(piqp_backward(work, backward_grad_x, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &invalid),
-              PIQP_BWD_INVALID_FORWARD_RESULT);
-    EXPECT_EQ(piqp_gradients_valid(work), 0);
+              PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(work->gradients->status, PIQP_INVALID_SETTINGS);
 
+    ASSERT_EQ(piqp_backward(work, backward_grad_x, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+              PIQP_SOLVED);
     piqp_update_dense(work, NULL, qp.c, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    EXPECT_EQ(work->gradients->status, PIQP_UNSOLVED);
     EXPECT_EQ(piqp_backward(work, backward_grad_x, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_BWD_INVALID_FORWARD_RESULT);
+              PIQP_UNSOLVED);
 
     piqp_cleanup(work);
 }
@@ -342,7 +346,7 @@ TEST(CInterfaceTest, SparseBackwardMatchesDense)
     piqp_workspace* work_dense = setup_backward_dense(qp);
     ASSERT_EQ(piqp_solve(work_dense), PIQP_SOLVED);
     ASSERT_EQ(piqp_backward(work_dense, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_BWD_SOLVED);
+              PIQP_SOLVED);
 
     piqp_float P_x[2] = {6, 4};
     piqp_int P_p[3] = {0, 1, 2};
@@ -380,7 +384,7 @@ TEST(CInterfaceTest, SparseBackwardMatchesDense)
     EXPECT_EQ(work->gradients->P, nullptr);
     ASSERT_EQ(piqp_solve(work), PIQP_SOLVED);
     ASSERT_EQ(piqp_backward(work, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_BWD_SOLVED);
+              PIQP_SOLVED);
 
     const piqp_gradients* gs = work->gradients;
     const piqp_gradients* gd = work_dense->gradients;
@@ -442,6 +446,6 @@ TEST(CInterfaceTest, BackwardNotEnabled)
     EXPECT_EQ(work->gradients, nullptr);
     ASSERT_EQ(piqp_solve(work), PIQP_SOLVED);
     EXPECT_EQ(piqp_backward(work, backward_grad_x, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_BWD_INVALID_SETTINGS);
+              PIQP_INVALID_SETTINGS);
     piqp_cleanup(work);
 }

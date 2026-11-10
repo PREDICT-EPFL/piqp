@@ -417,15 +417,15 @@ mxArray* run_backward(Solver& solver, const mxArray* prhs[])
         forward_result = mx_struct_to_result(prhs[12]);
     }
 
-    piqp::BackwardStatus status = solver.backward(grads[0], grads[1], grads[2], grads[3], grads[4],
-                                                  grads[5], grads[6], grads[7], grads[8], grads[9],
-                                                  forward_result);
+    piqp::Status status = solver.backward(grads[0], grads[1], grads[2], grads[3], grads[4],
+                                          grads[5], grads[6], grads[7], grads[8], grads[9],
+                                          forward_result);
 
     int n_fields = sizeof(PIQP_GRADIENTS_FIELDS) / sizeof(PIQP_GRADIENTS_FIELDS[0]);
     mxArray* mx_ptr = mxCreateStructMatrix(1, 1, n_fields, PIQP_GRADIENTS_FIELDS);
-    mxSetField(mx_ptr, 0, "status", mxCreateString(piqp::backward_status_to_string(status)));
+    mxSetField(mx_ptr, 0, "status", mxCreateString(piqp::status_to_string(status)));
     mxSetField(mx_ptr, 0, "status_val", mxCreateDoubleScalar((double) status));
-    if (solver.gradients_valid()) {
+    if (status == piqp::Status::PIQP_SOLVED) {
         const auto& g = solver.gradients();
         mxSetField(mx_ptr, 0, "P", eigen_to_mx(g.P));
         mxSetField(mx_ptr, 0, "c", eigen_to_mx(g.c));

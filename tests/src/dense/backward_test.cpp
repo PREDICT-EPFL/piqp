@@ -70,50 +70,50 @@ TEST(DenseBackwardTest, InvalidStates)
     configure(solver);
 
     // not setup
-    EXPECT_EQ(solver.backward(), BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT);
-    EXPECT_FALSE(solver.gradients_valid());
+    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
 
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
     // not solved
-    EXPECT_EQ(solver.backward(), BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT);
-    EXPECT_FALSE(solver.gradients_valid());
+    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
 
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), BackwardStatus::PIQP_BWD_SOLVED);
-    EXPECT_TRUE(solver.gradients_valid());
+    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
 
     // wrong dimensions, each adjoint is checked; a failed call invalidates the previous gradients
     Vec<T> wrong_n = Vec<T>::Zero(model.P.rows() + 1);
     Vec<T> wrong_p = Vec<T>::Zero(model.A.rows() + 1);
     Vec<T> wrong_m = Vec<T>::Zero(model.G.rows() + 1);
-    EXPECT_EQ(solver.backward(wrong_n), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_FALSE(solver.gradients_valid());
-    EXPECT_EQ(solver.backward(nullopt, wrong_p), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, wrong_m), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, wrong_m), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, wrong_n), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
-    EXPECT_FALSE(solver.gradients_valid());
+    EXPECT_EQ(solver.backward(wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, wrong_p), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
 
-    EXPECT_EQ(solver.backward(), BackwardStatus::PIQP_BWD_SOLVED);
-    EXPECT_TRUE(solver.gradients_valid());
+    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
 
     // data changed since last solve, update() invalidates the gradients
     solver.update(nullopt, model.c);
-    EXPECT_FALSE(solver.gradients_valid());
-    EXPECT_EQ(solver.backward(), BackwardStatus::PIQP_BWD_INVALID_FORWARD_RESULT);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
 
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), BackwardStatus::PIQP_BWD_SOLVED);
-    EXPECT_TRUE(solver.gradients_valid());
+    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
 
     // setup() invalidates the gradients
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    EXPECT_FALSE(solver.gradients_valid());
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
 }
 
 TEST(DenseBackwardTest, SmoothingAnalytic)
@@ -179,7 +179,7 @@ TEST(DenseBackwardTest, SmoothingAnalytic2D)
             EXPECT_LT((solver.result().x - x_opt).norm(), 1e-5) << "r = " << r << ", scale_cost = " << scale_cost;
 
             Vec<T> grad_z_u = Vec<T>::Constant(1, v);
-            ASSERT_EQ(solver.backward(w, nullopt, nullopt, grad_z_u), BackwardStatus::PIQP_BWD_SOLVED);
+            ASSERT_EQ(solver.backward(w, nullopt, nullopt, grad_z_u), Status::PIQP_SOLVED);
             const dense::Gradients<T>& grads = solver.gradients();
 
             T z = (-r + std::sqrt(r * r + 4 * q * mu)) / (2 * q);
@@ -213,15 +213,15 @@ TEST(DenseBackwardTest, RequiresEnableBackward)
     solver.settings().enable_backward = false;
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
 
     // enabling it after setup() is not sufficient
     solver.settings().enable_backward = true;
-    EXPECT_EQ(solver.backward(), BackwardStatus::PIQP_BWD_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
 
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), BackwardStatus::PIQP_BWD_SOLVED);
+    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
 }
 
 TEST(DenseBackwardTest, ProvidedResultInvalid)
