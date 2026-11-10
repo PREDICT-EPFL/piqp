@@ -134,7 +134,7 @@ A failed `backward` does not raise an error, `grads.status` and `grads.status_va
 
 ## Gradient Smoothing
 
-With `gradient_smoothing` enabled, `backward` differentiates at a relaxed point instead of the solution: starting from the solution, Newton iterations find the point satisfying the KKT conditions with $$s \circ z = \mu$$ instead of $$s \circ z = 0$$, where $$\mu$$ is `gradient_smoothing_mu`. This makes the gradients smooth across active-set changes, i.e., constraints close to becoming active or inactive contribute to the gradient, at the cost of a bias which vanishes as $$\mu \to 0$$.
+With `gradient_smoothing` enabled, `backward` differentiates at a relaxed point instead of the solution: starting from the solution, whose complementarity $$s \circ z$$ is of the order of the solver tolerance, Newton iterations find the nearby point satisfying the KKT conditions with the larger complementarity $$s \circ z = \mu$$, where $$\mu$$ is `gradient_smoothing_mu`. This makes the gradients smooth across active-set changes, i.e., constraints close to becoming active or inactive contribute to the gradient, at the cost of a bias which vanishes as $$\mu \to 0$$.
 
 | Setting                       | Default | Description                                                         |
 |:------------------------------|:--------|:--------------------------------------------------------------------|
