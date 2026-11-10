@@ -8,11 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- New method `backward()` on the dense and sparse solvers which computes the gradients of a loss with respect to the problem data (P, c, A, b, G, h_l, h_u, x_l, x_u) by implicit differentiation of the KKT conditions at the solution, given the gradients with respect to the solution (x, y, z, s). C++ interface only for now. By passing a stored `forward_result`, the gradients can be computed at the result of an earlier solve, e.g. for rollouts
+- New method `backward()` on the dense and sparse solvers which computes the gradients of a loss with respect to the problem data (P, c, A, b, G, h_l, h_u, x_l, x_u) by implicit differentiation of the KKT conditions at the solution, given the gradients with respect to the solution (x, y, z, s). By passing a stored `forward_result`, the gradients can be computed at the result of an earlier solve, e.g. for rollouts. Available in the C++, C (`piqp_backward()`), Python, Matlab and Octave interfaces. See the new [Differentiation](https://predict-epfl.github.io/piqp/differentiation) page in the documentation
 - `backward()` returns the new `BackwardStatus` (`PIQP_BWD_SOLVED`, `PIQP_BWD_INVALID_SETTINGS`, `PIQP_BWD_INVALID_FORWARD_RESULT`, `PIQP_BWD_NUMERICS`, `PIQP_BWD_MAX_ITER_REACHED`), the forward `Status` is only used for `solve()`
 - The gradients are available via `gradients()` and must only be used if `gradients_valid()` is true. A failed `backward()`, `setup()` or `update()` invalidates them
 - New setting `enable_backward`, which has to be set before `setup()` to use `backward()`. It allocates the gradient storage in `setup()`, such that `backward()` does not allocate
 - New settings `gradient_smoothing`, `gradient_smoothing_mu`, `gradient_smoothing_tol` and `gradient_smoothing_max_iter`: with `gradient_smoothing` enabled, `backward()` differentiates at a relaxed point with `s * z = mu`, which makes the gradient smooth across active-set changes
+
+### Changed
+- The C settings struct `piqp_settings` and the C workspace `piqp_workspace` (new field `gradients`) have new fields, so code compiled against the C interface must be recompiled
 
 ## [0.7.0] - 2026-11-05
 

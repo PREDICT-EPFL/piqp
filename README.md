@@ -27,6 +27,7 @@ Combining an infeasible interior point method with the proximal method of multip
 * PIQP is written in header only C++ 14 leveraging the [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) library for vectorized linear algebra.
 * Dense and sparse problem formulations are supported. For small dense problems, vectorized instructions and cache locality can be exploited more efficiently.
 * Special backend for multistage optimization problems.
+* Differentiation through the solution with respect to the problem data (reverse mode), e.g., for learning pipelines.
 * Allocation free problem updates and re-solves.
 * Open source under the BSD 2-Clause License.
 

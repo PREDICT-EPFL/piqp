@@ -1,7 +1,7 @@
 ---
 title: Citing PIQP
 layout: default
-nav_order: 6
+nav_order: 7
 ---
 
 If you found PIQP useful in your scientific work, we encourage you to cite our main paper:
