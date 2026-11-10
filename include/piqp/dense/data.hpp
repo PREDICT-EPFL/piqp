@@ -50,7 +50,7 @@ struct Data
 
     Vec<T> x_b_scaling; // scaling of x_l and x_u, i.e. x_l <= x_b_scaling .* x <= x_u
 
-    Vec<bool> G_row_disabled; // rows of G which were zeroed by disable_inf_constraints
+    Vec<bool> G_row_disabled; // rows with both bounds infinite, replaced by -1 <= 0 x <= 1 in disable_inf_constraints
 
     Data() = default;
 

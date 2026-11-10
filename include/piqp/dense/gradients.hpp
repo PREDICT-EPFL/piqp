@@ -29,7 +29,6 @@ namespace dense
  * called yet or the problem changed since (setup(), update()), and the status returned by the last
  * backward() otherwise.
  *
- * All quantities are in the user's (unscaled) coordinates:
  *   P: n x n, symmetric, dL/dP = 0.5 * (lam_x x^T + x lam_x^T)
  *   A: p x n
  *   G: m x n, rows with both bounds infinite are zero
@@ -69,13 +68,13 @@ struct Gradients
         x_u.resize(data.n);
     }
 
-    // Computes the gradients at the linearization point (user space) from the adjoint variables lambda
-    // (user space, box duals in compressed layout):
+    // Computes the gradients at the linearization point from the adjoint variables lambda:
     //   dP = 0.5 * (lam_x x^T + x lam_x^T)
     //   dA = lam_y x^T + y lam_x^T
     //   dG = (lam_z_u - lam_z_l) x^T + (z_u - z_l) lam_x^T
     //   dc = lam_x,  db = -lam_y,  dh_l = lam_z_l,  dh_u = -lam_z_u,  dx_l = lam_z_bl,  dx_u = -lam_z_bu
-    // Gradients of disabled constraints and infinite bounds are zero.
+    // lambda and the duals of the linearization point must be zero on disabled constraints and infinite bounds,
+    // which makes the corresponding gradients zero.
     void compute_from_adjoint(const Data<T>& data, const Variables<T>& linearization_point, const Variables<T>& lambda)
     {
         P.noalias() = lambda.x * linearization_point.x.transpose();
@@ -90,27 +89,12 @@ struct Gradients
         {
             G.col(j) = (lambda.z_u - lambda.z_l) * linearization_point.x(j) + (linearization_point.z_u - linearization_point.z_l) * lambda.x(j);
         }
-        for (isize i = 0; i < data.m; i++)
-        {
-            if (data.G_row_disabled(i))
-            {
-                G.row(i).setZero();
-            }
-        }
 
         c = lambda.x;
         b = -lambda.y;
         // lambda_z is zero for infinite bounds
         h_l = lambda.z_l;
         h_u = -lambda.z_u;
-        for (isize i = 0; i < data.m; i++)
-        {
-            if (data.G_row_disabled(i))
-            {
-                h_l(i) = T(0);
-                h_u(i) = T(0);
-            }
-        }
 
         // box duals are in compressed layout, zero for infinite bounds
         x_l.setZero();

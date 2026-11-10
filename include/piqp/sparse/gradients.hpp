@@ -100,7 +100,8 @@ struct Gradients
     //   dA = lam_y x^T + y lam_x^T
     //   dG = (lam_z_u - lam_z_l) x^T + (z_u - z_l) lam_x^T
     //   dc = lam_x,  db = -lam_y,  dh_l = lam_z_l,  dh_u = -lam_z_u,  dx_l = lam_z_bl,  dx_u = -lam_z_bu
-    // Gradients of disabled constraints and infinite bounds are zero.
+    // lambda and the duals of the linearization point must be zero on disabled constraints and infinite bounds,
+    // which makes the corresponding gradients zero.
     // The matrix gradients are evaluated on their sparsity patterns only.
     void compute_from_adjoint(const Data<T, I>& data, const Variables<T>& linearization_point, const Variables<T>& lambda)
     {
@@ -119,14 +120,7 @@ struct Gradients
             for (isize k = G.outerIndexPtr()[j]; k < G.outerIndexPtr()[j + 1]; k++)
             {
                 isize i = G.innerIndexPtr()[k];
-                if (data.G_row_disabled(i))
-                {
-                    G.valuePtr()[k] = T(0);
-                }
-                else
-                {
-                    G.valuePtr()[k] = (lambda.z_u(i) - lambda.z_l(i)) * linearization_point.x(j) + (linearization_point.z_u(i) - linearization_point.z_l(i)) * lambda.x(j);
-                }
+                G.valuePtr()[k] = (lambda.z_u(i) - lambda.z_l(i)) * linearization_point.x(j) + (linearization_point.z_u(i) - linearization_point.z_l(i)) * lambda.x(j);
             }
         }
 
@@ -135,14 +129,6 @@ struct Gradients
         // lambda_z is zero for infinite bounds
         h_l = lambda.z_l;
         h_u = -lambda.z_u;
-        for (isize i = 0; i < data.m; i++)
-        {
-            if (data.G_row_disabled(i))
-            {
-                h_l(i) = T(0);
-                h_u(i) = T(0);
-            }
-        }
 
         // box duals are in compressed layout, zero for infinite bounds
         x_l.setZero();

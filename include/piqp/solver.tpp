@@ -1710,6 +1710,30 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::backward_impl(const optiona
     }
 
     unscale_adjoint();
+
+    // Rows disabled by disable_inf_constraints() are decoupled from the rest of the problem. Zeroing
+    // their adjoints and duals makes their gradients exactly zero without affecting any other gradient.
+    if (m_data.G_row_disabled.any())
+    {
+        // m_smoothed and m_linearization_point are scratch, but m_result is returned to the user
+        Variables<T>* point = linearization_point == &m_smoothed ? &m_smoothed : &m_linearization_point;
+        if (linearization_point == &m_result)
+        {
+            m_linearization_point = m_result;
+        }
+        linearization_point = point;
+        for (isize i = 0; i < m_data.m; i++)
+        {
+            if (m_data.G_row_disabled(i))
+            {
+                m_adjoint.z_l(i) = T(0);
+                m_adjoint.z_u(i) = T(0);
+                point->z_l(i) = T(0);
+                point->z_u(i) = T(0);
+            }
+        }
+    }
+
     {
         PIQP_TRACY_ZoneScopedN("piqp::Solver::backward::assemble_gradients");
         m_gradients.compute_from_adjoint(m_data, *linearization_point, m_adjoint);
