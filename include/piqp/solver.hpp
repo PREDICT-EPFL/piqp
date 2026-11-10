@@ -89,6 +89,7 @@ protected:
     Variables<T> m_linearization_point;          // forward result provided to backward() in user space, zero on infinite bounds
     GradientsType m_gradients;
     bool m_backward_ready = false;               // a valid solve of the current data is available
+    bool m_forward_factor_valid = false;         // the KKT factorization of the last valid solve() can be reused
     bool m_gradients_allocated = false;
     bool m_gradients_valid = false;              // gradients() holds the result of a successful backward()
 
@@ -110,17 +111,21 @@ public:
      * Missing arguments are treated as zero. z_bl, z_bu, s_bl, s_bu are n-dimensional
      * (same layout as in Result). The results are available via gradients().
      *
-     * Each call factorizes the KKT system at the linearization point once (or once per smoothing
-     * iteration if settings.gradient_smoothing is enabled).
-     *
      * If forward_result is nullopt, the gradients are computed at the solution of the last solve(), which
      * must have returned PIQP_SOLVED or PIQP_MAX_ITER_REACHED and must not be followed by an update().
+     * Unless settings.gradient_smoothing is enabled, the KKT factorization of that solve() is reused, i.e.,
+     * no factorization is needed. It belongs to the second-to-last iterate, which is close to the solution
+     * after convergence. The factorization is no longer available once backward() refactorizes
+     * (forward_result provided or gradient smoothing).
      *
      * If forward_result is provided, the gradients are computed at its primal-dual point and regularization
      * (forward_result.info.rho, forward_result.info.delta) instead, e.g. a stored result of an earlier
      * solve() of the current problem data. It has to be the output of a solve() (status PIQP_SOLVED
      * or PIQP_MAX_ITER_REACHED, s and z strictly positive on finite bounds). Pass a stored
-     * optional<Result<T>> to avoid copying the result.
+     * optional<Result<T>> to avoid copying the result. The KKT system is factorized at that point.
+     *
+     * With settings.gradient_smoothing, the KKT system is always factorized, once per smoothing iteration,
+     * with or without forward_result.
      *
      * settings.enable_backward has to be set before setup(), which allocates the gradient storage,
      * such that backward() does not allocate.

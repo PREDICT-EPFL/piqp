@@ -89,6 +89,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
     m_result_scaled.s_bl = m_result.s_bl;
     m_result_scaled.s_bu = m_result.s_bu;
     m_backward_ready = (status == Status::PIQP_SOLVED || status == Status::PIQP_MAX_ITER_REACHED);
+    m_forward_factor_valid = m_backward_ready;
 
     unscale_results();
     restore_dual();
@@ -151,6 +152,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
     m_data.resize(P.rows(), A.has_value() ? A->rows() : 0, G.has_value() ? G->rows() : 0);
 
     m_backward_ready = false;
+    m_forward_factor_valid = false;
     m_gradients_allocated = false;
     m_gradients_valid = false;
 
@@ -227,6 +229,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_impl(const optional<CM
     }
 
     m_backward_ready = false;
+    m_forward_factor_valid = false;
     m_gradients_valid = false;
 
     m_preconditioner.unscale_data(m_data);
@@ -1648,6 +1651,10 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::backward(const opti
         delta = forward_result->info.delta;
     }
 
+    // KKT factorization at the linearization point:
+    // - gradient smoothing: factorized in every smoothing iteration, also without forward_result
+    // - forward_result provided: factorized once at that point
+    // - otherwise: the factorization of the last solve() is reused if it is still in place
     if (m_settings.gradient_smoothing)
     {
         // move the linearization point to the relaxed point s * z = mu nearby
@@ -1659,7 +1666,7 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::backward(const opti
         linearization_point_scaled = &m_smoothed_scaled;
         linearization_point = &m_smoothed;
     }
-    else
+    else if (forward_result.has_value() || !m_forward_factor_valid)
     {
         PIQP_TRACY_ZoneScopedN("piqp::Solver::backward::factor");
 
@@ -1697,6 +1704,8 @@ BackwardStatus SolverBase<T, I, Preconditioner, MatrixType>::backward(const opti
 template<typename T, typename I, typename Preconditioner, int MatrixType>
 bool SolverBase<T, I, Preconditioner, MatrixType>::factor_backward_kkt(const Variables<T>& vars_scaled, const T& rho, const T& delta)
 {
+    // overwrites the factorization of the last solve()
+    m_forward_factor_valid = false;
     bool ok = m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement, rho, delta, vars_scaled);
     if (!ok && !m_enable_iterative_refinement)
     {

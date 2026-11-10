@@ -15,7 +15,7 @@ $$
 \end{aligned}
 $$
 
-e.g., to use it as a layer in a learning pipeline. Given the gradients of a scalar loss $$L$$ with respect to the solution $$(x, y, z_l, z_u, z_{bl}, z_{bu}, s_l, s_u, s_{bl}, s_{bu})$$, the `backward` function computes the gradients of $$L$$ with respect to the problem data $$(P, c, A, b, G, h_l, h_u, x_l, x_u)$$, i.e., a vector-Jacobian product of the solution map. It is computed by implicit differentiation of the KKT conditions at the solution, which requires one factorization and solve of the KKT system.
+e.g., to use it as a layer in a learning pipeline. Given the gradients of a scalar loss $$L$$ with respect to the solution $$(x, y, z_l, z_u, z_{bl}, z_{bu}, s_l, s_u, s_{bl}, s_{bu})$$, the `backward` function computes the gradients of $$L$$ with respect to the problem data $$(P, c, A, b, G, h_l, h_u, x_l, x_u)$$, i.e., a vector-Jacobian product of the solution map. It is computed by implicit differentiation of the KKT conditions at the solution, which requires one solve of the KKT system with the factorization of the forward solve.
 
 ## Math
 
@@ -49,7 +49,12 @@ The solution map is differentiable if the solution is strictly complementary (ev
 
 The gradients are valid until the next `setup`, `update`, or `backward` call, and a failed `backward` invalidates them as well. Whether they are valid can be queried with `gradients_valid`. `backward` does not change the result of the solve, so `backward` can be called multiple times with different gradients after one `solve`.
 
-By default, the gradients are computed at the solution of the last `solve`. Alternatively, a stored result of an earlier `solve` of the same problem data can be passed as `forward_result`, e.g., to differentiate the results of a rollout after all problems have been solved.
+The argument `forward_result` is optional and selects the point at which the gradients are computed:
+
+* **Not provided (default):** the gradients are computed at the solution of the last `solve`, and, unless gradient smoothing is enabled, the KKT factorization of that `solve` is reused, i.e., `backward` only solves the KKT system. The factorization belongs to the second-to-last iterate, which is close to the solution after convergence.
+* **Provided:** the gradients are computed at the stored result of an earlier `solve` of the same problem data, e.g., to differentiate the results of a rollout after all problems have been solved. The KKT system is factorized once at that point. This overwrites the factorization of the last `solve`, so later calls without `forward_result` factorize as well.
+
+With [gradient smoothing](#gradient-smoothing), the factorization of the last `solve` is never reused: the KKT system is always factorized, once per smoothing iteration, with or without `forward_result`.
 
 ### Status code
 
