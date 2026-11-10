@@ -80,17 +80,17 @@ protected:
     T delta_dual_lin = 0;
 
     // backward pass (differentiation) state
-    Variables<T> m_result_scaled;                // final iterate in scaled space and compressed box layout
-    Variables<T> m_adjoint_rhs;                  // right-hand side of the adjoint (transposed KKT) system
-    Variables<T> m_adjoint;                      // adjoint variables lambda (s-fields are not meaningful)
-    Variables<T> m_smoothed_scaled;              // relaxed point (s * z = mu) in scaled space, compressed box layout
-    Variables<T> m_smoothed;                     // relaxed point in user space
-    Variables<T> m_linearization_point_scaled;   // forward result provided to backward() in scaled space, compressed box layout
-    Variables<T> m_linearization_point;          // forward result provided to backward() in user space, zero on infinite bounds
+    Variables<T> m_result_scaled;              // last solution (scaled)
+    Variables<T> m_adjoint_rhs;                // adjoint right-hand side (scaled)
+    Variables<T> m_adjoint;                    // adjoint variables
+    Variables<T> m_smoothed_scaled;            // smoothed point (scaled)
+    Variables<T> m_smoothed;                   // smoothed point (unscaled)
+    Variables<T> m_linearization_point_scaled; // provided forward result (scaled)
+    Variables<T> m_linearization_point;        // provided forward result (unscaled)
     GradientsType m_gradients;
-    bool m_backward_ready = false;               // a valid solve of the current data is available
-    bool m_forward_factor_valid = false;         // the KKT factorization of the last valid solve() can be reused
-    bool m_backward_enabled = false;             // backward workspace and gradients are allocated (enable_backward at setup())
+    bool m_backward_enabled = false;           // backward workspace is allocated
+    bool m_backward_ready = false;             // a valid solve of the current data is available
+    bool m_forward_factor_valid = false;       // the KKT factorization of the last solve() can be reused
 
 public:
     SolverBase();
@@ -101,47 +101,6 @@ public:
 
     Status solve();
 
-    /**
-     * Computes the gradients of a scalar loss L with respect to the problem data
-     * (P, c, A, b, G, h_l, h_u, x_l, x_u) given the gradients of L with respect to the
-     * solution (x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu) by implicit differentiation
-     * of the KKT conditions.
-     *
-     * Missing arguments are treated as zero. z_bl, z_bu, s_bl, s_bu are n-dimensional
-     * (same layout as in Result). The results are available via gradients().
-     *
-     * If forward_result is nullopt, the gradients are computed at the solution of the last solve(), which
-     * must have returned PIQP_SOLVED or PIQP_MAX_ITER_REACHED and must not be followed by an update().
-     * Unless settings.gradient_smoothing is enabled, the KKT factorization of that solve() is reused, i.e.,
-     * no factorization is needed. It belongs to the second-to-last iterate, which is close to the solution
-     * after convergence. The factorization is no longer available once backward() refactorizes
-     * (forward_result provided or gradient smoothing).
-     *
-     * If forward_result is provided, the gradients are computed at its primal-dual point and regularization
-     * (forward_result.info.rho, forward_result.info.delta) instead, e.g. a stored result of an earlier
-     * solve() of the current problem data. It has to be the output of a solve() (status PIQP_SOLVED
-     * or PIQP_MAX_ITER_REACHED, s and z strictly positive on finite bounds). Pass a stored
-     * optional<Result<T>> to avoid copying the result. The KKT system is factorized at that point.
-     *
-     * With settings.gradient_smoothing, the KKT system is always factorized, once per smoothing iteration,
-     * with or without forward_result.
-     *
-     * settings.enable_backward has to be set before setup(), which allocates the gradient storage,
-     * such that backward() does not allocate.
-     *
-     * The returned status is also stored in gradients().status, and gradients() must only be consumed if
-     * it is PIQP_SOLVED. setup() and update() reset gradients().status to PIQP_UNSOLVED.
-     *
-     * @return PIQP_SOLVED on success,
-     *         PIQP_UNSOLVED if there is no solution to differentiate, i.e., no forward_result is provided and
-     *         there is no solve() of the current problem data which returned PIQP_SOLVED or
-     *         PIQP_MAX_ITER_REACHED, or forward_result does not have one of these statuses,
-     *         PIQP_INVALID_SETTINGS if the solver is not setup, settings.enable_backward was not set before
-     *         setup(), a gradient vector has wrong dimensions, or forward_result has wrong dimensions, an
-     *         invalid regularization, or non-interior slacks/duals on finite bounds,
-     *         PIQP_NUMERICS if a KKT factorization or solve failed,
-     *         PIQP_MAX_ITER_REACHED if gradient smoothing did not converge.
-     */
     Status backward(const optional<CVecRef<T>>& grad_x = nullopt,
                     const optional<CVecRef<T>>& grad_y = nullopt,
                     const optional<CVecRef<T>>& grad_z_l = nullopt,
@@ -187,12 +146,13 @@ protected:
 
     Status solve_impl();
 
+    bool factor_kkt(const Variables<T>& vars, Info<T>& info, bool* regularization_changed = nullptr);
+
     T calculate_mu();
 
-    // step lengths to the boundary of the non-negative orthant for (s, z) of vars (m_result if nullptr)
     void calculate_step(T& alpha_s, T& alpha_z, const Variables<T>* vars = nullptr);
 
-    void update_residuals_nr();
+    void update_residuals_nr(const Variables<T>& vars, Info<T>& info);
 
     void update_residuals_r();
 
@@ -218,8 +178,9 @@ protected:
 
     void store_dual_infeasibility_certificate(const T& norm);
 
-    // unscales vars (m_result if nullptr) from scaled to user space, box variables in compressed layout
     void unscale_results(Variables<T>* vars = nullptr);
+
+    void unpack_dual(Variables<T>* vars = nullptr);
 
     void restore_dual();
 

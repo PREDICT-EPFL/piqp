@@ -77,7 +77,6 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
 
     Status status = solve_impl();
 
-    // keep a copy of the final iterate in scaled space and compressed box layout for backward()
     if (m_backward_enabled)
     {
         m_result_scaled.x = m_result.x;
@@ -184,7 +183,6 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
 
     init_workspace();
 
-    // the backward workspace is only allocated if requested, otherwise it is released
     m_backward_enabled = m_settings.enable_backward;
     isize n_bwd = m_backward_enabled ? m_data.n : 0;
     isize p_bwd = m_backward_enabled ? m_data.p : 0;
@@ -198,7 +196,6 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
     m_linearization_point.resize(n_bwd, p_bwd, m_bwd);
     if (m_backward_enabled)
     {
-        // the gradients take over the sparsity patterns of the matrices passed by the user
         m_gradients.resize(m_data, P, A, G);
     }
     else
@@ -496,35 +493,10 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
     m_enable_iterative_refinement = m_settings.iterative_refinement_always_enabled;
 
 
-    if (m_settings.compute_timings)
+    if (!factor_kkt(m_result, m_result.info))
     {
-        timer.start();
-    }
-    while (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
-                                                    m_result.info.rho, m_result.info.delta, m_result))
-    {
-        if (!m_enable_iterative_refinement)
-        {
-            m_enable_iterative_refinement = true;
-        }
-        else if (m_result.info.factor_retires < m_settings.max_factor_retires)
-        {
-            m_result.info.delta *= 100;
-            m_result.info.rho *= 100;
-            m_result.info.factor_retires++;
-            m_result.info.reg_limit = (std::min)(10 * m_result.info.reg_limit, m_settings.eps_abs);
-        }
-        else
-        {
-            m_result.info.status = Status::PIQP_NUMERICS;
-            return m_result.info.status;
-        }
-    }
-    m_result.info.factor_retires = 0;
-    if (m_settings.compute_timings)
-    {
-        T kkt_factor_time = timer.stop();
-        m_result.info.kkt_factor_time += kkt_factor_time;
+        m_result.info.status = Status::PIQP_NUMERICS;
+        return m_result.info.status;
     }
 
     res.x = -m_data.c;
@@ -637,7 +609,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
     {
         if (m_result.info.iter == 0)
         {
-            update_residuals_nr();
+            update_residuals_nr(m_result, m_result.info);
             prox_c_x = cert_c_x;
             prox_dual_lin = cert_dual_lin;
             m_result.info.prev_primal_res = m_result.info.primal_res;
@@ -753,37 +725,11 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
             }
         }
 
-        if (m_settings.compute_timings)
-        {
-            timer.start();
-        }
         bool regularization_changed = false;
-        while (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
-                                                        m_result.info.rho, m_result.info.delta, m_result))
+        if (!factor_kkt(m_result, m_result.info, &regularization_changed))
         {
-            if (!m_enable_iterative_refinement)
-            {
-                m_enable_iterative_refinement = true;
-                continue;
-            }
-            if (m_result.info.factor_retires < m_settings.max_factor_retires)
-            {
-                m_result.info.delta *= 100;
-                m_result.info.rho *= 100;
-                m_result.info.factor_retires++;
-                m_result.info.reg_limit = (std::min)(10 * m_result.info.reg_limit, m_settings.eps_abs);
-                regularization_changed = true;
-                continue;
-            }
-
             m_result.info.status = Status::PIQP_NUMERICS;
             return m_result.info.status;
-        }
-        m_result.info.factor_retires = 0;
-        if (m_settings.compute_timings)
-        {
-            T kkt_factor_time = timer.stop();
-            m_result.info.kkt_factor_time += kkt_factor_time;
         }
 
         if (regularization_changed) {
@@ -874,7 +820,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
             T mu_rate = (std::max)(T(0), (mu_prev - m_result.info.mu) / mu_prev);
 
             // ------------------ update regularization ------------------
-            update_residuals_nr();
+            update_residuals_nr(m_result, m_result.info);
             delta_c_x = cert_c_x - prox_c_x;
             delta_dual_lin = cert_dual_lin - prox_dual_lin;
 
@@ -930,7 +876,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
             delta_vars.y.noalias() = m_result.y - prox_vars.y;
 
             // ------------------ update regularization ------------------
-            update_residuals_nr();
+            update_residuals_nr(m_result, m_result.info);
             delta_c_x = cert_c_x - prox_c_x;
             delta_dual_lin = cert_dual_lin - prox_dual_lin;
 
@@ -964,6 +910,48 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve_impl()
 
     m_result.info.status = Status::PIQP_MAX_ITER_REACHED;
     return m_result.info.status;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+bool SolverBase<T, I, Preconditioner, MatrixType>::factor_kkt(const Variables<T>& vars, Info<T>& info, bool* regularization_changed)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::factor_kkt");
+
+    Timer<T> timer;
+    if (m_settings.compute_timings)
+    {
+        timer.start();
+    }
+    while (!m_kkt_system.update_scalings_and_factor(m_data, m_settings, m_enable_iterative_refinement,
+                                                    info.rho, info.delta, vars))
+    {
+        if (!m_enable_iterative_refinement)
+        {
+            m_enable_iterative_refinement = true;
+        }
+        else if (info.factor_retires < m_settings.max_factor_retires)
+        {
+            info.delta *= 100;
+            info.rho *= 100;
+            info.factor_retires++;
+            info.reg_limit = (std::min)(10 * info.reg_limit, m_settings.eps_abs);
+            if (regularization_changed != nullptr)
+            {
+                *regularization_changed = true;
+            }
+        }
+        else
+        {
+            return false;
+        }
+    }
+    info.factor_retires = 0;
+    if (m_settings.compute_timings)
+    {
+        T kkt_factor_time = timer.stop();
+        info.kkt_factor_time += kkt_factor_time;
+    }
+    return true;
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
@@ -1052,7 +1040,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::calculate_step(T& alpha_s, T&
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
-void SolverBase<T, I, Preconditioner, MatrixType>::update_residuals_nr()
+void SolverBase<T, I, Preconditioner, MatrixType>::update_residuals_nr(const Variables<T>& vars, Info<T>& info)
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::update_residuals_nr");
 
@@ -1065,56 +1053,56 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_residuals_nr()
     // we calculate these term here first to be able to reuse temporary vectors
     // res_nr.y = -A * x
     // work_x = A^T * y
-    m_kkt_system.eval_A_xn_and_AT_xt(m_data, T(-1), T(1), m_result.x, m_result.y, res_nr.y, work_x);
+    m_kkt_system.eval_A_xn_and_AT_xt(m_data, T(-1), T(1), vars.x, vars.y, res_nr.y, work_x);
     // res_nr.z_u = -G * x
     // res_nr.z_l = G * x
     // work_x += G^T * (z_u - z_l)
-    work_z.noalias() = m_result.z_u - m_result.z_l;
+    work_z.noalias() = vars.z_u - vars.z_l;
     Vec<T>& work_x_2 = res_nr.x; // use res_nr.x as temporary, gets overwritten in the next section
-    m_kkt_system.eval_G_xn_and_GT_xt(m_data, T(1), T(1), m_result.x, work_z, res_nr.z_l, work_x_2);
+    m_kkt_system.eval_G_xn_and_GT_xt(m_data, T(1), T(1), vars.x, work_z, res_nr.z_l, work_x_2);
     res_nr.z_u.noalias() = -res_nr.z_l;
     work_x.noalias() += work_x_2;
 
     // first part of dual residual and infeasibility calculation (used in cost calculation)
-    m_kkt_system.eval_P_x(m_data, T(-1), m_result.x, res_nr.x);
+    m_kkt_system.eval_P_x(m_data, T(-1), vars.x, res_nr.x);
     T dual_rel_norm = m_preconditioner.unscale_dual_res(res_nr.x).template lpNorm<Eigen::Infinity>();
 
     // calculate primal cost, dual cost, and duality gap
-    T tmp = -m_result.x.dot(res_nr.x); // x'Px
-    m_result.info.primal_obj = T(0.5) * tmp;
-    m_result.info.dual_obj = -T(0.5) * tmp;
+    T tmp = -vars.x.dot(res_nr.x); // x'Px
+    info.primal_obj = T(0.5) * tmp;
+    info.dual_obj = -T(0.5) * tmp;
     T duality_gap_rel_norm = m_preconditioner.unscale_cost(std::abs(tmp));
-    tmp = m_data.c.dot(m_result.x);
-    m_result.info.primal_obj += tmp;
+    tmp = m_data.c.dot(vars.x);
+    info.primal_obj += tmp;
     cert_c_x = tmp;
     duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
-    tmp = m_data.b.dot(m_result.y);
-    m_result.info.dual_obj -= tmp;
+    tmp = m_data.b.dot(vars.y);
+    info.dual_obj -= tmp;
     cert_dual_lin = tmp;
     duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
-    tmp = -m_data.h_l.dot(m_result.z_l);
-    m_result.info.dual_obj -= tmp;
+    tmp = -m_data.h_l.dot(vars.z_l);
+    info.dual_obj -= tmp;
     cert_dual_lin += tmp;
     duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
-    tmp = m_data.h_u.dot(m_result.z_u);
-    m_result.info.dual_obj -= tmp;
+    tmp = m_data.h_u.dot(vars.z_u);
+    info.dual_obj -= tmp;
     cert_dual_lin += tmp;
     duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
-    tmp = -m_data.x_l.head(m_data.n_x_l).dot(m_result.z_bl.head(m_data.n_x_l));
-    m_result.info.dual_obj -= tmp;
+    tmp = -m_data.x_l.head(m_data.n_x_l).dot(vars.z_bl.head(m_data.n_x_l));
+    info.dual_obj -= tmp;
     cert_dual_lin += tmp;
     duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
-    tmp = m_data.x_u.head(m_data.n_x_u).dot(m_result.z_bu.head(m_data.n_x_u));
-    m_result.info.dual_obj -= tmp;
+    tmp = m_data.x_u.head(m_data.n_x_u).dot(vars.z_bu.head(m_data.n_x_u));
+    info.dual_obj -= tmp;
     cert_dual_lin += tmp;
     duality_gap_rel_norm = (std::max)(duality_gap_rel_norm, m_preconditioner.unscale_cost(std::abs(tmp)));
 
-    m_result.info.duality_gap = std::abs(m_result.info.primal_obj - m_result.info.dual_obj);
+    info.duality_gap = std::abs(info.primal_obj - info.dual_obj);
 
-    m_result.info.primal_obj = m_preconditioner.unscale_cost(m_result.info.primal_obj);
-    m_result.info.dual_obj = m_preconditioner.unscale_cost(m_result.info.dual_obj);
-    m_result.info.duality_gap = m_preconditioner.unscale_cost(m_result.info.duality_gap);
-    m_result.info.duality_gap_rel = m_result.info.duality_gap / (std::max)(T(1), duality_gap_rel_norm);
+    info.primal_obj = m_preconditioner.unscale_cost(info.primal_obj);
+    info.dual_obj = m_preconditioner.unscale_cost(info.dual_obj);
+    info.duality_gap = m_preconditioner.unscale_cost(info.duality_gap);
+    info.duality_gap_rel = info.duality_gap / (std::max)(T(1), duality_gap_rel_norm);
 
     // dual residual and infeasibility calculation
     res_nr.x.noalias() -= m_data.c;
@@ -1122,12 +1110,12 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_residuals_nr()
     for (isize i = 0; i < m_data.n_x_l; i++)
     {
         Eigen::Index idx = m_data.x_l_idx(i);
-        work_x(idx) -= m_data.x_b_scaling(idx) * m_result.z_bl(i);
+        work_x(idx) -= m_data.x_b_scaling(idx) * vars.z_bl(i);
     }
     for (isize i = 0; i < m_data.n_x_u; i++)
     {
         Eigen::Index idx = m_data.x_u_idx(i);
-        work_x(idx) += m_data.x_b_scaling(idx) * m_result.z_bu(i);
+        work_x(idx) += m_data.x_b_scaling(idx) * vars.z_bu(i);
     }
     dual_rel_norm = (std::max)(dual_rel_norm, m_preconditioner.unscale_dual_res(work_x).template lpNorm<Eigen::Infinity>());
     res_nr.x.noalias() -= work_x;
@@ -1146,9 +1134,9 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_residuals_nr()
             res_nr.z_l(i++) = T(0);
         }
         primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_ineq(res_nr.z_l)(i));
-        res_nr.z_l(i) += -m_data.h_l(i) - m_result.s_l(i);
+        res_nr.z_l(i) += -m_data.h_l(i) - vars.s_l(i);
         primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_ineq(m_data.h_l)(i));
-        primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_ineq(m_result.s_l)(i));
+        primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_ineq(vars.s_l)(i));
         i++;
     }
     // zero out remaining residuals corresponding to infinite bounds
@@ -1165,9 +1153,9 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_residuals_nr()
             res_nr.z_u(i++) = T(0);
         }
         primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_ineq(res_nr.z_u)(i));
-        res_nr.z_u(i) += m_data.h_u(i) - m_result.s_u(i);
+        res_nr.z_u(i) += m_data.h_u(i) - vars.s_u(i);
         primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_ineq(m_data.h_u)(i));
-        primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_ineq(m_result.s_u)(i));
+        primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_ineq(vars.s_u)(i));
         i++;
     }
     // zero out remaining residuals corresponding to infinite bounds
@@ -1178,31 +1166,31 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_residuals_nr()
     for (i = 0; i < m_data.n_x_l; i++)
     {
         Eigen::Index idx = m_data.x_l_idx(i);
-        res_nr.z_bl(i) = m_data.x_b_scaling(idx) * m_result.x(idx);
+        res_nr.z_bl(i) = m_data.x_b_scaling(idx) * vars.x(idx);
         primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_b_i(res_nr.z_bl(i), idx));
         primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_b_i(m_data.x_l(i), idx));
-        primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_b_i(m_result.s_bl(i), idx));
+        primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_b_i(vars.s_bl(i), idx));
     }
-    res_nr.z_bl.head(m_data.n_x_l).noalias() += -m_data.x_l.head(m_data.n_x_l) - m_result.s_bl.head(m_data.n_x_l);
+    res_nr.z_bl.head(m_data.n_x_l).noalias() += -m_data.x_l.head(m_data.n_x_l) - vars.s_bl.head(m_data.n_x_l);
 
     for (i = 0; i < m_data.n_x_u; i++)
     {
         Eigen::Index idx = m_data.x_u_idx(i);
-        res_nr.z_bu(i) = -m_data.x_b_scaling(idx) * m_result.x(idx);
+        res_nr.z_bu(i) = -m_data.x_b_scaling(idx) * vars.x(idx);
         primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_b_i(res_nr.z_bu(i), idx));
         primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_b_i(m_data.x_u(i), idx));
-        primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_b_i(m_result.s_bu(i), idx));
+        primal_rel_norm = (std::max)(primal_rel_norm, m_preconditioner.unscale_primal_res_b_i(vars.s_bu(i), idx));
     }
-    res_nr.z_bu.head(m_data.n_x_u).noalias() += m_data.x_u.head(m_data.n_x_u) - m_result.s_bu.head(m_data.n_x_u);
+    res_nr.z_bu.head(m_data.n_x_u).noalias() += m_data.x_u.head(m_data.n_x_u) - vars.s_bu.head(m_data.n_x_u);
 
-    m_result.info.prev_primal_res = m_result.info.primal_res;
-    m_result.info.prev_dual_res = m_result.info.dual_res;
+    info.prev_primal_res = info.primal_res;
+    info.prev_dual_res = info.dual_res;
 
-    m_result.info.primal_res = primal_res_nr();
-    m_result.info.primal_res_rel = m_result.info.primal_res / (std::max)(T(1), primal_rel_norm);
+    info.primal_res = primal_res_nr();
+    info.primal_res_rel = info.primal_res / (std::max)(T(1), primal_rel_norm);
 
-    m_result.info.dual_res = dual_res_nr();
-    m_result.info.dual_res_rel = m_result.info.dual_res / (std::max)(T(1), dual_rel_norm);
+    info.dual_res = dual_res_nr();
+    info.dual_res_rel = info.dual_res / (std::max)(T(1), dual_rel_norm);
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
@@ -1545,17 +1533,27 @@ void SolverBase<T, I, Preconditioner, MatrixType>::restore_dual()
     m_result.z_bu.tail(m_data.n - m_data.n_x_u).setZero();
     m_result.s_bl.tail(m_data.n - m_data.n_x_l).array() = PIQP_INF;;
     m_result.s_bu.tail(m_data.n - m_data.n_x_u).array() = PIQP_INF;;
+    unpack_dual();
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::unpack_dual(Variables<T>* vars_ptr)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::unpack_dual");
+
+    Variables<T>& vars = vars_ptr != nullptr ? *vars_ptr : m_result;
+
     for (isize i = m_data.n_x_l - 1; i >= 0; i--)
     {
         Eigen::Index idx = m_data.x_l_idx(i);
-        std::swap(m_result.z_bl(i), m_result.z_bl(idx));
-        std::swap(m_result.s_bl(i), m_result.s_bl(idx));
+        std::swap(vars.z_bl(i), vars.z_bl(idx));
+        std::swap(vars.s_bl(i), vars.s_bl(idx));
     }
     for (isize i = m_data.n_x_u - 1; i >= 0; i--)
     {
         Eigen::Index idx = m_data.x_u_idx(i);
-        std::swap(m_result.z_bu(i), m_result.z_bu(idx));
-        std::swap(m_result.s_bu(i), m_result.s_bu(idx));
+        std::swap(vars.z_bu(i), vars.z_bu(idx));
+        std::swap(vars.s_bu(i), vars.s_bu(idx));
     }
 }
 
@@ -1661,7 +1659,6 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::backward_impl(const optiona
         return Status::PIQP_INVALID_SETTINGS;
     }
 
-    // Linearization point: the stored solution or the provided forward result.
     const Variables<T>* linearization_point_scaled = &m_result_scaled;
     const Variables<T>* linearization_point = &m_result;
     T rho = m_result.info.rho;
@@ -1679,10 +1676,6 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::backward_impl(const optiona
         delta = forward_result->info.delta;
     }
 
-    // KKT factorization at the linearization point:
-    // - gradient smoothing: factorized in every smoothing iteration, also without forward_result
-    // - forward_result provided: factorized once at that point
-    // - otherwise: the factorization of the last solve() is reused if it is still in place
     if (m_settings.gradient_smoothing)
     {
         // move the linearization point to the relaxed point s * z = mu nearby
@@ -1720,11 +1713,10 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::backward_impl(const optiona
 
     unscale_adjoint();
 
-    // Rows disabled by disable_inf_constraints() are decoupled from the rest of the problem. Zeroing
-    // their adjoints and duals makes their gradients exactly zero without affecting any other gradient.
+    // disabled rows are decoupled from the problem, zeroing their duals and adjoints zeros their gradients
     if (m_data.G_row_disabled.any())
     {
-        // m_smoothed and m_linearization_point are scratch, but m_result is returned to the user
+        // don't modify m_result
         Variables<T>* point = linearization_point == &m_smoothed ? &m_smoothed : &m_linearization_point;
         if (linearization_point == &m_result)
         {
@@ -2093,11 +2085,8 @@ T SolverBase<T, I, Preconditioner, MatrixType>::smoothing_residual(const Variabl
 }
 
 
-// Assembles the right-hand side of the adjoint system K^T lambda = -g in scaled space and compressed
-// box layout into m_adjoint_rhs, where g are the gradients of the loss with respect to the solution.
-// K^T differs from K only in the slack blocks; solving K^T lambda = g with the forward KKT solve is
-// equivalent to replacing the slack part of the right-hand side g_s by S * g_s, with S the slacks of
-// the linearization point. The resulting slack components of lambda are not meaningful and are not used.
+// The adjoint system K^T lambda = -g only differs from K in the slack blocks,
+// which is accounted for by scaling the slack part of g with S.
 template<typename T, typename I, typename Preconditioner, int MatrixType>
 void SolverBase<T, I, Preconditioner, MatrixType>::assemble_adjoint_rhs(const optional<CVecRef<T>>& grad_x,
                                                                         const optional<CVecRef<T>>& grad_y,
@@ -2147,7 +2136,6 @@ void SolverBase<T, I, Preconditioner, MatrixType>::assemble_adjoint_rhs(const op
     {
         rhs.z_u.setZero();
     }
-    // s = 0 for infinite bounds, i.e. the corresponding entries vanish
     if (grad_s_l.has_value())
     {
         rhs.s_l = -m_preconditioner.unscale_slack_ineq(*grad_s_l);
@@ -2197,8 +2185,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::assemble_adjoint_rhs(const op
     }
 }
 
-// Unscales the adjoint variables in m_adjoint from scaled to user space,
-// they scale like the KKT residuals. The box duals are in compressed layout.
+// the adjoints scale like the KKT residuals
 template<typename T, typename I, typename Preconditioner, int MatrixType>
 void SolverBase<T, I, Preconditioner, MatrixType>::unscale_adjoint()
 {
