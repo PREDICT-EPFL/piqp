@@ -86,7 +86,9 @@ inline octave_value eigen_to_ov(const Mat& mat)
 
 inline octave_value eigen_to_ov(const SparseMat& mat)
 {
-    SparseMatrix arr(mat.rows(), mat.cols(), mat.nonZeros());
+    // explicit casts, otherwise the constructor call is ambiguous if Eigen::Index is not octave_idx_type (e.g. on macOS)
+    SparseMatrix arr(static_cast<octave_idx_type>(mat.rows()), static_cast<octave_idx_type>(mat.cols()),
+                     static_cast<octave_idx_type>(mat.nonZeros()));
     for (Eigen::Index j = 0; j <= mat.cols(); j++) {
         arr.xcidx(j) = mat.outerIndexPtr()[j];
     }
