@@ -126,6 +126,73 @@ classdef simple_tests < matlab.unittest.TestCase
             testCase.verifyEqual(results.z_bl, [0; 0], 'AbsTol', testCase.tol)
             testCase.verifyEqual(results.z_bu, [0; 0], 'AbsTol', testCase.tol)
         end
+
+        function backward_dense_qp(testCase)
+            check_backward(testCase, 'dense');
+        end
+
+        function backward_sparse_qp(testCase)
+            check_backward(testCase, 'sparse');
+        end
+
+        function backward_not_enabled(testCase)
+            testCase.solver_dense.solve();
+            grads = testCase.solver_dense.backward('x', [1; 2]);
+            testCase.verifyEqual(grads.status_val, -1) % invalid settings
+            testCase.verifyEmpty(grads.c)
+        end
+    end
+
+    methods
+        function solver = setup_backward_solver(testCase, backend, c)
+            % same problem with an active upper bound x2 <= 0.1
+            solver = piqp(backend);
+            solver.setup(testCase.P, c, testCase.A, testCase.b, ...
+                         testCase.G, testCase.h_l, testCase.h_u, ...
+                         testCase.x_l, [Inf; 0.1], ...
+                         'eps_abs', 1e-12, 'eps_rel', 1e-12, 'enable_backward', true);
+        end
+
+        function check_backward(testCase, backend)
+            % loss L = x1 + 2 x2 + y
+            solver = setup_backward_solver(testCase, backend, testCase.c);
+            grads = solver.backward('x', [1; 2], 'y', 1);
+            testCase.verifyEqual(grads.status_val, -2) % invalid forward result (no forward solution)
+            testCase.verifyEmpty(grads.c)
+
+            res = solver.solve();
+            grads = solver.backward('x', [1; 2], 'y', 1);
+            testCase.verifyEqual(grads.status_val, 1) % solved
+
+            % finite differences w.r.t. c
+            eps = 1e-6;
+            for i = 1:2
+                dc = zeros(2, 1);
+                dc(i) = eps;
+                fd = (backward_loss(testCase, backend, testCase.c + dc) - ...
+                      backward_loss(testCase, backend, testCase.c - dc)) / (2 * eps);
+                testCase.verifyEqual(grads.c(i), fd, 'AbsTol', 1e-5)
+            end
+            testCase.verifyEqual(size(grads.P), [2 2])
+            testCase.verifyEqual(size(grads.A), [1 2])
+            testCase.verifyEqual(size(grads.G), [2 2])
+            testCase.verifyEqual(issparse(grads.A), strcmp(backend, 'sparse'))
+
+            % gradients at a provided forward result
+            grads_fr = solver.backward(struct('x', [1; 2], 'y', 1, 'forward_result', res));
+            testCase.verifyEqual(grads_fr.status_val, 1)
+            testCase.verifyEqual(grads_fr.c, grads.c, 'AbsTol', 1e-10)
+
+            res.info.rho = 0;
+            grads_fr = solver.backward('x', [1; 2], 'forward_result', res);
+            testCase.verifyEqual(grads_fr.status_val, -2) % invalid forward result
+        end
+
+        function L = backward_loss(testCase, backend, c)
+            solver = setup_backward_solver(testCase, backend, c);
+            res = solver.solve();
+            L = res.x(1) + 2 * res.x(2) + res.y;
+        end
     end
 
 end

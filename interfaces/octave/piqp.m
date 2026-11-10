@@ -23,6 +23,7 @@ classdef piqp < handle
     %   setup             - configure solver with problem data
     %   solve             - solve the QP
     %   update            - modify problem data
+    %   backward          - compute gradients w.r.t. the problem data
     %
     %   get_settings      - get the current solver settings
     %   update_settings   - update the current solver settings
@@ -337,6 +338,65 @@ classdef piqp < handle
             end
 
             piqp_oct('update',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h_l,h_u,x_l,x_u);
+        end
+
+        %%
+        function grads = backward(this, varargin)
+            % BACKWARD compute the gradients of a scalar loss L w.r.t. the problem data.
+            %
+            %   grads = backward('x', dL_dx, 'y', dL_dy, ...) or backward(struct)
+            %
+            %   Allowed fields are the gradients of L w.r.t. the solution
+            %   x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu (missing ones are zero)
+            %   and forward_result, a result returned by solve() at which the
+            %   gradients are computed (default: the result of the last solve()).
+            %   Requires the setting enable_backward to be set in setup().
+            %
+            %   grads has the fields P, c, A, b, G, h_l, h_u, x_l, x_u, which are
+            %   only set if grads.status_val is 1 (PIQP_BWD_SOLVED), and status, status_val.
+
+            assert(this.n ~= 0, 'Problem is not initialized.')
+
+            gradFields = {'x','y','z_l','z_u','z_bl','z_bu','s_l','s_u','s_bl','s_bu'};
+            gradSizes = [this.n, this.p, this.m, this.m, this.n, this.n, this.m, this.m, this.n, this.n];
+            allowedFields = [gradFields, {'forward_result'}];
+
+            if isempty(varargin)
+                adjoints = struct();
+            elseif length(varargin) == 1
+                if(~isstruct(varargin{1}))
+                    error('Single input should be a structure with the gradients w.r.t. the solution');
+                else
+                    adjoints = varargin{1};
+                end
+            else % param / value style assumed
+                adjoints = struct(varargin{:});
+            end
+
+            %check for unknown fields
+            newFields = fieldnames(adjoints);
+            badFieldsIdx = find(~ismember(newFields,allowedFields));
+            if(~isempty(badFieldsIdx))
+                 error('Unrecognized input field ''%s'' detected',newFields{badFieldsIdx(1)});
+            end
+
+            grads = cell(1, length(gradFields));
+            for i = 1:length(gradFields)
+                if isfield(adjoints, gradFields{i}) && ~isempty(adjoints.(gradFields{i}))
+                    grads{i} = full(double(adjoints.(gradFields{i})(:)));
+                    assert(length(grads{i}) == gradSizes(i), 'Incorrect dimension of %s', gradFields{i});
+                else
+                    grads{i} = [];
+                end
+            end
+
+            if isfield(adjoints, 'forward_result')
+                forward_result = adjoints.forward_result;
+            else
+                forward_result = [];
+            end
+
+            grads = piqp_oct('backward',this.objectHandle,grads{:},forward_result);
         end
     end
 end
