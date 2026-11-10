@@ -125,8 +125,10 @@ def test_backward_forward_result(dense):
         setattr(result, field, np.array(getattr(solver.result, field)))
     result.info = solver.result.info
 
+    # the default call reuses the factorization of the forward solve (second-to-last iterate),
+    # the forward result is refactorized, so both agree up to the solver accuracy
     assert solver.backward(grad_x=w_x, forward_result=result) == piqp.PIQP_BWD_SOLVED
-    np.testing.assert_allclose(solver.gradients.c, expected, rtol=1e-8, atol=1e-10)
+    np.testing.assert_allclose(solver.gradients.c, expected, rtol=1e-6, atol=1e-6)
 
 
 @pytest.mark.parametrize("dense", [True, False])

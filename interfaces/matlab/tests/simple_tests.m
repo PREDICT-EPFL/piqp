@@ -178,10 +178,11 @@ classdef simple_tests < matlab.unittest.TestCase
             testCase.verifyEqual(size(grads.G), [2 2])
             testCase.verifyEqual(issparse(grads.A), strcmp(backend, 'sparse'))
 
-            % gradients at a provided forward result
+            % gradients at a provided forward result; the default call reuses the factorization of the
+            % forward solve (second-to-last iterate), the forward result is refactorized
             grads_fr = solver.backward(struct('x', [1; 2], 'y', 1, 'forward_result', res));
             testCase.verifyEqual(grads_fr.status_val, 1)
-            testCase.verifyEqual(grads_fr.c, grads.c, 'AbsTol', 1e-10)
+            testCase.verifyEqual(grads_fr.c, grads.c, 'AbsTol', 1e-6)
 
             res.info.rho = 0;
             grads_fr = solver.backward('x', [1; 2], 'forward_result', res);

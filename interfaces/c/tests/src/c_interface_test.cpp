@@ -315,11 +315,12 @@ TEST(CInterfaceTest, DenseBackward)
     EXPECT_NEAR(g->P[0], backward_finite_difference([](BackwardQP& q) { return &q.P[0]; }), tol);
     EXPECT_NEAR(g->P[3], backward_finite_difference([](BackwardQP& q) { return &q.P[3]; }), tol);
 
-    // the gradients at a provided forward result match the ones at the stored solution
+    // the gradients at a provided forward result match the ones at the stored solution; the default call reuses
+    // the factorization of the forward solve (second-to-last iterate), the forward result is refactorized
     piqp_float c0 = g->c[0];
     ASSERT_EQ(piqp_backward(work, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, work->result),
               PIQP_BWD_SOLVED);
-    EXPECT_NEAR(g->c[0], c0, 1e-10);
+    EXPECT_NEAR(g->c[0], c0, 1e-6);
 
     // a failed call invalidates the gradients
     piqp_result invalid = *work->result;
