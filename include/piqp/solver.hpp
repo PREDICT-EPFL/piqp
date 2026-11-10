@@ -90,7 +90,7 @@ protected:
     GradientsType m_gradients;
     bool m_backward_ready = false;               // a valid solve of the current data is available
     bool m_forward_factor_valid = false;         // the KKT factorization of the last valid solve() can be reused
-    bool m_gradients_allocated = false;
+    bool m_backward_enabled = false;             // backward workspace and gradients are allocated (enable_backward at setup())
 
 public:
     SolverBase();

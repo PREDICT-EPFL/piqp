@@ -78,16 +78,19 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
     Status status = solve_impl();
 
     // keep a copy of the final iterate in scaled space and compressed box layout for backward()
-    m_result_scaled.x = m_result.x;
-    m_result_scaled.y = m_result.y;
-    m_result_scaled.z_l = m_result.z_l;
-    m_result_scaled.z_u = m_result.z_u;
-    m_result_scaled.z_bl = m_result.z_bl;
-    m_result_scaled.z_bu = m_result.z_bu;
-    m_result_scaled.s_l = m_result.s_l;
-    m_result_scaled.s_u = m_result.s_u;
-    m_result_scaled.s_bl = m_result.s_bl;
-    m_result_scaled.s_bu = m_result.s_bu;
+    if (m_backward_enabled)
+    {
+        m_result_scaled.x = m_result.x;
+        m_result_scaled.y = m_result.y;
+        m_result_scaled.z_l = m_result.z_l;
+        m_result_scaled.z_u = m_result.z_u;
+        m_result_scaled.z_bl = m_result.z_bl;
+        m_result_scaled.z_bu = m_result.z_bu;
+        m_result_scaled.s_l = m_result.s_l;
+        m_result_scaled.s_u = m_result.s_u;
+        m_result_scaled.s_bl = m_result.s_bl;
+        m_result_scaled.s_bu = m_result.s_bu;
+    }
     m_backward_ready = (status == Status::PIQP_SOLVED || status == Status::PIQP_MAX_ITER_REACHED);
     m_forward_factor_valid = m_backward_ready;
 
@@ -153,7 +156,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
 
     m_backward_ready = false;
     m_forward_factor_valid = false;
-    m_gradients_allocated = false;
+    m_backward_enabled = false;
     m_gradients.status = Status::PIQP_UNSOLVED;
 
     if (P.rows() != m_data.n || P.cols() != m_data.n) { piqp_eprint("P must be square\n"); return; }
@@ -181,11 +184,26 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
 
     init_workspace();
 
-    // the gradients take over the sparsity patterns of the matrices passed by the user
-    m_gradients_allocated = m_settings.enable_backward;
-    if (m_gradients_allocated)
+    // the backward workspace is only allocated if requested, otherwise it is released
+    m_backward_enabled = m_settings.enable_backward;
+    isize n_bwd = m_backward_enabled ? m_data.n : 0;
+    isize p_bwd = m_backward_enabled ? m_data.p : 0;
+    isize m_bwd = m_backward_enabled ? m_data.m : 0;
+    m_result_scaled.resize(n_bwd, p_bwd, m_bwd);
+    m_adjoint_rhs.resize(n_bwd, p_bwd, m_bwd);
+    m_adjoint.resize(n_bwd, p_bwd, m_bwd);
+    m_smoothed_scaled.resize(n_bwd, p_bwd, m_bwd);
+    m_smoothed.resize(n_bwd, p_bwd, m_bwd);
+    m_linearization_point_scaled.resize(n_bwd, p_bwd, m_bwd);
+    m_linearization_point.resize(n_bwd, p_bwd, m_bwd);
+    if (m_backward_enabled)
     {
+        // the gradients take over the sparsity patterns of the matrices passed by the user
         m_gradients.resize(m_data, P, A, G);
+    }
+    else
+    {
+        m_gradients = GradientsType();
     }
 
     m_preconditioner.init(m_data);
@@ -412,15 +430,6 @@ void SolverBase<T, I, Preconditioner, MatrixType>::init_workspace()
     cert_work_p.resize(m_data.p);
     cert_work_m_1.resize(m_data.m);
     cert_work_m_2.resize(m_data.m);
-
-    // for backward
-    m_result_scaled.resize(m_data.n, m_data.p, m_data.m);
-    m_adjoint_rhs.resize(m_data.n, m_data.p, m_data.m);
-    m_adjoint.resize(m_data.n, m_data.p, m_data.m);
-    m_smoothed_scaled.resize(m_data.n, m_data.p, m_data.m);
-    m_smoothed.resize(m_data.n, m_data.p, m_data.m);
-    m_linearization_point_scaled.resize(m_data.n, m_data.p, m_data.m);
-    m_linearization_point.resize(m_data.n, m_data.p, m_data.m);
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
@@ -1589,7 +1598,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::backward_impl(const optiona
         return Status::PIQP_INVALID_SETTINGS;
     }
 
-    if (!m_gradients_allocated)
+    if (!m_backward_enabled)
     {
         piqp_eprint("backward() requires settings.enable_backward to be set before setup()\n");
         return Status::PIQP_INVALID_SETTINGS;
