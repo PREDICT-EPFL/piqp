@@ -283,7 +283,7 @@ TEST(RuizEquilibration, DenseSparseCompareScaleCost)
 
     for (unsigned int seed = 0; seed < 10; seed++)
     {
-        rand::gen.seed(seed);
+        rand::seed(seed);
 
         sparse::Model<T, I> qp_model_sparse = rand::sparse_strongly_convex_qp<T, I>(dim, n_eq, n_ineq, sparsity_factor);
         dense::Model<T> qp_model_dense = qp_model_sparse.dense_model();

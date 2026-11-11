@@ -20,8 +20,8 @@ TEST(BlasfeoWrapperTest, blasfeo_dgemm) {
     // Test dgemm_nn
     // D <= beta * C + alpha * A * B
     for (size_t i = 0; i < test_round; i++) {
-        T alpha = normal_dist(gen), beta = normal_dist(gen);
-        I m = uniform_dist_int(gen), n = uniform_dist_int(gen), k = uniform_dist_int(gen);
+        T alpha = normal_dist()(gen()), beta = normal_dist()(gen());
+        I m = uniform_dist_int(gen()), n = uniform_dist_int(gen()), k = uniform_dist_int(gen());
         Mat<T> A_ref = dense_matrix_rand<T>(m, k);
         Mat<T> B_ref = dense_matrix_rand<T>(k, n);
         Mat<T> C_ref = dense_matrix_rand<T>(m, n);
@@ -40,8 +40,8 @@ TEST(BlasfeoWrapperTest, blasfeo_dgemm) {
     // Test dgemm_tn
     // D <= beta * C + alpha * A^T * B
     for (size_t i = 0; i < test_round; i++) {
-        T alpha = normal_dist(gen), beta = normal_dist(gen);
-        I m = uniform_dist_int(gen), n = uniform_dist_int(gen), k = uniform_dist_int(gen);
+        T alpha = normal_dist()(gen()), beta = normal_dist()(gen());
+        I m = uniform_dist_int(gen()), n = uniform_dist_int(gen()), k = uniform_dist_int(gen());
         Mat<T> AT_ref = dense_matrix_rand<T>(m, k);
         Mat<T> B_ref = dense_matrix_rand<T>(k, n);
         Mat<T> C_ref = dense_matrix_rand<T>(m, n);
@@ -60,8 +60,8 @@ TEST(BlasfeoWrapperTest, blasfeo_dgemm) {
     // Test dgemm_tt
     // D <= beta * C + alpha * A^T * B^T
     for (size_t i = 0; i < test_round; i++) {
-        T alpha = normal_dist(gen), beta = normal_dist(gen);
-        I m = uniform_dist_int(gen), n = uniform_dist_int(gen), k = uniform_dist_int(gen);
+        T alpha = normal_dist()(gen()), beta = normal_dist()(gen());
+        I m = uniform_dist_int(gen()), n = uniform_dist_int(gen()), k = uniform_dist_int(gen());
         Mat<T> AT_ref = dense_matrix_rand<T>(m, k);
         Mat<T> BT_ref = dense_matrix_rand<T>(k, n);
         Mat<T> C_ref = dense_matrix_rand<T>(m, n);
@@ -84,8 +84,8 @@ TEST(BlasfeoWrapperTest, blasfeo_dsyrk) {
 
     size_t test_round = 100;
     for (size_t i = 0 ; i < test_round; i++) {
-        T alpha = dis_double(gen), beta = dis_double(gen);
-        I m = dis_int(gen), k = dis_int(gen);
+        T alpha = dis_double(gen()), beta = dis_double(gen());
+        I m = dis_int(gen()), k = dis_int(gen());
 
         const Mat<T> A_ref = Mat<T>::Random(m, k), B_ref = Mat<T>::Random(m, k), C1_ref = Mat<T>::Random(m, m), C2_ref = Mat<T>::Random(k, k);
         Mat<T> D1_ref(m, m), D2_ref(k, k);
@@ -118,8 +118,8 @@ TEST(BlasfeoWrapperTest, blasfeo_dtrsm) {
 
     size_t test_round = 50;
     for (size_t i = 0 ; i < test_round; i++) {
-        T alpha = dis_double(gen);
-        I m = dis_int(gen), k = dis_int(gen);
+        T alpha = dis_double(gen());
+        I m = dis_int(gen()), k = dis_int(gen());
 
         Mat<T> A_ref = dense_positive_definite_upper_triangular_rand<T>(m).transpose();
         Mat<T> B_ref = dense_matrix_rand<T>(m, k);
@@ -147,10 +147,10 @@ TEST(BlasfeoWrapperTest, blasfeo_dgemv) {
     std::uniform_int_distribution<int> uniform_dist_int(1, 100);
     size_t test_round = 100;
     for (size_t i = 0; i < test_round; i++) {
-        double alpha = normal_dist(gen);
-        double beta = normal_dist(gen);
-        int m = uniform_dist_int(gen);
-        int n = uniform_dist_int(gen);
+        double alpha = normal_dist()(gen());
+        double beta = normal_dist()(gen());
+        int m = uniform_dist_int(gen());
+        int n = uniform_dist_int(gen());
 
         Mat<T> A_ref = dense_matrix_rand<T>(m, n);
         Mat<T> B_ref = dense_matrix_rand<T>(n, n);
@@ -183,7 +183,7 @@ TEST(BlasfeoWrapperTest, blasfeo_dtrsv) {
     std::uniform_int_distribution<> dis_int(5, 100);
     size_t test_round = 100;
     for (size_t i = 0 ; i < test_round; i++) {
-        I n = dis_int(gen);
+        I n = dis_int(gen());
         Mat<T> A_ref = dense_positive_definite_upper_triangular_rand<T>(n, n).transpose();
         Vec<T> b_ref = dense_matrix_rand<T>(n, 1);
         Vec<T> d_ref(n);

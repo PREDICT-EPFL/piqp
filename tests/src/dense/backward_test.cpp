@@ -24,11 +24,7 @@ namespace
 std::pair<dense::Model<T>, rand::ActiveSet> make_qp(unsigned int seed)
 {
     // same problem in every test, independent of the test order
-    // (the distributions are reset as well, normal_distribution caches values)
-    rand::gen.seed(seed);
-    rand::uniform_dist.reset();
-    rand::uniform_dist_pos.reset();
-    rand::normal_dist.reset();
+    rand::seed(seed);
     return rand::dense_strongly_convex_qp_with_known_active_set<T>(12, 2, 8);
 }
 

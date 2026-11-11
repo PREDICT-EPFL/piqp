@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The C settings struct `piqp_settings` and the C workspace `piqp_workspace` have new fields, so code compiled against the C interface must be recompiled
 - `update()` rejects enabling an inequality constraint with both bounds previously infinite if `G` is not passed as well [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- The random generator and distributions in `piqp/utils/random_utils.hpp` are accessed through the functions `piqp::rand::gen()`, `uniform_dist()`, `uniform_dist_pos()` and `normal_dist()`, such that the header can be included in multiple translation units, and `piqp::rand::seed()` reseeds them [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
 
 ### Fixed
 - Inequality constraints with both bounds infinite stay disabled if only `G` or only one of `h_l` and `h_u` is updated [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)

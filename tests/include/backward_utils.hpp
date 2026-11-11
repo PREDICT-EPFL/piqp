@@ -306,7 +306,7 @@ void random_values(piqp::SparseMat<T, I>& M, bool nonzero)
 {
     for (piqp::isize k = 0; k < M.nonZeros(); k++)
     {
-        M.valuePtr()[k] = nonzero ? T(piqp::rand::normal_dist(piqp::rand::gen)) : T(0);
+        M.valuePtr()[k] = nonzero ? T(piqp::rand::normal_dist()(piqp::rand::gen())) : T(0);
     }
 }
 
@@ -316,7 +316,7 @@ void random_values(piqp::Vec<T>& d, const piqp::Vec<T>& bound, bool nonzero)
 {
     for (piqp::isize i = 0; i < d.rows(); i++)
     {
-        d(i) = nonzero && std::abs(bound(i)) < PIQP_INF ? T(piqp::rand::normal_dist(piqp::rand::gen)) : T(0);
+        d(i) = nonzero && std::abs(bound(i)) < PIQP_INF ? T(piqp::rand::normal_dist()(piqp::rand::gen())) : T(0);
     }
 }
 
