@@ -371,24 +371,31 @@ const mxArray* get_struct_field(const mxArray* mx_ptr, const char* name)
     return field;
 }
 
-Vec mx_to_vec(const mxArray* mx_ptr)
+Vec get_struct_vec(const mxArray* mx_ptr, const char* name)
 {
-    return Eigen::Map<const Vec>(mxGetPr(mx_ptr), (Eigen::Index) mxGetNumberOfElements(mx_ptr));
+    const mxArray* field = get_struct_field(mx_ptr, name);
+    if (!mxIsDouble(field) || mxIsComplex(field) || mxIsSparse(field)) {
+        mexErrMsgIdAndTxt("piqp:backward", "forward_result.%s must be a real full double array.", name);
+    }
+    return Eigen::Map<const Vec>(mxGetPr(field), (Eigen::Index) mxGetNumberOfElements(field));
 }
 
 piqp::Result<double> mx_struct_to_result(const mxArray* mx_ptr)
 {
+    if (!mxIsStruct(mx_ptr) || mxGetNumberOfElements(mx_ptr) != 1) {
+        mexErrMsgIdAndTxt("piqp:backward", "forward_result must be a scalar struct returned by solve().");
+    }
     piqp::Result<double> result;
-    result.x = mx_to_vec(get_struct_field(mx_ptr, "x"));
-    result.y = mx_to_vec(get_struct_field(mx_ptr, "y"));
-    result.z_l = mx_to_vec(get_struct_field(mx_ptr, "z_l"));
-    result.z_u = mx_to_vec(get_struct_field(mx_ptr, "z_u"));
-    result.z_bl = mx_to_vec(get_struct_field(mx_ptr, "z_bl"));
-    result.z_bu = mx_to_vec(get_struct_field(mx_ptr, "z_bu"));
-    result.s_l = mx_to_vec(get_struct_field(mx_ptr, "s_l"));
-    result.s_u = mx_to_vec(get_struct_field(mx_ptr, "s_u"));
-    result.s_bl = mx_to_vec(get_struct_field(mx_ptr, "s_bl"));
-    result.s_bu = mx_to_vec(get_struct_field(mx_ptr, "s_bu"));
+    result.x = get_struct_vec(mx_ptr, "x");
+    result.y = get_struct_vec(mx_ptr, "y");
+    result.z_l = get_struct_vec(mx_ptr, "z_l");
+    result.z_u = get_struct_vec(mx_ptr, "z_u");
+    result.z_bl = get_struct_vec(mx_ptr, "z_bl");
+    result.z_bu = get_struct_vec(mx_ptr, "z_bu");
+    result.s_l = get_struct_vec(mx_ptr, "s_l");
+    result.s_u = get_struct_vec(mx_ptr, "s_u");
+    result.s_bl = get_struct_vec(mx_ptr, "s_bl");
+    result.s_bu = get_struct_vec(mx_ptr, "s_bu");
     // only the status and the regularization are used by backward()
     const mxArray* info_ptr = get_struct_field(mx_ptr, "info");
     result.info.status = (piqp::Status) (int) mxGetScalar(get_struct_field(info_ptr, "status_val"));
