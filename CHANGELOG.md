@@ -8,16 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- New method `backward()` on the dense and sparse solvers which computes the gradients of a loss with respect to the problem data (P, c, A, b, G, h_l, h_u, x_l, x_u) by implicit differentiation of the KKT conditions at the solution, given the gradients with respect to the solution (x, y, z, s). By default, the KKT factorization of the last solve is reused, so `backward()` only solves the KKT system (with gradient smoothing, the KKT system is always refactorized). By passing an optional stored `forward_result`, the gradients are computed at the result of an earlier solve instead, e.g. for rollouts, which requires one KKT factorization. Available in the C++, C (`piqp_backward()`), Python, Matlab and Octave interfaces. See the new [Differentiation](https://predict-epfl.github.io/piqp/differentiation) page in the documentation
-- `backward()` returns a `Status` (`PIQP_SOLVED`, `PIQP_UNSOLVED` if there is no solution to differentiate, `PIQP_INVALID_SETTINGS`, `PIQP_NUMERICS`, or `PIQP_MAX_ITER_REACHED` if gradient smoothing did not converge)
-- The gradients are available via `gradients()` and must only be used if `gradients().status` is `PIQP_SOLVED`. It holds the status of the last `backward()` and is reset to `PIQP_UNSOLVED` by `setup()` and `update()`
-- The gradient w.r.t. `P` is `0.5 * (lam_x x^T + x lam_x^T)`, as in ProxQP, qpth and OSQP. The gradients of the sparse solver have the sparsity patterns of the matrices passed to `setup()`, e.g., the gradient w.r.t. `P` is upper triangular if only the upper triangular part of `P` is passed
-- In the Python interface, the gradients are read-only views into the solver memory without copies, also the scipy CSC matrices of the sparse solver. `setup()` keeps the storage if the problem dimensions (dense) or sparsity patterns (sparse) do not change, such that the views stay valid
-- New setting `enable_backward`, which has to be set before `setup()` to use `backward()`. It allocates the gradient storage in `setup()`, such that `backward()` does not allocate
-- New settings `gradient_smoothing`, `gradient_smoothing_mu` and `gradient_smoothing_max_iter`: with `gradient_smoothing` enabled, `backward()` differentiates at a relaxed point with `s * z = mu`, which makes the gradient smooth across active-set changes
+- New method `backward()` which computes the gradients w.r.t. the problem data by implicit differentiation of the KKT conditions, reusing the KKT factorization of the last solve, in all interfaces [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- New setting `enable_backward`, which has to be set before `setup()` to use `backward()` [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- New settings `gradient_smoothing`, `gradient_smoothing_mu` and `gradient_smoothing_max_iter` to smooth the gradients across active-set changes [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
 
 ### Changed
-- The C settings struct `piqp_settings` and the C workspace `piqp_workspace` (new field `gradients`) have new fields, so code compiled against the C interface must be recompiled
+- The C settings struct `piqp_settings` and the C workspace `piqp_workspace` have new fields, so code compiled against the C interface must be recompiled
 
 ## [0.7.0] - 2026-11-05
 
