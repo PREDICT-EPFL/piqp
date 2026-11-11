@@ -12,6 +12,7 @@
 #include "piqp/utils/random_utils.hpp"
 
 #include "gtest/gtest.h"
+#include "utils.hpp"
 
 using namespace piqp;
 
@@ -423,7 +424,7 @@ TEST(DenseSolverTest, CopyConstructor)
 
     ASSERT_EQ(status1, Status::PIQP_SOLVED);
     ASSERT_EQ(status2, Status::PIQP_SOLVED);
-    ASSERT_EQ(solver1.result().x, solver2.result().x);
+    expect_results_identical(solver1.result(), solver2.result());
 }
 
 TEST(DenseSolverTest, MoveConstructor)
@@ -438,6 +439,10 @@ TEST(DenseSolverTest, MoveConstructor)
     solver1.settings().verbose = true;
     solver1.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
 
+    DenseSolver<T> reference;
+    reference.settings() = solver1.settings();
+    reference.setup(qp_model.P, qp_model.c, qp_model.A, qp_model.b, qp_model.G, qp_model.h_l, qp_model.h_u, qp_model.x_l, qp_model.x_u);
+
     DenseSolver<T> solver2(std::move(solver1));
 
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
@@ -445,4 +450,6 @@ TEST(DenseSolverTest, MoveConstructor)
     PIQP_EIGEN_MALLOC_ALLOWED();
 
     ASSERT_EQ(status2, Status::PIQP_SOLVED);
+    ASSERT_EQ(reference.solve(), Status::PIQP_SOLVED);
+    expect_results_identical(solver2.result(), reference.result());
 }

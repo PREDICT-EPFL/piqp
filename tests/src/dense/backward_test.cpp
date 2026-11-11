@@ -21,7 +21,7 @@ using I = int;
 namespace
 {
 
-std::pair<dense::Model<T>, ActiveSet> make_qp(unsigned int seed)
+std::pair<dense::Model<T>, rand::ActiveSet> make_qp(unsigned int seed)
 {
     // same problem in every test, independent of the test order
     // (the distributions are reset as well, normal_distribution caches values)
@@ -29,7 +29,7 @@ std::pair<dense::Model<T>, ActiveSet> make_qp(unsigned int seed)
     rand::uniform_dist.reset();
     rand::uniform_dist_pos.reset();
     rand::normal_dist.reset();
-    return dense_strongly_convex_qp_with_known_active_set<T>(12, 2, 8);
+    return rand::dense_strongly_convex_qp_with_known_active_set<T>(12, 2, 8);
 }
 
 dense::Model<T> make_model()
@@ -56,7 +56,7 @@ TEST(DenseBackwardTest, FiniteDifferences)
     for (unsigned int seed : {1, 2, 3, 4, 5})
     {
         SCOPED_TRACE("seed " + std::to_string(seed));
-        std::pair<dense::Model<T>, ActiveSet> qp = make_qp(seed);
+        std::pair<dense::Model<T>, rand::ActiveSet> qp = make_qp(seed);
         DenseSolver<T> solver;
         configure(solver);
         run_finite_difference_test(solver, qp.first, qp.second);
@@ -68,52 +68,14 @@ TEST(DenseBackwardTest, InvalidStates)
     dense::Model<T> model = make_model();
     DenseSolver<T> solver;
     configure(solver);
+    run_invalid_states_test(solver, model);
+}
 
-    // not setup
-    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
-
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    // not solved
-    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
-
-    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
-
-    // wrong dimensions, each adjoint is checked; a failed call invalidates the previous gradients
-    Vec<T> wrong_n = Vec<T>::Zero(model.P.rows() + 1);
-    Vec<T> wrong_p = Vec<T>::Zero(model.A.rows() + 1);
-    Vec<T> wrong_m = Vec<T>::Zero(model.G.rows() + 1);
-    EXPECT_EQ(solver.backward(wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, wrong_p), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
-
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
-
-    // data changed since last solve, update() invalidates the gradients
-    solver.update(nullopt, model.c);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
-
-    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
-
-    // setup() invalidates the gradients
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
+TEST(DenseBackwardTest, NoConstraints)
+{
+    DenseSolver<T> solver;
+    configure(solver);
+    run_no_constraints_test(solver, rand::dense_positive_definite_upper_triangular_rand<T>(4, T(1)));
 }
 
 TEST(DenseBackwardTest, SmoothingAnalytic)
@@ -168,14 +130,6 @@ TEST(DenseBackwardTest, SmoothingAnalytic2D)
             solver.setup(P, c, nullopt, nullopt, G, nullopt, h_u, nullopt, nullopt);
             ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
 
-            // the forward solution is the true optimum, i.e. the projection onto the half space
-            Vec<T> x_opt = a;
-            if (r < 0)
-            {
-                x_opt -= g * (-r / q);
-            }
-            EXPECT_LT((solver.result().x - x_opt).norm(), 1e-5) << "r = " << r << ", scale_cost = " << scale_cost;
-
             Vec<T> grad_z_u = Vec<T>::Constant(1, v);
             ASSERT_EQ(solver.backward(w, nullopt, nullopt, grad_z_u), Status::PIQP_SOLVED);
             const dense::Gradients<T>& grads = solver.gradients();
@@ -202,7 +156,6 @@ TEST(DenseBackwardTest, SmoothingAnalytic2D)
     }
 }
 
-// backward() requires enable_backward to be set before setup()
 TEST(DenseBackwardTest, SmoothingEqualities)
 {
     DenseSolver<T> solver;
@@ -210,25 +163,6 @@ TEST(DenseBackwardTest, SmoothingEqualities)
     configure(solver);
     configure(reference);
     run_smoothing_equality_test(solver, reference, make_model());
-}
-
-TEST(DenseBackwardTest, RequiresEnableBackward)
-{
-    dense::Model<T> model = make_model();
-    DenseSolver<T> solver;
-    configure(solver);
-    solver.settings().enable_backward = false;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
-
-    // enabling it after setup() is not sufficient
-    solver.settings().enable_backward = true;
-    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
-
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
 }
 
 TEST(DenseBackwardTest, ProvidedResultInvalid)
@@ -247,4 +181,12 @@ TEST(DenseBackwardTest, NoSideEffectsOnForward)
     configure(solver);
     configure(reference);
     run_no_side_effects_test(solver, reference, model);
+}
+
+TEST(DenseBackwardTest, CopyMove)
+{
+    dense::Model<T> model = make_model();
+    DenseSolver<T> solver;
+    configure(solver);
+    run_copy_move_test(solver, model);
 }

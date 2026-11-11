@@ -8,6 +8,7 @@
 #include <cstdlib>
 
 #include "piqp.h"
+#include "piqp/piqp.hpp"
 
 #include "gtest/gtest.h"
 
@@ -215,237 +216,242 @@ TEST(CInterfaceTest, SimpleSparseQPWithUpdate)
 }
 
 /*
- * QP for the backward tests:
+ * The backward() tests only check the C interface, i.e., the gradients have to be exactly the ones of the
+ * C++ solver for the same arguments. QP with an active and an inactive inequality, such that the gradient
+ * w.r.t. G is not symmetric and its layout is tested:
  * min 3 x1^2 + 2 x2^2 - x1 - 4 x2
- * s.t. x1 = 2 x2, x1 >= -1, x2 <= 0.1 (active)
- *
- * loss L = x1 + 2 x2 + y
-*/
-struct BackwardQP
+ * s.t. x1 = 2 x2, x1 + x2 <= 0.3 (active), x1 >= -1, x2 <= 0.5
+ */
+namespace backward_qp
 {
-    piqp_float P[4] = {6, 0, 0, 4};
-    piqp_float c[2] = {-1, -4};
-    piqp_float A[2] = {1, -2};
-    piqp_float b[1] = {0};
-    piqp_float G[2] = {1, 0};
-    piqp_float h_l[1] = {-1};
-    piqp_float h_u[1] = {PIQP_INF};
-    piqp_float x_l[2] = {-PIQP_INF, -PIQP_INF};
-    piqp_float x_u[2] = {PIQP_INF, 0.1};
-};
+constexpr piqp_int n = 2;
+constexpr piqp_int p = 1;
+constexpr piqp_int m = 2;
+piqp_float P[4] = {6, 0, 0, 4}; // row-major
+piqp_float c[2] = {-1, -4};
+piqp_float A[2] = {1, -2};
+piqp_float b[1] = {0};
+piqp_float G[4] = {1, 1, 1, 0};
+piqp_float h_l[2] = {-PIQP_INF, -1};
+piqp_float h_u[2] = {0.3, PIQP_INF};
+piqp_float x_l[2] = {-PIQP_INF, -PIQP_INF};
+piqp_float x_u[2] = {PIQP_INF, 0.5};
 
-static const piqp_float backward_grad_x[2] = {1, 2};
-static const piqp_float backward_grad_y[1] = {1};
+const piqp_float grad_x[2] = {1, 2};
+const piqp_float grad_y[1] = {0.5};
+const piqp_float grad_z_l[2] = {0.3, -0.2};
+const piqp_float grad_z_u[2] = {0.7, 0.1};
+const piqp_float grad_z_bl[2] = {-0.4, 0.6};
+const piqp_float grad_z_bu[2] = {0.2, -0.3};
+const piqp_float grad_s_l[2] = {0.1, 0.4};
+const piqp_float grad_s_u[2] = {-0.5, 0.2};
+const piqp_float grad_s_bl[2] = {0.3, 0.3};
+const piqp_float grad_s_bu[2] = {-0.1, 0.8};
 
-static piqp_workspace* setup_backward_dense(BackwardQP& qp)
+using Mat = piqp::Mat<piqp_float>;
+using SparseMat = piqp::SparseMat<piqp_float, piqp_int>;
+using Vec = piqp::Vec<piqp_float>;
+
+Mat mat(const piqp_float* data, piqp_int rows, piqp_int cols)
+{
+    return Eigen::Map<const Eigen::Matrix<piqp_float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(data, rows, cols);
+}
+
+Vec vec(const piqp_float* data, piqp_int size)
+{
+    return Eigen::Map<const Vec>(data, size);
+}
+
+piqp_settings settings(bool dense)
 {
     piqp_settings settings;
-    piqp_set_default_settings_dense(&settings);
-    settings.eps_abs = 1e-12;
-    settings.eps_rel = 1e-12;
+    if (dense) piqp_set_default_settings_dense(&settings);
+    else piqp_set_default_settings_sparse(&settings);
     settings.enable_backward = 1;
-
-    piqp_data_dense data;
-    data.n = 2;
-    data.p = 1;
-    data.m = 1;
-    data.P = qp.P;
-    data.c = qp.c;
-    data.A = qp.A;
-    data.b = qp.b;
-    data.G = qp.G;
-    data.h_l = qp.h_l;
-    data.h_u = qp.h_u;
-    data.x_l = qp.x_l;
-    data.x_u = qp.x_u;
-
-    piqp_workspace* work;
-    piqp_setup_dense(&work, &data, &settings);
-    return work;
+    return settings;
 }
 
-static piqp_float backward_loss(BackwardQP qp)
+void setup_reference(piqp::DenseSolver<piqp_float>& solver)
 {
-    piqp_workspace* work = setup_backward_dense(qp);
-    EXPECT_EQ(piqp_solve(work), PIQP_SOLVED);
-    piqp_float loss = work->result->x[0] + 2 * work->result->x[1] + work->result->y[0];
-    piqp_cleanup(work);
-    return loss;
+    solver.settings().enable_backward = true;
+    solver.setup(mat(P, n, n), vec(c, n), mat(A, p, n), vec(b, p), mat(G, m, n), vec(h_l, m), vec(h_u, m), vec(x_l, n), vec(x_u, n));
 }
 
-template<typename Field>
-static piqp_float backward_finite_difference(Field field)
+void setup_reference(piqp::SparseSolver<piqp_float, piqp_int>& solver)
 {
-    const piqp_float eps = 1e-6;
-    BackwardQP qp_p, qp_m;
-    *field(qp_p) += eps;
-    *field(qp_m) -= eps;
-    return (backward_loss(qp_p) - backward_loss(qp_m)) / (2 * eps);
+    solver.settings().enable_backward = true;
+    SparseMat P_sp = mat(P, n, n).sparseView();
+    SparseMat A_sp = mat(A, p, n).sparseView();
+    SparseMat G_sp = mat(G, m, n).sparseView();
+    solver.setup(P_sp, vec(c, n), A_sp, vec(b, p), G_sp, vec(h_l, m), vec(h_u, m), vec(x_l, n), vec(x_u, n));
 }
+
+template<typename Solver>
+piqp::Status backward_reference(Solver& solver, bool all_arguments, const piqp::optional<piqp::Result<piqp_float>>& forward_result)
+{
+    if (!all_arguments) return solver.backward(vec(grad_x, n), piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt,
+                                               piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, forward_result);
+    return solver.backward(vec(grad_x, n), vec(grad_y, p), vec(grad_z_l, m), vec(grad_z_u, m), vec(grad_z_bl, n), vec(grad_z_bu, n),
+                           vec(grad_s_l, m), vec(grad_s_u, m), vec(grad_s_bl, n), vec(grad_s_bu, n), forward_result);
+}
+
+piqp_status backward(piqp_workspace* work, bool all_arguments, const piqp_result* forward_result)
+{
+    if (!all_arguments) return piqp_backward(work, grad_x, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, forward_result);
+    return piqp_backward(work, grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, forward_result);
+}
+
+void expect_equal(const piqp_float* g, const Vec& ref)
+{
+    for (piqp::isize i = 0; i < ref.rows(); i++) EXPECT_EQ(g[i], ref(i)) << i;
+}
+
+void expect_equal(const piqp_float* g, const Mat& ref)
+{
+    for (piqp::isize i = 0; i < ref.rows(); i++)
+        for (piqp::isize j = 0; j < ref.cols(); j++) EXPECT_EQ(g[i * ref.cols() + j], ref(i, j)) << i << ", " << j;
+}
+
+void expect_equal(const piqp_csc* g, const SparseMat& ref)
+{
+    ASSERT_EQ(g->m, ref.rows());
+    ASSERT_EQ(g->n, ref.cols());
+    ASSERT_EQ(g->nnz, ref.nonZeros());
+    for (piqp_int j = 0; j <= g->n; j++) EXPECT_EQ(g->p[j], ref.outerIndexPtr()[j]);
+    for (piqp_int k = 0; k < g->nnz; k++)
+    {
+        EXPECT_EQ(g->i[k], ref.innerIndexPtr()[k]);
+        EXPECT_EQ(g->x[k], ref.valuePtr()[k]);
+    }
+}
+
+template<typename Gradients>
+void expect_equal(const piqp_gradients* g, const Gradients& ref)
+{
+    EXPECT_EQ(g->status, (piqp_status) ref.status);
+    expect_equal(g->c, ref.c);
+    expect_equal(g->b, ref.b);
+    expect_equal(g->h_l, ref.h_l);
+    expect_equal(g->h_u, ref.h_u);
+    expect_equal(g->x_l, ref.x_l);
+    expect_equal(g->x_u, ref.x_u);
+}
+} // namespace backward_qp
 
 TEST(CInterfaceTest, DenseBackward)
 {
-    BackwardQP qp;
-    piqp_workspace* work = setup_backward_dense(qp);
-    ASSERT_NE(work->gradients, nullptr);
-    EXPECT_EQ(work->gradients->P_csc, nullptr);
-    EXPECT_EQ(work->gradients->status, PIQP_UNSOLVED);
-
-    EXPECT_EQ(piqp_backward(work, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_UNSOLVED);
-    EXPECT_EQ(work->gradients->status, PIQP_UNSOLVED);
-
+    using namespace backward_qp;
+    piqp_data_dense data = {n, p, m, P, c, A, b, G, h_l, h_u, x_l, x_u};
+    piqp_settings s = settings(true);
+    piqp_workspace* work;
+    piqp_setup_dense(&work, &data, &s);
     ASSERT_EQ(piqp_solve(work), PIQP_SOLVED);
-    ASSERT_EQ(piqp_backward(work, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_SOLVED);
-    EXPECT_EQ(work->gradients->status, PIQP_SOLVED);
 
-    const piqp_gradients* g = work->gradients;
-    const double tol = 1e-5;
-    EXPECT_NEAR(g->c[0], backward_finite_difference([](BackwardQP& q) { return &q.c[0]; }), tol);
-    EXPECT_NEAR(g->c[1], backward_finite_difference([](BackwardQP& q) { return &q.c[1]; }), tol);
-    EXPECT_NEAR(g->b[0], backward_finite_difference([](BackwardQP& q) { return &q.b[0]; }), tol);
-    EXPECT_NEAR(g->x_u[1], backward_finite_difference([](BackwardQP& q) { return &q.x_u[1]; }), tol);
-    EXPECT_NEAR(g->h_l[0], 0, tol); // inactive
-    EXPECT_EQ(g->h_u[0], 0);        // infinite bound
-    EXPECT_EQ(g->x_u[0], 0);        // infinite bound
-    // A and G are row-major, A has a single row
-    EXPECT_NEAR(g->A[0], backward_finite_difference([](BackwardQP& q) { return &q.A[0]; }), tol);
-    EXPECT_NEAR(g->A[1], backward_finite_difference([](BackwardQP& q) { return &q.A[1]; }), tol);
-    // diagonal of P (only the upper triangular part of P is used)
-    EXPECT_NEAR(g->P[0], backward_finite_difference([](BackwardQP& q) { return &q.P[0]; }), tol);
-    EXPECT_NEAR(g->P[3], backward_finite_difference([](BackwardQP& q) { return &q.P[3]; }), tol);
+    piqp::DenseSolver<piqp_float> ref;
+    setup_reference(ref);
+    ASSERT_EQ(ref.solve(), piqp::Status::PIQP_SOLVED);
 
-    // the gradients at a provided forward result match the ones at the stored solution; the default call reuses
-    // the factorization of the forward solve (second-to-last iterate), the forward result is refactorized
-    piqp_float c0 = g->c[0];
-    ASSERT_EQ(piqp_backward(work, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, work->result),
-              PIQP_SOLVED);
-    EXPECT_NEAR(g->c[0], c0, 1e-6);
+    for (bool all_arguments : {true, false})
+    {
+        SCOPED_TRACE(all_arguments ? "all arguments" : "only grad_x");
+        ASSERT_EQ(backward(work, all_arguments, NULL), PIQP_SOLVED);
+        ASSERT_EQ(backward_reference(ref, all_arguments, piqp::nullopt), piqp::Status::PIQP_SOLVED);
+        expect_equal(work->gradients, ref.gradients());
+        expect_equal(work->gradients->P, ref.gradients().P);
+        expect_equal(work->gradients->A, ref.gradients().A);
+        expect_equal(work->gradients->G, ref.gradients().G);
+        EXPECT_EQ(work->gradients->P_csc, nullptr);
 
-    // a failed call invalidates the gradients
-    piqp_result invalid = *work->result;
-    invalid.info.rho = 0;
-    EXPECT_EQ(piqp_backward(work, backward_grad_x, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &invalid),
-              PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(work->gradients->status, PIQP_INVALID_SETTINGS);
-
-    ASSERT_EQ(piqp_backward(work, backward_grad_x, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_SOLVED);
-    piqp_update_dense(work, NULL, qp.c, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-    EXPECT_EQ(work->gradients->status, PIQP_UNSOLVED);
-    EXPECT_EQ(piqp_backward(work, backward_grad_x, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_UNSOLVED);
+        ASSERT_EQ(backward(work, all_arguments, work->result), PIQP_SOLVED);
+        ASSERT_EQ(backward_reference(ref, all_arguments, ref.result()), piqp::Status::PIQP_SOLVED);
+        expect_equal(work->gradients, ref.gradients());
+        expect_equal(work->gradients->G, ref.gradients().G);
+    }
 
     piqp_cleanup(work);
 }
 
-TEST(CInterfaceTest, SparseBackwardMatchesDense)
+TEST(CInterfaceTest, SparseBackward)
 {
-    BackwardQP qp;
-    piqp_workspace* work_dense = setup_backward_dense(qp);
-    ASSERT_EQ(piqp_solve(work_dense), PIQP_SOLVED);
-    ASSERT_EQ(piqp_backward(work_dense, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_SOLVED);
-
-    piqp_float P_x[2] = {6, 4};
+    using namespace backward_qp;
     piqp_int P_p[3] = {0, 1, 2};
     piqp_int P_i[2] = {0, 1};
-    piqp_float A_x[2] = {1, -2};
+    piqp_float P_x[2] = {6, 4};
     piqp_int A_p[3] = {0, 1, 2};
     piqp_int A_i[2] = {0, 0};
-    piqp_float G_x[1] = {1};
-    piqp_int G_p[3] = {0, 1, 1};
-    piqp_int G_i[1] = {0};
-
-    piqp_settings settings;
-    piqp_set_default_settings_sparse(&settings);
-    settings.eps_abs = 1e-12;
-    settings.eps_rel = 1e-12;
-    settings.enable_backward = 1;
-
-    piqp_data_sparse data;
-    data.n = 2;
-    data.p = 1;
-    data.m = 1;
-    data.P = piqp_csc_matrix(2, 2, 2, P_p, P_i, P_x);
-    data.c = qp.c;
-    data.A = piqp_csc_matrix(1, 2, 2, A_p, A_i, A_x);
-    data.b = qp.b;
-    data.G = piqp_csc_matrix(1, 2, 1, G_p, G_i, G_x);
-    data.h_l = qp.h_l;
-    data.h_u = qp.h_u;
-    data.x_l = qp.x_l;
-    data.x_u = qp.x_u;
-
+    piqp_float A_x[2] = {1, -2};
+    piqp_int G_p[3] = {0, 2, 3};
+    piqp_int G_i[3] = {0, 1, 0};
+    piqp_float G_x[3] = {1, 1, 1};
+    piqp_data_sparse data = {n, p, m, piqp_csc_matrix(n, n, 2, P_p, P_i, P_x), c, piqp_csc_matrix(p, n, 2, A_p, A_i, A_x), b,
+                             piqp_csc_matrix(m, n, 3, G_p, G_i, G_x), h_l, h_u, x_l, x_u};
+    piqp_settings s = settings(false);
     piqp_workspace* work;
-    piqp_setup_sparse(&work, &data, &settings);
-    ASSERT_NE(work->gradients, nullptr);
-    EXPECT_EQ(work->gradients->P, nullptr);
+    piqp_setup_sparse(&work, &data, &s);
     ASSERT_EQ(piqp_solve(work), PIQP_SOLVED);
-    ASSERT_EQ(piqp_backward(work, backward_grad_x, backward_grad_y, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_SOLVED);
 
-    const piqp_gradients* gs = work->gradients;
-    const piqp_gradients* gd = work_dense->gradients;
-    // both solvers stop at slightly different final iterates
-    const double tol = 1e-5;
-    for (int i = 0; i < 2; i++)
+    piqp::SparseSolver<piqp_float, piqp_int> ref;
+    setup_reference(ref);
+    ASSERT_EQ(ref.solve(), piqp::Status::PIQP_SOLVED);
+
+    for (bool all_arguments : {true, false})
     {
-        EXPECT_NEAR(gs->c[i], gd->c[i], tol);
-        EXPECT_NEAR(gs->x_u[i], gd->x_u[i], tol);
-    }
-    EXPECT_NEAR(gs->b[0], gd->b[0], tol);
-    // sparse matrices are views on the sparsity pattern of the data, dense ones are row-major
-    for (piqp_int j = 0; j < 2; j++)
-    {
-        for (piqp_int k = gs->P_csc->p[j]; k < gs->P_csc->p[j + 1]; k++)
-        {
-            EXPECT_NEAR(gs->P_csc->x[k], gd->P[gs->P_csc->i[k] * 2 + j], tol);
-        }
-        for (piqp_int k = gs->A_csc->p[j]; k < gs->A_csc->p[j + 1]; k++)
-        {
-            EXPECT_NEAR(gs->A_csc->x[k], gd->A[gs->A_csc->i[k] * 2 + j], tol);
-        }
-        for (piqp_int k = gs->G_csc->p[j]; k < gs->G_csc->p[j + 1]; k++)
-        {
-            EXPECT_NEAR(gs->G_csc->x[k], gd->G[gs->G_csc->i[k] * 2 + j], tol);
-        }
+        SCOPED_TRACE(all_arguments ? "all arguments" : "only grad_x");
+        ASSERT_EQ(backward(work, all_arguments, NULL), PIQP_SOLVED);
+        ASSERT_EQ(backward_reference(ref, all_arguments, piqp::nullopt), piqp::Status::PIQP_SOLVED);
+        expect_equal(work->gradients, ref.gradients());
+        expect_equal(work->gradients->P_csc, ref.gradients().P);
+        expect_equal(work->gradients->A_csc, ref.gradients().A);
+        expect_equal(work->gradients->G_csc, ref.gradients().G);
+        EXPECT_EQ(work->gradients->P, nullptr);
+
+        ASSERT_EQ(backward(work, all_arguments, work->result), PIQP_SOLVED);
+        ASSERT_EQ(backward_reference(ref, all_arguments, ref.result()), piqp::Status::PIQP_SOLVED);
+        expect_equal(work->gradients, ref.gradients());
+        expect_equal(work->gradients->G_csc, ref.gradients().G);
     }
 
     piqp_cleanup(work);
-    piqp_cleanup(work_dense);
     free(data.P);
     free(data.A);
     free(data.G);
 }
 
-TEST(CInterfaceTest, BackwardNotEnabled)
+TEST(CInterfaceTest, BackwardStatus)
 {
-    BackwardQP qp;
-    piqp_settings settings;
-    piqp_set_default_settings_dense(&settings);
-    EXPECT_EQ(settings.enable_backward, 0);
+    using namespace backward_qp;
+    piqp_data_dense data = {n, p, m, P, c, A, b, G, h_l, h_u, x_l, x_u};
 
-    piqp_data_dense data;
-    data.n = 2;
-    data.p = 1;
-    data.m = 1;
-    data.P = qp.P;
-    data.c = qp.c;
-    data.A = qp.A;
-    data.b = qp.b;
-    data.G = qp.G;
-    data.h_l = qp.h_l;
-    data.h_u = qp.h_u;
-    data.x_l = qp.x_l;
-    data.x_u = qp.x_u;
-
+    // not enabled
+    piqp_settings s;
+    piqp_set_default_settings_dense(&s);
+    EXPECT_EQ(s.enable_backward, 0);
     piqp_workspace* work;
-    piqp_setup_dense(&work, &data, &settings);
+    piqp_setup_dense(&work, &data, &s);
     EXPECT_EQ(work->gradients, nullptr);
     ASSERT_EQ(piqp_solve(work), PIQP_SOLVED);
-    EXPECT_EQ(piqp_backward(work, backward_grad_x, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-              PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(backward(work, false, NULL), PIQP_INVALID_SETTINGS);
+    piqp_cleanup(work);
+
+    s = settings(true);
+    piqp_setup_dense(&work, &data, &s);
+    ASSERT_NE(work->gradients, nullptr);
+    EXPECT_EQ(work->gradients->status, PIQP_UNSOLVED);
+    EXPECT_EQ(backward(work, false, NULL), PIQP_UNSOLVED);
+    EXPECT_EQ(work->gradients->status, PIQP_UNSOLVED);
+
+    ASSERT_EQ(piqp_solve(work), PIQP_SOLVED);
+    EXPECT_EQ(backward(work, false, NULL), PIQP_SOLVED);
+    EXPECT_EQ(work->gradients->status, PIQP_SOLVED);
+
+    piqp_result invalid = *work->result;
+    invalid.info.rho = 0;
+    EXPECT_EQ(backward(work, false, &invalid), PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(work->gradients->status, PIQP_INVALID_SETTINGS);
+
+    EXPECT_EQ(backward(work, false, NULL), PIQP_SOLVED);
+    piqp_update_dense(work, NULL, c, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    EXPECT_EQ(work->gradients->status, PIQP_UNSOLVED);
+
     piqp_cleanup(work);
 }

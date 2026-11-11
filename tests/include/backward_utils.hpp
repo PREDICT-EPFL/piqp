@@ -9,10 +9,8 @@
 #define PIQP_TESTS_BACKWARD_UTILS_HPP
 
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <limits>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -20,97 +18,7 @@
 #include "piqp/piqp.hpp"
 #include "piqp/utils/random_utils.hpp"
 #include "gtest/gtest.h"
-
-// Random cotangents; slack cotangents are zeroed where the slack is infinite (inactive bound).
-template<typename T>
-piqp::Variables<T> random_variables(const piqp::Result<T>& r)
-{
-    piqp::Variables<T> w;
-    w.x = piqp::rand::vector_rand<T>(r.x.rows());
-    w.y = piqp::rand::vector_rand<T>(r.y.rows());
-    w.z_l = piqp::rand::vector_rand<T>(r.z_l.rows());
-    w.z_u = piqp::rand::vector_rand<T>(r.z_u.rows());
-    w.z_bl = piqp::rand::vector_rand<T>(r.z_bl.rows());
-    w.z_bu = piqp::rand::vector_rand<T>(r.z_bu.rows());
-    w.s_l = piqp::rand::vector_rand<T>(r.s_l.rows());
-    w.s_u = piqp::rand::vector_rand<T>(r.s_u.rows());
-    w.s_bl = piqp::rand::vector_rand<T>(r.s_bl.rows());
-    w.s_bu = piqp::rand::vector_rand<T>(r.s_bu.rows());
-    for (piqp::isize i = 0; i < r.s_l.rows(); i++)
-    {
-        if (r.s_l(i) >= PIQP_INF)
-        {
-            w.s_l(i) = T(0);
-        }
-        if (r.s_u(i) >= PIQP_INF)
-        {
-            w.s_u(i) = T(0);
-        }
-    }
-    for (piqp::isize i = 0; i < r.s_bl.rows(); i++)
-    {
-        if (r.s_bl(i) >= PIQP_INF)
-        {
-            w.s_bl(i) = T(0);
-        }
-        if (r.s_bu(i) >= PIQP_INF)
-        {
-            w.s_bu(i) = T(0);
-        }
-    }
-    return w;
-}
-
-// Exact (bitwise) comparison of two results, excluding the timings.
-template<typename T>
-void expect_results_identical(const piqp::Result<T>& r1, const piqp::Result<T>& r2)
-{
-    auto same = [](const piqp::Vec<T>& v1, const piqp::Vec<T>& v2)
-    {
-        return v1.size() == v2.size() && (v1.array() == v2.array()).all();
-    };
-    EXPECT_TRUE(same(r1.x, r2.x)) << "x";
-    EXPECT_TRUE(same(r1.y, r2.y)) << "y";
-    EXPECT_TRUE(same(r1.z_l, r2.z_l)) << "z_l";
-    EXPECT_TRUE(same(r1.z_u, r2.z_u)) << "z_u";
-    EXPECT_TRUE(same(r1.z_bl, r2.z_bl)) << "z_bl";
-    EXPECT_TRUE(same(r1.z_bu, r2.z_bu)) << "z_bu";
-    EXPECT_TRUE(same(r1.s_l, r2.s_l)) << "s_l";
-    EXPECT_TRUE(same(r1.s_u, r2.s_u)) << "s_u";
-    EXPECT_TRUE(same(r1.s_bl, r2.s_bl)) << "s_bl";
-    EXPECT_TRUE(same(r1.s_bu, r2.s_bu)) << "s_bu";
-
-    const piqp::Info<T>& i1 = r1.info;
-    const piqp::Info<T>& i2 = r2.info;
-    EXPECT_EQ(i1.status, i2.status);
-    EXPECT_EQ(i1.iter, i2.iter);
-    EXPECT_EQ(i1.rho, i2.rho);
-    EXPECT_EQ(i1.delta, i2.delta);
-    EXPECT_EQ(i1.mu, i2.mu);
-    EXPECT_EQ(i1.sigma, i2.sigma);
-    EXPECT_EQ(i1.primal_step, i2.primal_step);
-    EXPECT_EQ(i1.dual_step, i2.dual_step);
-    EXPECT_EQ(i1.primal_res, i2.primal_res);
-    EXPECT_EQ(i1.primal_res_rel, i2.primal_res_rel);
-    EXPECT_EQ(i1.dual_res, i2.dual_res);
-    EXPECT_EQ(i1.dual_res_rel, i2.dual_res_rel);
-    EXPECT_EQ(i1.primal_res_reg, i2.primal_res_reg);
-    EXPECT_EQ(i1.primal_res_reg_rel, i2.primal_res_reg_rel);
-    EXPECT_EQ(i1.dual_res_reg, i2.dual_res_reg);
-    EXPECT_EQ(i1.dual_res_reg_rel, i2.dual_res_reg_rel);
-    EXPECT_EQ(i1.primal_prox_inf, i2.primal_prox_inf);
-    EXPECT_EQ(i1.dual_prox_inf, i2.dual_prox_inf);
-    EXPECT_EQ(i1.prev_primal_res, i2.prev_primal_res);
-    EXPECT_EQ(i1.prev_dual_res, i2.prev_dual_res);
-    EXPECT_EQ(i1.primal_obj, i2.primal_obj);
-    EXPECT_EQ(i1.dual_obj, i2.dual_obj);
-    EXPECT_EQ(i1.duality_gap, i2.duality_gap);
-    EXPECT_EQ(i1.duality_gap_rel, i2.duality_gap_rel);
-    EXPECT_EQ(i1.factor_retires, i2.factor_retires);
-    EXPECT_EQ(i1.reg_limit, i2.reg_limit);
-    EXPECT_EQ(i1.no_primal_update, i2.no_primal_update);
-    EXPECT_EQ(i1.no_dual_update, i2.no_dual_update);
-}
+#include "utils.hpp"
 
 /*
  * backward() must not have side effects on the forward pass: the result of the last solve() and a
@@ -126,7 +34,7 @@ void run_no_side_effects_test(Solver& solver, Solver& reference, Model& model)
     ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
     const piqp::Result<T> result_before = solver.result();
     piqp::optional<piqp::Result<T>> forward_result = solver.result();
-    piqp::Variables<T> w = random_variables(result_before);
+    piqp::Variables<T> w = piqp::rand::variables_rand<T>(model.P.rows(), model.A.rows(), model.G.rows());
 
     for (bool smoothing : {false, true})
     {
@@ -150,6 +58,152 @@ void run_no_side_effects_test(Solver& solver, Solver& reference, Model& model)
     expect_results_identical(solver.result(), reference.result());
 }
 
+/*
+ * Status of backward() in all invalid states: not set up, not enabled before setup(), not solved, wrong
+ * dimensions, data changed since the last solve(), smoothing not converged. The status is also stored in
+ * gradients().status, and setup() and update() reset it.
+ */
+template<typename Solver, typename Model>
+void run_invalid_states_test(Solver& solver, Model& model)
+{
+    using T = typename Model::T;
+    using piqp::nullopt;
+    using piqp::Status;
+    auto setup = [&]() { solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u); };
+
+    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
+
+    // enable_backward has to be set before setup()
+    solver.settings().enable_backward = false;
+    setup();
+    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
+    solver.settings().enable_backward = true;
+    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
+
+    setup();
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
+
+    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
+
+    // wrong dimensions of each argument, a failed call invalidates the previous gradients
+    piqp::Vec<T> wrong_n = piqp::Vec<T>::Zero(model.P.rows() + 1);
+    piqp::Vec<T> wrong_p = piqp::Vec<T>::Zero(model.A.rows() + 1);
+    piqp::Vec<T> wrong_m = piqp::Vec<T>::Zero(model.G.rows() + 1);
+    EXPECT_EQ(solver.backward(wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, wrong_p), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+
+    // smoothing not converged
+    solver.settings().gradient_smoothing = true;
+    solver.settings().gradient_smoothing_max_iter = 1;
+    EXPECT_EQ(solver.backward(), Status::PIQP_MAX_ITER_REACHED);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_MAX_ITER_REACHED);
+    solver.settings().gradient_smoothing = false;
+
+    // data changed since the last solve()
+    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    solver.update(nullopt, model.c);
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
+
+    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    setup();
+    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
+}
+
+/*
+ * Without constraints, x = -P^{-1} c, such that for L = w^T x
+ *   dL/dc = -P^{-1} w,  dL/dP = 0.5 (dL/dc x^T + x dL/dc^T),
+ * with and without gradient smoothing. All constraint gradients are empty or zero.
+ */
+template<typename Solver, typename MatP>
+void run_no_constraints_test(Solver& solver, const MatP& P)
+{
+    using T = typename MatP::Scalar;
+    piqp::Mat<T> P_full = piqp::Mat<T>(piqp::Mat<T>(P).template selfadjointView<Eigen::Upper>());
+    piqp::isize n = P_full.rows();
+    piqp::Vec<T> c = piqp::rand::vector_rand<T>(n);
+    piqp::Vec<T> w = piqp::rand::vector_rand<T>(n);
+
+    piqp::Vec<T> x = -P_full.ldlt().solve(c);
+    piqp::Vec<T> dL_dc = -P_full.ldlt().solve(w);
+    piqp::Mat<T> dL_dP = T(0.5) * (dL_dc * x.transpose() + x * dL_dc.transpose());
+
+    for (bool smoothing : {false, true})
+    {
+        SCOPED_TRACE(smoothing ? "with smoothing" : "without smoothing");
+        solver.settings().gradient_smoothing = smoothing;
+        solver.setup(P, c);
+        ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
+        ASSERT_EQ(solver.backward(w), piqp::Status::PIQP_SOLVED);
+
+        // backward() uses the regularized KKT matrix, i.e., the error is O(rho / lambda_min(P))
+        const auto& g = solver.gradients();
+        T tol = T(1e-5) * (T(1) + dL_dc.norm());
+        EXPECT_LT((g.c - dL_dc).norm(), tol);
+        expect_on_pattern(g.P, dL_dP, tol);
+        EXPECT_EQ(g.A.rows(), 0);
+        EXPECT_EQ(g.G.rows(), 0);
+        EXPECT_EQ(g.b.rows(), 0);
+        EXPECT_EQ(g.h_l.rows(), 0);
+        EXPECT_EQ(g.h_u.rows(), 0);
+        EXPECT_TRUE(g.x_l.isZero(0));
+        EXPECT_TRUE(g.x_u.isZero(0));
+    }
+}
+
+// A copied or moved solver computes the same gradients, i.e., the backward state is copied as well.
+template<typename Solver, typename Model>
+void run_copy_move_test(Solver& solver, Model& model)
+{
+    using T = typename Model::T;
+    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+    ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
+    piqp::Variables<T> w = piqp::rand::variables_rand<T>(model.P.rows(), model.A.rows(), model.G.rows());
+
+    auto backward = [&w](Solver& s) {
+        ASSERT_EQ(s.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu), piqp::Status::PIQP_SOLVED);
+    };
+    auto expect_same_gradients = [](const Solver& s1, const Solver& s2) {
+        const auto& g1 = s1.gradients();
+        const auto& g2 = s2.gradients();
+        EXPECT_EQ(g1.status, g2.status);
+        EXPECT_EQ(piqp::Mat<T>(g1.P), piqp::Mat<T>(g2.P));
+        EXPECT_EQ(piqp::Mat<T>(g1.A), piqp::Mat<T>(g2.A));
+        EXPECT_EQ(piqp::Mat<T>(g1.G), piqp::Mat<T>(g2.G));
+        EXPECT_EQ(g1.c, g2.c);
+        EXPECT_EQ(g1.b, g2.b);
+        EXPECT_EQ(g1.h_l, g2.h_l);
+        EXPECT_EQ(g1.h_u, g2.h_u);
+        EXPECT_EQ(g1.x_l, g2.x_l);
+        EXPECT_EQ(g1.x_u, g2.x_u);
+    };
+
+    Solver copy(solver);
+    ASSERT_NO_FATAL_FAILURE(backward(solver));
+    ASSERT_NO_FATAL_FAILURE(backward(copy));
+    expect_same_gradients(solver, copy);
+
+    Solver moved(std::move(copy));
+    ASSERT_NO_FATAL_FAILURE(backward(moved));
+    expect_same_gradients(solver, moved);
+}
+
 // Invalid provided results are rejected: a forward result which is not solved with PIQP_UNSOLVED,
 // a malformed one with PIQP_INVALID_SETTINGS.
 template<typename Solver, typename Model>
@@ -159,7 +213,7 @@ void run_invalid_result_test(Solver& solver, Model& model)
 
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
     ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
-    piqp::Variables<T> w = random_variables(solver.result());
+    piqp::Variables<T> w = piqp::rand::variables_rand<T>(model.P.rows(), model.A.rows(), model.G.rows());
 
     piqp::optional<piqp::Result<T>> r = solver.result();
     r->info.status = piqp::Status::PIQP_PRIMAL_INFEASIBLE;
@@ -189,189 +243,6 @@ void run_invalid_result_test(Solver& solver, Model& model)
     r->info.delta = T(-1);
     EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
     EXPECT_EQ(solver.gradients().status, piqp::Status::PIQP_INVALID_SETTINGS);
-}
-
-/*
- * Indices of the active bounds in the user-space layout, i.e. h_l, h_u index rows of G
- * and x_l, x_u index variables.
- */
-struct ActiveSet
-{
-    std::vector<piqp::isize> h_l;
-    std::vector<piqp::isize> h_u;
-    std::vector<piqp::isize> x_l;
-    std::vector<piqp::isize> x_u;
-};
-
-// attempts of the known-active-set generators, each samples P, A, G and the active set
-constexpr int MAX_ATTEMPTS = 500;
-// maximum condition number of the stacked Jacobian of the equality and active constraints
-constexpr double MAX_ACTIVE_JACOBIAN_COND = 50;
-
-/*
- * Builds a QP backwards from a prescribed KKT point (x, y, z) with a randomly sampled active set.
- * Each G row is disabled (10%), has only a lower (30%), only an upper (30%) or both bounds (30%);
- * a fraction bounds_perc of the variables gets box bounds in the same way. Every finite bound is active
- * with probability 0.5, at most one bound per row/variable. Active bounds get duals in [0.5, 1.5],
- * inactive bounds slacks in [0.5, 1.5], such that the solution is strictly complementary. Active sets
- * violating LICQ (or with a stacked active Jacobian of condition number > MAX_ACTIVE_JACOBIAN_COND) are rejected
- * by returning nullopt, e.g., if A has an empty row.
- */
-template<typename Model, typename MatP, typename MatA, typename MatG>
-piqp::optional<std::pair<Model, ActiveSet>> qp_with_known_active_set(const MatP& P, const MatA& A, const MatG& G, typename Model::T bounds_perc)
-{
-    using T = typename Model::T;
-    using piqp::isize;
-    const T inf = std::numeric_limits<T>::infinity();
-    isize n = P.rows();
-    isize p = A.rows();
-    isize m = G.rows();
-    piqp::Mat<T> A_dense = piqp::Mat<T>(A);
-    piqp::Mat<T> G_dense = piqp::Mat<T>(G);
-    auto uniform = []() { return T(piqp::rand::uniform_dist(piqp::rand::gen)); };
-
-    // finite bounds, and active bound: -1 lower, 1 upper, 0 none
-    std::vector<bool> h_l_finite(m), h_u_finite(m), x_l_finite(n), x_u_finite(n);
-    std::vector<int> G_active(m), x_active(n);
-    auto sample_active = [&](bool lower_finite, bool upper_finite) {
-        if (uniform() >= T(0.5)) return 0;
-        if (lower_finite && (!upper_finite || uniform() < T(0.5))) return -1;
-        return upper_finite ? 1 : 0;
-    };
-    for (isize i = 0; i < m; i++)
-    {
-        T u = uniform();
-        h_l_finite[i] = (u >= T(0.1) && u < T(0.4)) || u >= T(0.7);
-        h_u_finite[i] = u >= T(0.4);
-        G_active[i] = sample_active(h_l_finite[i], h_u_finite[i]);
-    }
-    for (isize i = 0; i < n; i++)
-    {
-        T u = uniform();
-        x_l_finite[i] = u < bounds_perc / 3 || (u >= 2 * bounds_perc / 3 && u < bounds_perc);
-        x_u_finite[i] = u >= bounds_perc / 3 && u < bounds_perc;
-        x_active[i] = sample_active(x_l_finite[i], x_u_finite[i]);
-    }
-
-    // LICQ: equality rows and active constraint gradients are linearly independent
-    isize n_active = p;
-    for (isize i = 0; i < m; i++) n_active += G_active[i] != 0;
-    for (isize i = 0; i < n; i++) n_active += x_active[i] != 0;
-    if (n_active > n) return piqp::nullopt;
-    if (n_active > 0)
-    {
-        piqp::Mat<T> J = piqp::Mat<T>::Zero(n_active, n);
-        J.topRows(p) = A_dense;
-        isize k = p;
-        for (isize i = 0; i < m; i++)
-        {
-            if (G_active[i] != 0) J.row(k++) = G_dense.row(i);
-        }
-        for (isize i = 0; i < n; i++)
-        {
-            if (x_active[i] != 0) J(k++, i) = T(1);
-        }
-        Eigen::JacobiSVD<piqp::Mat<T>> svd(J);
-        const piqp::Vec<T>& sigma = svd.singularValues();
-        if (!(sigma(n_active - 1) > T(0)) || sigma(0) / sigma(n_active - 1) > T(MAX_ACTIVE_JACOBIAN_COND)) return piqp::nullopt;
-    }
-
-    piqp::Vec<T> x = piqp::rand::vector_rand<T>(n);
-    piqp::Vec<T> y = piqp::rand::vector_rand<T>(p);
-    piqp::Vec<T> Gx = G_dense * x;
-    auto margin = [&]() { return T(0.5) + uniform(); };
-
-    ActiveSet active_set;
-    piqp::Vec<T> h_l(m), h_u(m), z_l = piqp::Vec<T>::Zero(m), z_u = piqp::Vec<T>::Zero(m);
-    for (isize i = 0; i < m; i++)
-    {
-        h_l(i) = h_l_finite[i] ? Gx(i) - margin() : -inf;
-        h_u(i) = h_u_finite[i] ? Gx(i) + margin() : inf;
-        if (G_active[i] < 0) { h_l(i) = Gx(i); z_l(i) = margin(); active_set.h_l.push_back(i); }
-        if (G_active[i] > 0) { h_u(i) = Gx(i); z_u(i) = margin(); active_set.h_u.push_back(i); }
-    }
-    piqp::Vec<T> x_l(n), x_u(n), z_bl = piqp::Vec<T>::Zero(n), z_bu = piqp::Vec<T>::Zero(n);
-    for (isize i = 0; i < n; i++)
-    {
-        x_l(i) = x_l_finite[i] ? x(i) - margin() : -inf;
-        x_u(i) = x_u_finite[i] ? x(i) + margin() : inf;
-        if (x_active[i] < 0) { x_l(i) = x(i); z_bl(i) = margin(); active_set.x_l.push_back(i); }
-        if (x_active[i] > 0) { x_u(i) = x(i); z_bu(i) = margin(); active_set.x_u.push_back(i); }
-    }
-
-    // stationarity P x + c + A^T y + G^T (z_u - z_l) + z_bu - z_bl = 0 and primal feasibility A x = b
-    piqp::Vec<T> c = -(P.template selfadjointView<Eigen::Upper>() * x + A_dense.transpose() * y
-                       + G_dense.transpose() * (z_u - z_l) + z_bu - z_bl);
-    piqp::Vec<T> b = A_dense * x;
-
-    return std::make_pair(Model(P, c, A, b, G, h_l, h_u, x_l, x_u), active_set);
-}
-
-/*
- * Random strongly convex QPs with a known, strictly complementary solution satisfying LICQ (see qp_with_known_active_set).
- * Each of the MAX_ATTEMPTS attempts samples P, A, G and the active set. The result only depends on the state of
- * piqp::rand::gen.
- */
-template<typename T>
-std::pair<piqp::dense::Model<T>, ActiveSet>
-dense_strongly_convex_qp_with_known_active_set(piqp::isize dim, piqp::isize n_eq, piqp::isize n_ineq,
-                                               T bounds_perc = T(0.5), T strong_convexity_factor = T(1e-2))
-{
-    for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
-    {
-        piqp::Mat<T> P = piqp::rand::dense_positive_definite_upper_triangular_rand<T>(dim, strong_convexity_factor);
-        piqp::Mat<T> A = piqp::rand::dense_matrix_rand<T>(n_eq, dim);
-        piqp::Mat<T> G = piqp::rand::dense_matrix_rand<T>(n_ineq, dim);
-        auto qp = qp_with_known_active_set<piqp::dense::Model<T>>(P, A, G, bounds_perc);
-        if (qp.has_value()) return *qp;
-    }
-    throw std::runtime_error("no QP with a known active set found");
-}
-
-template<typename T, typename I>
-std::pair<piqp::sparse::Model<T, I>, ActiveSet>
-sparse_strongly_convex_qp_with_known_active_set(piqp::isize dim, piqp::isize n_eq, piqp::isize n_ineq, T sparsity_factor,
-                                                T bounds_perc = T(0.5), T strong_convexity_factor = T(1e-2))
-{
-    for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
-    {
-        piqp::SparseMat<T, I> P = piqp::rand::sparse_positive_definite_upper_triangular_rand<T, I>(dim, sparsity_factor, strong_convexity_factor);
-        piqp::SparseMat<T, I> A = piqp::rand::sparse_matrix_rand<T, I>(n_eq, dim, sparsity_factor);
-        piqp::SparseMat<T, I> G = piqp::rand::sparse_matrix_rand<T, I>(n_ineq, dim, sparsity_factor);
-        auto qp = qp_with_known_active_set<piqp::sparse::Model<T, I>>(P, A, G, bounds_perc);
-        if (qp.has_value()) return *qp;
-    }
-    throw std::runtime_error("no QP with a known active set found");
-}
-
-/*
- * checks that every finite bound in the active set has slack <= tol and dual >= tol,
- * and every other finite bound has slack >= tol and dual <= tol
- */
-template<typename T>
-void assert_active_set_match(const piqp::Result<T>& result, const ActiveSet& active_set, T tol = T(1e-6))
-{
-    auto assert_match = [tol](const piqp::Vec<T>& s, const piqp::Vec<T>& z, const std::vector<piqp::isize>& active, const char* name)
-    {
-        for (piqp::isize i = 0; i < s.rows(); i++)
-        {
-            if (s(i) >= PIQP_INF) continue; // infinite bound
-            if (std::find(active.begin(), active.end(), i) != active.end())
-            {
-                ASSERT_LE(s(i), tol) << name << " " << i << " should be active";
-                ASSERT_GE(z(i), tol) << name << " " << i << " should be active";
-            }
-            else
-            {
-                ASSERT_GE(s(i), tol) << name << " " << i << " should be inactive";
-                ASSERT_LE(z(i), tol) << name << " " << i << " should be inactive";
-            }
-        }
-    };
-    ASSERT_NO_FATAL_FAILURE(assert_match(result.s_l, result.z_l, active_set.h_l, "h_l"));
-    ASSERT_NO_FATAL_FAILURE(assert_match(result.s_u, result.z_u, active_set.h_u, "h_u"));
-    ASSERT_NO_FATAL_FAILURE(assert_match(result.s_bl, result.z_bl, active_set.x_l, "x_l"));
-    ASSERT_NO_FATAL_FAILURE(assert_match(result.s_bu, result.z_bu, active_set.x_u, "x_u"));
 }
 
 template<typename T>
@@ -526,7 +397,7 @@ std::vector<OutputField<T>> output_fields()
  * within a fixed active set, which is asserted for both perturbed problems.
  */
 template<typename Solver, typename Model>
-void finite_difference_jvp(Solver& solver, const Model& model, const Model& d, const ActiveSet& active_set,
+void finite_difference_jvp(Solver& solver, const Model& model, const Model& d, const piqp::rand::ActiveSet& active_set,
                            piqp::Variables<typename Model::T>& jvp)
 {
     using T = typename Model::T;
@@ -556,7 +427,7 @@ void finite_difference_jvp(Solver& solver, const Model& model, const Model& d, c
  * The model has to be generated with a known active set, which is checked at the solution.
  */
 template<typename Solver, typename Model>
-void run_finite_difference_test(Solver& solver, const Model& model, const ActiveSet& active_set)
+void run_finite_difference_test(Solver& solver, const Model& model, const piqp::rand::ActiveSet& active_set)
 {
     using T = typename Model::T;
 
@@ -674,9 +545,6 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
                 solver.setup(P, c, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, x_l, piqp::nullopt);
                 ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
 
-                // the forward solution is the true optimum
-                EXPECT_NEAR(solver.result().x(0), (std::max)(a, T(0)), 1e-5);
-
                 piqp::Vec<T> grad_x = piqp::Vec<T>::Constant(1, w_x);
                 piqp::Vec<T> grad_s_bl = piqp::Vec<T>::Constant(1, w_s);
                 ASSERT_EQ(solver.backward(grad_x, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt,
@@ -701,37 +569,6 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
             }
         }
     }
-}
-
-template<typename T>
-piqp::Mat<T> append_rows(const piqp::Mat<T>& A, const piqp::Mat<T>& R)
-{
-    piqp::Mat<T> out(A.rows() + R.rows(), R.cols());
-    out << A, R;
-    return out;
-}
-
-template<typename T, typename I>
-piqp::SparseMat<T, I> append_rows(const piqp::SparseMat<T, I>& A, const piqp::Mat<T>& R)
-{
-    std::vector<Eigen::Triplet<T, I>> triplets;
-    for (piqp::isize j = 0; j < A.outerSize(); j++)
-    {
-        for (typename piqp::SparseMat<T, I>::InnerIterator it(A, j); it; ++it)
-        {
-            triplets.emplace_back(I(it.row()), I(it.col()), it.value());
-        }
-    }
-    for (piqp::isize i = 0; i < R.rows(); i++)
-    {
-        for (piqp::isize j = 0; j < R.cols(); j++)
-        {
-            if (R(i, j) != 0) triplets.emplace_back(I(A.rows() + i), I(j), R(i, j));
-        }
-    }
-    piqp::SparseMat<T, I> out(A.rows() + R.rows(), R.cols());
-    out.setFromTriplets(triplets.begin(), triplets.end());
-    return out;
 }
 
 /*

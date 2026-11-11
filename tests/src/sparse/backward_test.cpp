@@ -41,7 +41,7 @@ protected:
 namespace
 {
 
-std::pair<sparse::Model<T, I>, ActiveSet> make_qp(unsigned int seed)
+std::pair<sparse::Model<T, I>, rand::ActiveSet> make_qp(unsigned int seed)
 {
     // same problem in every test, independent of the test order
     // (the distributions are reset as well, normal_distribution caches values)
@@ -49,7 +49,7 @@ std::pair<sparse::Model<T, I>, ActiveSet> make_qp(unsigned int seed)
     rand::uniform_dist.reset();
     rand::uniform_dist_pos.reset();
     rand::normal_dist.reset();
-    return sparse_strongly_convex_qp_with_known_active_set<T, I>(12, 2, 8, 0.5);
+    return rand::sparse_strongly_convex_qp_with_known_active_set<T, I>(12, 2, 8, 0.5);
 }
 
 sparse::Model<T, I> make_model()
@@ -67,16 +67,6 @@ void configure(Solver& solver, KKTSolver kkt_solver)
     solver.settings().eps_duality_gap_abs = 1e-10;
     solver.settings().eps_duality_gap_rel = 1e-10;
     solver.settings().enable_backward = true;
-}
-
-void expect_same_pattern(const SparseMat<T, I>& a, SparseMat<T, I> b)
-{
-    b.makeCompressed();
-    ASSERT_EQ(a.rows(), b.rows());
-    ASSERT_EQ(a.cols(), b.cols());
-    ASSERT_EQ(a.nonZeros(), b.nonZeros());
-    EXPECT_TRUE(std::equal(a.outerIndexPtr(), a.outerIndexPtr() + a.outerSize() + 1, b.outerIndexPtr()));
-    EXPECT_TRUE(std::equal(a.innerIndexPtr(), a.innerIndexPtr() + a.nonZeros(), b.innerIndexPtr()));
 }
 
 } // namespace
@@ -152,10 +142,7 @@ TEST_P(SparseBackwardTest, SetupKeepsGradientStorage)
         ASSERT_EQ(moved.G.nonZeros(), model.G.nonZeros());
     }
     solver.setup(moved.P, moved.c, moved.A, moved.b, moved.G, moved.h_l, moved.h_u, moved.x_l, moved.x_u);
-    const SparseMat<T, I>& G_grad = solver.gradients().G;
-    ASSERT_EQ(G_grad.nonZeros(), moved.G.nonZeros());
-    EXPECT_TRUE(std::equal(G_grad.outerIndexPtr(), G_grad.outerIndexPtr() + G_grad.outerSize() + 1, moved.G.outerIndexPtr()));
-    EXPECT_TRUE(std::equal(G_grad.innerIndexPtr(), G_grad.innerIndexPtr() + G_grad.nonZeros(), moved.G.innerIndexPtr()));
+    expect_same_pattern(solver.gradients().G, moved.G);
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
     ASSERT_EQ(solver.backward(), Status::PIQP_SOLVED);
 
@@ -165,26 +152,6 @@ TEST_P(SparseBackwardTest, SetupKeepsGradientStorage)
     EXPECT_EQ(solver.gradients().G.nonZeros(), 0);
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
     ASSERT_EQ(solver.backward(), Status::PIQP_SOLVED);
-}
-
-// backward() requires enable_backward to be set before setup()
-TEST_P(SparseBackwardTest, RequiresEnableBackward)
-{
-    sparse::Model<T, I> model = make_model();
-    SparseSolver<T, I> solver;
-    configure(solver, GetParam());
-    solver.settings().enable_backward = false;
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
-
-    // enabling it after setup() is not sufficient
-    solver.settings().enable_backward = true;
-    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
-
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
 }
 
 TEST_P(SparseBackwardTest, ProvidedResultInvalid)
@@ -210,7 +177,7 @@ TEST_P(SparseBackwardTest, FiniteDifferences)
     for (unsigned int seed : {1, 2, 3, 4, 5})
     {
         SCOPED_TRACE("seed " + std::to_string(seed));
-        std::pair<sparse::Model<T, I>, ActiveSet> qp = make_qp(seed);
+        std::pair<sparse::Model<T, I>, rand::ActiveSet> qp = make_qp(seed);
         const sparse::Model<T, I>& model = qp.first;
         SparseSolver<T, I> solver;
         configure(solver, GetParam());
@@ -228,51 +195,14 @@ TEST_P(SparseBackwardTest, InvalidStates)
     sparse::Model<T, I> model = make_model();
     SparseSolver<T, I> solver;
     configure(solver, GetParam());
+    run_invalid_states_test(solver, model);
+}
 
-    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
-
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    // not solved
-    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
-
-    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
-
-    // wrong dimensions, each adjoint is checked; a failed call invalidates the previous gradients
-    Vec<T> wrong_n = Vec<T>::Zero(model.P.rows() + 1);
-    Vec<T> wrong_p = Vec<T>::Zero(model.A.rows() + 1);
-    Vec<T> wrong_m = Vec<T>::Zero(model.G.rows() + 1);
-    EXPECT_EQ(solver.backward(wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, wrong_p), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
-
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
-
-    // data changed since last solve, update() invalidates the gradients
-    solver.update(nullopt, model.c);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
-
-    ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
-
-    // setup() invalidates the gradients
-    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
+TEST_P(SparseBackwardTest, NoConstraints)
+{
+    SparseSolver<T, I> solver;
+    configure(solver, GetParam());
+    run_no_constraints_test(solver, rand::sparse_positive_definite_upper_triangular_rand<T, I>(4, T(0.5), T(1)));
 }
 
 TEST_P(SparseBackwardTest, SmoothingAnalytic)
@@ -292,6 +222,14 @@ TEST_P(SparseBackwardTest, SmoothingEqualities)
     configure(solver, GetParam());
     configure(reference, GetParam());
     run_smoothing_equality_test(solver, reference, make_model());
+}
+
+TEST_P(SparseBackwardTest, CopyMove)
+{
+    sparse::Model<T, I> model = make_model();
+    SparseSolver<T, I> solver;
+    configure(solver, GetParam());
+    run_copy_move_test(solver, model);
 }
 
 INSTANTIATE_TEST_SUITE_P(
