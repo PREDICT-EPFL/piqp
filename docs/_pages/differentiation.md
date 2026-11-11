@@ -55,7 +55,7 @@ i.e., it solves a single linear system for the adjoint variables $$\lambda = (\l
 
 The lower bounds $$h_l$$ and the box constraints $$x_l \leq x \leq x_u$$ are handled in the same way with their own slacks and duals, e.g., $$\nabla_{h_l} L = \lambda_{z_l}$$ and $$\nabla_{x_u} L = -\lambda_{z_{bu}}$$.
 
-The sparse gradients have the sparsity patterns of the matrices passed to `setup`, e.g., the gradient with respect to $$P$$ is upper triangular if only the upper triangular part of $$P$$ is passed. Gradients with respect to infinite bounds are zero.
+The sparse gradients have the sparsity patterns of the matrices passed to `setup`, e.g., the gradient with respect to $$P$$ is upper triangular if only the upper triangular part of $$P$$ is passed. The gradient with respect to $$P$$ is always the gradient with respect to the symmetric matrix $$P$$. Hence, if only the upper triangular part of $$P$$ is passed, the derivative with respect to a stored off-diagonal value, which represents both $$P_{ij}$$ and $$P_{ji}$$, is twice the returned entry. Gradients with respect to infinite bounds are zero.
 
 At degenerate solutions, e.g., an active constraint with zero dual, the solution map is not differentiable. In this case, or to get informative gradients across active-set changes, [gradient smoothing](#gradient-smoothing) can be used.
 

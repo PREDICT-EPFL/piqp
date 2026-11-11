@@ -32,7 +32,9 @@ namespace sparse
  *
  * All quantities are in the user's (unscaled) coordinates:
  *   P: n x n, dL/dP = 0.5 * (lam_x x^T + x lam_x^T) on the sparsity pattern of the P passed to setup(),
- *      i.e., upper triangular if only the upper triangular part of P is passed
+ *      i.e., upper triangular if only the upper triangular part of P is passed. This is the gradient w.r.t. the
+ *      symmetric matrix P, the derivative w.r.t. a stored off-diagonal value of an upper triangular P is twice
+ *      the returned entry.
  *   A: p x n, sparsity pattern of the A passed to setup()
  *   G: m x n, sparsity pattern of the G passed to setup(), rows with both bounds infinite are zero
  *   c, b, h_l, h_u: entries of infinite bounds are zero
