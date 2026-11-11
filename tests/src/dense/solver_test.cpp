@@ -403,6 +403,56 @@ TEST(DenseSolverTest, InfinityBounds)
     ASSERT_NEAR(solver.result().x(3), -1.0, 1e-6);
 }
 
+// rows with both bounds infinite stay disabled when only G or only one of the bounds is updated
+TEST(DenseSolverTest, InfinityBoundsUpdate)
+{
+    Mat<T> P = Mat<T>::Identity(4, 4);
+    Vec<T> c(4); c << 1, 1, 1, 1;
+
+    Mat<T> G(6, 4); G << 1,  0, 0,  0,
+                         1,  0, -1, 0,
+                         -1, 0, -1, 0,
+                         -1, 0, 0,  0,
+                         -1, 0, 1,  0,
+                         1,  0, 1,  0;
+    T inf = std::numeric_limits<T>::infinity();
+    Vec<T> h_l = Vec<T>::Constant(6, -inf);
+    Vec<T> h_u(6); h_u << 1, 1, 1, 1, inf, inf;
+
+    DenseSolver<T> solver;
+    solver.settings().verbose = false;
+    solver.setup(P, c, piqp::nullopt, piqp::nullopt, G, piqp::nullopt, h_u);
+
+    auto expect_solution = [&solver]() {
+        ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
+        EXPECT_NEAR(solver.result().x(0), -0.5, 1e-6);
+        EXPECT_NEAR(solver.result().x(1), -1.0, 1e-6);
+        EXPECT_NEAR(solver.result().x(2), -0.5, 1e-6);
+        EXPECT_NEAR(solver.result().x(3), -1.0, 1e-6);
+    };
+
+    // the replacement bounds -1 <= G_i x <= 1 of the disabled rows would be violated by the solution
+    G.bottomRows(2) *= T(10);
+    solver.update(piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, G);
+    expect_solution();
+
+    // updating only one bound keeps the other bound of the disabled rows infinite
+    solver.update(piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, h_l);
+    expect_solution();
+
+    // enabling a disabled row again without passing G is rejected and leaves the problem unchanged,
+    // otherwise the zeroed row would give the infeasible constraint 0 <= -0.5
+    h_u(4) = T(-0.5);
+    solver.update(piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, h_u);
+    expect_solution();
+
+    // with G the row is enabled again: -10 x_0 + 10 x_2 <= 0.5 is inactive, x_0 + x_2 is unbounded
+    h_u(4) = T(0.5);
+    solver.update(piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, G, piqp::nullopt, h_u);
+    expect_solution();
+    EXPECT_NEAR(solver.result().s_u(4), 0.5, 1e-6);
+}
+
 TEST(DenseSolverTest, CopyConstructor)
 {
     isize dim = 20;

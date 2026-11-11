@@ -226,6 +226,22 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_impl(const optional<CM
         return;
     }
 
+    // The G rows of disabled constraints are zeroed, i.e., G has to be passed to enable them again.
+    if (!G.has_value() && (h_l.has_value() || h_u.has_value()))
+    {
+        for (isize i = 0; i < m_data.m; i++)
+        {
+            if (!m_data.G_row_disabled(i)) { continue; }
+            bool h_l_finite = h_l.has_value() && h_l->size() == m_data.m && (*h_l)(i) > -PIQP_INF;
+            bool h_u_finite = h_u.has_value() && h_u->size() == m_data.m && (*h_u)(i) < PIQP_INF;
+            if (h_l_finite || h_u_finite)
+            {
+                piqp_eprint("h_l[%zd] or h_u[%zd] is finite but both were infinite before, G has to be passed as well to enable the constraint again\n", i, i);
+                return;
+            }
+        }
+    }
+
     Timer<T> update_timer;
     if (m_settings.compute_timings)
     {
@@ -275,9 +291,22 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_impl(const optional<CM
 
     if (h_l.has_value() && h_l->size() != m_data.m) { piqp_eprint("h_l has wrong dimensions\n"); return; }
     if (h_u.has_value() && h_u->size() != m_data.m) { piqp_eprint("h_u has wrong dimensions\n"); return; }
-    if (h_l.has_value()) { m_data.set_h_l(h_l); }
-    if (h_u.has_value()) { m_data.set_h_u(h_u); }
-    if (h_l.has_value() || h_u.has_value()) { m_data.disable_inf_constraints(); }
+    if (G.has_value() || h_l.has_value() || h_u.has_value())
+    {
+        // Disabled rows hold the replacement bounds -1 <= 0 x <= 1. Restore their infinite bounds, such that
+        // bounds which are not updated stay infinite, and disable them again, which also zeros updated G rows.
+        for (isize i = 0; i < m_data.m; i++)
+        {
+            if (m_data.G_row_disabled(i))
+            {
+                m_data.h_l(i) = -PIQP_INF;
+                m_data.h_u(i) = PIQP_INF;
+            }
+        }
+        m_data.set_h_l(h_l.has_value() ? h_l : optional<CVecRef<T>>(m_data.h_l));
+        m_data.set_h_u(h_u.has_value() ? h_u : optional<CVecRef<T>>(m_data.h_u));
+        m_data.disable_inf_constraints();
+    }
 
     if (x_l.has_value() && x_l->size() != m_data.n) { piqp_eprint("x_l has wrong dimensions\n"); return; }
     if (x_u.has_value() && x_u->size() != m_data.n) { piqp_eprint("x_u has wrong dimensions\n"); return; }
