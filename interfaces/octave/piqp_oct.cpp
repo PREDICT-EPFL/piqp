@@ -152,7 +152,6 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     ov_struct.assign("enable_backward", octave_value(settings.enable_backward));
     ov_struct.assign("gradient_smoothing", octave_value(settings.gradient_smoothing));
     ov_struct.assign("gradient_smoothing_mu", octave_value(settings.gradient_smoothing_mu));
-    ov_struct.assign("gradient_smoothing_tol", octave_value(settings.gradient_smoothing_tol));
     ov_struct.assign("gradient_smoothing_max_iter", octave_value(settings.gradient_smoothing_max_iter));
     ov_struct.assign("verbose", octave_value(settings.verbose));
     ov_struct.assign("compute_timings", octave_value(settings.compute_timings));
@@ -194,7 +193,6 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
     settings.enable_backward = ov_struct.getfield("enable_backward").bool_value();
     settings.gradient_smoothing = ov_struct.getfield("gradient_smoothing").bool_value();
     settings.gradient_smoothing_mu = ov_struct.getfield("gradient_smoothing_mu").double_value();
-    settings.gradient_smoothing_tol = ov_struct.getfield("gradient_smoothing_tol").double_value();
     settings.gradient_smoothing_max_iter = ov_struct.getfield("gradient_smoothing_max_iter").int_value();
     settings.verbose = ov_struct.getfield("verbose").bool_value();
     settings.compute_timings = ov_struct.getfield("compute_timings").bool_value();

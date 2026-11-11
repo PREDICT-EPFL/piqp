@@ -285,6 +285,15 @@ TEST_P(SparseBackwardTest, SmoothingAnalytic)
     run_smoothing_analytic_test(solver, P);
 }
 
+TEST_P(SparseBackwardTest, SmoothingEqualities)
+{
+    SparseSolver<T, I> solver;
+    SparseSolver<T, I> reference;
+    configure(solver, GetParam());
+    configure(reference, GetParam());
+    run_smoothing_equality_test(solver, reference, make_model());
+}
+
 INSTANTIATE_TEST_SUITE_P(
     KKTSolver,
     SparseBackwardTest,

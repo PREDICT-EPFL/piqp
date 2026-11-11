@@ -165,8 +165,6 @@ TEST(DenseBackwardTest, SmoothingAnalytic2D)
             configure(solver, scale_cost);
             solver.settings().gradient_smoothing = true;
             solver.settings().gradient_smoothing_mu = mu;
-            solver.settings().gradient_smoothing_tol = 1e-10;
-            solver.settings().gradient_smoothing_max_iter = 20;
             solver.setup(P, c, nullopt, nullopt, G, nullopt, h_u, nullopt, nullopt);
             ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
 
@@ -205,6 +203,15 @@ TEST(DenseBackwardTest, SmoothingAnalytic2D)
 }
 
 // backward() requires enable_backward to be set before setup()
+TEST(DenseBackwardTest, SmoothingEqualities)
+{
+    DenseSolver<T> solver;
+    DenseSolver<T> reference;
+    configure(solver);
+    configure(reference);
+    run_smoothing_equality_test(solver, reference, make_model());
+}
+
 TEST(DenseBackwardTest, RequiresEnableBackward)
 {
     dense::Model<T> model = make_model();

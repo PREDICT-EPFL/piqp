@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The gradient w.r.t. `P` is `0.5 * (lam_x x^T + x lam_x^T)`, as in ProxQP, qpth and OSQP. The gradients of the sparse solver have the sparsity patterns of the matrices passed to `setup()`, e.g., the gradient w.r.t. `P` is upper triangular if only the upper triangular part of `P` is passed
 - In the Python interface, the gradients are read-only views into the solver memory without copies, also the scipy CSC matrices of the sparse solver. `setup()` keeps the storage if the problem dimensions (dense) or sparsity patterns (sparse) do not change, such that the views stay valid
 - New setting `enable_backward`, which has to be set before `setup()` to use `backward()`. It allocates the gradient storage in `setup()`, such that `backward()` does not allocate
-- New settings `gradient_smoothing`, `gradient_smoothing_mu`, `gradient_smoothing_tol` and `gradient_smoothing_max_iter`: with `gradient_smoothing` enabled, `backward()` differentiates at a relaxed point with `s * z = mu`, which makes the gradient smooth across active-set changes
+- New settings `gradient_smoothing`, `gradient_smoothing_mu` and `gradient_smoothing_max_iter`: with `gradient_smoothing` enabled, `backward()` differentiates at a relaxed point with `s * z = mu`, which makes the gradient smooth across active-set changes
 
 ### Changed
 - The C settings struct `piqp_settings` and the C workspace `piqp_workspace` (new field `gradients`) have new fields, so code compiled against the C interface must be recompiled

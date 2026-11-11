@@ -142,7 +142,8 @@ With `gradient_smoothing` enabled, `backward` differentiates at a relaxed point 
 |:------------------------------|:--------|:--------------------------------------------------------------------|
 | `gradient_smoothing`          | `false` | Differentiate at the relaxed point with $$s \circ z = \mu$$.        |
 | `gradient_smoothing_mu`       | `1e-3`  | Relaxation parameter $$\mu$$.                                       |
-| `gradient_smoothing_tol`      | `1e-5`  | Tolerance on the residual of the relaxed KKT conditions.            |
-| `gradient_smoothing_max_iter` | `5`     | Maximum number of Newton iterations.                                |
+| `gradient_smoothing_max_iter` | `10`    | Maximum number of Newton iterations.                                |
 
-If the Newton iterations do not converge, `backward` returns `PIQP_MAX_ITER_REACHED`.
+The Newton iterations use the same termination criterion as `solve`, i.e., `eps_abs` and `eps_rel` on the primal and dual residuals, and in addition on the deviation of $$s \circ z$$ from $$\mu$$. If they do not converge, `backward` returns `PIQP_MAX_ITER_REACHED`.
+
+Constraints with equal lower and upper bounds, i.e., equality constraints given as inequalities (`h_l[i] == h_u[i]` or `x_l[i] == x_u[i]`), have no interior and are not relaxed. Equality constraints which are only implied by several inequality constraints cannot be detected, in that case the smoothing does not converge.

@@ -158,7 +158,6 @@ static void piqp_set_default_settings(piqp_settings* settings, Solver&& solver)
     settings->enable_backward = solver.settings().enable_backward;
     settings->gradient_smoothing = solver.settings().gradient_smoothing;
     settings->gradient_smoothing_mu = solver.settings().gradient_smoothing_mu;
-    settings->gradient_smoothing_tol = solver.settings().gradient_smoothing_tol;
     settings->gradient_smoothing_max_iter = (piqp_int) solver.settings().gradient_smoothing_max_iter;
     settings->verbose = solver.settings().verbose;
     settings->compute_timings = solver.settings().compute_timings;
@@ -403,7 +402,6 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().enable_backward = settings->enable_backward;
         solver->settings().gradient_smoothing = settings->gradient_smoothing;
         solver->settings().gradient_smoothing_mu = settings->gradient_smoothing_mu;
-        solver->settings().gradient_smoothing_tol = settings->gradient_smoothing_tol;
         solver->settings().gradient_smoothing_max_iter = settings->gradient_smoothing_max_iter;
         solver->settings().verbose = settings->verbose;
         solver->settings().compute_timings = settings->compute_timings;
@@ -444,7 +442,6 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().enable_backward = settings->enable_backward;
         solver->settings().gradient_smoothing = settings->gradient_smoothing;
         solver->settings().gradient_smoothing_mu = settings->gradient_smoothing_mu;
-        solver->settings().gradient_smoothing_tol = settings->gradient_smoothing_tol;
         solver->settings().gradient_smoothing_max_iter = settings->gradient_smoothing_max_iter;
         solver->settings().verbose = settings->verbose;
         solver->settings().compute_timings = settings->compute_timings;

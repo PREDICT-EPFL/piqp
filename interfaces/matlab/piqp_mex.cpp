@@ -58,7 +58,6 @@ const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "enable_backward",
                                       "gradient_smoothing",
                                       "gradient_smoothing_mu",
-                                      "gradient_smoothing_tol",
                                       "gradient_smoothing_max_iter",
                                       "verbose",
                                       "compute_timings"};
@@ -256,7 +255,6 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     mxSetField(mx_ptr, 0, "enable_backward", mxCreateDoubleScalar(settings.enable_backward));
     mxSetField(mx_ptr, 0, "gradient_smoothing", mxCreateDoubleScalar(settings.gradient_smoothing));
     mxSetField(mx_ptr, 0, "gradient_smoothing_mu", mxCreateDoubleScalar(settings.gradient_smoothing_mu));
-    mxSetField(mx_ptr, 0, "gradient_smoothing_tol", mxCreateDoubleScalar(settings.gradient_smoothing_tol));
     mxSetField(mx_ptr, 0, "gradient_smoothing_max_iter", mxCreateDoubleScalar((double) settings.gradient_smoothing_max_iter));
     mxSetField(mx_ptr, 0, "verbose", mxCreateDoubleScalar(settings.verbose));
     mxSetField(mx_ptr, 0, "compute_timings", mxCreateDoubleScalar(settings.compute_timings));
@@ -300,7 +298,6 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
     settings.enable_backward = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "enable_backward"));
     settings.gradient_smoothing = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "gradient_smoothing"));
     settings.gradient_smoothing_mu = (double) mxGetScalar(mxGetField(mx_ptr, 0, "gradient_smoothing_mu"));
-    settings.gradient_smoothing_tol = (double) mxGetScalar(mxGetField(mx_ptr, 0, "gradient_smoothing_tol"));
     settings.gradient_smoothing_max_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "gradient_smoothing_max_iter"));
     settings.verbose = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "verbose"));
     settings.compute_timings = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "compute_timings"));

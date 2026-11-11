@@ -80,17 +80,11 @@ protected:
     T delta_dual_lin = 0;
 
     // backward pass (differentiation) state
-    Variables<T> m_result_scaled;              // last solution (scaled)
-    Variables<T> m_adjoint_rhs;                // adjoint right-hand side (scaled)
-    Variables<T> m_adjoint;                    // adjoint variables
-    Variables<T> m_smoothed_scaled;            // smoothed point (scaled)
-    Variables<T> m_smoothed;                   // smoothed point (unscaled)
-    Variables<T> m_linearization_point_scaled; // provided forward result (scaled)
-    Variables<T> m_linearization_point;        // provided forward result (unscaled)
+    Variables<T> m_linearization_point;  // point the gradients are computed at
     GradientsType m_gradients;
-    bool m_backward_enabled = false;           // backward workspace is allocated
-    bool m_backward_ready = false;             // a valid solve of the current data is available
-    bool m_forward_factor_valid = false;       // the KKT factorization of the last solve() can be reused
+    bool m_backward_enabled = false;     // backward workspace is allocated
+    bool m_backward_ready = false;       // a valid solve of the current data is available
+    bool m_forward_factor_valid = false; // the KKT factorization of the last solve() can be reused
 
 public:
     SolverBase();
@@ -150,7 +144,7 @@ protected:
 
     T calculate_mu();
 
-    void calculate_step(T& alpha_s, T& alpha_z, const Variables<T>* vars = nullptr);
+    void calculate_step(T& alpha_s, T& alpha_z, const Variables<T>& vars);
 
     void update_residuals_nr(const Variables<T>& vars, Info<T>& info);
 
@@ -178,17 +172,21 @@ protected:
 
     void store_dual_infeasibility_certificate(const T& norm);
 
-    void unscale_results(Variables<T>* vars = nullptr);
+    void scale_results(Variables<T>& vars);
 
-    void unpack_dual(Variables<T>* vars = nullptr);
+    void unscale_results(Variables<T>& vars);
+
+    void pack_dual(Variables<T>& vars);
+
+    void unpack_dual(Variables<T>& vars);
 
     void restore_dual();
 
-    Status scale_backward_point(const Result<T>& forward_result);
+    void reduce_dual(Variables<T>& vars);
 
-    bool factor_backward_kkt(const Variables<T>& vars_scaled, const T& rho, const T& delta);
+    Status init_linearization_point(const Result<T>& forward_result);
 
-    Status run_gradient_smoothing(const Variables<T>& start_scaled, const T& rho, const T& delta);
+    Status smooth_linearization_point(Info<T>& info);
 
     Status backward_impl(const optional<CVecRef<T>>& grad_x,
                          const optional<CVecRef<T>>& grad_y,
@@ -202,8 +200,6 @@ protected:
                          const optional<CVecRef<T>>& grad_s_bu,
                          const optional<Result<T>>& forward_result);
 
-    T smoothing_residual(const Variables<T>& vars, const T& mu);
-
     void assemble_adjoint_rhs(const optional<CVecRef<T>>& grad_x,
                               const optional<CVecRef<T>>& grad_y,
                               const optional<CVecRef<T>>& grad_z_l,
@@ -214,9 +210,9 @@ protected:
                               const optional<CVecRef<T>>& grad_s_u,
                               const optional<CVecRef<T>>& grad_s_bl,
                               const optional<CVecRef<T>>& grad_s_bu,
-                              const Variables<T>& linearization_point_scaled);
+                              Variables<T>& rhs);
 
-    void unscale_adjoint();
+    void unscale_adjoint(Variables<T>& lambda);
 };
 
 template<typename T, typename Preconditioner = dense::RuizEquilibration<T>>

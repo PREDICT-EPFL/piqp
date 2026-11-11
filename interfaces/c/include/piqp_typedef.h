@@ -106,7 +106,6 @@ typedef struct {
     piqp_int        enable_backward;
     piqp_int        gradient_smoothing;
     piqp_float       gradient_smoothing_mu;
-    piqp_float       gradient_smoothing_tol;
     piqp_int        gradient_smoothing_max_iter;
     piqp_int        verbose;
     piqp_int        compute_timings;

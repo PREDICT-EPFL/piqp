@@ -175,7 +175,6 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("enable_backward", &piqp::Settings<T>::enable_backward)
         .def_readwrite("gradient_smoothing", &piqp::Settings<T>::gradient_smoothing)
         .def_readwrite("gradient_smoothing_mu", &piqp::Settings<T>::gradient_smoothing_mu)
-        .def_readwrite("gradient_smoothing_tol", &piqp::Settings<T>::gradient_smoothing_tol)
         .def_readwrite("gradient_smoothing_max_iter", &piqp::Settings<T>::gradient_smoothing_max_iter)
         .def_readwrite("verbose", &piqp::Settings<T>::verbose)
         .def_readwrite("compute_timings", &piqp::Settings<T>::compute_timings);

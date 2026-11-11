@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -658,8 +659,6 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
     const T w_x = 1;
     solver.settings().gradient_smoothing = true;
     solver.settings().gradient_smoothing_mu = mu;
-    solver.settings().gradient_smoothing_tol = 1e-10;
-    solver.settings().gradient_smoothing_max_iter = 20;
 
     for (bool scale_cost : {false, true})
     {
@@ -702,6 +701,90 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
             }
         }
     }
+}
+
+template<typename T>
+piqp::Mat<T> append_rows(const piqp::Mat<T>& A, const piqp::Mat<T>& R)
+{
+    piqp::Mat<T> out(A.rows() + R.rows(), R.cols());
+    out << A, R;
+    return out;
+}
+
+template<typename T, typename I>
+piqp::SparseMat<T, I> append_rows(const piqp::SparseMat<T, I>& A, const piqp::Mat<T>& R)
+{
+    std::vector<Eigen::Triplet<T, I>> triplets;
+    for (piqp::isize j = 0; j < A.outerSize(); j++)
+    {
+        for (typename piqp::SparseMat<T, I>::InnerIterator it(A, j); it; ++it)
+        {
+            triplets.emplace_back(I(it.row()), I(it.col()), it.value());
+        }
+    }
+    for (piqp::isize i = 0; i < R.rows(); i++)
+    {
+        for (piqp::isize j = 0; j < R.cols(); j++)
+        {
+            if (R(i, j) != 0) triplets.emplace_back(I(A.rows() + i), I(j), R(i, j));
+        }
+    }
+    piqp::SparseMat<T, I> out(A.rows() + R.rows(), R.cols());
+    out.setFromTriplets(triplets.begin(), triplets.end());
+    return out;
+}
+
+/*
+ * Gradient smoothing with an inequality row with h_l == h_u and a variable with x_l == x_u, which have no
+ * interior and are not smoothed. The gradients have to match the ones of the same problem with both
+ * constraints given as equality constraints, where only the sums dh_l + dh_u and dx_l + dx_u are defined.
+ */
+template<typename Solver, typename Model>
+void run_smoothing_equality_test(Solver& solver, Solver& reference, const Model& model)
+{
+    using T = typename Model::T;
+
+    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+    ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
+    piqp::Vec<T> x = solver.result().x;
+    piqp::Mat<T> G_dense = piqp::Mat<T>(model.G);
+    T g_x = G_dense.row(0).dot(x);
+
+    Model ineq = model;
+    ineq.h_l(0) = g_x;
+    ineq.h_u(0) = g_x;
+    ineq.x_l(0) = x(0);
+    ineq.x_u(0) = x(0);
+
+    Model eq = model;
+    piqp::Mat<T> rows = piqp::Mat<T>::Zero(2, x.rows());
+    rows.row(0) = G_dense.row(0);
+    rows(1, 0) = T(1);
+    eq.A = append_rows(model.A, rows);
+    eq.b.conservativeResize(model.b.rows() + 2);
+    eq.b.tail(2) << g_x, x(0);
+    eq.h_l(0) = -std::numeric_limits<T>::infinity();
+    eq.h_u(0) = std::numeric_limits<T>::infinity();
+    eq.x_l(0) = -std::numeric_limits<T>::infinity();
+    eq.x_u(0) = std::numeric_limits<T>::infinity();
+
+    piqp::Vec<T> grad_x = piqp::Vec<T>::Ones(x.rows());
+    for (Solver* s : {&solver, &reference})
+    {
+        const Model& m = s == &solver ? ineq : eq;
+        s->settings().gradient_smoothing = true;
+        s->setup(m.P, m.c, m.A, m.b, m.G, m.h_l, m.h_u, m.x_l, m.x_u);
+        ASSERT_EQ(s->solve(), piqp::Status::PIQP_SOLVED);
+        ASSERT_EQ(s->backward(grad_x), piqp::Status::PIQP_SOLVED);
+    }
+
+    const auto& g_ineq = solver.gradients();
+    const auto& g_eq = reference.gradients();
+    piqp::isize p = model.b.rows();
+    T tol = T(1e-5) * (std::max)(T(1), g_eq.c.template lpNorm<Eigen::Infinity>());
+    EXPECT_LT((g_ineq.c - g_eq.c).template lpNorm<Eigen::Infinity>(), tol);
+    EXPECT_NEAR(g_ineq.h_l(0) + g_ineq.h_u(0), g_eq.b(p), tol);
+    EXPECT_NEAR(g_ineq.x_l(0) + g_ineq.x_u(0), g_eq.b(p + 1), tol);
 }
 
 #endif //PIQP_TESTS_BACKWARD_UTILS_HPP
