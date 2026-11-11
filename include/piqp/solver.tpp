@@ -1641,54 +1641,20 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::backward_impl(const optiona
         return Status::PIQP_UNSOLVED;
     }
 
-    if (grad_x.has_value() && grad_x->size() != m_data.n)
+    auto valid_size = [](const optional<CVecRef<T>>& grad, isize size, const char* name) {
+        if (grad.has_value() && grad->size() != size)
+        {
+            piqp_eprint("%s has wrong dimensions\n", name);
+            return false;
+        }
+        return true;
+    };
+    if (!valid_size(grad_x, m_data.n, "grad_x") || !valid_size(grad_y, m_data.p, "grad_y") ||
+        !valid_size(grad_z_l, m_data.m, "grad_z_l") || !valid_size(grad_z_u, m_data.m, "grad_z_u") ||
+        !valid_size(grad_z_bl, m_data.n, "grad_z_bl") || !valid_size(grad_z_bu, m_data.n, "grad_z_bu") ||
+        !valid_size(grad_s_l, m_data.m, "grad_s_l") || !valid_size(grad_s_u, m_data.m, "grad_s_u") ||
+        !valid_size(grad_s_bl, m_data.n, "grad_s_bl") || !valid_size(grad_s_bu, m_data.n, "grad_s_bu"))
     {
-        piqp_eprint("grad_x has wrong dimensions\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-    if (grad_y.has_value() && grad_y->size() != m_data.p)
-    {
-        piqp_eprint("grad_y has wrong dimensions\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-    if (grad_z_l.has_value() && grad_z_l->size() != m_data.m)
-    {
-        piqp_eprint("grad_z_l has wrong dimensions\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-    if (grad_z_u.has_value() && grad_z_u->size() != m_data.m)
-    {
-        piqp_eprint("grad_z_u has wrong dimensions\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-    if (grad_z_bl.has_value() && grad_z_bl->size() != m_data.n)
-    {
-        piqp_eprint("grad_z_bl has wrong dimensions\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-    if (grad_z_bu.has_value() && grad_z_bu->size() != m_data.n)
-    {
-        piqp_eprint("grad_z_bu has wrong dimensions\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-    if (grad_s_l.has_value() && grad_s_l->size() != m_data.m)
-    {
-        piqp_eprint("grad_s_l has wrong dimensions\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-    if (grad_s_u.has_value() && grad_s_u->size() != m_data.m)
-    {
-        piqp_eprint("grad_s_u has wrong dimensions\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-    if (grad_s_bl.has_value() && grad_s_bl->size() != m_data.n)
-    {
-        piqp_eprint("grad_s_bl has wrong dimensions\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-    if (grad_s_bu.has_value() && grad_s_bu->size() != m_data.n)
-    {
-        piqp_eprint("grad_s_bu has wrong dimensions\n");
         return Status::PIQP_INVALID_SETTINGS;
     }
 
