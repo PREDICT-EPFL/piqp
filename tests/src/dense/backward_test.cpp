@@ -173,6 +173,14 @@ TEST(DenseBackwardTest, ProvidedResultInvalid)
     run_invalid_result_test(solver, model);
 }
 
+TEST(DenseBackwardTest, DefaultMatchesProvidedResult)
+{
+    dense::Model<T> model = make_model();
+    DenseSolver<T> solver;
+    configure(solver);
+    run_default_matches_provided_test(solver, model);
+}
+
 TEST(DenseBackwardTest, NoSideEffectsOnForward)
 {
     dense::Model<T> model = make_model();

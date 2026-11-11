@@ -42,7 +42,7 @@ $$
 \nabla_\theta L = \left(\frac{\partial \omega}{\partial \theta}\right)^\top \nabla_\omega L = \left(\frac{\partial F}{\partial \theta}\right)^\top \lambda, \qquad \left(\frac{\partial F}{\partial \omega}\right)^\top \lambda = -\nabla_\omega L,
 $$
 
-i.e., it solves a single linear system for the adjoint variables $$\lambda = (\lambda_x, \lambda_y, \lambda_z, \lambda_s)$$. Since $$\partial F / \partial \omega$$ only differs from the regularized KKT matrix of the forward solve by the regularization, the factorization of the last iteration is reused. The gradients with respect to the problem data are then
+i.e., it solves a single linear system for the adjoint variables $$\lambda = (\lambda_x, \lambda_y, \lambda_z, \lambda_s)$$. Since $$\partial F / \partial \omega$$ only differs from the regularized KKT matrix of the forward solve by the regularization, the regularized KKT matrix is factored once at the solution, reusing the symbolic analysis of the forward solve, and the factorization is cached for subsequent `backward()` calls on the same solution. The gradients with respect to the problem data are then
 
 | Data  | Gradient                                             |
 |:------|:-----------------------------------------------------|

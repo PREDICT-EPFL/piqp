@@ -162,6 +162,14 @@ TEST_P(SparseBackwardTest, ProvidedResultInvalid)
     run_invalid_result_test(solver, model);
 }
 
+TEST_P(SparseBackwardTest, DefaultMatchesProvidedResult)
+{
+    sparse::Model<T, I> model = make_model();
+    SparseSolver<T, I> solver;
+    configure(solver, GetParam());
+    run_default_matches_provided_test(solver, model);
+}
+
 TEST_P(SparseBackwardTest, NoSideEffectsOnForward)
 {
     sparse::Model<T, I> model = make_model();

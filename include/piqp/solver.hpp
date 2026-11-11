@@ -84,7 +84,7 @@ protected:
     GradientsType m_gradients;
     bool m_backward_enabled = false;     // backward workspace is allocated
     bool m_backward_ready = false;       // a valid solve of the current data is available
-    bool m_forward_factor_valid = false; // the KKT factorization of the last solve() can be reused
+    bool m_backward_factor_valid = false; // the KKT is factored at the linearization point of the last solve() result
 
 public:
     SolverBase();

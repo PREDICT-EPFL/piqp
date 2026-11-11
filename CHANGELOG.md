@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- New method `backward()` which computes the gradients w.r.t. the problem data by implicit differentiation of the KKT conditions, reusing the KKT factorization of the last solve, in all interfaces [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- New method `backward()` which computes the gradients w.r.t. the problem data by implicit differentiation of the KKT conditions in all interfaces [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
 - New setting `enable_backward`, which has to be set before `setup()` to use `backward()` [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
 - New settings `gradient_smoothing`, `gradient_smoothing_mu` and `gradient_smoothing_max_iter` to smooth the gradients across active-set changes [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
 

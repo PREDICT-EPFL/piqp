@@ -204,6 +204,54 @@ void run_copy_move_test(Solver& solver, Model& model)
     expect_same_gradients(solver, moved);
 }
 
+/*
+ * The default backward() linearizes at the result of the last solve(), i.e., it gives the same gradients as
+ * passing that result explicitly. Repeated calls and mixing both paths reuse or refactor the KKT matrix correctly.
+ */
+template<typename Solver, typename Model>
+void run_default_matches_provided_test(Solver& solver, Model& model)
+{
+    using T = typename Model::T;
+    solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
+    ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
+    piqp::optional<piqp::Result<T>> forward_result = solver.result();
+    piqp::Variables<T> w = piqp::rand::variables_rand<T>(model.P.rows(), model.A.rows(), model.G.rows());
+
+    struct Grads { piqp::Mat<T> P, A, G; piqp::Vec<T> c, b, h_l, h_u, x_l, x_u; };
+    auto backward = [&](bool provided, Grads& out) {
+        piqp::Status status = provided
+            ? solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, forward_result)
+            : solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu);
+        ASSERT_EQ(status, piqp::Status::PIQP_SOLVED);
+        const auto& g = solver.gradients();
+        out = {piqp::Mat<T>(g.P), piqp::Mat<T>(g.A), piqp::Mat<T>(g.G), g.c, g.b, g.h_l, g.h_u, g.x_l, g.x_u};
+    };
+    auto expect_close = [](const Grads& g1, const Grads& g2) {
+        auto close = [](const piqp::Mat<T>& a, const piqp::Mat<T>& b) {
+            T scale = (std::max)(T(1), b.template lpNorm<Eigen::Infinity>());
+            return (a - b).template lpNorm<Eigen::Infinity>() <= T(1e-9) * scale;
+        };
+        EXPECT_TRUE(close(g1.P, g2.P));
+        EXPECT_TRUE(close(g1.A, g2.A));
+        EXPECT_TRUE(close(g1.G, g2.G));
+        EXPECT_TRUE(close(g1.c, g2.c));
+        EXPECT_TRUE(close(g1.b, g2.b));
+        EXPECT_TRUE(close(g1.h_l, g2.h_l));
+        EXPECT_TRUE(close(g1.h_u, g2.h_u));
+        EXPECT_TRUE(close(g1.x_l, g2.x_l));
+        EXPECT_TRUE(close(g1.x_u, g2.x_u));
+    };
+
+    Grads g_default, g_cached, g_provided, g_after_provided;
+    ASSERT_NO_FATAL_FAILURE(backward(false, g_default));
+    ASSERT_NO_FATAL_FAILURE(backward(false, g_cached));
+    ASSERT_NO_FATAL_FAILURE(backward(true, g_provided));
+    ASSERT_NO_FATAL_FAILURE(backward(false, g_after_provided));
+    expect_close(g_cached, g_default);
+    expect_close(g_provided, g_default);
+    expect_close(g_after_provided, g_default);
+}
+
 // Invalid provided results are rejected: a forward result which is not solved with PIQP_UNSOLVED,
 // a malformed one with PIQP_INVALID_SETTINGS.
 template<typename Solver, typename Model>

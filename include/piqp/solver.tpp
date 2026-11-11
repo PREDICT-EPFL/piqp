@@ -79,7 +79,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
     Status status = solve_impl();
 
     m_backward_ready = (status == Status::PIQP_SOLVED || status == Status::PIQP_MAX_ITER_REACHED);
-    m_forward_factor_valid = m_backward_ready;
+    m_backward_factor_valid = false;
 
     unscale_results(m_result);
     restore_dual();
@@ -142,7 +142,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
     m_data.resize(P.rows(), A.has_value() ? A->rows() : 0, G.has_value() ? G->rows() : 0);
 
     m_backward_ready = false;
-    m_forward_factor_valid = false;
+    m_backward_factor_valid = false;
     m_backward_enabled = false;
     m_gradients.status = Status::PIQP_UNSOLVED;
 
@@ -233,7 +233,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_impl(const optional<CM
     }
 
     m_backward_ready = false;
-    m_forward_factor_valid = false;
+    m_backward_factor_valid = false;
     m_gradients.status = Status::PIQP_UNSOLVED;
 
     m_preconditioner.unscale_data(m_data);
@@ -1683,14 +1683,16 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::backward_impl(const optiona
             return smoothing_status;
         }
     }
-    else if (forward_result.has_value() || !m_forward_factor_valid)
+    else if (forward_result.has_value() || !m_backward_factor_valid)
     {
-        m_forward_factor_valid = false;
+        m_backward_factor_valid = false;
         if (!factor_kkt(m_linearization_point, info))
         {
             piqp_eprint("backward(): KKT factorization at the linearization point failed\n");
             return Status::PIQP_NUMERICS;
         }
+        // only the linearization point of the last solve() result is cached
+        m_backward_factor_valid = !forward_result.has_value();
     }
 
     // the forward residuals and steps are not needed anymore and hold the adjoint system
@@ -1864,7 +1866,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::smooth_linearization_point(
     project(vars.s_bl, vars.z_bl, target.z_bl, m_data.n_x_l);
     project(vars.s_bu, vars.z_bu, target.z_bu, m_data.n_x_u);
 
-    m_forward_factor_valid = false;
+    m_backward_factor_valid = false;
     for (isize iter = 0;; iter++)
     {
         if (!factor_kkt(vars, info))
