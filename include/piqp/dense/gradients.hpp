@@ -84,10 +84,12 @@ struct Gradients
         A.noalias() = lambda.y * linearization_point.x.transpose();
         A.noalias() += linearization_point.y * lambda.x.transpose();
 
-        // column-wise to avoid temporaries for the differences
+        // h_l and h_u hold the differences until they are set below
+        h_l = lambda.z_u - lambda.z_l;
+        h_u = linearization_point.z_u - linearization_point.z_l;
         for (isize j = 0; j < data.n; j++)
         {
-            G.col(j) = (lambda.z_u - lambda.z_l) * linearization_point.x(j) + (linearization_point.z_u - linearization_point.z_l) * lambda.x(j);
+            G.col(j) = h_l * linearization_point.x(j) + h_u * lambda.x(j);
         }
 
         c = lambda.x;
