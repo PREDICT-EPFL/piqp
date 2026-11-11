@@ -172,38 +172,38 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("iterative_refinement_min_improvement_rate", &piqp::Settings<T>::iterative_refinement_min_improvement_rate)
         .def_readwrite("iterative_refinement_static_regularization_eps", &piqp::Settings<T>::iterative_refinement_static_regularization_eps)
         .def_readwrite("iterative_refinement_static_regularization_rel", &piqp::Settings<T>::iterative_refinement_static_regularization_rel)
-        .def_readwrite("enable_backward", &piqp::Settings<T>::enable_backward)
-        .def_readwrite("gradient_smoothing", &piqp::Settings<T>::gradient_smoothing)
-        .def_readwrite("gradient_smoothing_mu", &piqp::Settings<T>::gradient_smoothing_mu)
-        .def_readwrite("gradient_smoothing_max_iter", &piqp::Settings<T>::gradient_smoothing_max_iter)
+        .def_readwrite("enable_derivatives", &piqp::Settings<T>::enable_derivatives)
+        .def_readwrite("derivative_smoothing", &piqp::Settings<T>::derivative_smoothing)
+        .def_readwrite("derivative_smoothing_mu", &piqp::Settings<T>::derivative_smoothing_mu)
+        .def_readwrite("derivative_smoothing_max_iter", &piqp::Settings<T>::derivative_smoothing_max_iter)
         .def_readwrite("verbose", &piqp::Settings<T>::verbose)
         .def_readwrite("compute_timings", &piqp::Settings<T>::compute_timings);
 
-    using DenseGradients = piqp::dense::Gradients<T>;
-    py::class_<DenseGradients>(m, "DenseGradients", py::module_local())
-        .def_readonly("status", &DenseGradients::status)
-        .def_readonly("P", &DenseGradients::P)
-        .def_readonly("c", &DenseGradients::c)
-        .def_readonly("A", &DenseGradients::A)
-        .def_readonly("b", &DenseGradients::b)
-        .def_readonly("G", &DenseGradients::G)
-        .def_readonly("h_l", &DenseGradients::h_l)
-        .def_readonly("h_u", &DenseGradients::h_u)
-        .def_readonly("x_l", &DenseGradients::x_l)
-        .def_readonly("x_u", &DenseGradients::x_u);
+    using DenseVJPResult = piqp::dense::VJPResult<T>;
+    py::class_<DenseVJPResult>(m, "DenseVJPResult", py::module_local())
+        .def_readonly("status", &DenseVJPResult::status)
+        .def_readonly("P", &DenseVJPResult::P)
+        .def_readonly("c", &DenseVJPResult::c)
+        .def_readonly("A", &DenseVJPResult::A)
+        .def_readonly("b", &DenseVJPResult::b)
+        .def_readonly("G", &DenseVJPResult::G)
+        .def_readonly("h_l", &DenseVJPResult::h_l)
+        .def_readonly("h_u", &DenseVJPResult::h_u)
+        .def_readonly("x_l", &DenseVJPResult::x_l)
+        .def_readonly("x_u", &DenseVJPResult::x_u);
 
-    using SparseGradients = piqp::sparse::Gradients<T, I>;
-    py::class_<SparseGradients>(m, "SparseGradients", py::module_local())
-        .def_readonly("status", &SparseGradients::status)
-        .def_property_readonly("P", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseGradients&>().P, self); })
-        .def_readonly("c", &SparseGradients::c)
-        .def_property_readonly("A", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseGradients&>().A, self); })
-        .def_readonly("b", &SparseGradients::b)
-        .def_property_readonly("G", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseGradients&>().G, self); })
-        .def_readonly("h_l", &SparseGradients::h_l)
-        .def_readonly("h_u", &SparseGradients::h_u)
-        .def_readonly("x_l", &SparseGradients::x_l)
-        .def_readonly("x_u", &SparseGradients::x_u);
+    using SparseVJPResult = piqp::sparse::VJPResult<T, I>;
+    py::class_<SparseVJPResult>(m, "SparseVJPResult", py::module_local())
+        .def_readonly("status", &SparseVJPResult::status)
+        .def_property_readonly("P", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseVJPResult&>().P, self); })
+        .def_readonly("c", &SparseVJPResult::c)
+        .def_property_readonly("A", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseVJPResult&>().A, self); })
+        .def_readonly("b", &SparseVJPResult::b)
+        .def_property_readonly("G", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseVJPResult&>().G, self); })
+        .def_readonly("h_l", &SparseVJPResult::h_l)
+        .def_readonly("h_u", &SparseVJPResult::h_u)
+        .def_readonly("x_l", &SparseVJPResult::x_l)
+        .def_readonly("x_u", &SparseVJPResult::x_u);
 
     using SparseSolver = piqp::SparseSolver<T, I>;
     py::class_<SparseSolver>(m, "SparseSolver", py::module_local())
@@ -247,14 +247,14 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
              py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
         .def("solve", &SparseSolver::solve)
-        .def("backward", &SparseSolver::backward,
+        .def("vjp", &SparseSolver::vjp,
              py::arg("grad_x") = piqp::nullopt, py::arg("grad_y") = piqp::nullopt,
              py::arg("grad_z_l") = piqp::nullopt, py::arg("grad_z_u") = piqp::nullopt,
              py::arg("grad_z_bl") = piqp::nullopt, py::arg("grad_z_bu") = piqp::nullopt,
              py::arg("grad_s_l") = piqp::nullopt, py::arg("grad_s_u") = piqp::nullopt,
              py::arg("grad_s_bl") = piqp::nullopt, py::arg("grad_s_bu") = piqp::nullopt,
-             py::arg("forward_result") = piqp::nullopt)
-        .def_property_readonly("gradients", &SparseSolver::gradients);
+             py::arg("solve_result") = piqp::nullopt)
+        .def_property_readonly("vjp_result", &SparseSolver::vjp_result);
 
     using DenseSolver = piqp::DenseSolver<T>;
     py::class_<DenseSolver>(m, "DenseSolver", py::module_local())
@@ -272,14 +272,14 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
              py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
         .def("solve", &DenseSolver::solve)
-        .def("backward", &DenseSolver::backward,
+        .def("vjp", &DenseSolver::vjp,
              py::arg("grad_x") = piqp::nullopt, py::arg("grad_y") = piqp::nullopt,
              py::arg("grad_z_l") = piqp::nullopt, py::arg("grad_z_u") = piqp::nullopt,
              py::arg("grad_z_bl") = piqp::nullopt, py::arg("grad_z_bu") = piqp::nullopt,
              py::arg("grad_s_l") = piqp::nullopt, py::arg("grad_s_u") = piqp::nullopt,
              py::arg("grad_s_bl") = piqp::nullopt, py::arg("grad_s_bu") = piqp::nullopt,
-             py::arg("forward_result") = piqp::nullopt)
-        .def_property_readonly("gradients", &DenseSolver::gradients);
+             py::arg("solve_result") = piqp::nullopt)
+        .def_property_readonly("vjp_result", &DenseSolver::vjp_result);
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

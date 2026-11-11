@@ -155,10 +155,10 @@ static void piqp_set_default_settings(piqp_settings* settings, Solver&& solver)
     settings->iterative_refinement_min_improvement_rate = solver.settings().iterative_refinement_min_improvement_rate;
     settings->iterative_refinement_static_regularization_eps = solver.settings().iterative_refinement_static_regularization_eps;
     settings->iterative_refinement_static_regularization_rel = solver.settings().iterative_refinement_static_regularization_rel;
-    settings->enable_backward = solver.settings().enable_backward;
-    settings->gradient_smoothing = solver.settings().gradient_smoothing;
-    settings->gradient_smoothing_mu = solver.settings().gradient_smoothing_mu;
-    settings->gradient_smoothing_max_iter = (piqp_int) solver.settings().gradient_smoothing_max_iter;
+    settings->enable_derivatives = solver.settings().enable_derivatives;
+    settings->derivative_smoothing = solver.settings().derivative_smoothing;
+    settings->derivative_smoothing_mu = solver.settings().derivative_smoothing_mu;
+    settings->derivative_smoothing_max_iter = (piqp_int) solver.settings().derivative_smoothing_max_iter;
     settings->verbose = solver.settings().verbose;
     settings->compute_timings = solver.settings().compute_timings;
 }
@@ -213,43 +213,43 @@ static piqp::optional<Eigen::Map<CSparseMat>> piqp_optional_sparse_mat_map(piqp_
     return mat;
 }
 
-template<typename Gradients>
-static void piqp_set_gradient_vectors(piqp_gradients* gradients, const Gradients& solver_gradients)
+template<typename VJPResult>
+static void piqp_set_vjp_result_vectors(piqp_vjp_result* vjp_result, const VJPResult& solver_vjp_result)
 {
-    gradients->status = (piqp_status) solver_gradients.status;
-    gradients->c = solver_gradients.c.data();
-    gradients->b = solver_gradients.b.data();
-    gradients->h_l = solver_gradients.h_l.data();
-    gradients->h_u = solver_gradients.h_u.data();
-    gradients->x_l = solver_gradients.x_l.data();
-    gradients->x_u = solver_gradients.x_u.data();
+    vjp_result->status = (piqp_status) solver_vjp_result.status;
+    vjp_result->c = solver_vjp_result.c.data();
+    vjp_result->b = solver_vjp_result.b.data();
+    vjp_result->h_l = solver_vjp_result.h_l.data();
+    vjp_result->h_u = solver_vjp_result.h_u.data();
+    vjp_result->x_l = solver_vjp_result.x_l.data();
+    vjp_result->x_u = solver_vjp_result.x_u.data();
 }
 
 // the dense gradients are stored column-major in the solver, they are copied
-// into row-major buffers owned by the workspace after each successful backward
-static void piqp_allocate_gradients_dense(piqp_workspace* work, const DenseSolver& solver)
+// into row-major buffers owned by the workspace after each successful vjp
+static void piqp_allocate_vjp_result_dense(piqp_workspace* work, const DenseSolver& solver)
 {
-    work->gradients = new piqp_gradients;
+    work->vjp_result = new piqp_vjp_result;
     const piqp_int n = work->solver_info.n;
     const piqp_int p = work->solver_info.p;
     const piqp_int m = work->solver_info.m;
-    work->gradients->P = new piqp_float[n * n];
-    work->gradients->A = new piqp_float[p * n];
-    work->gradients->G = new piqp_float[m * n];
-    work->gradients->P_csc = nullptr;
-    work->gradients->A_csc = nullptr;
-    work->gradients->G_csc = nullptr;
-    piqp_set_gradient_vectors(work->gradients, solver.gradients());
+    work->vjp_result->P = new piqp_float[n * n];
+    work->vjp_result->A = new piqp_float[p * n];
+    work->vjp_result->G = new piqp_float[m * n];
+    work->vjp_result->P_csc = nullptr;
+    work->vjp_result->A_csc = nullptr;
+    work->vjp_result->G_csc = nullptr;
+    piqp_set_vjp_result_vectors(work->vjp_result, solver.vjp_result());
 }
 
-static void piqp_copy_gradients_dense(piqp_workspace* work, const DenseSolver& solver)
+static void piqp_copy_vjp_result_dense(piqp_workspace* work, const DenseSolver& solver)
 {
     const piqp_int n = work->solver_info.n;
     const piqp_int p = work->solver_info.p;
     const piqp_int m = work->solver_info.m;
-    Eigen::Map<CMat>(const_cast<piqp_float*>(work->gradients->P), n, n) = solver.gradients().P;
-    Eigen::Map<CMat>(const_cast<piqp_float*>(work->gradients->A), p, n) = solver.gradients().A;
-    Eigen::Map<CMat>(const_cast<piqp_float*>(work->gradients->G), m, n) = solver.gradients().G;
+    Eigen::Map<CMat>(const_cast<piqp_float*>(work->vjp_result->P), n, n) = solver.vjp_result().P;
+    Eigen::Map<CMat>(const_cast<piqp_float*>(work->vjp_result->A), p, n) = solver.vjp_result().A;
+    Eigen::Map<CMat>(const_cast<piqp_float*>(work->vjp_result->G), m, n) = solver.vjp_result().G;
 }
 
 static piqp_csc* piqp_csc_view(const CSparseMat& mat)
@@ -261,29 +261,29 @@ static piqp_csc* piqp_csc_view(const CSparseMat& mat)
 }
 
 // the sparse gradients are views into the solver memory, whose sparsity pattern is fixed after the setup
-static void piqp_allocate_gradients_sparse(piqp_workspace* work, const SparseSolver& solver)
+static void piqp_allocate_vjp_result_sparse(piqp_workspace* work, const SparseSolver& solver)
 {
-    work->gradients = new piqp_gradients;
-    work->gradients->P = nullptr;
-    work->gradients->A = nullptr;
-    work->gradients->G = nullptr;
-    work->gradients->P_csc = piqp_csc_view(solver.gradients().P);
-    work->gradients->A_csc = piqp_csc_view(solver.gradients().A);
-    work->gradients->G_csc = piqp_csc_view(solver.gradients().G);
-    piqp_set_gradient_vectors(work->gradients, solver.gradients());
+    work->vjp_result = new piqp_vjp_result;
+    work->vjp_result->P = nullptr;
+    work->vjp_result->A = nullptr;
+    work->vjp_result->G = nullptr;
+    work->vjp_result->P_csc = piqp_csc_view(solver.vjp_result().P);
+    work->vjp_result->A_csc = piqp_csc_view(solver.vjp_result().A);
+    work->vjp_result->G_csc = piqp_csc_view(solver.vjp_result().G);
+    piqp_set_vjp_result_vectors(work->vjp_result, solver.vjp_result());
 }
 
-static void piqp_free_gradients(piqp_workspace* work)
+static void piqp_free_vjp_result(piqp_workspace* work)
 {
-    if (!work->gradients) return;
-    delete[] work->gradients->P;
-    delete[] work->gradients->A;
-    delete[] work->gradients->G;
-    free(const_cast<piqp_csc*>(work->gradients->P_csc));
-    free(const_cast<piqp_csc*>(work->gradients->A_csc));
-    free(const_cast<piqp_csc*>(work->gradients->G_csc));
-    delete work->gradients;
-    work->gradients = nullptr;
+    if (!work->vjp_result) return;
+    delete[] work->vjp_result->P;
+    delete[] work->vjp_result->A;
+    delete[] work->vjp_result->G;
+    free(const_cast<piqp_csc*>(work->vjp_result->P_csc));
+    free(const_cast<piqp_csc*>(work->vjp_result->A_csc));
+    free(const_cast<piqp_csc*>(work->vjp_result->G_csc));
+    delete work->vjp_result;
+    work->vjp_result = nullptr;
 }
 
 void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, const piqp_settings* settings)
@@ -298,7 +298,7 @@ void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, c
     work->solver_info.p = data->p;
     work->solver_info.m = data->m;
     work->result = new piqp_result;
-    work->gradients = nullptr;
+    work->vjp_result = nullptr;
 
     if (settings)
     {
@@ -319,9 +319,9 @@ void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, c
 
     piqp_update_result(work->result, solver->result());
 
-    if (solver->settings().enable_backward)
+    if (solver->settings().enable_derivatives)
     {
-        piqp_allocate_gradients_dense(work, *solver);
+        piqp_allocate_vjp_result_dense(work, *solver);
     }
 }
 
@@ -337,7 +337,7 @@ void piqp_setup_sparse(piqp_workspace** workspace, const piqp_data_sparse* data,
     work->solver_info.p = data->p;
     work->solver_info.m = data->m;
     work->result = new piqp_result;
-    work->gradients = nullptr;
+    work->vjp_result = nullptr;
 
     if (settings)
     {
@@ -358,9 +358,9 @@ void piqp_setup_sparse(piqp_workspace** workspace, const piqp_data_sparse* data,
 
     piqp_update_result(work->result, solver->result());
 
-    if (solver->settings().enable_backward)
+    if (solver->settings().enable_derivatives)
     {
-        piqp_allocate_gradients_sparse(work, *solver);
+        piqp_allocate_vjp_result_sparse(work, *solver);
     }
 }
 
@@ -399,10 +399,10 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().iterative_refinement_min_improvement_rate = settings->iterative_refinement_min_improvement_rate;
         solver->settings().iterative_refinement_static_regularization_eps = settings->iterative_refinement_static_regularization_eps;
         solver->settings().iterative_refinement_static_regularization_rel = settings->iterative_refinement_static_regularization_rel;
-        solver->settings().enable_backward = settings->enable_backward;
-        solver->settings().gradient_smoothing = settings->gradient_smoothing;
-        solver->settings().gradient_smoothing_mu = settings->gradient_smoothing_mu;
-        solver->settings().gradient_smoothing_max_iter = settings->gradient_smoothing_max_iter;
+        solver->settings().enable_derivatives = settings->enable_derivatives;
+        solver->settings().derivative_smoothing = settings->derivative_smoothing;
+        solver->settings().derivative_smoothing_mu = settings->derivative_smoothing_mu;
+        solver->settings().derivative_smoothing_max_iter = settings->derivative_smoothing_max_iter;
         solver->settings().verbose = settings->verbose;
         solver->settings().compute_timings = settings->compute_timings;
     }
@@ -439,10 +439,10 @@ void piqp_update_settings(piqp_workspace* workspace, const piqp_settings* settin
         solver->settings().iterative_refinement_min_improvement_rate = settings->iterative_refinement_min_improvement_rate;
         solver->settings().iterative_refinement_static_regularization_eps = settings->iterative_refinement_static_regularization_eps;
         solver->settings().iterative_refinement_static_regularization_rel = settings->iterative_refinement_static_regularization_rel;
-        solver->settings().enable_backward = settings->enable_backward;
-        solver->settings().gradient_smoothing = settings->gradient_smoothing;
-        solver->settings().gradient_smoothing_mu = settings->gradient_smoothing_mu;
-        solver->settings().gradient_smoothing_max_iter = settings->gradient_smoothing_max_iter;
+        solver->settings().enable_derivatives = settings->enable_derivatives;
+        solver->settings().derivative_smoothing = settings->derivative_smoothing;
+        solver->settings().derivative_smoothing_mu = settings->derivative_smoothing_mu;
+        solver->settings().derivative_smoothing_max_iter = settings->derivative_smoothing_max_iter;
         solver->settings().verbose = settings->verbose;
         solver->settings().compute_timings = settings->compute_timings;
     }
@@ -467,7 +467,7 @@ void piqp_update_dense(piqp_workspace* workspace,
     auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
     solver->update(P_, c_, A_, b_, G_, h_l_, h_u_, x_l_, x_u_);
 
-    if (workspace->gradients) workspace->gradients->status = (piqp_status) solver->gradients().status;
+    if (workspace->vjp_result) workspace->vjp_result->status = (piqp_status) solver->vjp_result().status;
 }
 
 void piqp_update_sparse(piqp_workspace* workspace,
@@ -489,7 +489,7 @@ void piqp_update_sparse(piqp_workspace* workspace,
     auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
     solver->update(P_, c_, A_, b_, G_, h_l_, h_u_, x_l_, x_u_);
 
-    if (workspace->gradients) workspace->gradients->status = (piqp_status) solver->gradients().status;
+    if (workspace->vjp_result) workspace->vjp_result->status = (piqp_status) solver->vjp_result().status;
 }
 
 piqp_status piqp_solve(piqp_workspace* workspace)
@@ -528,7 +528,7 @@ static piqp::Result<piqp_float> piqp_result_from_c(const piqp_workspace* workspa
     cpp_result.s_u = Eigen::Map<const CVec>(result->s_u, m);
     cpp_result.s_bl = Eigen::Map<const CVec>(result->s_bl, n);
     cpp_result.s_bu = Eigen::Map<const CVec>(result->s_bu, n);
-    // only the status and the regularization are used by backward()
+    // only the status and the regularization are used by vjp()
     cpp_result.info.status = (piqp::Status) result->info.status;
     cpp_result.info.rho = result->info.rho;
     cpp_result.info.delta = result->info.delta;
@@ -536,25 +536,25 @@ static piqp::Result<piqp_float> piqp_result_from_c(const piqp_workspace* workspa
 }
 
 template<typename Solver>
-static piqp::Status piqp_backward_impl(Solver& solver, const piqp_workspace* workspace,
+static piqp::Status piqp_vjp_impl(Solver& solver, const piqp_workspace* workspace,
                                        const piqp_float* grad_x, const piqp_float* grad_y,
                                        const piqp_float* grad_z_l, const piqp_float* grad_z_u,
                                        const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
                                        const piqp_float* grad_s_l, const piqp_float* grad_s_u,
                                        const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
-                                       const piqp_result* forward_result)
+                                       const piqp_result* solve_result)
 {
     const piqp_int n = workspace->solver_info.n;
     const piqp_int p = workspace->solver_info.p;
     const piqp_int m = workspace->solver_info.m;
 
-    piqp::optional<piqp::Result<piqp_float>> cpp_forward_result;
-    if (forward_result)
+    piqp::optional<piqp::Result<piqp_float>> cpp_solve_result;
+    if (solve_result)
     {
-        cpp_forward_result = piqp_result_from_c(workspace, forward_result);
+        cpp_solve_result = piqp_result_from_c(workspace, solve_result);
     }
 
-    return solver.backward(piqp_optional_const_vec_map(grad_x, n),
+    return solver.vjp(piqp_optional_const_vec_map(grad_x, n),
                            piqp_optional_const_vec_map(grad_y, p),
                            piqp_optional_const_vec_map(grad_z_l, m),
                            piqp_optional_const_vec_map(grad_z_u, m),
@@ -564,36 +564,36 @@ static piqp::Status piqp_backward_impl(Solver& solver, const piqp_workspace* wor
                            piqp_optional_const_vec_map(grad_s_u, m),
                            piqp_optional_const_vec_map(grad_s_bl, n),
                            piqp_optional_const_vec_map(grad_s_bu, n),
-                           cpp_forward_result);
+                           cpp_solve_result);
 }
 
-piqp_status piqp_backward(piqp_workspace* workspace,
+piqp_status piqp_vjp(piqp_workspace* workspace,
                           const piqp_float* grad_x, const piqp_float* grad_y,
                           const piqp_float* grad_z_l, const piqp_float* grad_z_u,
                           const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
                           const piqp_float* grad_s_l, const piqp_float* grad_s_u,
                           const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
-                          const piqp_result* forward_result)
+                          const piqp_result* solve_result)
 {
     piqp::Status status;
     if (workspace->solver_info.is_dense)
     {
         auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
-        status = piqp_backward_impl(*solver, workspace, grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
-                                    grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, forward_result);
+        status = piqp_vjp_impl(*solver, workspace, grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
+                                    grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result);
         if (status == piqp::Status::PIQP_SOLVED)
         {
-            piqp_copy_gradients_dense(workspace, *solver);
+            piqp_copy_vjp_result_dense(workspace, *solver);
         }
     }
     else
     {
         auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
-        status = piqp_backward_impl(*solver, workspace, grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
-                                    grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, forward_result);
+        status = piqp_vjp_impl(*solver, workspace, grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
+                                    grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result);
     }
 
-    if (workspace->gradients) workspace->gradients->status = (piqp_status) status;
+    if (workspace->vjp_result) workspace->vjp_result->status = (piqp_status) status;
 
     return (piqp_status) status;
 }
@@ -612,7 +612,7 @@ void piqp_cleanup(piqp_workspace* workspace)
             auto* solver = reinterpret_cast<SparseSolver *>(workspace->solver_handle);
             delete solver;
         }
-        piqp_free_gradients(workspace);
+        piqp_free_vjp_result(workspace);
         delete workspace->result;
         delete workspace;
     }

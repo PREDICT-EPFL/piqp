@@ -5,8 +5,8 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_TESTS_BACKWARD_UTILS_HPP
-#define PIQP_TESTS_BACKWARD_UTILS_HPP
+#ifndef PIQP_TESTS_DERIVATIVE_UTILS_HPP
+#define PIQP_TESTS_DERIVATIVE_UTILS_HPP
 
 #include <algorithm>
 #include <cmath>
@@ -21,9 +21,9 @@
 #include "utils.hpp"
 
 /*
- * backward() must not have side effects on the forward pass: the result of the last solve() and a
- * provided forward result stay unchanged, and a subsequent solve() gives exactly the same result as
- * on a solver that never called backward(). Both solvers have to be configured identically.
+ * vjp() must not have side effects on solve(): the result of the last solve() and a
+ * provided solve result stay unchanged, and a subsequent solve() gives exactly the same result as
+ * on a solver that never called vjp(). Both solvers have to be configured identically.
  */
 template<typename Solver, typename Model>
 void run_no_side_effects_test(Solver& solver, Solver& reference, Model& model)
@@ -33,24 +33,24 @@ void run_no_side_effects_test(Solver& solver, Solver& reference, Model& model)
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
     ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
     const piqp::Result<T> result_before = solver.result();
-    piqp::optional<piqp::Result<T>> forward_result = solver.result();
+    piqp::optional<piqp::Result<T>> solve_result = solver.result();
     piqp::Variables<T> w = piqp::rand::variables_rand<T>(model.P.rows(), model.A.rows(), model.G.rows());
 
     for (bool smoothing : {false, true})
     {
         SCOPED_TRACE(smoothing ? "with smoothing" : "without smoothing");
-        solver.settings().gradient_smoothing = smoothing;
+        solver.settings().derivative_smoothing = smoothing;
 
-        ASSERT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu), piqp::Status::PIQP_SOLVED);
+        ASSERT_EQ(solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu), piqp::Status::PIQP_SOLVED);
         expect_results_identical(solver.result(), result_before);
 
-        ASSERT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, forward_result), piqp::Status::PIQP_SOLVED);
+        ASSERT_EQ(solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, solve_result), piqp::Status::PIQP_SOLVED);
         expect_results_identical(solver.result(), result_before);
-        expect_results_identical(*forward_result, result_before);
+        expect_results_identical(*solve_result, result_before);
     }
-    solver.settings().gradient_smoothing = false;
+    solver.settings().derivative_smoothing = false;
 
-    // the next solve is not affected by the backward passes
+    // the next solve is not affected by the vjp calls
     ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
     reference.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
     ASSERT_EQ(reference.solve(), piqp::Status::PIQP_SOLVED);
@@ -59,9 +59,9 @@ void run_no_side_effects_test(Solver& solver, Solver& reference, Model& model)
 }
 
 /*
- * Status of backward() in all invalid states: not set up, not enabled before setup(), not solved, wrong
+ * Status of vjp() in all invalid states: not set up, not enabled before setup(), not solved, wrong
  * dimensions, data changed since the last solve(), smoothing not converged. The status is also stored in
- * gradients().status, and setup() and update() reset it.
+ * vjp_result().status, and setup() and update() reset it.
  */
 template<typename Solver, typename Model>
 void run_invalid_states_test(Solver& solver, Model& model)
@@ -71,65 +71,65 @@ void run_invalid_states_test(Solver& solver, Model& model)
     using piqp::Status;
     auto setup = [&]() { solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u); };
 
-    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp_result().status, Status::PIQP_INVALID_SETTINGS);
 
-    // enable_backward has to be set before setup()
-    solver.settings().enable_backward = false;
+    // enable_derivatives has to be set before setup()
+    solver.settings().enable_derivatives = false;
     setup();
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
-    solver.settings().enable_backward = true;
-    EXPECT_EQ(solver.backward(), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(), Status::PIQP_INVALID_SETTINGS);
+    solver.settings().enable_derivatives = true;
+    EXPECT_EQ(solver.vjp(), Status::PIQP_INVALID_SETTINGS);
 
     setup();
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.vjp_result().status, Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.vjp(), Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.vjp_result().status, Status::PIQP_UNSOLVED);
 
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.vjp(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.vjp_result().status, Status::PIQP_SOLVED);
 
     // wrong dimensions of each argument, a failed call invalidates the previous gradients
     piqp::Vec<T> wrong_n = piqp::Vec<T>::Zero(model.P.rows() + 1);
     piqp::Vec<T> wrong_p = piqp::Vec<T>::Zero(model.A.rows() + 1);
     piqp::Vec<T> wrong_m = piqp::Vec<T>::Zero(model.G.rows() + 1);
-    EXPECT_EQ(solver.backward(wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, wrong_p), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.backward(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp_result().status, Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(nullopt, wrong_p), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_m), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, wrong_n), Status::PIQP_INVALID_SETTINGS);
 
     // smoothing not converged
-    solver.settings().gradient_smoothing = true;
-    solver.settings().gradient_smoothing_max_iter = 1;
-    EXPECT_EQ(solver.backward(), Status::PIQP_MAX_ITER_REACHED);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_MAX_ITER_REACHED);
-    solver.settings().gradient_smoothing = false;
+    solver.settings().derivative_smoothing = true;
+    solver.settings().derivative_smoothing_max_iter = 1;
+    EXPECT_EQ(solver.vjp(), Status::PIQP_MAX_ITER_REACHED);
+    EXPECT_EQ(solver.vjp_result().status, Status::PIQP_MAX_ITER_REACHED);
+    solver.settings().derivative_smoothing = false;
 
     // data changed since the last solve()
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.vjp(), Status::PIQP_SOLVED);
     solver.update(nullopt, model.c);
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.vjp_result().status, Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.vjp(), Status::PIQP_UNSOLVED);
 
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.vjp(), Status::PIQP_SOLVED);
     setup();
-    EXPECT_EQ(solver.gradients().status, Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.vjp_result().status, Status::PIQP_UNSOLVED);
 }
 
 /*
  * Without constraints, x = -P^{-1} c, such that for L = w^T x
  *   dL/dc = -P^{-1} w,  dL/dP = 0.5 (dL/dc x^T + x dL/dc^T),
- * with and without gradient smoothing. All constraint gradients are empty or zero.
+ * with and without derivative smoothing. All constraint gradients are empty or zero.
  */
 template<typename Solver, typename MatP>
 void run_no_constraints_test(Solver& solver, const MatP& P)
@@ -147,13 +147,13 @@ void run_no_constraints_test(Solver& solver, const MatP& P)
     for (bool smoothing : {false, true})
     {
         SCOPED_TRACE(smoothing ? "with smoothing" : "without smoothing");
-        solver.settings().gradient_smoothing = smoothing;
+        solver.settings().derivative_smoothing = smoothing;
         solver.setup(P, c);
         ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
-        ASSERT_EQ(solver.backward(w), piqp::Status::PIQP_SOLVED);
+        ASSERT_EQ(solver.vjp(w), piqp::Status::PIQP_SOLVED);
 
-        // backward() uses the regularized KKT matrix, i.e., the error is O(rho / lambda_min(P))
-        const auto& g = solver.gradients();
+        // vjp() uses the regularized KKT matrix, i.e., the error is O(rho / lambda_min(P))
+        const auto& g = solver.vjp_result();
         T tol = T(1e-5) * (T(1) + dL_dc.norm());
         EXPECT_LT((g.c - dL_dc).norm(), tol);
         expect_on_pattern(g.P, dL_dP, tol);
@@ -167,7 +167,7 @@ void run_no_constraints_test(Solver& solver, const MatP& P)
     }
 }
 
-// A copied or moved solver computes the same gradients, i.e., the backward state is copied as well.
+// A copied or moved solver computes the same gradients, i.e., the differentiation state is copied as well.
 template<typename Solver, typename Model>
 void run_copy_move_test(Solver& solver, Model& model)
 {
@@ -176,12 +176,12 @@ void run_copy_move_test(Solver& solver, Model& model)
     ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
     piqp::Variables<T> w = piqp::rand::variables_rand<T>(model.P.rows(), model.A.rows(), model.G.rows());
 
-    auto backward = [&w](Solver& s) {
-        ASSERT_EQ(s.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu), piqp::Status::PIQP_SOLVED);
+    auto vjp = [&w](Solver& s) {
+        ASSERT_EQ(s.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu), piqp::Status::PIQP_SOLVED);
     };
     auto expect_same_gradients = [](const Solver& s1, const Solver& s2) {
-        const auto& g1 = s1.gradients();
-        const auto& g2 = s2.gradients();
+        const auto& g1 = s1.vjp_result();
+        const auto& g2 = s2.vjp_result();
         EXPECT_EQ(g1.status, g2.status);
         EXPECT_EQ(piqp::Mat<T>(g1.P), piqp::Mat<T>(g2.P));
         EXPECT_EQ(piqp::Mat<T>(g1.A), piqp::Mat<T>(g2.A));
@@ -195,22 +195,22 @@ void run_copy_move_test(Solver& solver, Model& model)
     };
 
     Solver copy(solver);
-    ASSERT_NO_FATAL_FAILURE(backward(solver));
-    ASSERT_NO_FATAL_FAILURE(backward(copy));
+    ASSERT_NO_FATAL_FAILURE(vjp(solver));
+    ASSERT_NO_FATAL_FAILURE(vjp(copy));
     expect_same_gradients(solver, copy);
 
     Solver moved(std::move(copy));
-    ASSERT_NO_FATAL_FAILURE(backward(moved));
+    ASSERT_NO_FATAL_FAILURE(vjp(moved));
     expect_same_gradients(solver, moved);
 
-    // a copy after backward() reuses the copied KKT factorization
-    Solver copy_after_backward(solver);
-    ASSERT_NO_FATAL_FAILURE(backward(copy_after_backward));
-    expect_same_gradients(solver, copy_after_backward);
+    // a copy after vjp() reuses the copied KKT factorization
+    Solver copy_after_vjp(solver);
+    ASSERT_NO_FATAL_FAILURE(vjp(copy_after_vjp));
+    expect_same_gradients(solver, copy_after_vjp);
 }
 
 /*
- * The default backward() linearizes at the result of the last solve(), i.e., it gives the same gradients as
+ * The default vjp() linearizes at the result of the last solve(), i.e., it gives the same gradients as
  * passing that result explicitly. Repeated calls and mixing both paths reuse or refactor the KKT matrix correctly.
  */
 template<typename Solver, typename Model>
@@ -219,16 +219,16 @@ void run_default_matches_provided_test(Solver& solver, Model& model)
     using T = typename Model::T;
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
     ASSERT_EQ(solver.solve(), piqp::Status::PIQP_SOLVED);
-    piqp::optional<piqp::Result<T>> forward_result = solver.result();
+    piqp::optional<piqp::Result<T>> solve_result = solver.result();
     piqp::Variables<T> w = piqp::rand::variables_rand<T>(model.P.rows(), model.A.rows(), model.G.rows());
 
     struct Grads { piqp::Mat<T> P, A, G; piqp::Vec<T> c, b, h_l, h_u, x_l, x_u; };
-    auto backward = [&](bool provided, Grads& out) {
+    auto vjp = [&](bool provided, Grads& out) {
         piqp::Status status = provided
-            ? solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, forward_result)
-            : solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu);
+            ? solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, solve_result)
+            : solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu);
         ASSERT_EQ(status, piqp::Status::PIQP_SOLVED);
-        const auto& g = solver.gradients();
+        const auto& g = solver.vjp_result();
         out = {piqp::Mat<T>(g.P), piqp::Mat<T>(g.A), piqp::Mat<T>(g.G), g.c, g.b, g.h_l, g.h_u, g.x_l, g.x_u};
     };
     auto expect_close = [](const Grads& g1, const Grads& g2) {
@@ -248,16 +248,16 @@ void run_default_matches_provided_test(Solver& solver, Model& model)
     };
 
     Grads g_default, g_cached, g_provided, g_after_provided;
-    ASSERT_NO_FATAL_FAILURE(backward(false, g_default));
-    ASSERT_NO_FATAL_FAILURE(backward(false, g_cached));
-    ASSERT_NO_FATAL_FAILURE(backward(true, g_provided));
-    ASSERT_NO_FATAL_FAILURE(backward(false, g_after_provided));
+    ASSERT_NO_FATAL_FAILURE(vjp(false, g_default));
+    ASSERT_NO_FATAL_FAILURE(vjp(false, g_cached));
+    ASSERT_NO_FATAL_FAILURE(vjp(true, g_provided));
+    ASSERT_NO_FATAL_FAILURE(vjp(false, g_after_provided));
     expect_close(g_cached, g_default);
     expect_close(g_provided, g_default);
     expect_close(g_after_provided, g_default);
 }
 
-// Invalid provided results are rejected: a forward result which is not solved with PIQP_UNSOLVED,
+// Invalid provided results are rejected: a solve result which is not solved with PIQP_UNSOLVED,
 // a malformed one with PIQP_INVALID_SETTINGS.
 template<typename Solver, typename Model>
 void run_invalid_result_test(Solver& solver, Model& model)
@@ -270,15 +270,15 @@ void run_invalid_result_test(Solver& solver, Model& model)
 
     piqp::optional<piqp::Result<T>> r = solver.result();
     r->info.status = piqp::Status::PIQP_PRIMAL_INFEASIBLE;
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_UNSOLVED);
+    EXPECT_EQ(solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_UNSOLVED);
 
     r = solver.result();
     r->x.resize(r->x.size() + 1);
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
 
     r = solver.result();
     r->info.rho = T(0);
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
 
     // non-positive dual on a finite bound
     piqp::isize i_finite = 0;
@@ -286,16 +286,16 @@ void run_invalid_result_test(Solver& solver, Model& model)
     ASSERT_LT(i_finite, model.h_l.rows());
     r = solver.result();
     r->z_l(i_finite) = T(0);
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
 
     r = solver.result();
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.gradients().status, piqp::Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.vjp_result().status, piqp::Status::PIQP_SOLVED);
 
-    // a rejected forward result invalidates the previously computed gradients
+    // a rejected solve result invalidates the previously computed gradients
     r->info.delta = T(-1);
-    EXPECT_EQ(solver.backward(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
-    EXPECT_EQ(solver.gradients().status, piqp::Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu, r), piqp::Status::PIQP_INVALID_SETTINGS);
+    EXPECT_EQ(solver.vjp_result().status, piqp::Status::PIQP_INVALID_SETTINGS);
 }
 
 template<typename T>
@@ -474,9 +474,9 @@ void finite_difference_jvp(Solver& solver, const Model& model, const Model& d, c
 }
 
 /*
- * Compares J d from backward() with central finite differences of the solution along random unit
- * directions d, for each data block separately and for all blocks at once. backward() computes J^T w,
- * so the k-th entry of J d is <J^T e_k, d>, obtained from backward() with the unit cotangent e_k.
+ * Compares J d from vjp() with central finite differences of the solution along random unit
+ * directions d, for each data block separately and for all blocks at once. vjp() computes J^T w,
+ * so the k-th entry of J d is <J^T e_k, d>, obtained from vjp() with the unit cotangent e_k.
  * The model has to be generated with a known active set, which is checked at the solution.
  */
 template<typename Solver, typename Model>
@@ -514,13 +514,13 @@ void run_finite_difference_test(Solver& solver, const Model& model, const piqp::
     }
     e.x(0) = T(1);
 
-    // gradients are preallocated in setup(), backward() must not allocate
+    // gradients are preallocated in setup(), vjp() must not allocate
     PIQP_EIGEN_MALLOC_NOT_ALLOWED();
-    ASSERT_EQ(solver.backward(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::Status::PIQP_SOLVED);
-    ASSERT_EQ(solver.backward(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::Status::PIQP_SOLVED);
+    ASSERT_EQ(solver.vjp(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::Status::PIQP_SOLVED);
+    ASSERT_EQ(solver.vjp(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::Status::PIQP_SOLVED);
     PIQP_EIGEN_MALLOC_ALLOWED();
     e.x(0) = T(0);
-    const auto& g = solver.gradients();
+    const auto& g = solver.vjp_result();
 
     expect_symmetric_values(g.P);
 
@@ -546,7 +546,7 @@ void run_finite_difference_test(Solver& solver, const Model& model, const piqp::
             if ((result.*f.field)(k) >= PIQP_INF) continue;
 
             e_f(k) = T(1);
-            ASSERT_EQ(solver.backward(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::Status::PIQP_SOLVED);
+            ASSERT_EQ(solver.vjp(e.x, e.y, e.z_l, e.z_u, e.z_bl, e.z_bu, e.s_l, e.s_u, e.s_bl, e.s_bu), piqp::Status::PIQP_SOLVED);
             e_f(k) = T(0);
 
             // the directions have unit norm, i.e. |<g - g_exact, d>| <= ||g - g_exact||, so the tolerance is relative to ||g||
@@ -564,7 +564,7 @@ void run_finite_difference_test(Solver& solver, const Model& model, const piqp::
 }
 
 /*
- * min 0.5 x^2 - a x  s.t.  x >= x_l = 0, with gradient smoothing the relaxed KKT conditions are
+ * min 0.5 x^2 - a x  s.t.  x >= x_l = 0, with derivative smoothing the relaxed KKT conditions are
  *   x - a - z = 0,  x - x_l - s = 0,  s z = mu   =>   x = (a + sqrt(a^2 + 4 mu)) / 2,  s = x,  z = x - a,
  * such that with D = sqrt(a^2 + 4 mu) = s + z
  *   dx/da = 0.5 (1 + a / D),  dx/dx_l = z / (s + z),  ds/da = dx/da,  ds/dx_l = dx/dx_l - 1.
@@ -581,8 +581,8 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
     using T = typename MatP::Scalar;
     const T mu = 1e-3;
     const T w_x = 1;
-    solver.settings().gradient_smoothing = true;
-    solver.settings().gradient_smoothing_mu = mu;
+    solver.settings().derivative_smoothing = true;
+    solver.settings().derivative_smoothing_mu = mu;
 
     for (bool scale_cost : {false, true})
     {
@@ -600,9 +600,9 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
 
                 piqp::Vec<T> grad_x = piqp::Vec<T>::Constant(1, w_x);
                 piqp::Vec<T> grad_s_bl = piqp::Vec<T>::Constant(1, w_s);
-                ASSERT_EQ(solver.backward(grad_x, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt,
+                ASSERT_EQ(solver.vjp(grad_x, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt, piqp::nullopt,
                                           piqp::nullopt, piqp::nullopt, grad_s_bl), piqp::Status::PIQP_SOLVED);
-                ASSERT_EQ(solver.gradients().status, piqp::Status::PIQP_SOLVED);
+                ASSERT_EQ(solver.vjp_result().status, piqp::Status::PIQP_SOLVED);
 
                 T D = std::sqrt(a * a + 4 * mu);
                 T x = (a + D) / 2;
@@ -612,10 +612,10 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
                 T dx_dxl = z / (s + z);
                 T dL_dc = -(w_x + w_s) * dx_da;
 
-                // backward() differentiates the KKT system regularized with the final delta of the forward solve,
+                // vjp() differentiates the KKT system regularized with the final delta of the forward solve,
                 // which is larger at the kink (degenerate forward problem), so the error is O(delta)
                 T tol = T(1e-7) + solver.result().info.delta;
-                const auto& g = solver.gradients();
+                const auto& g = solver.vjp_result();
                 EXPECT_NEAR(g.c(0), dL_dc, tol);
                 EXPECT_NEAR(g.x_l(0), w_x * dx_dxl + w_s * (dx_dxl - 1), tol);
                 EXPECT_NEAR(g.P.coeff(0, 0), x * dL_dc, tol);
@@ -625,7 +625,7 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
 }
 
 /*
- * Gradient smoothing with an inequality row with h_l == h_u and a variable with x_l == x_u, which have no
+ * Derivative smoothing with an inequality row with h_l == h_u and a variable with x_l == x_u, which have no
  * interior and are not smoothed. The gradients have to match the ones of the same problem with both
  * constraints given as equality constraints, where only the sums dh_l + dh_u and dx_l + dx_u are defined.
  */
@@ -662,14 +662,14 @@ void run_smoothing_equality_test(Solver& solver, Solver& reference, const Model&
     for (Solver* s : {&solver, &reference})
     {
         const Model& m = s == &solver ? ineq : eq;
-        s->settings().gradient_smoothing = true;
+        s->settings().derivative_smoothing = true;
         s->setup(m.P, m.c, m.A, m.b, m.G, m.h_l, m.h_u, m.x_l, m.x_u);
         ASSERT_EQ(s->solve(), piqp::Status::PIQP_SOLVED);
-        ASSERT_EQ(s->backward(grad_x), piqp::Status::PIQP_SOLVED);
+        ASSERT_EQ(s->vjp(grad_x), piqp::Status::PIQP_SOLVED);
     }
 
-    const auto& g_ineq = solver.gradients();
-    const auto& g_eq = reference.gradients();
+    const auto& g_ineq = solver.vjp_result();
+    const auto& g_eq = reference.vjp_result();
     piqp::isize p = model.b.rows();
     T tol = T(1e-5) * (std::max)(T(1), g_eq.c.template lpNorm<Eigen::Infinity>());
     EXPECT_LT((g_ineq.c - g_eq.c).template lpNorm<Eigen::Infinity>(), tol);
@@ -677,4 +677,4 @@ void run_smoothing_equality_test(Solver& solver, Solver& reference, const Model&
     EXPECT_NEAR(g_ineq.x_l(0) + g_ineq.x_u(0), g_eq.b(p + 1), tol);
 }
 
-#endif //PIQP_TESTS_BACKWARD_UTILS_HPP
+#endif //PIQP_TESTS_DERIVATIVE_UTILS_HPP

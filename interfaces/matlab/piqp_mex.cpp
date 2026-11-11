@@ -55,10 +55,10 @@ const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "iterative_refinement_min_improvement_rate",
                                       "iterative_refinement_static_regularization_eps",
                                       "iterative_refinement_static_regularization_rel",
-                                      "enable_backward",
-                                      "gradient_smoothing",
-                                      "gradient_smoothing_mu",
-                                      "gradient_smoothing_max_iter",
+                                      "enable_derivatives",
+                                      "derivative_smoothing",
+                                      "derivative_smoothing_mu",
+                                      "derivative_smoothing_max_iter",
                                       "verbose",
                                       "compute_timings"};
 
@@ -110,7 +110,7 @@ const char* PIQP_RESULT_FIELDS[] = {"x",
                                     "s_bu",
                                     "info"};
 
-const char* PIQP_GRADIENTS_FIELDS[] = {"P",
+const char* PIQP_VJP_RESULT_FIELDS[] = {"P",
                                        "c",
                                        "A",
                                        "b",
@@ -252,10 +252,10 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     mxSetField(mx_ptr, 0, "iterative_refinement_min_improvement_rate", mxCreateDoubleScalar(settings.iterative_refinement_min_improvement_rate));
     mxSetField(mx_ptr, 0, "iterative_refinement_static_regularization_eps", mxCreateDoubleScalar(settings.iterative_refinement_static_regularization_eps));
     mxSetField(mx_ptr, 0, "iterative_refinement_static_regularization_rel", mxCreateDoubleScalar(settings.iterative_refinement_static_regularization_rel));
-    mxSetField(mx_ptr, 0, "enable_backward", mxCreateDoubleScalar(settings.enable_backward));
-    mxSetField(mx_ptr, 0, "gradient_smoothing", mxCreateDoubleScalar(settings.gradient_smoothing));
-    mxSetField(mx_ptr, 0, "gradient_smoothing_mu", mxCreateDoubleScalar(settings.gradient_smoothing_mu));
-    mxSetField(mx_ptr, 0, "gradient_smoothing_max_iter", mxCreateDoubleScalar((double) settings.gradient_smoothing_max_iter));
+    mxSetField(mx_ptr, 0, "enable_derivatives", mxCreateDoubleScalar(settings.enable_derivatives));
+    mxSetField(mx_ptr, 0, "derivative_smoothing", mxCreateDoubleScalar(settings.derivative_smoothing));
+    mxSetField(mx_ptr, 0, "derivative_smoothing_mu", mxCreateDoubleScalar(settings.derivative_smoothing_mu));
+    mxSetField(mx_ptr, 0, "derivative_smoothing_max_iter", mxCreateDoubleScalar((double) settings.derivative_smoothing_max_iter));
     mxSetField(mx_ptr, 0, "verbose", mxCreateDoubleScalar(settings.verbose));
     mxSetField(mx_ptr, 0, "compute_timings", mxCreateDoubleScalar(settings.compute_timings));
 
@@ -295,10 +295,10 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
     settings.iterative_refinement_min_improvement_rate = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_min_improvement_rate"));
     settings.iterative_refinement_static_regularization_eps = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_static_regularization_eps"));
     settings.iterative_refinement_static_regularization_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_static_regularization_rel"));
-    settings.enable_backward = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "enable_backward"));
-    settings.gradient_smoothing = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "gradient_smoothing"));
-    settings.gradient_smoothing_mu = (double) mxGetScalar(mxGetField(mx_ptr, 0, "gradient_smoothing_mu"));
-    settings.gradient_smoothing_max_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "gradient_smoothing_max_iter"));
+    settings.enable_derivatives = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "enable_derivatives"));
+    settings.derivative_smoothing = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "derivative_smoothing"));
+    settings.derivative_smoothing_mu = (double) mxGetScalar(mxGetField(mx_ptr, 0, "derivative_smoothing_mu"));
+    settings.derivative_smoothing_max_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "derivative_smoothing_max_iter"));
     settings.verbose = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "verbose"));
     settings.compute_timings = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "compute_timings"));
 }
@@ -366,7 +366,7 @@ const mxArray* get_struct_field(const mxArray* mx_ptr, const char* name)
 {
     const mxArray* field = mxGetField(mx_ptr, 0, name);
     if (!field) {
-        mexErrMsgIdAndTxt("piqp:backward", "forward_result is missing the field '%s'.", name);
+        mexErrMsgIdAndTxt("piqp:vjp", "solve_result is missing the field '%s'.", name);
     }
     return field;
 }
@@ -375,7 +375,7 @@ Vec get_struct_vec(const mxArray* mx_ptr, const char* name)
 {
     const mxArray* field = get_struct_field(mx_ptr, name);
     if (!mxIsDouble(field) || mxIsComplex(field) || mxIsSparse(field)) {
-        mexErrMsgIdAndTxt("piqp:backward", "forward_result.%s must be a real full double array.", name);
+        mexErrMsgIdAndTxt("piqp:vjp", "solve_result.%s must be a real full double array.", name);
     }
     return Eigen::Map<const Vec>(mxGetPr(field), (Eigen::Index) mxGetNumberOfElements(field));
 }
@@ -383,7 +383,7 @@ Vec get_struct_vec(const mxArray* mx_ptr, const char* name)
 piqp::Result<double> mx_struct_to_result(const mxArray* mx_ptr)
 {
     if (!mxIsStruct(mx_ptr) || mxGetNumberOfElements(mx_ptr) != 1) {
-        mexErrMsgIdAndTxt("piqp:backward", "forward_result must be a scalar struct returned by solve().");
+        mexErrMsgIdAndTxt("piqp:vjp", "solve_result must be a scalar struct returned by solve().");
     }
     piqp::Result<double> result;
     result.x = get_struct_vec(mx_ptr, "x");
@@ -396,7 +396,7 @@ piqp::Result<double> mx_struct_to_result(const mxArray* mx_ptr)
     result.s_u = get_struct_vec(mx_ptr, "s_u");
     result.s_bl = get_struct_vec(mx_ptr, "s_bl");
     result.s_bu = get_struct_vec(mx_ptr, "s_bu");
-    // only the status and the regularization are used by backward()
+    // only the status and the regularization are used by vjp()
     const mxArray* info_ptr = get_struct_field(mx_ptr, "info");
     result.info.status = (piqp::Status) (int) mxGetScalar(get_struct_field(info_ptr, "status_val"));
     result.info.rho = mxGetScalar(get_struct_field(info_ptr, "rho"));
@@ -405,10 +405,10 @@ piqp::Result<double> mx_struct_to_result(const mxArray* mx_ptr)
 }
 
 template<typename Solver>
-mxArray* run_backward(Solver& solver, const mxArray* prhs[])
+mxArray* run_vjp(Solver& solver, const mxArray* prhs[])
 {
     // prhs[2], ..., prhs[11] are the gradients w.r.t. x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu,
-    // prhs[12] is the forward result, empty arrays are treated as not provided
+    // prhs[12] is the solve result, empty arrays are treated as not provided
     piqp::optional<Eigen::Map<const Vec>> grads[10];
     for (int i = 0; i < 10; i++) {
         const mxArray* ptr = prhs[2 + i];
@@ -416,21 +416,21 @@ mxArray* run_backward(Solver& solver, const mxArray* prhs[])
             grads[i].emplace(mxGetPr(ptr), (Eigen::Index) mxGetNumberOfElements(ptr));
         }
     }
-    piqp::optional<piqp::Result<double>> forward_result;
+    piqp::optional<piqp::Result<double>> solve_result;
     if (!mxIsEmpty(prhs[12])) {
-        forward_result = mx_struct_to_result(prhs[12]);
+        solve_result = mx_struct_to_result(prhs[12]);
     }
 
-    piqp::Status status = solver.backward(grads[0], grads[1], grads[2], grads[3], grads[4],
+    piqp::Status status = solver.vjp(grads[0], grads[1], grads[2], grads[3], grads[4],
                                           grads[5], grads[6], grads[7], grads[8], grads[9],
-                                          forward_result);
+                                          solve_result);
 
-    int n_fields = sizeof(PIQP_GRADIENTS_FIELDS) / sizeof(PIQP_GRADIENTS_FIELDS[0]);
-    mxArray* mx_ptr = mxCreateStructMatrix(1, 1, n_fields, PIQP_GRADIENTS_FIELDS);
+    int n_fields = sizeof(PIQP_VJP_RESULT_FIELDS) / sizeof(PIQP_VJP_RESULT_FIELDS[0]);
+    mxArray* mx_ptr = mxCreateStructMatrix(1, 1, n_fields, PIQP_VJP_RESULT_FIELDS);
     mxSetField(mx_ptr, 0, "status", mxCreateString(piqp::status_to_string(status)));
     mxSetField(mx_ptr, 0, "status_val", mxCreateDoubleScalar((double) status));
     if (status == piqp::Status::PIQP_SOLVED) {
-        const auto& g = solver.gradients();
+        const auto& g = solver.vjp_result();
         mxSetField(mx_ptr, 0, "P", eigen_to_mx(g.P));
         mxSetField(mx_ptr, 0, "c", eigen_to_mx(g.c));
         mxSetField(mx_ptr, 0, "A", eigen_to_mx(g.A));
@@ -672,14 +672,14 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         return;
     }
 
-    if (!strcmp("backward", cmd)) {
+    if (!strcmp("vjp", cmd)) {
         if (nrhs != 13) {
-            mexErrMsgTxt("backward expects 10 gradients and a forward result.");
+            mexErrMsgTxt("vjp expects 10 cotangents and a solve result.");
         }
         if (mex_handle->isDense()) {
-            plhs[0] = run_backward(*mex_handle->as_dense_ptr(), prhs);
+            plhs[0] = run_vjp(*mex_handle->as_dense_ptr(), prhs);
         } else {
-            plhs[0] = run_backward(*mex_handle->as_sparse_ptr(), prhs);
+            plhs[0] = run_vjp(*mex_handle->as_sparse_ptr(), prhs);
         }
 
         return;

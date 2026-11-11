@@ -11,14 +11,14 @@
 #include "piqp/utils/random_utils.hpp"
 
 #include "gtest/gtest.h"
-#include "backward_utils.hpp"
+#include "derivative_utils.hpp"
 
 using namespace piqp;
 
 using T = double;
 using I = int;
 
-class SparseBackwardTest : public testing::TestWithParam<KKTSolver>
+class SparseDerivativeTest : public testing::TestWithParam<KKTSolver>
 {
 protected:
     void SetUp() override
@@ -62,28 +62,28 @@ void configure(Solver& solver, KKTSolver kkt_solver)
     solver.settings().eps_rel = 1e-10;
     solver.settings().eps_duality_gap_abs = 1e-10;
     solver.settings().eps_duality_gap_rel = 1e-10;
-    solver.settings().enable_backward = true;
+    solver.settings().enable_derivatives = true;
 }
 
 } // namespace
 
 // the P gradient follows the pattern of the P passed to setup(): upper triangular or full symmetric
-TEST_P(SparseBackwardTest, GradientPatternFollowsInput)
+TEST_P(SparseDerivativeTest, GradientPatternFollowsInput)
 {
     sparse::Model<T, I> model = make_model();
     SparseSolver<T, I> solver;
     configure(solver, GetParam());
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    ASSERT_EQ(solver.backward(solver.result().x), Status::PIQP_SOLVED);
-    expect_same_pattern(solver.gradients().P, model.P);
-    SparseMat<T, I> dP_utri = solver.gradients().P;
+    ASSERT_EQ(solver.vjp(solver.result().x), Status::PIQP_SOLVED);
+    expect_same_pattern(solver.vjp_result().P, model.P);
+    SparseMat<T, I> dP_utri = solver.vjp_result().P;
 
     SparseMat<T, I> P_full = model.P.template selfadjointView<Eigen::Upper>();
     solver.setup(P_full, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    ASSERT_EQ(solver.backward(solver.result().x), Status::PIQP_SOLVED);
-    const SparseMat<T, I>& dP_full = solver.gradients().P;
+    ASSERT_EQ(solver.vjp(solver.result().x), Status::PIQP_SOLVED);
+    const SparseMat<T, I>& dP_full = solver.vjp_result().P;
     expect_same_pattern(dP_full, P_full);
 
     // same values on the upper triangular part, mirrored to the lower one
@@ -94,15 +94,15 @@ TEST_P(SparseBackwardTest, GradientPatternFollowsInput)
 
 // setup() with an unchanged sparsity pattern keeps the storage of the gradients, such that views into it
 // (e.g., in the Python interface) stay valid
-TEST_P(SparseBackwardTest, SetupKeepsGradientStorage)
+TEST_P(SparseDerivativeTest, SetupKeepsGradientStorage)
 {
     sparse::Model<T, I> model = make_model();
     SparseSolver<T, I> solver;
     configure(solver, GetParam());
     solver.setup(model.P, model.c, model.A, model.b, model.G, model.h_l, model.h_u, model.x_l, model.x_u);
-    const T* P_values = solver.gradients().P.valuePtr();
-    const T* A_values = solver.gradients().A.valuePtr();
-    const T* G_values = solver.gradients().G.valuePtr();
+    const T* P_values = solver.vjp_result().P.valuePtr();
+    const T* A_values = solver.vjp_result().A.valuePtr();
+    const T* G_values = solver.vjp_result().G.valuePtr();
 
     // same pattern, different values
     sparse::Model<T, I> scaled = model;
@@ -110,12 +110,12 @@ TEST_P(SparseBackwardTest, SetupKeepsGradientStorage)
     scaled.A *= T(2);
     scaled.G *= T(2);
     solver.setup(scaled.P, scaled.c, scaled.A, scaled.b, scaled.G, scaled.h_l, scaled.h_u, scaled.x_l, scaled.x_u);
-    EXPECT_EQ(solver.gradients().P.valuePtr(), P_values);
-    EXPECT_EQ(solver.gradients().A.valuePtr(), A_values);
-    EXPECT_EQ(solver.gradients().G.valuePtr(), G_values);
+    EXPECT_EQ(solver.vjp_result().P.valuePtr(), P_values);
+    EXPECT_EQ(solver.vjp_result().A.valuePtr(), A_values);
+    EXPECT_EQ(solver.vjp_result().G.valuePtr(), G_values);
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    ASSERT_EQ(solver.backward(), Status::PIQP_SOLVED);
-    EXPECT_EQ(solver.gradients().P.valuePtr(), P_values);
+    ASSERT_EQ(solver.vjp(), Status::PIQP_SOLVED);
+    EXPECT_EQ(solver.vjp_result().P.valuePtr(), P_values);
 
     // same dimensions and number of nonzeros, but an entry of G moved to a different column
     sparse::Model<T, I> moved = model;
@@ -138,19 +138,19 @@ TEST_P(SparseBackwardTest, SetupKeepsGradientStorage)
         ASSERT_EQ(moved.G.nonZeros(), model.G.nonZeros());
     }
     solver.setup(moved.P, moved.c, moved.A, moved.b, moved.G, moved.h_l, moved.h_u, moved.x_l, moved.x_u);
-    expect_same_pattern(solver.gradients().G, moved.G);
+    expect_same_pattern(solver.vjp_result().G, moved.G);
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    ASSERT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    ASSERT_EQ(solver.vjp(), Status::PIQP_SOLVED);
 
     // changed dimensions: the gradients take over the new pattern
     solver.setup(model.P, model.c, model.A, model.b, nullopt, nullopt, nullopt, model.x_l, model.x_u);
-    EXPECT_EQ(solver.gradients().G.rows(), 0);
-    EXPECT_EQ(solver.gradients().G.nonZeros(), 0);
+    EXPECT_EQ(solver.vjp_result().G.rows(), 0);
+    EXPECT_EQ(solver.vjp_result().G.nonZeros(), 0);
     ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
-    ASSERT_EQ(solver.backward(), Status::PIQP_SOLVED);
+    ASSERT_EQ(solver.vjp(), Status::PIQP_SOLVED);
 }
 
-TEST_P(SparseBackwardTest, ProvidedResultInvalid)
+TEST_P(SparseDerivativeTest, ProvidedResultInvalid)
 {
     sparse::Model<T, I> model = make_model();
     SparseSolver<T, I> solver;
@@ -158,7 +158,7 @@ TEST_P(SparseBackwardTest, ProvidedResultInvalid)
     run_invalid_result_test(solver, model);
 }
 
-TEST_P(SparseBackwardTest, DefaultMatchesProvidedResult)
+TEST_P(SparseDerivativeTest, DefaultMatchesProvidedResult)
 {
     sparse::Model<T, I> model = make_model();
     SparseSolver<T, I> solver;
@@ -166,7 +166,7 @@ TEST_P(SparseBackwardTest, DefaultMatchesProvidedResult)
     run_default_matches_provided_test(solver, model);
 }
 
-TEST_P(SparseBackwardTest, NoSideEffectsOnForward)
+TEST_P(SparseDerivativeTest, NoSideEffectsOnSolve)
 {
     sparse::Model<T, I> model = make_model();
     SparseSolver<T, I> solver;
@@ -176,7 +176,7 @@ TEST_P(SparseBackwardTest, NoSideEffectsOnForward)
     run_no_side_effects_test(solver, reference, model);
 }
 
-TEST_P(SparseBackwardTest, FiniteDifferences)
+TEST_P(SparseDerivativeTest, FiniteDifferences)
 {
     for (unsigned int seed : {1, 2, 3, 4, 5})
     {
@@ -188,13 +188,13 @@ TEST_P(SparseBackwardTest, FiniteDifferences)
         run_finite_difference_test(solver, model, qp.second);
 
         // the gradients have the sparsity patterns of the matrices passed to setup()
-        expect_same_pattern(solver.gradients().P, model.P);
-        expect_same_pattern(solver.gradients().A, model.A);
-        expect_same_pattern(solver.gradients().G, model.G);
+        expect_same_pattern(solver.vjp_result().P, model.P);
+        expect_same_pattern(solver.vjp_result().A, model.A);
+        expect_same_pattern(solver.vjp_result().G, model.G);
     }
 }
 
-TEST_P(SparseBackwardTest, InvalidStates)
+TEST_P(SparseDerivativeTest, InvalidStates)
 {
     sparse::Model<T, I> model = make_model();
     SparseSolver<T, I> solver;
@@ -202,14 +202,14 @@ TEST_P(SparseBackwardTest, InvalidStates)
     run_invalid_states_test(solver, model);
 }
 
-TEST_P(SparseBackwardTest, NoConstraints)
+TEST_P(SparseDerivativeTest, NoConstraints)
 {
     SparseSolver<T, I> solver;
     configure(solver, GetParam());
     run_no_constraints_test(solver, rand::sparse_positive_definite_upper_triangular_rand<T, I>(4, T(0.5), T(1)));
 }
 
-TEST_P(SparseBackwardTest, SmoothingAnalytic)
+TEST_P(SparseDerivativeTest, SmoothingAnalytic)
 {
     SparseMat<T, I> P(1, 1);
     P.insert(0, 0) = T(1);
@@ -219,7 +219,7 @@ TEST_P(SparseBackwardTest, SmoothingAnalytic)
     run_smoothing_analytic_test(solver, P);
 }
 
-TEST_P(SparseBackwardTest, SmoothingEqualities)
+TEST_P(SparseDerivativeTest, SmoothingEqualities)
 {
     SparseSolver<T, I> solver;
     SparseSolver<T, I> reference;
@@ -228,7 +228,7 @@ TEST_P(SparseBackwardTest, SmoothingEqualities)
     run_smoothing_equality_test(solver, reference, make_model());
 }
 
-TEST_P(SparseBackwardTest, CopyMove)
+TEST_P(SparseDerivativeTest, CopyMove)
 {
     sparse::Model<T, I> model = make_model();
     SparseSolver<T, I> solver;
@@ -238,7 +238,7 @@ TEST_P(SparseBackwardTest, CopyMove)
 
 INSTANTIATE_TEST_SUITE_P(
     KKTSolver,
-    SparseBackwardTest,
+    SparseDerivativeTest,
     ::testing::Values(KKTSolver::sparse_ldlt,
                       KKTSolver::sparse_ldlt_eq_cond,
                       KKTSolver::sparse_ldlt_ineq_cond,

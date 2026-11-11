@@ -1,11 +1,11 @@
 ---
-title: Gradients
+title: Derivatives
 layout: default
 parent: API
 nav_order: 3
 ---
 
-The gradients computed by `backward` (see [Differentiation]({{site.baseurl}}/differentiation)), i.e., the gradients of the loss with respect to the problem data.
+The gradients computed by `vjp` (see [Differentiation]({{site.baseurl}}/differentiation)), i.e., the gradients of the loss with respect to the problem data.
 
 | Field    | Description                                                                                                          |
 |:---------|:---------------------------------------------------------------------------------------------------------------------|
@@ -21,8 +21,8 @@ The gradients computed by `backward` (see [Differentiation]({{site.baseurl}}/dif
 | `x_u`    | Gradient w.r.t. `x_u`, zero at infinite bounds                                                                       |
 
 {: .warning }
-The gradients are only valid if `status` is `PIQP_SOLVED`. `status` is the status returned by the last `backward`, and is reset to `PIQP_UNSOLVED` by `setup` and `update`.
+The gradients are only valid if `status` is `PIQP_SOLVED`. `status` is the status returned by the last `vjp`, and is reset to `PIQP_UNSOLVED` by `setup` and `update`.
 
 ## Status code
 
-{% root_include _common/backward_status_code_table.md %}
+{% root_include _common/derivative_status_code_table.md %}

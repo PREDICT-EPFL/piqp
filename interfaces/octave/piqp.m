@@ -23,7 +23,7 @@ classdef piqp < handle
     %   setup             - configure solver with problem data
     %   solve             - solve the QP
     %   update            - modify problem data
-    %   backward          - compute gradients w.r.t. the problem data
+    %   vjp               - vector-Jacobian product (reverse mode): gradients w.r.t. the problem data
     %
     %   get_settings      - get the current solver settings
     %   update_settings   - update the current solver settings
@@ -341,17 +341,17 @@ classdef piqp < handle
         end
 
         %%
-        function grads = backward(this, varargin)
-            % BACKWARD compute the gradients of a scalar loss L w.r.t. the problem data.
+        function grads = vjp(this, varargin)
+            % VJP compute the gradients of a scalar loss L w.r.t. the problem data.
             %
-            %   grads = backward('grad_x', dL_dx, 'grad_y', dL_dy, ...) or backward(struct)
+            %   grads = vjp('grad_x', dL_dx, 'grad_y', dL_dy, ...) or vjp(struct)
             %
             %   Allowed fields are the gradients of L w.r.t. the solution grad_x, grad_y,
             %   grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl,
             %   grad_s_bu (missing ones are zero)
-            %   and forward_result, a result returned by solve() at which the
+            %   and solve_result, a result returned by solve() at which the
             %   gradients are computed (default: the result of the last solve()).
-            %   Requires the setting enable_backward to be set in setup().
+            %   Requires the setting enable_derivatives to be set in setup().
             %
             %   grads has the fields P, c, A, b, G, h_l, h_u, x_l, x_u, which are
             %   only set if grads.status_val is 1 (PIQP_SOLVED), and status, status_val.
@@ -360,7 +360,7 @@ classdef piqp < handle
 
             gradFields = {'grad_x','grad_y','grad_z_l','grad_z_u','grad_z_bl','grad_z_bu','grad_s_l','grad_s_u','grad_s_bl','grad_s_bu'};
             gradSizes = [this.n, this.p, this.m, this.m, this.n, this.n, this.m, this.m, this.n, this.n];
-            allowedFields = [gradFields, {'forward_result'}];
+            allowedFields = [gradFields, {'solve_result'}];
 
             if isempty(varargin)
                 adjoints = struct();
@@ -391,13 +391,13 @@ classdef piqp < handle
                 end
             end
 
-            if isfield(adjoints, 'forward_result')
-                forward_result = adjoints.forward_result;
+            if isfield(adjoints, 'solve_result')
+                solve_result = adjoints.solve_result;
             else
-                forward_result = [];
+                solve_result = [];
             end
 
-            grads = piqp_oct('backward',this.objectHandle,grads{:},forward_result);
+            grads = piqp_oct('vjp',this.objectHandle,grads{:},solve_result);
         end
     end
 end

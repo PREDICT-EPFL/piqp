@@ -17,10 +17,10 @@
 #include "piqp/kkt_system.hpp"
 #include "piqp/dense/data.hpp"
 #include "piqp/dense/preconditioner.hpp"
-#include "piqp/dense/gradients.hpp"
+#include "piqp/dense/vjp_result.hpp"
 #include "piqp/sparse/data.hpp"
 #include "piqp/sparse/preconditioner.hpp"
-#include "piqp/sparse/gradients.hpp"
+#include "piqp/sparse/vjp_result.hpp"
 #include "piqp/utils/optional.hpp"
 
 namespace piqp
@@ -47,7 +47,7 @@ class SolverBase
 protected:
     using DataType = std::conditional_t<MatrixType == PIQP_DENSE, dense::Data<T>, sparse::Data<T, I>>;
     using CMatRefType = std::conditional_t<MatrixType == PIQP_DENSE, CMatRef<T>, CSparseMatRef<T, I>>;
-    using GradientsType = std::conditional_t<MatrixType == PIQP_DENSE, dense::Gradients<T>, sparse::Gradients<T, I>>;
+    using VJPResultType = std::conditional_t<MatrixType == PIQP_DENSE, dense::VJPResult<T>, sparse::VJPResult<T, I>>;
 
     Result<T> m_result;
     Settings<T> m_settings;
@@ -79,12 +79,12 @@ protected:
     T delta_c_x = 0;
     T delta_dual_lin = 0;
 
-    // backward pass (differentiation) state
+    // differentiation state (vjp, jvp)
     Variables<T> m_linearization_point;  // point the gradients are computed at
-    GradientsType m_gradients;
-    bool m_backward_enabled = false;     // backward workspace is allocated
-    bool m_backward_ready = false;       // a valid solve of the current data is available
-    bool m_backward_factor_valid = false; // the KKT is factored at the linearization point of the last solve() result
+    VJPResultType m_vjp_result;
+    bool m_derivatives_enabled = false;     // differentiation workspace is allocated
+    bool m_derivatives_ready = false;       // a valid solve of the current data is available
+    bool m_derivatives_factor_valid = false; // the KKT is factored at the linearization point of the last solve() result
 
 public:
     SolverBase();
@@ -95,7 +95,7 @@ public:
 
     Status solve();
 
-    Status backward(const optional<CVecRef<T>>& grad_x = nullopt,
+    Status vjp(const optional<CVecRef<T>>& grad_x = nullopt,
                     const optional<CVecRef<T>>& grad_y = nullopt,
                     const optional<CVecRef<T>>& grad_z_l = nullopt,
                     const optional<CVecRef<T>>& grad_z_u = nullopt,
@@ -105,9 +105,9 @@ public:
                     const optional<CVecRef<T>>& grad_s_u = nullopt,
                     const optional<CVecRef<T>>& grad_s_bl = nullopt,
                     const optional<CVecRef<T>>& grad_s_bu = nullopt,
-                    const optional<Result<T>>& forward_result = nullopt);
+                    const optional<Result<T>>& solve_result = nullopt);
 
-    const GradientsType& gradients() const { return m_gradients; }
+    const VJPResultType& vjp_result() const { return m_vjp_result; }
 
 protected:
     void setup_impl(const CMatRefType& P,
@@ -184,11 +184,11 @@ protected:
 
     void reduce_dual(Variables<T>& vars);
 
-    Status init_linearization_point(const Result<T>& forward_result);
+    Status init_linearization_point(const Result<T>& solve_result);
 
     Status smooth_linearization_point(Info<T>& info);
 
-    Status backward_impl(const optional<CVecRef<T>>& grad_x,
+    Status vjp_impl(const optional<CVecRef<T>>& grad_x,
                          const optional<CVecRef<T>>& grad_y,
                          const optional<CVecRef<T>>& grad_z_l,
                          const optional<CVecRef<T>>& grad_z_u,
@@ -198,7 +198,7 @@ protected:
                          const optional<CVecRef<T>>& grad_s_u,
                          const optional<CVecRef<T>>& grad_s_bl,
                          const optional<CVecRef<T>>& grad_s_bu,
-                         const optional<Result<T>>& forward_result);
+                         const optional<Result<T>>& solve_result);
 
     void assemble_adjoint_rhs(const optional<CVecRef<T>>& grad_x,
                               const optional<CVecRef<T>>& grad_y,

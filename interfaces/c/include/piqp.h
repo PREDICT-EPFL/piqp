@@ -40,13 +40,13 @@ void piqp_update_sparse(piqp_workspace* workspace,
 
 piqp_status piqp_solve(piqp_workspace* workspace);
 
-piqp_status piqp_backward(piqp_workspace* workspace,
+piqp_status piqp_vjp(piqp_workspace* workspace,
                           const piqp_float* grad_x, const piqp_float* grad_y,
                           const piqp_float* grad_z_l, const piqp_float* grad_z_u,
                           const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
                           const piqp_float* grad_s_l, const piqp_float* grad_s_u,
                           const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
-                          const piqp_result* forward_result);
+                          const piqp_result* solve_result);
 
 void piqp_cleanup(piqp_workspace* workspace);
 

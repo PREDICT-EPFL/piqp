@@ -52,7 +52,7 @@ In case you are using the `sparse_multistage_parallel` KKT solver backend, we ad
 ```
 {% endraw %}
 
-In case you are using the differentiation (`backward`), we encourage you to cite:
+In case you are using the differentiation (`vjp`), we encourage you to cite:
 
 {% raw %}
 ```

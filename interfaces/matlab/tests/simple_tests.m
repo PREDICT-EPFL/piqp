@@ -150,41 +150,41 @@ classdef simple_tests < matlab.unittest.TestCase
             end
         end
 
-        function backward_dense_qp(testCase)
-            check_backward(testCase, 'dense');
+        function vjp_dense_qp(testCase)
+            check_vjp(testCase, 'dense');
         end
 
-        function backward_sparse_qp(testCase)
-            check_backward(testCase, 'sparse');
+        function vjp_sparse_qp(testCase)
+            check_vjp(testCase, 'sparse');
         end
 
-        function backward_not_enabled(testCase)
+        function vjp_not_enabled(testCase)
             testCase.solver_dense.solve();
-            grads = testCase.solver_dense.backward('grad_x', [1; 2]);
+            grads = testCase.solver_dense.vjp('grad_x', [1; 2]);
             testCase.verifyEqual(grads.status_val, -10) % PIQP_INVALID_SETTINGS
             testCase.verifyEmpty(grads.c)
         end
     end
 
     methods
-        function solver = setup_backward_solver(testCase, backend, c)
+        function solver = setup_vjp_solver(testCase, backend, c)
             % same problem with an active upper bound x2 <= 0.1
             solver = piqp(backend);
             solver.setup(testCase.P, c, testCase.A, testCase.b, ...
                          testCase.G, testCase.h_l, testCase.h_u, ...
                          testCase.x_l, [Inf; 0.1], ...
-                         'eps_abs', 1e-12, 'eps_rel', 1e-12, 'enable_backward', true);
+                         'eps_abs', 1e-12, 'eps_rel', 1e-12, 'enable_derivatives', true);
         end
 
-        function check_backward(testCase, backend)
+        function check_vjp(testCase, backend)
             % loss L = x1 + 2 x2 + y
-            solver = setup_backward_solver(testCase, backend, testCase.c);
-            grads = solver.backward('grad_x', [1; 2], 'grad_y', 1);
-            testCase.verifyEqual(grads.status_val, -9) % PIQP_UNSOLVED (no forward solution)
+            solver = setup_vjp_solver(testCase, backend, testCase.c);
+            grads = solver.vjp('grad_x', [1; 2], 'grad_y', 1);
+            testCase.verifyEqual(grads.status_val, -9) % PIQP_UNSOLVED (no solution)
             testCase.verifyEmpty(grads.c)
 
             res = solver.solve();
-            grads = solver.backward('grad_x', [1; 2], 'grad_y', 1);
+            grads = solver.vjp('grad_x', [1; 2], 'grad_y', 1);
             testCase.verifyEqual(grads.status_val, 1) % PIQP_SOLVED
 
             % finite differences w.r.t. c
@@ -192,8 +192,8 @@ classdef simple_tests < matlab.unittest.TestCase
             for i = 1:2
                 dc = zeros(2, 1);
                 dc(i) = eps;
-                fd = (backward_loss(testCase, backend, testCase.c + dc) - ...
-                      backward_loss(testCase, backend, testCase.c - dc)) / (2 * eps);
+                fd = (vjp_loss(testCase, backend, testCase.c + dc) - ...
+                      vjp_loss(testCase, backend, testCase.c - dc)) / (2 * eps);
                 testCase.verifyEqual(grads.c(i), fd, 'AbsTol', 1e-5)
             end
             testCase.verifyEqual(size(grads.P), [2 2])
@@ -201,30 +201,30 @@ classdef simple_tests < matlab.unittest.TestCase
             testCase.verifyEqual(size(grads.G), [2 2])
             testCase.verifyEqual(issparse(grads.A), strcmp(backend, 'sparse'))
 
-            % gradients at a provided forward result, the default call linearizes at the same point
-            grads_fr = solver.backward(struct('grad_x', [1; 2], 'grad_y', 1, 'forward_result', res));
+            % gradients at a provided solve result, the default call linearizes at the same point
+            grads_fr = solver.vjp(struct('grad_x', [1; 2], 'grad_y', 1, 'solve_result', res));
             testCase.verifyEqual(grads_fr.status_val, 1)
             testCase.verifyEqual(grads_fr.c, grads.c, 'AbsTol', 1e-9)
 
-            % forward result fields which are not real full double arrays are rejected
+            % solve result fields which are not real full double arrays are rejected
             bad = res;
             bad.x = single(res.x);
-            testCase.verifyError(@() solver.backward('grad_x', [1; 2], 'forward_result', bad), 'piqp:backward')
+            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', bad), 'piqp:vjp')
             bad = res;
             bad.z_l = complex(res.z_l);
-            testCase.verifyError(@() solver.backward('grad_x', [1; 2], 'forward_result', bad), 'piqp:backward')
+            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', bad), 'piqp:vjp')
             bad = res;
             bad.s_bl = sparse(res.s_bl);
-            testCase.verifyError(@() solver.backward('grad_x', [1; 2], 'forward_result', bad), 'piqp:backward')
-            testCase.verifyError(@() solver.backward('grad_x', [1; 2], 'forward_result', 1), 'piqp:backward')
+            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', bad), 'piqp:vjp')
+            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', 1), 'piqp:vjp')
 
             res.info.rho = 0;
-            grads_fr = solver.backward('grad_x', [1; 2], 'forward_result', res);
-            testCase.verifyEqual(grads_fr.status_val, -10) % PIQP_INVALID_SETTINGS (invalid forward result)
+            grads_fr = solver.vjp('grad_x', [1; 2], 'solve_result', res);
+            testCase.verifyEqual(grads_fr.status_val, -10) % PIQP_INVALID_SETTINGS (invalid solve result)
         end
 
-        function L = backward_loss(testCase, backend, c)
-            solver = setup_backward_solver(testCase, backend, c);
+        function L = vjp_loss(testCase, backend, c)
+            solver = setup_vjp_solver(testCase, backend, c);
             res = solver.solve();
             L = res.x(1) + 2 * res.x(2) + res.y;
         end

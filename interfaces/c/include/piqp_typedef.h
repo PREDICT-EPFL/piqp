@@ -103,10 +103,10 @@ typedef struct {
     piqp_float       iterative_refinement_min_improvement_rate;
     piqp_float       iterative_refinement_static_regularization_eps;
     piqp_float       iterative_refinement_static_regularization_rel;
-    piqp_int        enable_backward;
-    piqp_int        gradient_smoothing;
-    piqp_float       gradient_smoothing_mu;
-    piqp_int        gradient_smoothing_max_iter;
+    piqp_int        enable_derivatives;
+    piqp_int        derivative_smoothing;
+    piqp_float       derivative_smoothing_mu;
+    piqp_int        derivative_smoothing_max_iter;
     piqp_int        verbose;
     piqp_int        compute_timings;
 } piqp_settings;
@@ -196,7 +196,7 @@ typedef struct {
     const piqp_float* h_u; // gradient w.r.t. h_u (size m), zero for infinite bounds
     const piqp_float* x_l; // gradient w.r.t. x_l (size n), zero for infinite bounds
     const piqp_float* x_u; // gradient w.r.t. x_u (size n), zero for infinite bounds
-} piqp_gradients;
+} piqp_vjp_result;
 
 struct piqp_solver_handle; // An opaque type that we'll use as a handle for the C++ solver object
 typedef struct piqp_solver_handle piqp_solver_handle;
@@ -212,7 +212,7 @@ typedef struct {
     piqp_solver_handle* solver_handle;
     piqp_solver_info    solver_info;
     piqp_result*        result;
-    piqp_gradients*     gradients; // NULL if settings->enable_backward was not set in the setup
+    piqp_vjp_result*    vjp_result; // NULL if settings->enable_derivatives was not set in the setup
 } piqp_workspace;
 
 # ifdef __cplusplus

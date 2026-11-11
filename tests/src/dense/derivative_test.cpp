@@ -11,7 +11,7 @@
 #include "piqp/utils/random_utils.hpp"
 
 #include "gtest/gtest.h"
-#include "backward_utils.hpp"
+#include "derivative_utils.hpp"
 
 using namespace piqp;
 
@@ -42,12 +42,12 @@ void configure(Solver& solver, bool scale_cost = false)
     solver.settings().eps_duality_gap_abs = 1e-10;
     solver.settings().eps_duality_gap_rel = 1e-10;
     solver.settings().preconditioner_scale_cost = scale_cost;
-    solver.settings().enable_backward = true;
+    solver.settings().enable_derivatives = true;
 }
 
 } // namespace
 
-TEST(DenseBackwardTest, FiniteDifferences)
+TEST(DenseDerivativeTest, FiniteDifferences)
 {
     for (unsigned int seed : {1, 2, 3, 4, 5})
     {
@@ -59,7 +59,7 @@ TEST(DenseBackwardTest, FiniteDifferences)
     }
 }
 
-TEST(DenseBackwardTest, InvalidStates)
+TEST(DenseDerivativeTest, InvalidStates)
 {
     dense::Model<T> model = make_model();
     DenseSolver<T> solver;
@@ -67,14 +67,14 @@ TEST(DenseBackwardTest, InvalidStates)
     run_invalid_states_test(solver, model);
 }
 
-TEST(DenseBackwardTest, NoConstraints)
+TEST(DenseDerivativeTest, NoConstraints)
 {
     DenseSolver<T> solver;
     configure(solver);
     run_no_constraints_test(solver, rand::dense_positive_definite_upper_triangular_rand<T>(4, T(1)));
 }
 
-TEST(DenseBackwardTest, SmoothingAnalytic)
+TEST(DenseDerivativeTest, SmoothingAnalytic)
 {
     Mat<T> P = Mat<T>::Identity(1, 1);
     DenseSolver<T> solver;
@@ -85,7 +85,7 @@ TEST(DenseBackwardTest, SmoothingAnalytic)
 /*
  * 2D QP coupled through one inequality
  *   min 0.5 ||x||^2 - a^T x  s.t.  g^T x <= h
- * With gradient smoothing the relaxed KKT conditions are
+ * With derivative smoothing the relaxed KKT conditions are
  *   x = a - z g,  s = h - g^T x,  s z = mu,
  * i.e. with q = ||g||^2 and r = h - g^T a, z solves q z^2 + r z - mu = 0:
  *   z = (-r + sqrt(r^2 + 4 q mu)) / (2 q),  x = a - z g.
@@ -95,7 +95,7 @@ TEST(DenseBackwardTest, SmoothingAnalytic)
  *   dL/dc = -(w + (v - g^T w) dz/da),  dL/dh = (v - g^T w) dz/dh,  dL/dg = -z w + (v - g^T w) dz/dg,
  * and dL/dP = 0.5 (lam_x x^T + x lam_x^T) with lam_x = dL/dc, since P and c only enter through P x + c.
  */
-TEST(DenseBackwardTest, SmoothingAnalytic2D)
+TEST(DenseDerivativeTest, SmoothingAnalytic2D)
 {
     T mu = 1e-3;
     Vec<T> g(2);
@@ -121,14 +121,14 @@ TEST(DenseBackwardTest, SmoothingAnalytic2D)
 
             DenseSolver<T> solver;
             configure(solver, scale_cost);
-            solver.settings().gradient_smoothing = true;
-            solver.settings().gradient_smoothing_mu = mu;
+            solver.settings().derivative_smoothing = true;
+            solver.settings().derivative_smoothing_mu = mu;
             solver.setup(P, c, nullopt, nullopt, G, nullopt, h_u, nullopt, nullopt);
             ASSERT_EQ(solver.solve(), Status::PIQP_SOLVED);
 
             Vec<T> grad_z_u = Vec<T>::Constant(1, v);
-            ASSERT_EQ(solver.backward(w, nullopt, nullopt, grad_z_u), Status::PIQP_SOLVED);
-            const dense::Gradients<T>& grads = solver.gradients();
+            ASSERT_EQ(solver.vjp(w, nullopt, nullopt, grad_z_u), Status::PIQP_SOLVED);
+            const dense::VJPResult<T>& grads = solver.vjp_result();
 
             T z = (-r + std::sqrt(r * r + 4 * q * mu)) / (2 * q);
             Vec<T> x = a - z * g;
@@ -152,7 +152,7 @@ TEST(DenseBackwardTest, SmoothingAnalytic2D)
     }
 }
 
-TEST(DenseBackwardTest, SmoothingEqualities)
+TEST(DenseDerivativeTest, SmoothingEqualities)
 {
     DenseSolver<T> solver;
     DenseSolver<T> reference;
@@ -161,7 +161,7 @@ TEST(DenseBackwardTest, SmoothingEqualities)
     run_smoothing_equality_test(solver, reference, make_model());
 }
 
-TEST(DenseBackwardTest, ProvidedResultInvalid)
+TEST(DenseDerivativeTest, ProvidedResultInvalid)
 {
     dense::Model<T> model = make_model();
     DenseSolver<T> solver;
@@ -169,7 +169,7 @@ TEST(DenseBackwardTest, ProvidedResultInvalid)
     run_invalid_result_test(solver, model);
 }
 
-TEST(DenseBackwardTest, DefaultMatchesProvidedResult)
+TEST(DenseDerivativeTest, DefaultMatchesProvidedResult)
 {
     dense::Model<T> model = make_model();
     DenseSolver<T> solver;
@@ -177,7 +177,7 @@ TEST(DenseBackwardTest, DefaultMatchesProvidedResult)
     run_default_matches_provided_test(solver, model);
 }
 
-TEST(DenseBackwardTest, NoSideEffectsOnForward)
+TEST(DenseDerivativeTest, NoSideEffectsOnSolve)
 {
     dense::Model<T> model = make_model();
     DenseSolver<T> solver;
@@ -187,7 +187,7 @@ TEST(DenseBackwardTest, NoSideEffectsOnForward)
     run_no_side_effects_test(solver, reference, model);
 }
 
-TEST(DenseBackwardTest, CopyMove)
+TEST(DenseDerivativeTest, CopyMove)
 {
     dense::Model<T> model = make_model();
     DenseSolver<T> solver;

@@ -27,12 +27,12 @@ OUTPUTS = ["x", "y", "z_l", "z_u", "z_bl", "z_bu", "s_l", "s_u", "s_bl", "s_bu"]
 VECTORS = dict(c=c, b=b, h_l=h_l, h_u=h_u, x_l=x_l, x_u=x_u)
 
 
-def make_solver(dense, vectors=VECTORS, enable_backward=True):
+def make_solver(dense, vectors=VECTORS, enable_derivatives=True):
     v = vectors
     solver = piqp.DenseSolver() if dense else piqp.SparseSolver()
     solver.settings.eps_abs = 1e-12
     solver.settings.eps_rel = 1e-12
-    solver.settings.enable_backward = enable_backward
+    solver.settings.enable_derivatives = enable_derivatives
     if dense:
         solver.setup(P, v["c"], A, v["b"], G, v["h_l"], v["h_u"], v["x_l"], v["x_u"])
     else:
@@ -48,7 +48,7 @@ def solve(dense, vectors):
 
 
 @pytest.mark.parametrize("dense", [True, False])
-def test_backward_arguments(dense):
+def test_vjp_arguments(dense):
     # every keyword argument is the gradient w.r.t. the output of the same name, checked with the
     # directional derivative of the loss w^T output along a random direction d of the vector data
     rng = np.random.default_rng(0)
@@ -62,67 +62,67 @@ def test_backward_arguments(dense):
     for name in OUTPUTS:
         w = rng.standard_normal(plus[name].shape)
         w[np.isinf(plus[name])] = 0.0  # infinite slacks
-        assert solver.backward(**{"grad_" + name: w}) == piqp.PIQP_SOLVED
-        derivative = sum(np.asarray(getattr(solver.gradients, k)) @ d[k] for k in VECTORS)
+        assert solver.vjp(**{"grad_" + name: w}) == piqp.PIQP_SOLVED
+        derivative = sum(np.asarray(getattr(solver.vjp_result, k)) @ d[k] for k in VECTORS)
         fd = w @ (plus[name] - minus[name]) / (2 * eps)
         assert derivative == pytest.approx(fd, abs=1e-6, rel=1e-4), name
 
 
 @pytest.mark.parametrize("dense", [True, False])
-def test_backward_forward_result(dense):
+def test_vjp_solve_result(dense):
     solver = make_solver(dense)
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward(grad_x=np.ones(3)) == piqp.PIQP_SOLVED
-    expected = np.array(solver.gradients.c)
+    assert solver.vjp(grad_x=np.ones(3)) == piqp.PIQP_SOLVED
+    expected = np.array(solver.vjp_result.c)
 
     # solver.result refers to the memory of the solver
     result = piqp.Result()
     for name in OUTPUTS:
         setattr(result, name, np.array(getattr(solver.result, name)))
     result.info = solver.result.info
-    assert solver.backward(grad_x=np.ones(3), forward_result=result) == piqp.PIQP_SOLVED
-    np.testing.assert_allclose(solver.gradients.c, expected, rtol=1e-6, atol=1e-6)
+    assert solver.vjp(grad_x=np.ones(3), solve_result=result) == piqp.PIQP_SOLVED
+    np.testing.assert_allclose(solver.vjp_result.c, expected, rtol=1e-6, atol=1e-6)
 
 
 @pytest.mark.parametrize("dense", [True, False])
-def test_backward_status(dense):
-    solver = make_solver(dense, enable_backward=False)
+def test_vjp_status(dense):
+    solver = make_solver(dense, enable_derivatives=False)
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward() == piqp.PIQP_INVALID_SETTINGS
+    assert solver.vjp() == piqp.PIQP_INVALID_SETTINGS
 
     solver = make_solver(dense)
-    grads = solver.gradients
+    grads = solver.vjp_result
     assert grads.status == piqp.PIQP_UNSOLVED
-    assert solver.backward() == piqp.PIQP_UNSOLVED
+    assert solver.vjp() == piqp.PIQP_UNSOLVED
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward() == piqp.PIQP_SOLVED
+    assert solver.vjp() == piqp.PIQP_SOLVED
     assert grads.status == piqp.PIQP_SOLVED
 
-    assert solver.backward(grad_x=np.zeros(4)) == piqp.PIQP_INVALID_SETTINGS
+    assert solver.vjp(grad_x=np.zeros(4)) == piqp.PIQP_INVALID_SETTINGS
     assert grads.status == piqp.PIQP_INVALID_SETTINGS
 
     result = piqp.Result()
     result.info.status = piqp.PIQP_PRIMAL_INFEASIBLE
-    assert solver.backward(forward_result=result) == piqp.PIQP_UNSOLVED
+    assert solver.vjp(solve_result=result) == piqp.PIQP_UNSOLVED
     assert grads.status == piqp.PIQP_UNSOLVED
 
     # the smoothing settings are passed on
-    solver.settings.gradient_smoothing = True
-    solver.settings.gradient_smoothing_max_iter = 1
-    assert solver.backward() == piqp.PIQP_MAX_ITER_REACHED
-    solver.settings.gradient_smoothing = False
+    solver.settings.derivative_smoothing = True
+    solver.settings.derivative_smoothing_max_iter = 1
+    assert solver.vjp() == piqp.PIQP_MAX_ITER_REACHED
+    solver.settings.derivative_smoothing = False
 
-    assert solver.backward() == piqp.PIQP_SOLVED
+    assert solver.vjp() == piqp.PIQP_SOLVED
     solver.update(c=2.0 * c)
     assert grads.status == piqp.PIQP_UNSOLVED
 
 
 @pytest.mark.parametrize("dense", [True, False])
-def test_gradient_types(dense):
+def test_vjp_result_types(dense):
     solver = make_solver(dense)
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward(grad_x=np.ones(3)) == piqp.PIQP_SOLVED
-    grads = solver.gradients
+    assert solver.vjp(grad_x=np.ones(3)) == piqp.PIQP_SOLVED
+    grads = solver.vjp_result
     for name, shape in [("P", (3, 3)), ("A", (1, 3)), ("G", (3, 3))]:
         mat = getattr(grads, name)
         assert mat.shape == shape
@@ -137,11 +137,11 @@ def test_gradient_types(dense):
         assert not vec.flags.writeable
 
 
-def test_sparse_gradients_are_views():
+def test_sparse_vjp_result_is_view():
     solver = make_solver(False)
     assert solver.solve() == piqp.PIQP_SOLVED
-    assert solver.backward(grad_x=np.ones(3)) == piqp.PIQP_SOLVED
-    gP, gG = solver.gradients.P, solver.gradients.G
+    assert solver.vjp(grad_x=np.ones(3)) == piqp.PIQP_SOLVED
+    gP, gG = solver.vjp_result.P, solver.vjp_result.G
     assert not gP.data.flags.writeable
     with pytest.raises(ValueError):
         gP.data[0] = 1.0
@@ -152,14 +152,14 @@ def test_sparse_gradients_are_views():
     # the usual operations work on the read-only views
     np.testing.assert_allclose(gG @ np.ones(3), gG.toarray() @ np.ones(3))
 
-    # the views reflect the next backward(), which is linear in the arguments
+    # the views reflect the next vjp(), which is linear in the arguments
     gP_before = gP.toarray()
-    assert solver.backward(grad_x=-np.ones(3)) == piqp.PIQP_SOLVED
+    assert solver.vjp(grad_x=-np.ones(3)) == piqp.PIQP_SOLVED
     np.testing.assert_allclose(gP.toarray(), -gP_before, atol=1e-12)
 
     # setup() with the same sparsity pattern keeps the storage, the views stay valid
     solver.setup(sparse.csc_matrix(np.triu(P)), 2.0 * c, sparse.csc_matrix(A), b, sparse.csc_matrix(G), h_l, h_u, x_l, x_u)
-    assert np.shares_memory(gP.data, solver.gradients.P.data)
+    assert np.shares_memory(gP.data, solver.vjp_result.P.data)
 
 
 if __name__ == "__main__":

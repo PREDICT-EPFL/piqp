@@ -149,10 +149,10 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     ov_struct.assign("iterative_refinement_min_improvement_rate", octave_value(settings.iterative_refinement_min_improvement_rate));
     ov_struct.assign("iterative_refinement_static_regularization_eps", octave_value(settings.iterative_refinement_static_regularization_eps));
     ov_struct.assign("iterative_refinement_static_regularization_rel", octave_value(settings.iterative_refinement_static_regularization_rel));
-    ov_struct.assign("enable_backward", octave_value(settings.enable_backward));
-    ov_struct.assign("gradient_smoothing", octave_value(settings.gradient_smoothing));
-    ov_struct.assign("gradient_smoothing_mu", octave_value(settings.gradient_smoothing_mu));
-    ov_struct.assign("gradient_smoothing_max_iter", octave_value(settings.gradient_smoothing_max_iter));
+    ov_struct.assign("enable_derivatives", octave_value(settings.enable_derivatives));
+    ov_struct.assign("derivative_smoothing", octave_value(settings.derivative_smoothing));
+    ov_struct.assign("derivative_smoothing_mu", octave_value(settings.derivative_smoothing_mu));
+    ov_struct.assign("derivative_smoothing_max_iter", octave_value(settings.derivative_smoothing_max_iter));
     ov_struct.assign("verbose", octave_value(settings.verbose));
     ov_struct.assign("compute_timings", octave_value(settings.compute_timings));
 
@@ -190,10 +190,10 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
     settings.iterative_refinement_min_improvement_rate = ov_struct.getfield("iterative_refinement_min_improvement_rate").double_value();
     settings.iterative_refinement_static_regularization_eps = ov_struct.getfield("iterative_refinement_static_regularization_eps").double_value();
     settings.iterative_refinement_static_regularization_rel = ov_struct.getfield("iterative_refinement_static_regularization_rel").double_value();
-    settings.enable_backward = ov_struct.getfield("enable_backward").bool_value();
-    settings.gradient_smoothing = ov_struct.getfield("gradient_smoothing").bool_value();
-    settings.gradient_smoothing_mu = ov_struct.getfield("gradient_smoothing_mu").double_value();
-    settings.gradient_smoothing_max_iter = ov_struct.getfield("gradient_smoothing_max_iter").int_value();
+    settings.enable_derivatives = ov_struct.getfield("enable_derivatives").bool_value();
+    settings.derivative_smoothing = ov_struct.getfield("derivative_smoothing").bool_value();
+    settings.derivative_smoothing_mu = ov_struct.getfield("derivative_smoothing_mu").double_value();
+    settings.derivative_smoothing_max_iter = ov_struct.getfield("derivative_smoothing_max_iter").int_value();
     settings.verbose = ov_struct.getfield("verbose").bool_value();
     settings.compute_timings = ov_struct.getfield("compute_timings").bool_value();
 }
@@ -258,7 +258,7 @@ octave_value result_to_ov_struct(const piqp::Result<double>& result)
 octave_value get_struct_field(const octave_scalar_map& map, const std::string& name)
 {
     if (!map.isfield(name)) {
-        error("forward_result is missing the field '%s'.", name.c_str());
+        error("solve_result is missing the field '%s'.", name.c_str());
     }
     return map.getfield(name);
 }
@@ -282,7 +282,7 @@ piqp::Result<double> ov_struct_to_result(const octave_scalar_map& map)
     result.s_u = ov_to_vec(get_struct_field(map, "s_u"));
     result.s_bl = ov_to_vec(get_struct_field(map, "s_bl"));
     result.s_bu = ov_to_vec(get_struct_field(map, "s_bu"));
-    // only the status and the regularization are used by backward()
+    // only the status and the regularization are used by vjp()
     octave_scalar_map info = get_struct_field(map, "info").scalar_map_value();
     result.info.status = (piqp::Status) get_struct_field(info, "status_val").int_value();
     result.info.rho = get_struct_field(info, "rho").double_value();
@@ -291,10 +291,10 @@ piqp::Result<double> ov_struct_to_result(const octave_scalar_map& map)
 }
 
 template<typename Solver>
-octave_value run_backward(Solver& solver, const octave_value_list& args)
+octave_value run_vjp(Solver& solver, const octave_value_list& args)
 {
     // args(2), ..., args(11) are the gradients w.r.t. x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu,
-    // args(12) is the forward result, empty arrays are treated as not provided
+    // args(12) is the solve result, empty arrays are treated as not provided
     Vec grad_values[10];
     piqp::optional<Eigen::Map<const Vec>> grads[10];
     for (int i = 0; i < 10; i++) {
@@ -303,20 +303,20 @@ octave_value run_backward(Solver& solver, const octave_value_list& args)
             grads[i].emplace(grad_values[i].data(), grad_values[i].rows());
         }
     }
-    piqp::optional<piqp::Result<double>> forward_result;
+    piqp::optional<piqp::Result<double>> solve_result;
     if (!args(12).isempty()) {
-        forward_result = ov_struct_to_result(args(12).scalar_map_value());
+        solve_result = ov_struct_to_result(args(12).scalar_map_value());
     }
 
-    piqp::Status status = solver.backward(grads[0], grads[1], grads[2], grads[3], grads[4],
+    piqp::Status status = solver.vjp(grads[0], grads[1], grads[2], grads[3], grads[4],
                                           grads[5], grads[6], grads[7], grads[8], grads[9],
-                                          forward_result);
+                                          solve_result);
 
     octave_scalar_map ov_struct;
     ov_struct.assign("status", octave_value(piqp::status_to_string(status)));
     ov_struct.assign("status_val", octave_value((int) status));
     if (status == piqp::Status::PIQP_SOLVED) {
-        const auto& g = solver.gradients();
+        const auto& g = solver.vjp_result();
         ov_struct.assign("P", eigen_to_ov(g.P));
         ov_struct.assign("c", eigen_to_ov(g.c));
         ov_struct.assign("A", eigen_to_ov(g.A));
@@ -589,14 +589,14 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
         return {};
     }
 
-    if (args(0).string_value() == "backward") {
+    if (args(0).string_value() == "vjp") {
         if (args.length() != 13) {
-            error("backward expects 10 gradients and a forward result.");
+            error("vjp expects 10 cotangents and a solve result.");
         }
         if (oct_handle->isDense()) {
-            return run_backward(*oct_handle->as_dense_ptr(), args);
+            return run_vjp(*oct_handle->as_dense_ptr(), args);
         } else {
-            return run_backward(*oct_handle->as_sparse_ptr(), args);
+            return run_vjp(*oct_handle->as_sparse_ptr(), args);
         }
     }
 

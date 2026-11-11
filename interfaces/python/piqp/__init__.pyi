@@ -5,8 +5,31 @@ import numpy.typing
 from piqp import instruction_set
 import scipy.sparse
 import typing
-__all__: list[str] = ['DenseGradients', 'DenseSolver', 'Info', 'KKTSolver', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseGradients', 'SparseSolver', 'Status', 'dense_cholesky', 'instruction_set', 'sparse_ldlt', 'sparse_ldlt_cond', 'sparse_ldlt_eq_cond', 'sparse_ldlt_ineq_cond', 'sparse_multistage', 'sparse_multistage_parallel']
-class DenseGradients:
+__all__: list[str] = ['DenseSolver', 'DenseVJPResult', 'Info', 'KKTSolver', 'PIQP_DUAL_INFEASIBLE', 'PIQP_INVALID_SETTINGS', 'PIQP_MAX_ITER_REACHED', 'PIQP_NUMERICS', 'PIQP_PRIMAL_INFEASIBLE', 'PIQP_SOLVED', 'PIQP_UNSOLVED', 'Result', 'Settings', 'SparseSolver', 'SparseVJPResult', 'Status', 'dense_cholesky', 'instruction_set', 'sparse_ldlt', 'sparse_ldlt_cond', 'sparse_ldlt_eq_cond', 'sparse_ldlt_ineq_cond', 'sparse_multistage', 'sparse_multistage_parallel']
+class DenseSolver:
+    def __init__(self: DenseSolver) -> None:
+        ...
+    def setup(self: DenseSolver, P: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"], c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], A: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
+        ...
+    def solve(self: DenseSolver) -> Status:
+        ...
+    def update(self: DenseSolver, P: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, A: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
+        ...
+    def vjp(self: DenseSolver, grad_x: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_y: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, solve_result: Result | None = None) -> Status:
+        ...
+    @property
+    def vjp_result(self) -> DenseVJPResult:
+        ...
+    @property
+    def result(self) -> Result:
+        ...
+    @property
+    def settings(self) -> Settings:
+        ...
+    @settings.setter
+    def settings(self) -> Settings:
+        ...
+class DenseVJPResult:
     @property
     def A(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
         ...
@@ -36,29 +59,6 @@ class DenseGradients:
         ...
     @property
     def x_u(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
-        ...
-class DenseSolver:
-    def __init__(self: DenseSolver) -> None:
-        ...
-    def setup(self: DenseSolver, P: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"], c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], A: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
-        ...
-    def solve(self: DenseSolver) -> Status:
-        ...
-    def update(self: DenseSolver, P: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, A: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.f_contiguous"] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
-        ...
-    def backward(self: DenseSolver, grad_x: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_y: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, forward_result: Result | None = None) -> Status:
-        ...
-    @property
-    def gradients(self) -> DenseGradients:
-        ...
-    @property
-    def result(self) -> Result:
-        ...
-    @property
-    def settings(self) -> Settings:
-        ...
-    @settings.setter
-    def settings(self) -> Settings:
         ...
 class Info:
     status: Status
@@ -381,8 +381,8 @@ class Result:
 class Settings:
     check_duality_gap: bool
     compute_timings: bool
-    enable_backward: bool
-    gradient_smoothing: bool
+    enable_derivatives: bool
+    derivative_smoothing: bool
     iterative_refinement_always_enabled: bool
     kkt_solver: KKTSolver
     preconditioner_reuse_on_update: bool
@@ -431,16 +431,16 @@ class Settings:
     def eps_rel(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
         ...
     @property
-    def gradient_smoothing_max_iter(self) -> int:
+    def derivative_smoothing_max_iter(self) -> int:
         ...
-    @gradient_smoothing_max_iter.setter
-    def gradient_smoothing_max_iter(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+    @derivative_smoothing_max_iter.setter
+    def derivative_smoothing_max_iter(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
     @property
-    def gradient_smoothing_mu(self) -> float:
+    def derivative_smoothing_mu(self) -> float:
         ...
-    @gradient_smoothing_mu.setter
-    def gradient_smoothing_mu(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
+    @derivative_smoothing_mu.setter
+    def derivative_smoothing_mu(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
         ...
     @property
     def infeasibility_threshold(self) -> float:
@@ -544,7 +544,30 @@ class Settings:
     @tau.setter
     def tau(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
         ...
-class SparseGradients:
+class SparseSolver:
+    def __init__(self: SparseSolver) -> None:
+        ...
+    def setup(self: SparseSolver, P: scipy.sparse.csc_matrix, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], A: scipy.sparse.csc_matrix[numpy.float64] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: scipy.sparse.csc_matrix[numpy.float64] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
+        ...
+    def solve(self: SparseSolver) -> Status:
+        ...
+    def update(self: SparseSolver, P: scipy.sparse.csc_matrix[numpy.float64] | None = None, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, A: scipy.sparse.csc_matrix[numpy.float64] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: scipy.sparse.csc_matrix[numpy.float64] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
+        ...
+    def vjp(self: SparseSolver, grad_x: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_y: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, solve_result: Result | None = None) -> Status:
+        ...
+    @property
+    def vjp_result(self) -> SparseVJPResult:
+        ...
+    @property
+    def result(self) -> Result:
+        ...
+    @property
+    def settings(self) -> Settings:
+        ...
+    @settings.setter
+    def settings(self) -> Settings:
+        ...
+class SparseVJPResult:
     @property
     def A(self) -> scipy.sparse.csc_matrix[numpy.float64]:
         ...
@@ -574,29 +597,6 @@ class SparseGradients:
         ...
     @property
     def x_u(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
-        ...
-class SparseSolver:
-    def __init__(self: SparseSolver) -> None:
-        ...
-    def setup(self: SparseSolver, P: scipy.sparse.csc_matrix, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], A: scipy.sparse.csc_matrix[numpy.float64] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: scipy.sparse.csc_matrix[numpy.float64] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
-        ...
-    def solve(self: SparseSolver) -> Status:
-        ...
-    def update(self: SparseSolver, P: scipy.sparse.csc_matrix[numpy.float64] | None = None, c: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, A: scipy.sparse.csc_matrix[numpy.float64] | None = None, b: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, G: scipy.sparse.csc_matrix[numpy.float64] | None = None, h_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, h_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, x_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None) -> None:
-        ...
-    def backward(self: SparseSolver, grad_x: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_y: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_z_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_l: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_u: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bl: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, grad_s_bu: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None = None, forward_result: Result | None = None) -> Status:
-        ...
-    @property
-    def gradients(self) -> SparseGradients:
-        ...
-    @property
-    def result(self) -> Result:
-        ...
-    @property
-    def settings(self) -> Settings:
-        ...
-    @settings.setter
-    def settings(self) -> Settings:
         ...
 class Status:
     """

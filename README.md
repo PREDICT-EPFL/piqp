@@ -99,7 +99,7 @@ In case you are using the `sparse_multistage_parallel` KKT solver backend, we ad
   year={2026}
 }
 ```
-In case you are using the differentiation (`backward`), we encourage you to cite:
+In case you are using the differentiation (`vjp`), we encourage you to cite:
 ```
 @misc{song2026cupiqp,
   author={Song, Fenglong and Schwan, Roland and Chen, Yuwen and Jiang, Yuning and Jones, Colin N.},

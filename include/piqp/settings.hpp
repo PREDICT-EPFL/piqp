@@ -84,10 +84,10 @@ struct Settings
     T iterative_refinement_static_regularization_eps = 1e-8;
     T iterative_refinement_static_regularization_rel = std::numeric_limits<T>::epsilon() * std::numeric_limits<T>::epsilon();
 
-    bool enable_backward = false;
-    bool gradient_smoothing = false;
-    T gradient_smoothing_mu = T(1e-3);
-    isize gradient_smoothing_max_iter = 10;
+    bool enable_derivatives = false;
+    bool derivative_smoothing = false;
+    T derivative_smoothing_mu = T(1e-3);
+    isize derivative_smoothing_max_iter = 10;
 
     bool verbose = false;
     bool compute_timings = false;
@@ -117,8 +117,8 @@ struct Settings
                iterative_refinement_min_improvement_rate >= 1.0 &&
                iterative_refinement_static_regularization_eps > 0 &&
                iterative_refinement_static_regularization_rel >= 0 &&
-               gradient_smoothing_mu > 0 &&
-               gradient_smoothing_max_iter > 0;
+               derivative_smoothing_mu > 0 &&
+               derivative_smoothing_max_iter > 0;
     }
 };
 

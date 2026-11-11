@@ -5,8 +5,8 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef PIQP_SPARSE_GRADIENTS_HPP
-#define PIQP_SPARSE_GRADIENTS_HPP
+#ifndef PIQP_SPARSE_VJP_RESULT_HPP
+#define PIQP_SPARSE_VJP_RESULT_HPP
 
 #include <algorithm>
 
@@ -24,11 +24,11 @@ namespace sparse
 
 /**
  * Gradients of a scalar loss L with respect to the problem data,
- * as computed by SolverBase::backward().
+ * as computed by SolverBase::vjp().
  *
- * The gradients are only valid if status is PIQP_SOLVED. status is PIQP_UNSOLVED if backward() was not
+ * The gradients are only valid if status is PIQP_SOLVED. status is PIQP_UNSOLVED if vjp() was not
  * called yet or the problem changed since (setup(), update()), and the status returned by the last
- * backward() otherwise.
+ * vjp() otherwise.
  *
  * All quantities are in the user's (unscaled) coordinates:
  *   P: n x n, dL/dP = 0.5 * (lam_x x^T + x lam_x^T) on the sparsity pattern of the P passed to setup(),
@@ -41,7 +41,7 @@ namespace sparse
  *   x_l, x_u: full n-length, entries of infinite bounds are zero
  */
 template<typename T, typename I>
-struct Gradients
+struct VJPResult
 {
     Status status = Status::PIQP_UNSOLVED;
 
@@ -150,4 +150,4 @@ struct Gradients
 
 } // namespace piqp
 
-#endif //PIQP_SPARSE_GRADIENTS_HPP
+#endif //PIQP_SPARSE_VJP_RESULT_HPP
