@@ -127,6 +127,29 @@ classdef simple_tests < matlab.unittest.TestCase
             testCase.verifyEqual(results.z_bu, [0; 0], 'AbsTol', testCase.tol)
         end
 
+        function non_double_inputs(testCase)
+            % single, integer and logical data is converted to double (all values are exactly representable)
+            for backend = {'dense', 'sparse'}
+                solver = piqp(backend{1});
+                solver.setup(single(full(testCase.P)), int32(testCase.c), ...
+                             int8(full(testCase.A)), logical(testCase.b), ...
+                             int8(full(testCase.G)), testCase.h_l, single(testCase.h_u), ...
+                             testCase.x_l, single(testCase.x_u));
+                results = solver.solve();
+                testCase.verifyEqual(results.x, [0.4285714; 0.2142857], 'AbsTol', testCase.tol)
+
+                solver.update('c', single(testCase.c), 'P', int16(full(testCase.P)));
+                results = solver.solve();
+                testCase.verifyEqual(results.x, [0.4285714; 0.2142857], 'AbsTol', testCase.tol)
+
+                % complex and non-numeric data is rejected
+                testCase.verifyError(@() solver.update('c', complex(testCase.c)), 'piqp:input')
+                testCase.verifyError(@() solver.update('h_u', 'ab'), 'piqp:input')
+                other = piqp(backend{1});
+                testCase.verifyError(@() other.setup(testCase.P, 1i * testCase.c, [], [], [], [], [], [], []), 'piqp:input')
+            end
+        end
+
         function backward_dense_qp(testCase)
             check_backward(testCase, 'dense');
         end
@@ -178,11 +201,22 @@ classdef simple_tests < matlab.unittest.TestCase
             testCase.verifyEqual(size(grads.G), [2 2])
             testCase.verifyEqual(issparse(grads.A), strcmp(backend, 'sparse'))
 
-            % gradients at a provided forward result; the default call reuses the factorization of the
-            % forward solve (second-to-last iterate), the forward result is refactorized
+            % gradients at a provided forward result, the default call linearizes at the same point
             grads_fr = solver.backward(struct('grad_x', [1; 2], 'grad_y', 1, 'forward_result', res));
             testCase.verifyEqual(grads_fr.status_val, 1)
-            testCase.verifyEqual(grads_fr.c, grads.c, 'AbsTol', 1e-6)
+            testCase.verifyEqual(grads_fr.c, grads.c, 'AbsTol', 1e-9)
+
+            % forward result fields which are not real full double arrays are rejected
+            bad = res;
+            bad.x = single(res.x);
+            testCase.verifyError(@() solver.backward('grad_x', [1; 2], 'forward_result', bad), 'piqp:backward')
+            bad = res;
+            bad.z_l = complex(res.z_l);
+            testCase.verifyError(@() solver.backward('grad_x', [1; 2], 'forward_result', bad), 'piqp:backward')
+            bad = res;
+            bad.s_bl = sparse(res.s_bl);
+            testCase.verifyError(@() solver.backward('grad_x', [1; 2], 'forward_result', bad), 'piqp:backward')
+            testCase.verifyError(@() solver.backward('grad_x', [1; 2], 'forward_result', 1), 'piqp:backward')
 
             res.info.rho = 0;
             grads_fr = solver.backward('grad_x', [1; 2], 'forward_result', res);

@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Inequality constraints with both bounds infinite stay disabled if only `G` or only one of `h_l` and `h_u` is updated [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- The Matlab interface converts single, integer and logical problem data to double and rejects complex data instead of misreading it [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
 
 ## [0.7.0] - 2026-11-05
 

@@ -165,16 +165,16 @@ classdef piqp < handle
                 end
             else
                 if this.isDense
-                    P = full(P);
+                    P = full(to_double(P, 'P'));
                 else
-                    P = sparse(P);
+                    P = sparse(to_double(P, 'P'));
                 end
             end
 
             if isempty(c)
                 c = zeros(this.n, 1);
             else
-                c = full(c(:));
+                c = full(to_double(c(:), 'c'));
             end
 
             % Create proper equalty constraints if they are not passed
@@ -191,11 +191,11 @@ classdef piqp < handle
                 b = zeros(this.p, 1);
             else
                 if this.isDense
-                    A = full(A);
+                    A = full(to_double(A, 'A'));
                 else
-                    A = sparse(A);
+                    A = sparse(to_double(A, 'A'));
                 end
-                b  = full(b(:));
+                b  = full(to_double(b(:), 'b'));
             end
 
             % Create proper inequalty constraints if they are not passed
@@ -213,24 +213,24 @@ classdef piqp < handle
                 h_u = Inf(this.m, 1);
             else
                 if this.isDense
-                    G = full(G);
+                    G = full(to_double(G, 'G'));
                 else
-                    G = sparse(G);
+                    G = sparse(to_double(G, 'G'));
                 end
-                h_l  = full(h_l(:));
-                h_u  = full(h_u(:));
+                h_l  = full(to_double(h_l(:), 'h_l'));
+                h_u  = full(to_double(h_u(:), 'h_u'));
             end
 
             if isempty(x_l)
                 x_l = -Inf(this.n, 1);
             else
-                x_l = full(x_l(:));
+                x_l = full(to_double(x_l(:), 'x_l'));
             end
 
             if isempty(x_u)
                 x_u = Inf(this.n, 1);
             else
-                x_u = full(x_u(:));
+                x_u = full(to_double(x_u(:), 'x_u'));
             end
 
             %
@@ -295,58 +295,58 @@ classdef piqp < handle
 
             if ~isempty(P)
                 if this.isDense
-                    P = full(P);
+                    P = full(to_double(P, 'P'));
                 else
-                    P = sparse(P);
+                    P = sparse(to_double(P, 'P'));
                 end
                 assert(size(P, 1) == this.n && size(P, 2) == this.n, 'Incorrect dimension of P')
             end
 
             if ~isempty(c)
-                c = full(c(:));
+                c = full(to_double(c(:), 'c'));
                 assert(length(c) == this.n, 'Incorrect dimension of c');
             end
 
             if ~isempty(A)
                 if this.isDense
-                    A = full(A);
+                    A = full(to_double(A, 'A'));
                 else
-                    A = sparse(A);
+                    A = sparse(to_double(A, 'A'));
                 end
                 assert(size(A, 1) == this.p && size(A, 2) == this.n, 'Incorrect dimension of A')
             end
 
             if ~isempty(b)
-                b = full(b(:));
+                b = full(to_double(b(:), 'b'));
                 assert(length(b) == this.p, 'Incorrect dimension of b');
             end
 
             if ~isempty(G)
                 if this.isDense
-                    G = full(G);
+                    G = full(to_double(G, 'G'));
                 else
-                    G = sparse(G);
+                    G = sparse(to_double(G, 'G'));
                 end
                 assert(size(G, 1) == this.m && size(G, 2) == this.n, 'Incorrect dimension of G')
             end
 
             if ~isempty(h_l)
-                h_l = full(h_l(:));
+                h_l = full(to_double(h_l(:), 'h_l'));
                 assert(length(h_l) == this.m, 'Incorrect dimension of h_l');
             end
 
             if ~isempty(h_u)
-                h_u = full(h_u(:));
+                h_u = full(to_double(h_u(:), 'h_u'));
                 assert(length(h_u) == this.m, 'Incorrect dimension of h_u');
             end
 
             if ~isempty(x_l)
-                x_l = full(x_l(:));
+                x_l = full(to_double(x_l(:), 'x_l'));
                 assert(length(x_l) == this.n, 'Incorrect dimension of x_l');
             end
 
             if ~isempty(x_u)
-                x_u = full(x_u(:));
+                x_u = full(to_double(x_u(:), 'x_u'));
                 assert(length(x_u) == this.n, 'Incorrect dimension of x_u');
             end
 
@@ -397,7 +397,7 @@ classdef piqp < handle
             grads = cell(1, length(gradFields));
             for i = 1:length(gradFields)
                 if isfield(adjoints, gradFields{i}) && ~isempty(adjoints.(gradFields{i}))
-                    grads{i} = full(double(adjoints.(gradFields{i})(:)));
+                    grads{i} = full(to_double(adjoints.(gradFields{i})(:), gradFields{i}));
                     assert(length(grads{i}) == gradSizes(i), 'Incorrect dimension of %s', gradFields{i});
                 else
                     grads{i} = [];
@@ -449,4 +449,12 @@ for i = 1:length(newFields)
     settings.(newFields{i}) = double(newSettings.(newFields{i}));
 end
 
+end
+
+function M = to_double(M, name)
+% converts numeric and logical data to double, the MEX interface only reads real double arrays
+if ~(isnumeric(M) || islogical(M)) || ~isreal(M)
+    error('piqp:input', '%s must be a real numeric array.', name);
+end
+M = double(M);
 end
