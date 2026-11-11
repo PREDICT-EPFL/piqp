@@ -202,6 +202,11 @@ void run_copy_move_test(Solver& solver, Model& model)
     Solver moved(std::move(copy));
     ASSERT_NO_FATAL_FAILURE(backward(moved));
     expect_same_gradients(solver, moved);
+
+    // a copy after backward() reuses the copied KKT factorization
+    Solver copy_after_backward(solver);
+    ASSERT_NO_FATAL_FAILURE(backward(copy_after_backward));
+    expect_same_gradients(solver, copy_after_backward);
 }
 
 /*
