@@ -65,7 +65,7 @@ PIQP is an adapted implementation of [work](https://link.springer.com/article/10
 
 If you found PIQP useful in your scientific work, we encourage you to cite our main paper:
 ```
-@INPROCEEDINGS{schwan2023piqp,
+@inproceedings{schwan2023piqp,
   author={Schwan, Roland and Jiang, Yuning and Kuhn, Daniel and Jones, Colin N.},
   booktitle={IEEE Conference on Decision and Control (CDC)}, 
   title={{PIQP}: A Proximal Interior-Point Quadratic Programming Solver}, 
@@ -78,7 +78,7 @@ If you found PIQP useful in your scientific work, we encourage you to cite our m
 ```
 In case you are specifically using the `sparse_multistage` KKT solver backend, we encourage you to cite the specific paper:
 ```
-@INPROCEEDINGS{schwan2025piqp_multistage,
+@inproceedings{schwan2025piqp_multistage,
   author={Schwan, Roland and Kuhn, Daniel and Jones, Colin N.},
   booktitle={IEEE Conference on Decision and Control (CDC)}, 
   title={Exploiting Multistage Optimization Structure in Proximal Solvers}, 
@@ -91,11 +91,21 @@ In case you are specifically using the `sparse_multistage` KKT solver backend, w
 ```
 In case you are using the `sparse_multistage_parallel` KKT solver backend, we additionally encourage you to cite:
 ```
-@misc{song2025piqp_parallel,
+@article{song2026piqp_parallel,
   author={Song, Fenglong and Schwan, Roland and Chen, Yuwen and Jones, Colin N.},
+  journal = {IFAC-PapersOnLine},
   title={Parallel {KKT} Solver in {PIQP} for Multistage Optimization},
-  year={2025},
-  eprint = {arXiv:2511.00946}
+  note = {23nd IFAC World Congress},
+  year={2026}
+}
+```
+In case you are using the differentiation (`backward`), we encourage you to cite:
+```
+@misc{song2026cupiqp,
+  author={Song, Fenglong and Schwan, Roland and Chen, Yuwen and Jiang, Yuning and Jones, Colin N.},
+  title={{CuPIQP}: A Batched and Differentiable {QP} Solver on {GPUs} for Robot Learning and Control},
+  year={2026},
+  eprint = {arXiv:2610.41021}
 }
 ```
 The benchmarks are available in the following repos: [piqp_benchmarks](https://github.com/PREDICT-EPFL/piqp_benchmarks), [piqp_multistage_benchmarks](https://github.com/PREDICT-EPFL/piqp_multistage_benchmarks)

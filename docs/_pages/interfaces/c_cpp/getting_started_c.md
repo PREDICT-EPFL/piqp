@@ -53,7 +53,7 @@ data->x_l = x_l;
 data->x_u = x_u;
 ```
 
-Here `PIQP_INF` represents $$\infty$$, and we store the whole problem in the `data` struct.
+Here `PIQP_INF` represents $$\infty$$, the dense matrices $$P$$, $$A$$, and $$G$$ are stored in row-major order, and we store the whole problem in the `data` struct.
 
 For the sparse interface $$P$$, $$A$$, and $$G$$ have to be in compressed sparse column (CSC) format.
 

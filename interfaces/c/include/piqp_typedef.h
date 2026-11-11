@@ -37,11 +37,11 @@ typedef struct {
     piqp_int   n;    // number of decision variables
     piqp_int   p;    // number of equality constraints
     piqp_int   m;    // number of inequality constraints
-    piqp_float* P;   // quadratic cost matrix P (size n x n), only upper triangular part is used
+    piqp_float* P;   // quadratic cost matrix P (size n x n, row-major), only upper triangular part is used
     piqp_float* c;   // linear cost weights c (size n)
-    piqp_float* A;   // equality constraints matrix A (size p x n), can be NULL
+    piqp_float* A;   // equality constraints matrix A (size p x n, row-major), can be NULL
     piqp_float* b;   // equality constraints constant b (size p), can be NULL
-    piqp_float* G;   // inequality constraints matrix G (size m x n), can be NULL
+    piqp_float* G;   // inequality constraints matrix G (size m x n, row-major), can be NULL
     piqp_float* h_l; // inequality lower bounds h_l (size m), can be NULL
     piqp_float* h_u; // inequality upper bounds h_u (size m), can be NULL
     piqp_float* x_l; // decision variables lower bounds x_l (size n), can be NULL
