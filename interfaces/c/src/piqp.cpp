@@ -5,6 +5,8 @@
 // This source code is licensed under the BSD 2-Clause License found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <cstddef>
+
 #include "piqp.h"
 
 #include "piqp/piqp.hpp"
@@ -230,9 +232,9 @@ static void piqp_set_vjp_result_vectors(piqp_vjp_result* vjp_result, const VJPRe
 static void piqp_allocate_vjp_result_dense(piqp_workspace* work, const DenseSolver& solver)
 {
     work->vjp_result = new piqp_vjp_result;
-    const piqp_int n = work->solver_info.n;
-    const piqp_int p = work->solver_info.p;
-    const piqp_int m = work->solver_info.m;
+    const std::size_t n = static_cast<std::size_t>(work->solver_info.n);
+    const std::size_t p = static_cast<std::size_t>(work->solver_info.p);
+    const std::size_t m = static_cast<std::size_t>(work->solver_info.m);
     work->vjp_result->P = new piqp_float[n * n];
     work->vjp_result->A = new piqp_float[p * n];
     work->vjp_result->G = new piqp_float[m * n];
