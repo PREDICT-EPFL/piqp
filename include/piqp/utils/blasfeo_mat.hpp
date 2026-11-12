@@ -39,11 +39,7 @@ public:
 
     BlasfeoMat(const BlasfeoMat& other)
     {
-        this->resize(other.rows(), other.cols());
-        if (other.mat.mem) {
-            // B <= A
-            blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
-        }
+        copy_from(other);
     }
 
     BlasfeoMat& operator=(BlasfeoMat&& other) noexcept
@@ -57,10 +53,8 @@ public:
 
     BlasfeoMat& operator=(const BlasfeoMat& other)
     {
-        this->resize(other.rows(), other.cols());
-        if (other.mat.mem) {
-            // B <= A
-            blasfeo_dgecp(other.rows(), other.cols(), const_cast<BlasfeoMat&>(other).ref(), 0, 0, this->ref(), 0, 0);
+        if (this != &other) {
+            copy_from(other);
         }
         return *this;
     }
@@ -172,6 +166,19 @@ public:
             }
         }
         return false;
+    }
+
+protected:
+    void copy_from(const BlasfeoMat& other)
+    {
+        this->resize(other.rows(), other.cols());
+        if (other.mat.mem) {
+            // copy the whole memory, i.e., also the panel padding and the inverse diagonal stored by a
+            // factorization, which blasfeo_dgecp skips, such that the copy computes bitwise identical results
+            assert(mat.memsize == other.mat.memsize && "memory size mismatch");
+            std::memcpy(mat.mem, other.mat.mem, static_cast<std::size_t>(other.mat.memsize));
+            mat.use_dA = other.mat.use_dA;
+        }
     }
 };
 

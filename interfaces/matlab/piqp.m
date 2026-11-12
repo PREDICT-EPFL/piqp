@@ -175,7 +175,7 @@ classdef piqp < handle
             if isempty(c)
                 c = zeros(this.n, 1);
             else
-                c = full(to_double(c(:), 'c'));
+                c = full(reshape(to_double(c, 'c'), [], 1));
             end
 
             % Create proper equalty constraints if they are not passed
@@ -196,7 +196,7 @@ classdef piqp < handle
                 else
                     A = sparse(to_double(A, 'A'));
                 end
-                b  = full(to_double(b(:), 'b'));
+                b  = full(reshape(to_double(b, 'b'), [], 1));
             end
 
             % Create proper inequalty constraints if they are not passed
@@ -218,20 +218,20 @@ classdef piqp < handle
                 else
                     G = sparse(to_double(G, 'G'));
                 end
-                h_l  = full(to_double(h_l(:), 'h_l'));
-                h_u  = full(to_double(h_u(:), 'h_u'));
+                h_l  = full(reshape(to_double(h_l, 'h_l'), [], 1));
+                h_u  = full(reshape(to_double(h_u, 'h_u'), [], 1));
             end
 
             if isempty(x_l)
                 x_l = -Inf(this.n, 1);
             else
-                x_l = full(to_double(x_l(:), 'x_l'));
+                x_l = full(reshape(to_double(x_l, 'x_l'), [], 1));
             end
 
             if isempty(x_u)
                 x_u = Inf(this.n, 1);
             else
-                x_u = full(to_double(x_u(:), 'x_u'));
+                x_u = full(reshape(to_double(x_u, 'x_u'), [], 1));
             end
 
             %
@@ -304,7 +304,7 @@ classdef piqp < handle
             end
 
             if ~isempty(c)
-                c = full(to_double(c(:), 'c'));
+                c = full(reshape(to_double(c, 'c'), [], 1));
                 assert(length(c) == this.n, 'Incorrect dimension of c');
             end
 
@@ -318,7 +318,7 @@ classdef piqp < handle
             end
 
             if ~isempty(b)
-                b = full(to_double(b(:), 'b'));
+                b = full(reshape(to_double(b, 'b'), [], 1));
                 assert(length(b) == this.p, 'Incorrect dimension of b');
             end
 
@@ -332,22 +332,22 @@ classdef piqp < handle
             end
 
             if ~isempty(h_l)
-                h_l = full(to_double(h_l(:), 'h_l'));
+                h_l = full(reshape(to_double(h_l, 'h_l'), [], 1));
                 assert(length(h_l) == this.m, 'Incorrect dimension of h_l');
             end
 
             if ~isempty(h_u)
-                h_u = full(to_double(h_u(:), 'h_u'));
+                h_u = full(reshape(to_double(h_u, 'h_u'), [], 1));
                 assert(length(h_u) == this.m, 'Incorrect dimension of h_u');
             end
 
             if ~isempty(x_l)
-                x_l = full(to_double(x_l(:), 'x_l'));
+                x_l = full(reshape(to_double(x_l, 'x_l'), [], 1));
                 assert(length(x_l) == this.n, 'Incorrect dimension of x_l');
             end
 
             if ~isempty(x_u)
-                x_u = full(to_double(x_u(:), 'x_u'));
+                x_u = full(reshape(to_double(x_u, 'x_u'), [], 1));
                 assert(length(x_u) == this.n, 'Incorrect dimension of x_u');
             end
 
@@ -399,7 +399,7 @@ classdef piqp < handle
             grads = cell(1, length(gradFields));
             for i = 1:length(gradFields)
                 if isfield(adjoints, gradFields{i}) && ~isempty(adjoints.(gradFields{i}))
-                    grads{i} = full(to_double(adjoints.(gradFields{i})(:), gradFields{i}));
+                    grads{i} = full(reshape(to_double(adjoints.(gradFields{i}), gradFields{i}), [], 1));
                     assert(length(grads{i}) == gradSizes(i), 'Incorrect dimension of %s', gradFields{i});
                 else
                     grads{i} = [];
@@ -470,7 +470,7 @@ classdef piqp < handle
                         end
                         assert(size(value, 1) == rows(i) && size(value, 2) == this.n, 'Incorrect dimension of %s', name);
                     else
-                        value = full(to_double(value(:), name));
+                        value = full(reshape(to_double(value, name), [], 1));
                         assert(length(value) == rows(i), 'Incorrect dimension of %s', name);
                     end
                     args{i} = value;

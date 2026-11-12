@@ -1,5 +1,6 @@
 #define PIQP_EIGEN_CHECK_MALLOC
 
+#include <cstring>
 #include <random>
 #include "piqp/utils/random_utils.hpp"
 #include "piqp/utils/blasfeo_wrapper.hpp"
@@ -204,3 +205,36 @@ TEST(BlasfeoWrapperTest, blasfeo_dtrsv) {
     }
 }
 
+
+// a copy is bitwise identical, including the padding and the inverse diagonal stored by a factorization,
+// i.e., computations with the copy give the same results
+TEST(BlasfeoWrapperTest, copy_is_bitwise_identical) {
+    I n = 21; // not a multiple of the panel size
+    Mat<T> P = dense_positive_definite_upper_triangular_rand<T>(n);
+    Mat<T> A_ref = P.template selfadjointView<Eigen::Upper>();
+    Vec<T> b_ref = dense_matrix_rand<T>(n, 1);
+
+    BlasfeoMat A(n, n);
+    A.assign(A_ref);
+    ASSERT_TRUE(blasfeo_dpotrf_l(A));
+    ASSERT_NE(A.ref()->use_dA, 0);
+    BlasfeoVec b(n);
+    b.assign(b_ref);
+
+    BlasfeoMat A_copy(A);
+    BlasfeoMat A_assigned(n, n);
+    A_assigned = A;
+    for (BlasfeoMat* C : {&A_copy, &A_assigned}) {
+        EXPECT_EQ(C->ref()->use_dA, A.ref()->use_dA);
+        ASSERT_EQ(C->ref()->memsize, A.ref()->memsize);
+        EXPECT_EQ(std::memcmp(C->ref()->mem, A.ref()->mem, static_cast<std::size_t>(A.ref()->memsize)), 0);
+    }
+
+    BlasfeoVec b_copy(b);
+    BlasfeoVec b_assigned(n);
+    b_assigned = b;
+    for (BlasfeoVec* c : {&b_copy, &b_assigned}) {
+        ASSERT_EQ(c->ref()->memsize, b.ref()->memsize);
+        EXPECT_EQ(std::memcmp(c->ref()->mem, b.ref()->mem, static_cast<std::size_t>(b.ref()->memsize)), 0);
+    }
+}

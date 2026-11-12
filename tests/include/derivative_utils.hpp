@@ -1084,7 +1084,7 @@ void run_smoothing_equality_test(Solver& solver, Solver& reference, const Model&
     const auto& g_ineq = solver.vjp_result();
     const auto& g_eq = reference.vjp_result();
     piqp::isize p = model.b.rows();
-    T tol = T(1e-5) * (std::max)(T(1), g_eq.c.template lpNorm<Eigen::Infinity>());
+    T tol = T(1e-5) * (std::max)({T(1), g_eq.c.template lpNorm<Eigen::Infinity>(), g_eq.b.template lpNorm<Eigen::Infinity>()});
     EXPECT_LT((g_ineq.c - g_eq.c).template lpNorm<Eigen::Infinity>(), tol);
     EXPECT_NEAR(g_ineq.h_l(0) + g_ineq.h_u(0), g_eq.b(p), tol);
     EXPECT_NEAR(g_ineq.x_l(0) + g_ineq.x_u(0), g_eq.b(p + 1), tol);

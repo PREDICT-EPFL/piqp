@@ -269,7 +269,7 @@ classdef simple_tests < matlab.unittest.TestCase
                     fd = (plus{k}.(name) - minus{k}.(name)) / (2 * eps);
                     finite = ~isinf(plus{k}.(name)); % infinite slacks
                     testCase.verifyEqual(tangents.(name)(finite), fd(finite), 'AbsTol', 1e-5)
-                    testCase.verifyEqual(tangents.(name)(~finite), zeros(nnz(~finite), 1))
+                    testCase.verifyTrue(all(tangents.(name)(~finite) == 0))
                 end
             end
 
