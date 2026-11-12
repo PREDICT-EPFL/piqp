@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - New method `vjp()` (vector-Jacobian product, reverse mode) which computes the gradients w.r.t. the problem data by implicit differentiation of the KKT conditions in all interfaces [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
-- New setting `enable_derivatives`, which has to be set before `setup()` to use `vjp()` [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- New method `jvp()` (Jacobian-vector product, forward mode) which computes the change of the solution along a perturbation of the problem data in all interfaces (`piqp_jvp_dense()` and `piqp_jvp_sparse()` in C) [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- New setting `enable_derivatives`, which has to be set before `setup()` to use `vjp()` and `jvp()` [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
 - New settings `derivative_smoothing`, `derivative_smoothing_mu` and `derivative_smoothing_max_iter` to smooth the derivatives across active-set changes [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
 
 ### Changed

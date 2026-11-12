@@ -5,7 +5,7 @@
 # This source code is licensed under the BSD 2-Clause License found in the
 # LICENSE file in the root directory of this source tree.
 
-# The correctness of the gradients is tested in C++, these tests only check the Python interface.
+# The correctness of the derivatives is tested in C++, these tests only check the Python interface.
 
 import numpy as np
 import pytest
@@ -27,22 +27,26 @@ OUTPUTS = ["x", "y", "z_l", "z_u", "z_bl", "z_bu", "s_l", "s_u", "s_bl", "s_bu"]
 VECTORS = dict(c=c, b=b, h_l=h_l, h_u=h_u, x_l=x_l, x_u=x_u)
 
 
-def make_solver(dense, vectors=VECTORS, enable_derivatives=True):
+MATRICES = dict(P=P, A=A, G=G)
+
+
+def make_solver(dense, vectors=VECTORS, enable_derivatives=True, matrices=MATRICES):
     v = vectors
+    M = matrices
     solver = piqp.DenseSolver() if dense else piqp.SparseSolver()
     solver.settings.eps_abs = 1e-12
     solver.settings.eps_rel = 1e-12
     solver.settings.enable_derivatives = enable_derivatives
     if dense:
-        solver.setup(P, v["c"], A, v["b"], G, v["h_l"], v["h_u"], v["x_l"], v["x_u"])
+        solver.setup(M["P"], v["c"], M["A"], v["b"], M["G"], v["h_l"], v["h_u"], v["x_l"], v["x_u"])
     else:
-        solver.setup(sparse.csc_matrix(np.triu(P)), v["c"], sparse.csc_matrix(A), v["b"], sparse.csc_matrix(G),
+        solver.setup(sparse.csc_matrix(np.triu(M["P"])), v["c"], sparse.csc_matrix(M["A"]), v["b"], sparse.csc_matrix(M["G"]),
                      v["h_l"], v["h_u"], v["x_l"], v["x_u"])
     return solver
 
 
-def solve(dense, vectors):
-    solver = make_solver(dense, vectors)
+def solve(dense, vectors, matrices=MATRICES):
+    solver = make_solver(dense, vectors, matrices=matrices)
     assert solver.solve() == piqp.PIQP_SOLVED
     return {name: np.array(getattr(solver.result, name)) for name in OUTPUTS}
 
@@ -160,6 +164,86 @@ def test_sparse_vjp_result_is_view():
     # setup() with the same sparsity pattern keeps the storage, the views stay valid
     solver.setup(sparse.csc_matrix(np.triu(P)), 2.0 * c, sparse.csc_matrix(A), b, sparse.csc_matrix(G), h_l, h_u, x_l, x_u)
     assert np.shares_memory(gP.data, solver.vjp_result.P.data)
+
+
+@pytest.mark.parametrize("dense", [True, False])
+def test_jvp_arguments(dense):
+    # every keyword argument d<name> is the perturbation of the data of the same name, checked with central
+    # differences of all outputs, the matrices are perturbed on their sparsity patterns
+    rng = np.random.default_rng(1)
+    solver = make_solver(dense)
+    assert solver.solve() == piqp.PIQP_SOLVED
+    eps = 1e-6
+    for name in list(MATRICES) + list(VECTORS):
+        matrices, vectors = dict(MATRICES), dict(VECTORS)
+        if name in MATRICES:
+            value = MATRICES[name]
+            d = rng.standard_normal(value.shape) * (value != 0)
+            if name == "P":
+                d = np.triu(d)
+                d_full = d + np.triu(d, 1).T  # only the upper triangular part of dP is read
+            else:
+                d_full = d
+            arg = d if dense else sparse.csc_matrix(d)
+            plus = solve(dense, vectors, dict(matrices, **{name: value + eps * d_full}))
+            minus = solve(dense, vectors, dict(matrices, **{name: value - eps * d_full}))
+        else:
+            value = VECTORS[name]
+            d = np.where(np.isinf(value), 0.0, rng.standard_normal(value.shape))
+            arg = d
+            plus = solve(dense, dict(vectors, **{name: value + eps * d}))
+            minus = solve(dense, dict(vectors, **{name: value - eps * d}))
+
+        assert solver.jvp(**{"d" + name: arg}) == piqp.PIQP_SOLVED, name
+        for out in OUTPUTS:
+            fd = (plus[out] - minus[out]) / (2 * eps)
+            finite = ~np.isinf(plus[out])  # infinite slacks
+            tangent = np.asarray(getattr(solver.jvp_result, out))
+            np.testing.assert_allclose(tangent[finite], fd[finite], atol=1e-5, rtol=1e-4, err_msg=f"d{name}: {out}")
+            assert np.all(tangent[~finite] == 0.0), f"d{name}: {out}"
+
+
+@pytest.mark.parametrize("dense", [True, False])
+def test_jvp_status(dense):
+    solver = make_solver(dense, enable_derivatives=False)
+    assert solver.solve() == piqp.PIQP_SOLVED
+    assert solver.jvp() == piqp.PIQP_INVALID_SETTINGS
+
+    solver = make_solver(dense)
+    tangents = solver.jvp_result
+    assert tangents.status == piqp.PIQP_UNSOLVED
+    assert solver.jvp() == piqp.PIQP_UNSOLVED
+    assert solver.solve() == piqp.PIQP_SOLVED
+    assert solver.jvp(dc=np.ones(3)) == piqp.PIQP_SOLVED
+    assert tangents.status == piqp.PIQP_SOLVED
+
+    # at a provided solve result
+    expected = np.array(tangents.x)
+    assert solver.jvp(dc=np.ones(3), solve_result=solver.result) == piqp.PIQP_SOLVED
+    np.testing.assert_allclose(tangents.x, expected, rtol=1e-9, atol=1e-12)
+
+    assert solver.jvp(dc=np.zeros(4)) == piqp.PIQP_INVALID_SETTINGS
+    assert tangents.status == piqp.PIQP_INVALID_SETTINGS
+    dA = np.zeros((2, 3)) if dense else sparse.csc_matrix((2, 3))
+    assert solver.jvp(dA=dA) == piqp.PIQP_INVALID_SETTINGS
+
+    assert solver.jvp() == piqp.PIQP_SOLVED
+    solver.update(c=2.0 * c)
+    assert tangents.status == piqp.PIQP_UNSOLVED
+
+
+@pytest.mark.parametrize("dense", [True, False])
+def test_jvp_result_types(dense):
+    solver = make_solver(dense)
+    assert solver.solve() == piqp.PIQP_SOLVED
+    assert solver.jvp(dc=np.ones(3)) == piqp.PIQP_SOLVED
+    tangents = solver.jvp_result
+    assert isinstance(tangents, piqp.JVPResult)
+    for name, size in [("x", 3), ("y", 1), ("z_l", 3), ("z_u", 3), ("z_bl", 3), ("z_bu", 3),
+                       ("s_l", 3), ("s_u", 3), ("s_bl", 3), ("s_bu", 3)]:
+        vec = getattr(tangents, name)
+        assert vec.shape == (size,)
+        assert not vec.flags.writeable
 
 
 if __name__ == "__main__":

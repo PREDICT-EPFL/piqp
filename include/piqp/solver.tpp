@@ -79,7 +79,10 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
     Status status = solve_impl();
 
     m_derivatives_ready = (status == Status::PIQP_SOLVED || status == Status::PIQP_MAX_ITER_REACHED);
-    m_derivatives_factor_valid = false;
+    m_linearization_valid = false;
+    // the derivatives of the previous solution are not valid anymore
+    m_vjp_result.status = Status::PIQP_UNSOLVED;
+    m_jvp_result.status = Status::PIQP_UNSOLVED;
 
     unscale_results(m_result);
     restore_dual();
@@ -142,9 +145,10 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
     m_data.resize(P.rows(), A.has_value() ? A->rows() : 0, G.has_value() ? G->rows() : 0);
 
     m_derivatives_ready = false;
-    m_derivatives_factor_valid = false;
+    m_linearization_valid = false;
     m_derivatives_enabled = false;
     m_vjp_result.status = Status::PIQP_UNSOLVED;
+    m_jvp_result.status = Status::PIQP_UNSOLVED;
 
     if (P.rows() != m_data.n || P.cols() != m_data.n) { piqp_eprint("P must be square\n"); return; }
     if (A.has_value() && (A->rows() != m_data.p || A->cols() != m_data.n)) { piqp_eprint("A must have correct dimensions\n"); return; }
@@ -172,10 +176,11 @@ void SolverBase<T, I, Preconditioner, MatrixType>::setup_impl(const CMatRefType&
     init_workspace();
 
     m_derivatives_enabled = m_settings.enable_derivatives;
-    isize n_bwd = m_derivatives_enabled ? m_data.n : 0;
-    isize p_bwd = m_derivatives_enabled ? m_data.p : 0;
-    isize m_bwd = m_derivatives_enabled ? m_data.m : 0;
-    m_linearization_point.resize(n_bwd, p_bwd, m_bwd);
+    isize n_der = m_derivatives_enabled ? m_data.n : 0;
+    isize p_der = m_derivatives_enabled ? m_data.p : 0;
+    isize m_der = m_derivatives_enabled ? m_data.m : 0;
+    m_linearization_point.resize(n_der, p_der, m_der);
+    m_jvp_result.resize(n_der, p_der, m_der);
     if (m_derivatives_enabled)
     {
         m_vjp_result.resize(m_data, P, A, G);
@@ -249,8 +254,9 @@ void SolverBase<T, I, Preconditioner, MatrixType>::update_impl(const optional<CM
     }
 
     m_derivatives_ready = false;
-    m_derivatives_factor_valid = false;
+    m_linearization_valid = false;
     m_vjp_result.status = Status::PIQP_UNSOLVED;
+    m_jvp_result.status = Status::PIQP_UNSOLVED;
 
     m_preconditioner.unscale_data(m_data);
 
@@ -1621,6 +1627,151 @@ void SolverBase<T, I, Preconditioner, MatrixType>::unpack_dual(Variables<T>& var
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
 Status SolverBase<T, I, Preconditioner, MatrixType>::vjp(const optional<CVecRef<T>>& grad_x,
+                                                         const optional<CVecRef<T>>& grad_y,
+                                                         const optional<CVecRef<T>>& grad_z_l,
+                                                         const optional<CVecRef<T>>& grad_z_u,
+                                                         const optional<CVecRef<T>>& grad_z_bl,
+                                                         const optional<CVecRef<T>>& grad_z_bu,
+                                                         const optional<CVecRef<T>>& grad_s_l,
+                                                         const optional<CVecRef<T>>& grad_s_u,
+                                                         const optional<CVecRef<T>>& grad_s_bl,
+                                                         const optional<CVecRef<T>>& grad_s_bu,
+                                                         const optional<Result<T>>& solve_result)
+{
+    m_vjp_result.status = vjp_impl(grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
+                                   grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result);
+    return m_vjp_result.status;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::jvp(const optional<CMatRefType>& dP,
+                                                         const optional<CVecRef<T>>& dc,
+                                                         const optional<CMatRefType>& dA,
+                                                         const optional<CVecRef<T>>& db,
+                                                         const optional<CMatRefType>& dG,
+                                                         const optional<CVecRef<T>>& dh_l,
+                                                         const optional<CVecRef<T>>& dh_u,
+                                                         const optional<CVecRef<T>>& dx_l,
+                                                         const optional<CVecRef<T>>& dx_u,
+                                                         const optional<Result<T>>& solve_result)
+{
+    m_jvp_result.status = jvp_impl(dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u, solve_result);
+    return m_jvp_result.status;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::check_derivatives_available(const char* name, bool has_solve_result)
+{
+    if (!m_setup_done)
+    {
+        piqp_eprint("Solver not setup yet\n");
+        return Status::PIQP_INVALID_SETTINGS;
+    }
+
+    if (!m_derivatives_enabled)
+    {
+        piqp_eprint("%s() requires settings.enable_derivatives to be set before setup()\n", name);
+        return Status::PIQP_INVALID_SETTINGS;
+    }
+
+    if (!has_solve_result && !linearization_reusable() && !m_derivatives_ready)
+    {
+        piqp_eprint("%s() requires a solve() of the current problem data which returned PIQP_SOLVED or PIQP_MAX_ITER_REACHED\n", name);
+        return Status::PIQP_UNSOLVED;
+    }
+
+    return Status::PIQP_SOLVED;
+}
+
+// Sets the linearization point and factors the KKT matrix at it, such that the KKT system can be solved with the
+// Jacobian of the KKT conditions. The linearization point is the provided solve result if given. Otherwise, the last
+// linearization is reused if the smoothing settings are unchanged, or the result of the last solve() is used.
+// The linearization point is unscaled to user space afterwards, the KKT system keeps its own scaled copies.
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::linearize(const char* name, const optional<Result<T>>& solve_result)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::linearize");
+
+    Info<T> info;
+    if (solve_result.has_value())
+    {
+        // the last linearization is overwritten, also if the solve result is rejected
+        m_linearization_valid = false;
+        Status init_status = init_linearization_point(name, *solve_result);
+        if (init_status != Status::PIQP_SOLVED)
+        {
+            return init_status;
+        }
+        info = solve_result->info;
+    }
+    else if (linearization_reusable())
+    {
+        return Status::PIQP_SOLVED;
+    }
+    else
+    {
+        m_linearization_valid = false;
+        m_linearization_point = m_result;
+        reduce_dual(m_linearization_point);
+        scale_results(m_linearization_point);
+        info = m_result.info;
+    }
+
+    if (m_settings.derivative_smoothing)
+    {
+        Status smoothing_status = smooth_linearization_point(name, info);
+        if (smoothing_status != Status::PIQP_SOLVED)
+        {
+            return smoothing_status;
+        }
+    }
+    else if (!factor_kkt(m_linearization_point, info))
+    {
+        piqp_eprint("%s(): KKT factorization at the linearization point failed\n", name);
+        return Status::PIQP_NUMERICS;
+    }
+
+    // disabled rows are decoupled from the problem, zeroing their duals zeros their contributions to the derivatives
+    unscale_results(m_linearization_point);
+    zero_inactive_rows(m_linearization_point.z_l, m_linearization_point.z_u);
+
+    m_linearization_valid = true;
+    m_linearization_smoothing = m_settings.derivative_smoothing;
+    m_linearization_smoothing_mu = m_settings.derivative_smoothing_mu;
+    return Status::PIQP_SOLVED;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+bool SolverBase<T, I, Preconditioner, MatrixType>::linearization_reusable() const
+{
+    return m_linearization_valid && m_linearization_smoothing == m_settings.derivative_smoothing
+           && (!m_linearization_smoothing || m_linearization_smoothing_mu == m_settings.derivative_smoothing_mu);
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+bool SolverBase<T, I, Preconditioner, MatrixType>::valid_size(const optional<CVecRef<T>>& v, isize size, const char* name)
+{
+    if (v.has_value() && v->size() != size)
+    {
+        piqp_eprint("%s has wrong dimensions\n", name);
+        return false;
+    }
+    return true;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+bool SolverBase<T, I, Preconditioner, MatrixType>::valid_size(const optional<CMatRefType>& M, isize rows, isize cols, const char* name)
+{
+    if (M.has_value() && (M->rows() != rows || M->cols() != cols))
+    {
+        piqp_eprint("%s has wrong dimensions\n", name);
+        return false;
+    }
+    return true;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::vjp_impl(const optional<CVecRef<T>>& grad_x,
                                                               const optional<CVecRef<T>>& grad_y,
                                                               const optional<CVecRef<T>>& grad_z_l,
                                                               const optional<CVecRef<T>>& grad_z_u,
@@ -1632,52 +1783,14 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::vjp(const optional<CVecRef<
                                                               const optional<CVecRef<T>>& grad_s_bu,
                                                               const optional<Result<T>>& solve_result)
 {
-    m_vjp_result.status = vjp_impl(grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
-                                       grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result);
-    return m_vjp_result.status;
-}
-
-template<typename T, typename I, typename Preconditioner, int MatrixType>
-Status SolverBase<T, I, Preconditioner, MatrixType>::vjp_impl(const optional<CVecRef<T>>& grad_x,
-                                                                   const optional<CVecRef<T>>& grad_y,
-                                                                   const optional<CVecRef<T>>& grad_z_l,
-                                                                   const optional<CVecRef<T>>& grad_z_u,
-                                                                   const optional<CVecRef<T>>& grad_z_bl,
-                                                                   const optional<CVecRef<T>>& grad_z_bu,
-                                                                   const optional<CVecRef<T>>& grad_s_l,
-                                                                   const optional<CVecRef<T>>& grad_s_u,
-                                                                   const optional<CVecRef<T>>& grad_s_bl,
-                                                                   const optional<CVecRef<T>>& grad_s_bu,
-                                                                   const optional<Result<T>>& solve_result)
-{
     PIQP_TRACY_ZoneScopedN("piqp::Solver::vjp");
 
-    if (!m_setup_done)
+    Status status = check_derivatives_available("vjp", solve_result.has_value());
+    if (status != Status::PIQP_SOLVED)
     {
-        piqp_eprint("Solver not setup yet\n");
-        return Status::PIQP_INVALID_SETTINGS;
+        return status;
     }
 
-    if (!m_derivatives_enabled)
-    {
-        piqp_eprint("vjp() requires settings.enable_derivatives to be set before setup()\n");
-        return Status::PIQP_INVALID_SETTINGS;
-    }
-
-    if (!solve_result.has_value() && !m_derivatives_ready)
-    {
-        piqp_eprint("vjp() requires a solve() of the current problem data which returned PIQP_SOLVED or PIQP_MAX_ITER_REACHED\n");
-        return Status::PIQP_UNSOLVED;
-    }
-
-    auto valid_size = [](const optional<CVecRef<T>>& grad, isize size, const char* name) {
-        if (grad.has_value() && grad->size() != size)
-        {
-            piqp_eprint("%s has wrong dimensions\n", name);
-            return false;
-        }
-        return true;
-    };
     if (!valid_size(grad_x, m_data.n, "grad_x") || !valid_size(grad_y, m_data.p, "grad_y") ||
         !valid_size(grad_z_l, m_data.m, "grad_z_l") || !valid_size(grad_z_u, m_data.m, "grad_z_u") ||
         !valid_size(grad_z_bl, m_data.n, "grad_z_bl") || !valid_size(grad_z_bu, m_data.n, "grad_z_bu") ||
@@ -1687,41 +1800,10 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::vjp_impl(const optional<CVe
         return Status::PIQP_INVALID_SETTINGS;
     }
 
-    Info<T> info = m_result.info;
-    if (solve_result.has_value())
+    status = linearize("vjp", solve_result);
+    if (status != Status::PIQP_SOLVED)
     {
-        Status point_status = init_linearization_point(*solve_result);
-        if (point_status != Status::PIQP_SOLVED)
-        {
-            return point_status;
-        }
-        info = solve_result->info;
-    }
-    else
-    {
-        m_linearization_point = m_result;
-        reduce_dual(m_linearization_point);
-        scale_results(m_linearization_point);
-    }
-
-    if (m_settings.derivative_smoothing)
-    {
-        Status smoothing_status = smooth_linearization_point(info);
-        if (smoothing_status != Status::PIQP_SOLVED)
-        {
-            return smoothing_status;
-        }
-    }
-    else if (solve_result.has_value() || !m_derivatives_factor_valid)
-    {
-        m_derivatives_factor_valid = false;
-        if (!factor_kkt(m_linearization_point, info))
-        {
-            piqp_eprint("vjp(): KKT factorization at the linearization point failed\n");
-            return Status::PIQP_NUMERICS;
-        }
-        // only the linearization point of the last solve() result is cached
-        m_derivatives_factor_valid = !solve_result.has_value();
+        return status;
     }
 
     // the forward residuals and steps are not needed anymore and hold the adjoint system
@@ -1734,20 +1816,9 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::vjp_impl(const optional<CVe
         piqp_eprint("vjp(): adjoint KKT solve failed\n");
         return Status::PIQP_NUMERICS;
     }
-    unscale_adjoint(lambda);
-    unscale_results(m_linearization_point);
-
-    // disabled rows are decoupled from the problem, zeroing their duals and adjoints zeros their gradients
-    for (isize i = 0; i < m_data.m; i++)
-    {
-        if (m_data.G_row_disabled(i))
-        {
-            lambda.z_l(i) = T(0);
-            lambda.z_u(i) = T(0);
-            m_linearization_point.z_l(i) = T(0);
-            m_linearization_point.z_u(i) = T(0);
-        }
-    }
+    scale_like_residuals(lambda);
+    // disabled rows are decoupled from the problem, zeroing their adjoints zeros their gradients
+    zero_inactive_rows(lambda.z_l, lambda.z_u);
 
     m_vjp_result.compute_from_adjoint(m_data, m_linearization_point, lambda);
 
@@ -1755,13 +1826,62 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::vjp_impl(const optional<CVe
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
-Status SolverBase<T, I, Preconditioner, MatrixType>::init_linearization_point(const Result<T>& solve_result)
+Status SolverBase<T, I, Preconditioner, MatrixType>::jvp_impl(const optional<CMatRefType>& dP,
+                                                              const optional<CVecRef<T>>& dc,
+                                                              const optional<CMatRefType>& dA,
+                                                              const optional<CVecRef<T>>& db,
+                                                              const optional<CMatRefType>& dG,
+                                                              const optional<CVecRef<T>>& dh_l,
+                                                              const optional<CVecRef<T>>& dh_u,
+                                                              const optional<CVecRef<T>>& dx_l,
+                                                              const optional<CVecRef<T>>& dx_u,
+                                                              const optional<Result<T>>& solve_result)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::jvp");
+
+    Status status = check_derivatives_available("jvp", solve_result.has_value());
+    if (status != Status::PIQP_SOLVED)
+    {
+        return status;
+    }
+
+    if (!valid_size(dP, m_data.n, m_data.n, "dP") || !valid_size(dc, m_data.n, "dc") ||
+        !valid_size(dA, m_data.p, m_data.n, "dA") || !valid_size(db, m_data.p, "db") ||
+        !valid_size(dG, m_data.m, m_data.n, "dG") ||
+        !valid_size(dh_l, m_data.m, "dh_l") || !valid_size(dh_u, m_data.m, "dh_u") ||
+        !valid_size(dx_l, m_data.n, "dx_l") || !valid_size(dx_u, m_data.n, "dx_u"))
+    {
+        return Status::PIQP_INVALID_SETTINGS;
+    }
+
+    status = linearize("jvp", solve_result);
+    if (status != Status::PIQP_SOLVED)
+    {
+        return status;
+    }
+
+    // the forward residuals and steps are not needed anymore and hold the tangent system
+    Variables<T>& rhs = res;
+    Variables<T>& tangent = step;
+    assemble_tangent_rhs(dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u, rhs);
+    if (!m_kkt_system.solve(m_data, m_settings, rhs, tangent))
+    {
+        piqp_eprint("jvp(): tangent KKT solve failed\n");
+        return Status::PIQP_NUMERICS;
+    }
+    store_tangent(tangent);
+
+    return Status::PIQP_SOLVED;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+Status SolverBase<T, I, Preconditioner, MatrixType>::init_linearization_point(const char* name, const Result<T>& solve_result)
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::init_linearization_point");
 
     if (solve_result.info.status != Status::PIQP_SOLVED && solve_result.info.status != Status::PIQP_MAX_ITER_REACHED)
     {
-        piqp_eprint("vjp(): the provided solve result must have status PIQP_SOLVED or PIQP_MAX_ITER_REACHED\n");
+        piqp_eprint("%s(): the provided solve result must have status PIQP_SOLVED or PIQP_MAX_ITER_REACHED\n", name);
         return Status::PIQP_UNSOLVED;
     }
     if (solve_result.x.size() != m_data.n || solve_result.y.size() != m_data.p
@@ -1770,12 +1890,12 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::init_linearization_point(co
         || solve_result.z_bl.size() != m_data.n || solve_result.z_bu.size() != m_data.n
         || solve_result.s_bl.size() != m_data.n || solve_result.s_bu.size() != m_data.n)
     {
-        piqp_eprint("vjp(): the provided solve result has wrong dimensions\n");
+        piqp_eprint("%s(): the provided solve result has wrong dimensions\n", name);
         return Status::PIQP_INVALID_SETTINGS;
     }
     if (!(solve_result.info.rho > 0) || !(solve_result.info.delta > 0) || !std::isfinite(solve_result.info.rho) || !std::isfinite(solve_result.info.delta))
     {
-        piqp_eprint("vjp(): the provided solve result has an invalid regularization (info.rho, info.delta)\n");
+        piqp_eprint("%s(): the provided solve result has an invalid regularization (info.rho, info.delta)\n", name);
         return Status::PIQP_INVALID_SETTINGS;
     }
 
@@ -1808,7 +1928,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::init_linearization_point(co
         Eigen::Index idx = m_data.h_l_idx(i);
         if (!set_interior(solve_result.s_l, solve_result.z_l, point.s_l, point.z_l, idx, m_data.G_row_disabled(idx)))
         {
-            piqp_eprint("vjp(): s_l and z_l of the provided solve result must be strictly positive on finite bounds\n");
+            piqp_eprint("%s(): s_l and z_l of the provided solve result must be strictly positive on finite bounds\n", name);
             return Status::PIQP_INVALID_SETTINGS;
         }
     }
@@ -1817,7 +1937,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::init_linearization_point(co
         Eigen::Index idx = m_data.h_u_idx(i);
         if (!set_interior(solve_result.s_u, solve_result.z_u, point.s_u, point.z_u, idx, m_data.G_row_disabled(idx)))
         {
-            piqp_eprint("vjp(): s_u and z_u of the provided solve result must be strictly positive on finite bounds\n");
+            piqp_eprint("%s(): s_u and z_u of the provided solve result must be strictly positive on finite bounds\n", name);
             return Status::PIQP_INVALID_SETTINGS;
         }
     }
@@ -1825,7 +1945,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::init_linearization_point(co
     {
         if (!set_interior(solve_result.s_bl, solve_result.z_bl, point.s_bl, point.z_bl, m_data.x_l_idx(i), false))
         {
-            piqp_eprint("vjp(): s_bl and z_bl of the provided solve result must be strictly positive on finite bounds\n");
+            piqp_eprint("%s(): s_bl and z_bl of the provided solve result must be strictly positive on finite bounds\n", name);
             return Status::PIQP_INVALID_SETTINGS;
         }
     }
@@ -1833,7 +1953,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::init_linearization_point(co
     {
         if (!set_interior(solve_result.s_bu, solve_result.z_bu, point.s_bu, point.z_bu, m_data.x_u_idx(i), false))
         {
-            piqp_eprint("vjp(): s_bu and z_bu of the provided solve result must be strictly positive on finite bounds\n");
+            piqp_eprint("%s(): s_bu and z_bu of the provided solve result must be strictly positive on finite bounds\n", name);
             return Status::PIQP_INVALID_SETTINGS;
         }
     }
@@ -1845,7 +1965,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::init_linearization_point(co
 }
 
 template<typename T, typename I, typename Preconditioner, int MatrixType>
-Status SolverBase<T, I, Preconditioner, MatrixType>::smooth_linearization_point(Info<T>& info)
+Status SolverBase<T, I, Preconditioner, MatrixType>::smooth_linearization_point(const char* name, Info<T>& info)
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::smooth_linearization_point");
 
@@ -1895,12 +2015,11 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::smooth_linearization_point(
     project(vars.s_bl, vars.z_bl, target.z_bl, m_data.n_x_l);
     project(vars.s_bu, vars.z_bu, target.z_bu, m_data.n_x_u);
 
-    m_derivatives_factor_valid = false;
     for (isize iter = 0;; iter++)
     {
         if (!factor_kkt(vars, info))
         {
-            piqp_eprint("vjp(): KKT factorization failed during derivative smoothing\n");
+            piqp_eprint("%s(): KKT factorization failed during derivative smoothing\n", name);
             return Status::PIQP_NUMERICS;
         }
 
@@ -1931,13 +2050,13 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::smooth_linearization_point(
 
         if (iter >= m_settings.derivative_smoothing_max_iter)
         {
-            piqp_eprint("vjp(): derivative smoothing did not converge within derivative_smoothing_max_iter iterations\n");
+            piqp_eprint("%s(): derivative smoothing did not converge within derivative_smoothing_max_iter iterations\n", name);
             return Status::PIQP_MAX_ITER_REACHED;
         }
 
         if (!m_kkt_system.solve(m_data, m_settings, res, step))
         {
-            piqp_eprint("vjp(): KKT solve failed during derivative smoothing\n");
+            piqp_eprint("%s(): KKT solve failed during derivative smoothing\n", name);
             return Status::PIQP_NUMERICS;
         }
 
@@ -1976,6 +2095,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::assemble_adjoint_rhs(const op
 {
     PIQP_TRACY_ZoneScopedN("piqp::Solver::vjp::assemble_adjoint_rhs");
 
+    // the linearization point is in user space, the slacks of the right-hand side are in scaled space
     const Variables<T>& point = m_linearization_point;
 
     if (grad_x.has_value())
@@ -2017,7 +2137,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::assemble_adjoint_rhs(const op
     if (grad_s_l.has_value())
     {
         rhs.s_l = -m_preconditioner.unscale_slack_ineq(*grad_s_l);
-        rhs.s_l.array() *= point.s_l.array();
+        rhs.s_l.array() *= m_preconditioner.scale_slack_ineq(point.s_l).array();
     }
     else
     {
@@ -2027,7 +2147,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::assemble_adjoint_rhs(const op
     if (grad_s_u.has_value())
     {
         rhs.s_u = -m_preconditioner.unscale_slack_ineq(*grad_s_u);
-        rhs.s_u.array() *= point.s_u.array();
+        rhs.s_u.array() *= m_preconditioner.scale_slack_ineq(point.s_u).array();
     }
     else
     {
@@ -2047,7 +2167,7 @@ void SolverBase<T, I, Preconditioner, MatrixType>::assemble_adjoint_rhs(const op
         }
         if (grad_s_bl.has_value())
         {
-            rhs.s_bl(i) = -m_preconditioner.unscale_slack_b_i((*grad_s_bl)(idx), idx) * point.s_bl(i);
+            rhs.s_bl(i) = -m_preconditioner.unscale_slack_b_i((*grad_s_bl)(idx), idx) * m_preconditioner.scale_slack_b_i(point.s_bl(i), idx);
         }
     }
     for (isize i = 0; i < m_data.n_x_u; i++)
@@ -2059,31 +2179,148 @@ void SolverBase<T, I, Preconditioner, MatrixType>::assemble_adjoint_rhs(const op
         }
         if (grad_s_bu.has_value())
         {
-            rhs.s_bu(i) = -m_preconditioner.unscale_slack_b_i((*grad_s_bu)(idx), idx) * point.s_bu(i);
+            rhs.s_bu(i) = -m_preconditioner.unscale_slack_b_i((*grad_s_bu)(idx), idx) * m_preconditioner.scale_slack_b_i(point.s_bu(i), idx);
         }
     }
 }
 
-// the adjoints scale like the KKT residuals
 template<typename T, typename I, typename Preconditioner, int MatrixType>
-void SolverBase<T, I, Preconditioner, MatrixType>::unscale_adjoint(Variables<T>& lambda)
+void SolverBase<T, I, Preconditioner, MatrixType>::scale_like_residuals(Variables<T>& vars)
 {
-    PIQP_TRACY_ZoneScopedN("piqp::Solver::vjp::unscale_adjoint");
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::scale_like_residuals");
 
-    lambda.x = m_preconditioner.scale_dual_res(lambda.x);
-    lambda.y = m_preconditioner.scale_primal_res_eq(lambda.y);
-    lambda.z_l = m_preconditioner.scale_primal_res_ineq(lambda.z_l);
-    lambda.z_u = m_preconditioner.scale_primal_res_ineq(lambda.z_u);
+    vars.x = m_preconditioner.scale_dual_res(vars.x);
+    vars.y = m_preconditioner.scale_primal_res_eq(vars.y);
+    vars.z_l = m_preconditioner.scale_primal_res_ineq(vars.z_l);
+    vars.z_u = m_preconditioner.scale_primal_res_ineq(vars.z_u);
     for (isize i = 0; i < m_data.n_x_l; i++)
     {
         Eigen::Index idx = m_data.x_l_idx(i);
-        lambda.z_bl(i) = m_preconditioner.scale_primal_res_b_i(lambda.z_bl(i), idx);
+        vars.z_bl(i) = m_preconditioner.scale_primal_res_b_i(vars.z_bl(i), idx);
     }
     for (isize i = 0; i < m_data.n_x_u; i++)
     {
         Eigen::Index idx = m_data.x_u_idx(i);
-        lambda.z_bu(i) = m_preconditioner.scale_primal_res_b_i(lambda.z_bu(i), idx);
+        vars.z_bu(i) = m_preconditioner.scale_primal_res_b_i(vars.z_bu(i), idx);
     }
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::assemble_tangent_rhs(const optional<CMatRefType>& dP,
+                                                                        const optional<CVecRef<T>>& dc,
+                                                                        const optional<CMatRefType>& dA,
+                                                                        const optional<CVecRef<T>>& db,
+                                                                        const optional<CMatRefType>& dG,
+                                                                        const optional<CVecRef<T>>& dh_l,
+                                                                        const optional<CVecRef<T>>& dh_u,
+                                                                        const optional<CVecRef<T>>& dx_l,
+                                                                        const optional<CVecRef<T>>& dx_u,
+                                                                        Variables<T>& rhs)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::jvp::assemble_tangent_rhs");
+
+    const Variables<T>& point = m_linearization_point;
+
+    rhs.x.setZero();
+    if (dP.has_value())
+    {
+        // as P in setup(), only the upper triangular part of dP is read
+        rhs.x.noalias() -= dP->template selfadjointView<Eigen::Upper>() * point.x;
+    }
+    if (dc.has_value())
+    {
+        rhs.x -= *dc;
+    }
+    if (dA.has_value())
+    {
+        rhs.x.noalias() -= dA->transpose() * point.y;
+    }
+
+    rhs.y.setZero();
+    if (dA.has_value())
+    {
+        rhs.y.noalias() -= *dA * point.x;
+    }
+    if (db.has_value())
+    {
+        rhs.y += *db;
+    }
+
+    rhs.z_l.setZero();
+    if (dG.has_value())
+    {
+        // rhs.s_l is zeroed below and used as workspace, the duals of disabled rows are zero
+        rhs.s_l.noalias() = point.z_u - point.z_l;
+        rhs.x.noalias() -= dG->transpose() * rhs.s_l;
+        rhs.z_l.noalias() += *dG * point.x;
+    }
+    rhs.z_u = -rhs.z_l;
+    if (dh_l.has_value())
+    {
+        rhs.z_l -= *dh_l;
+    }
+    if (dh_u.has_value())
+    {
+        rhs.z_u += *dh_u;
+    }
+    // also discards the perturbations of infinite bounds
+    zero_inactive_rows(rhs.z_l, rhs.z_u);
+
+    rhs.z_bl.setZero();
+    rhs.z_bu.setZero();
+    if (dx_l.has_value())
+    {
+        for (isize i = 0; i < m_data.n_x_l; i++)
+        {
+            rhs.z_bl(i) = -(*dx_l)(m_data.x_l_idx(i));
+        }
+    }
+    if (dx_u.has_value())
+    {
+        for (isize i = 0; i < m_data.n_x_u; i++)
+        {
+            rhs.z_bu(i) = (*dx_u)(m_data.x_u_idx(i));
+        }
+    }
+
+    rhs.s_l.setZero();
+    rhs.s_u.setZero();
+    rhs.s_bl.setZero();
+    rhs.s_bu.setZero();
+
+    scale_like_residuals(rhs);
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::store_tangent(Variables<T>& tangent)
+{
+    PIQP_TRACY_ZoneScopedN("piqp::Solver::jvp::store_tangent");
+
+    unscale_results(tangent);
+    zero_inactive_rows(tangent.z_l, tangent.z_u);
+    zero_inactive_rows(tangent.s_l, tangent.s_u);
+    tangent.z_bl.tail(m_data.n - m_data.n_x_l).setZero();
+    tangent.z_bu.tail(m_data.n - m_data.n_x_u).setZero();
+    tangent.s_bl.tail(m_data.n - m_data.n_x_l).setZero();
+    tangent.s_bu.tail(m_data.n - m_data.n_x_u).setZero();
+    unpack_dual(tangent);
+
+    static_cast<Variables<T>&>(m_jvp_result) = tangent;
+}
+
+template<typename T, typename I, typename Preconditioner, int MatrixType>
+void SolverBase<T, I, Preconditioner, MatrixType>::zero_inactive_rows(Vec<T>& v_l, Vec<T>& v_u)
+{
+    auto zero_inactive = [this](Vec<T>& v, const Vec<Eigen::Index>& idx, isize n_idx) {
+        for (isize i = 0, k = 0; i < m_data.m; i++)
+        {
+            bool finite = k < n_idx && idx(k) == i;
+            if (finite) k++;
+            if (!finite || m_data.G_row_disabled(i)) v(i) = T(0);
+        }
+    };
+    zero_inactive(v_l, m_data.h_l_idx, m_data.n_h_l);
+    zero_inactive(v_u, m_data.h_u_idx, m_data.n_h_u);
 }
 
 template<typename T, typename Preconditioner>

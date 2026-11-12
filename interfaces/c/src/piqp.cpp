@@ -273,6 +273,31 @@ static void piqp_allocate_vjp_result_sparse(piqp_workspace* work, const SparseSo
     piqp_set_vjp_result_vectors(work->vjp_result, solver.vjp_result());
 }
 
+// the tangents are views into the solver memory, which is allocated in the setup
+template<typename Solver>
+static void piqp_allocate_jvp_result(piqp_workspace* work, const Solver& solver)
+{
+    const piqp::JVPResult<piqp_float>& t = solver.jvp_result();
+    work->jvp_result = new piqp_jvp_result;
+    work->jvp_result->status = (piqp_status) t.status;
+    work->jvp_result->x = t.x.data();
+    work->jvp_result->y = t.y.data();
+    work->jvp_result->z_l = t.z_l.data();
+    work->jvp_result->z_u = t.z_u.data();
+    work->jvp_result->z_bl = t.z_bl.data();
+    work->jvp_result->z_bu = t.z_bu.data();
+    work->jvp_result->s_l = t.s_l.data();
+    work->jvp_result->s_u = t.s_u.data();
+    work->jvp_result->s_bl = t.s_bl.data();
+    work->jvp_result->s_bu = t.s_bu.data();
+}
+
+static void piqp_free_jvp_result(piqp_workspace* work)
+{
+    delete work->jvp_result;
+    work->jvp_result = nullptr;
+}
+
 static void piqp_free_vjp_result(piqp_workspace* work)
 {
     if (!work->vjp_result) return;
@@ -284,6 +309,14 @@ static void piqp_free_vjp_result(piqp_workspace* work)
     free(const_cast<piqp_csc*>(work->vjp_result->G_csc));
     delete work->vjp_result;
     work->vjp_result = nullptr;
+}
+
+// mirrors the statuses of the derivatives, which solve(), update(), vjp() and jvp() change
+template<typename Solver>
+static void piqp_sync_derivative_status(piqp_workspace* workspace, const Solver& solver)
+{
+    if (workspace->vjp_result) workspace->vjp_result->status = (piqp_status) solver.vjp_result().status;
+    if (workspace->jvp_result) workspace->jvp_result->status = (piqp_status) solver.jvp_result().status;
 }
 
 void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, const piqp_settings* settings)
@@ -299,6 +332,7 @@ void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, c
     work->solver_info.m = data->m;
     work->result = new piqp_result;
     work->vjp_result = nullptr;
+    work->jvp_result = nullptr;
 
     if (settings)
     {
@@ -322,6 +356,7 @@ void piqp_setup_dense(piqp_workspace** workspace, const piqp_data_dense* data, c
     if (solver->settings().enable_derivatives)
     {
         piqp_allocate_vjp_result_dense(work, *solver);
+        piqp_allocate_jvp_result(work, *solver);
     }
 }
 
@@ -338,6 +373,7 @@ void piqp_setup_sparse(piqp_workspace** workspace, const piqp_data_sparse* data,
     work->solver_info.m = data->m;
     work->result = new piqp_result;
     work->vjp_result = nullptr;
+    work->jvp_result = nullptr;
 
     if (settings)
     {
@@ -361,6 +397,7 @@ void piqp_setup_sparse(piqp_workspace** workspace, const piqp_data_sparse* data,
     if (solver->settings().enable_derivatives)
     {
         piqp_allocate_vjp_result_sparse(work, *solver);
+        piqp_allocate_jvp_result(work, *solver);
     }
 }
 
@@ -467,7 +504,7 @@ void piqp_update_dense(piqp_workspace* workspace,
     auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
     solver->update(P_, c_, A_, b_, G_, h_l_, h_u_, x_l_, x_u_);
 
-    if (workspace->vjp_result) workspace->vjp_result->status = (piqp_status) solver->vjp_result().status;
+    piqp_sync_derivative_status(workspace, *solver);
 }
 
 void piqp_update_sparse(piqp_workspace* workspace,
@@ -489,7 +526,7 @@ void piqp_update_sparse(piqp_workspace* workspace,
     auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
     solver->update(P_, c_, A_, b_, G_, h_l_, h_u_, x_l_, x_u_);
 
-    if (workspace->vjp_result) workspace->vjp_result->status = (piqp_status) solver->vjp_result().status;
+    piqp_sync_derivative_status(workspace, *solver);
 }
 
 piqp_status piqp_solve(piqp_workspace* workspace)
@@ -500,12 +537,14 @@ piqp_status piqp_solve(piqp_workspace* workspace)
         auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
         status = solver->solve();
         piqp_update_result(workspace->result, solver->result());
+        piqp_sync_derivative_status(workspace, *solver);
     }
     else
     {
         auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
         status = solver->solve();
         piqp_update_result(workspace->result, solver->result());
+        piqp_sync_derivative_status(workspace, *solver);
     }
 
     return (piqp_status) status;
@@ -528,74 +567,168 @@ static piqp::Result<piqp_float> piqp_result_from_c(const piqp_workspace* workspa
     cpp_result.s_u = Eigen::Map<const CVec>(result->s_u, m);
     cpp_result.s_bl = Eigen::Map<const CVec>(result->s_bl, n);
     cpp_result.s_bu = Eigen::Map<const CVec>(result->s_bu, n);
-    // only the status and the regularization are used by vjp()
+    // only the status and the regularization are used by vjp() and jvp()
     cpp_result.info.status = (piqp::Status) result->info.status;
     cpp_result.info.rho = result->info.rho;
     cpp_result.info.delta = result->info.delta;
     return cpp_result;
 }
 
+static piqp::optional<piqp::Result<piqp_float>> piqp_optional_result_from_c(const piqp_workspace* workspace, const piqp_result* result)
+{
+    piqp::optional<piqp::Result<piqp_float>> cpp_result;
+    if (result)
+    {
+        cpp_result = piqp_result_from_c(workspace, result);
+    }
+    return cpp_result;
+}
+
 template<typename Solver>
 static piqp::Status piqp_vjp_impl(Solver& solver, const piqp_workspace* workspace,
-                                       const piqp_float* grad_x, const piqp_float* grad_y,
-                                       const piqp_float* grad_z_l, const piqp_float* grad_z_u,
-                                       const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
-                                       const piqp_float* grad_s_l, const piqp_float* grad_s_u,
-                                       const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
-                                       const piqp_result* solve_result)
+                                  const piqp_float* grad_x, const piqp_float* grad_y,
+                                  const piqp_float* grad_z_l, const piqp_float* grad_z_u,
+                                  const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
+                                  const piqp_float* grad_s_l, const piqp_float* grad_s_u,
+                                  const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
+                                  const piqp_result* solve_result)
 {
     const piqp_int n = workspace->solver_info.n;
     const piqp_int p = workspace->solver_info.p;
     const piqp_int m = workspace->solver_info.m;
 
-    piqp::optional<piqp::Result<piqp_float>> cpp_solve_result;
-    if (solve_result)
-    {
-        cpp_solve_result = piqp_result_from_c(workspace, solve_result);
-    }
-
     return solver.vjp(piqp_optional_const_vec_map(grad_x, n),
-                           piqp_optional_const_vec_map(grad_y, p),
-                           piqp_optional_const_vec_map(grad_z_l, m),
-                           piqp_optional_const_vec_map(grad_z_u, m),
-                           piqp_optional_const_vec_map(grad_z_bl, n),
-                           piqp_optional_const_vec_map(grad_z_bu, n),
-                           piqp_optional_const_vec_map(grad_s_l, m),
-                           piqp_optional_const_vec_map(grad_s_u, m),
-                           piqp_optional_const_vec_map(grad_s_bl, n),
-                           piqp_optional_const_vec_map(grad_s_bu, n),
-                           cpp_solve_result);
+                      piqp_optional_const_vec_map(grad_y, p),
+                      piqp_optional_const_vec_map(grad_z_l, m),
+                      piqp_optional_const_vec_map(grad_z_u, m),
+                      piqp_optional_const_vec_map(grad_z_bl, n),
+                      piqp_optional_const_vec_map(grad_z_bu, n),
+                      piqp_optional_const_vec_map(grad_s_l, m),
+                      piqp_optional_const_vec_map(grad_s_u, m),
+                      piqp_optional_const_vec_map(grad_s_bl, n),
+                      piqp_optional_const_vec_map(grad_s_bu, n),
+                      piqp_optional_result_from_c(workspace, solve_result));
 }
 
 piqp_status piqp_vjp(piqp_workspace* workspace,
-                          const piqp_float* grad_x, const piqp_float* grad_y,
-                          const piqp_float* grad_z_l, const piqp_float* grad_z_u,
-                          const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
-                          const piqp_float* grad_s_l, const piqp_float* grad_s_u,
-                          const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
-                          const piqp_result* solve_result)
+                     const piqp_float* grad_x, const piqp_float* grad_y,
+                     const piqp_float* grad_z_l, const piqp_float* grad_z_u,
+                     const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
+                     const piqp_float* grad_s_l, const piqp_float* grad_s_u,
+                     const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
+                     const piqp_result* solve_result)
 {
     piqp::Status status;
     if (workspace->solver_info.is_dense)
     {
         auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
         status = piqp_vjp_impl(*solver, workspace, grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
-                                    grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result);
+                               grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result);
         if (status == piqp::Status::PIQP_SOLVED)
         {
             piqp_copy_vjp_result_dense(workspace, *solver);
         }
+        piqp_sync_derivative_status(workspace, *solver);
     }
     else
     {
         auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
         status = piqp_vjp_impl(*solver, workspace, grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu,
-                                    grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result);
+                               grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result);
+        piqp_sync_derivative_status(workspace, *solver);
     }
 
-    if (workspace->vjp_result) workspace->vjp_result->status = (piqp_status) status;
+    return (piqp_status) status;
+}
+
+static piqp::optional<Eigen::Map<const CMat>> piqp_optional_const_mat_map(const piqp_float* data, piqp_int m, piqp_int n)
+{
+    piqp::optional<Eigen::Map<const CMat>> mat;
+    if (data)
+    {
+        mat.emplace(data, m, n);
+    }
+    return mat;
+}
+
+static piqp::optional<Eigen::Map<const CSparseMat>> piqp_optional_const_sparse_mat_map(const piqp_csc* data)
+{
+    piqp::optional<Eigen::Map<const CSparseMat>> mat;
+    if (data)
+    {
+        mat.emplace(data->m, data->n, data->nnz, data->p, data->i, data->x);
+    }
+    return mat;
+}
+
+template<typename Solver, typename MatMap>
+static piqp_status piqp_jvp_impl(piqp_workspace* workspace, Solver& solver,
+                                 const MatMap& dP, const piqp_float* dc,
+                                 const MatMap& dA, const piqp_float* db,
+                                 const MatMap& dG, const piqp_float* dh_l, const piqp_float* dh_u,
+                                 const piqp_float* dx_l, const piqp_float* dx_u,
+                                 const piqp_result* solve_result)
+{
+    const piqp_int n = workspace->solver_info.n;
+    const piqp_int p = workspace->solver_info.p;
+    const piqp_int m = workspace->solver_info.m;
+
+    piqp::Status status = solver.jvp(dP, piqp_optional_const_vec_map(dc, n),
+                                     dA, piqp_optional_const_vec_map(db, p),
+                                     dG, piqp_optional_const_vec_map(dh_l, m), piqp_optional_const_vec_map(dh_u, m),
+                                     piqp_optional_const_vec_map(dx_l, n), piqp_optional_const_vec_map(dx_u, n),
+                                     piqp_optional_result_from_c(workspace, solve_result));
+
+    piqp_sync_derivative_status(workspace, solver);
 
     return (piqp_status) status;
+}
+
+piqp_status piqp_jvp_dense(piqp_workspace* workspace,
+                           const piqp_float* dP, const piqp_float* dc,
+                           const piqp_float* dA, const piqp_float* db,
+                           const piqp_float* dG, const piqp_float* dh_l, const piqp_float* dh_u,
+                           const piqp_float* dx_l, const piqp_float* dx_u,
+                           const piqp_result* solve_result)
+{
+    if (!workspace->solver_info.is_dense)
+    {
+        piqp_eprint("piqp_jvp_dense requires a workspace set up with piqp_setup_dense\n");
+        return PIQP_INVALID_SETTINGS;
+    }
+
+    const piqp_int n = workspace->solver_info.n;
+    const piqp_int p = workspace->solver_info.p;
+    const piqp_int m = workspace->solver_info.m;
+
+    // the row-major matrices are converted to the column-major storage of the solver
+    auto* solver = reinterpret_cast<DenseSolver*>(workspace->solver_handle);
+    return piqp_jvp_impl(workspace, *solver,
+                         piqp_optional_const_mat_map(dP, n, n), dc,
+                         piqp_optional_const_mat_map(dA, p, n), db,
+                         piqp_optional_const_mat_map(dG, m, n), dh_l, dh_u,
+                         dx_l, dx_u, solve_result);
+}
+
+piqp_status piqp_jvp_sparse(piqp_workspace* workspace,
+                            const piqp_csc* dP, const piqp_float* dc,
+                            const piqp_csc* dA, const piqp_float* db,
+                            const piqp_csc* dG, const piqp_float* dh_l, const piqp_float* dh_u,
+                            const piqp_float* dx_l, const piqp_float* dx_u,
+                            const piqp_result* solve_result)
+{
+    if (workspace->solver_info.is_dense)
+    {
+        piqp_eprint("piqp_jvp_sparse requires a workspace set up with piqp_setup_sparse\n");
+        return PIQP_INVALID_SETTINGS;
+    }
+
+    auto* solver = reinterpret_cast<SparseSolver*>(workspace->solver_handle);
+    return piqp_jvp_impl(workspace, *solver,
+                         piqp_optional_const_sparse_mat_map(dP), dc,
+                         piqp_optional_const_sparse_mat_map(dA), db,
+                         piqp_optional_const_sparse_mat_map(dG), dh_l, dh_u,
+                         dx_l, dx_u, solve_result);
 }
 
 void piqp_cleanup(piqp_workspace* workspace)
@@ -613,6 +746,7 @@ void piqp_cleanup(piqp_workspace* workspace)
             delete solver;
         }
         piqp_free_vjp_result(workspace);
+        piqp_free_jvp_result(workspace);
         delete workspace->result;
         delete workspace;
     }

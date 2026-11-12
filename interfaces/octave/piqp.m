@@ -24,6 +24,7 @@ classdef piqp < handle
     %   solve             - solve the QP
     %   update            - modify problem data
     %   vjp               - vector-Jacobian product (reverse mode): gradients w.r.t. the problem data
+    %   jvp               - Jacobian-vector product (forward mode): change of the solution along a data perturbation
     %
     %   get_settings      - get the current solver settings
     %   update_settings   - update the current solver settings
@@ -342,7 +343,8 @@ classdef piqp < handle
 
         %%
         function grads = vjp(this, varargin)
-            % VJP compute the gradients of a scalar loss L w.r.t. the problem data.
+            % VJP vector-Jacobian product (reverse mode, backpropagation): computes the
+            % gradients of a scalar loss L w.r.t. the problem data.
             %
             %   grads = vjp('grad_x', dL_dx, 'grad_y', dL_dy, ...) or vjp(struct)
             %
@@ -350,7 +352,7 @@ classdef piqp < handle
             %   grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl,
             %   grad_s_bu (missing ones are zero)
             %   and solve_result, a result returned by solve() at which the
-            %   gradients are computed (default: the result of the last solve()).
+            %   gradients are computed (default: the point of the last vjp or jvp, or the result of the last solve() initially and if the smoothing settings changed).
             %   Requires the setting enable_derivatives to be set in setup().
             %
             %   grads has the fields P, c, A, b, G, h_l, h_u, x_l, x_u, which are
@@ -398,6 +400,79 @@ classdef piqp < handle
             end
 
             grads = piqp_oct('vjp',this.objectHandle,grads{:},solve_result);
+        end
+
+        %%
+        function tangents = jvp(this, varargin)
+            % JVP Jacobian-vector product (forward mode, sensitivity analysis): computes the
+            % change of the solution along a perturbation of the problem data.
+            %
+            %   tangents = jvp('dP', dP, 'dc', dc, ...) or jvp(struct)
+            %
+            %   Allowed fields are the perturbations of the problem data dP, dc, dA, db,
+            %   dG, dh_l, dh_u, dx_l, dx_u (missing ones are zero), where only the upper
+            %   triangular part of dP is read, and solve_result, a result returned by solve()
+            %   at which the tangents are computed (default: the point of the last vjp or jvp, or the result of the last solve() initially and if the smoothing settings changed).
+            %   Requires the setting enable_derivatives to be set in setup().
+            %
+            %   tangents has the fields x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu,
+            %   which are only set if tangents.status_val is 1 (PIQP_SOLVED), and status, status_val.
+
+            assert(this.n ~= 0, 'Problem is not initialized.')
+
+            dataFields = {'dP','dc','dA','db','dG','dh_l','dh_u','dx_l','dx_u'};
+            isMatrix = [true, false, true, false, true, false, false, false, false];
+            rows = [this.n, this.n, this.p, this.p, this.m, this.m, this.m, this.n, this.n];
+            allowedFields = [dataFields, {'solve_result'}];
+
+            if isempty(varargin)
+                perturbation = struct();
+            elseif length(varargin) == 1
+                if(~isstruct(varargin{1}))
+                    error('Single input should be a structure with the perturbations of the problem data');
+                else
+                    perturbation = varargin{1};
+                end
+            else % param / value style assumed
+                perturbation = struct(varargin{:});
+            end
+
+            %check for unknown fields
+            newFields = fieldnames(perturbation);
+            badFieldsIdx = find(~ismember(newFields,allowedFields));
+            if(~isempty(badFieldsIdx))
+                 error('Unrecognized input field ''%s'' detected',newFields{badFieldsIdx(1)});
+            end
+
+            args = cell(1, length(dataFields));
+            for i = 1:length(dataFields)
+                name = dataFields{i};
+                if isfield(perturbation, name) && ~isempty(perturbation.(name))
+                    value = perturbation.(name);
+                    if isMatrix(i)
+                        if this.isDense
+                            value = full(double(value));
+                        else
+                            value = sparse(double(value));
+                        end
+                        assert(size(value, 1) == rows(i) && size(value, 2) == this.n, 'Incorrect dimension of %s', name);
+                    else
+                        value = full(double(value(:)));
+                        assert(length(value) == rows(i), 'Incorrect dimension of %s', name);
+                    end
+                    args{i} = value;
+                else
+                    args{i} = [];
+                end
+            end
+
+            if isfield(perturbation, 'solve_result')
+                solve_result = perturbation.solve_result;
+            else
+                solve_result = [];
+            end
+
+            tangents = piqp_oct('jvp',this.objectHandle,args{:},solve_result);
         end
     end
 end

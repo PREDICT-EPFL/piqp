@@ -194,6 +194,31 @@ TEST_P(SparseDerivativeTest, FiniteDifferences)
     }
 }
 
+TEST_P(SparseDerivativeTest, AdjointIdentity)
+{
+    for (unsigned int seed : {1, 2, 3})
+    {
+        SCOPED_TRACE("seed " + std::to_string(seed));
+        SparseSolver<T, I> solver;
+        configure(solver, GetParam());
+        run_adjoint_identity_test(solver, make_qp(seed).first);
+    }
+}
+
+TEST_P(SparseDerivativeTest, LinearizationReuse)
+{
+    SparseSolver<T, I> solver;
+    configure(solver, GetParam());
+    run_linearization_reuse_test(solver, make_model());
+}
+
+TEST_P(SparseDerivativeTest, JVPIgnoredInputs)
+{
+    SparseSolver<T, I> solver;
+    configure(solver, GetParam());
+    run_jvp_ignored_inputs_test(solver, make_model());
+}
+
 TEST_P(SparseDerivativeTest, InvalidStates)
 {
     sparse::Model<T, I> model = make_model();

@@ -164,6 +164,21 @@ classdef simple_tests < matlab.unittest.TestCase
             testCase.verifyEqual(grads.status_val, -10) % PIQP_INVALID_SETTINGS
             testCase.verifyEmpty(grads.c)
         end
+
+        function jvp_dense_qp(testCase)
+            check_jvp(testCase, 'dense');
+        end
+
+        function jvp_sparse_qp(testCase)
+            check_jvp(testCase, 'sparse');
+        end
+
+        function jvp_not_enabled(testCase)
+            testCase.solver_dense.solve();
+            tangents = testCase.solver_dense.jvp('dc', [1; 2]);
+            testCase.verifyEqual(tangents.status_val, -10) % PIQP_INVALID_SETTINGS
+            testCase.verifyEmpty(tangents.x)
+        end
     end
 
     methods
@@ -209,18 +224,72 @@ classdef simple_tests < matlab.unittest.TestCase
             % solve result fields which are not real full double arrays are rejected
             bad = res;
             bad.x = single(res.x);
-            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', bad), 'piqp:vjp')
+            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', bad), 'piqp:solve_result')
             bad = res;
             bad.z_l = complex(res.z_l);
-            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', bad), 'piqp:vjp')
+            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', bad), 'piqp:solve_result')
             bad = res;
             bad.s_bl = sparse(res.s_bl);
-            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', bad), 'piqp:vjp')
-            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', 1), 'piqp:vjp')
+            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', bad), 'piqp:solve_result')
+            testCase.verifyError(@() solver.vjp('grad_x', [1; 2], 'solve_result', 1), 'piqp:solve_result')
 
             res.info.rho = 0;
             grads_fr = solver.vjp('grad_x', [1; 2], 'solve_result', res);
             testCase.verifyEqual(grads_fr.status_val, -10) % PIQP_INVALID_SETTINGS (invalid solve result)
+        end
+
+        function check_jvp(testCase, backend)
+            solver = setup_vjp_solver(testCase, backend, testCase.c);
+            tangents = solver.jvp('dc', [1; 2]);
+            testCase.verifyEqual(tangents.status_val, -9) % PIQP_UNSOLVED (no solution)
+            testCase.verifyEmpty(tangents.x)
+
+            res = solver.solve();
+            outputs = {'x', 'y', 'z_l', 'z_u', 'z_bl', 'z_bu', 's_l', 's_u', 's_bl', 's_bu'};
+
+            % finite differences along c and along G, the matrix is passed in the format of the backend
+            eps = 1e-6;
+            dc = [0.3; -0.7];
+            dG = [0.2 -0.1; 0.4 0.3];
+            if strcmp(backend, 'sparse')
+                dG_arg = sparse(dG);
+            else
+                dG_arg = dG;
+            end
+            cases = {{'dc', dc}, {'dG', dG_arg}};
+            plus = {jvp_solve(testCase, backend, testCase.c + eps * dc, testCase.G), ...
+                    jvp_solve(testCase, backend, testCase.c, testCase.G + eps * dG)};
+            minus = {jvp_solve(testCase, backend, testCase.c - eps * dc, testCase.G), ...
+                     jvp_solve(testCase, backend, testCase.c, testCase.G - eps * dG)};
+            for k = 1:2
+                tangents = solver.jvp(cases{k}{:});
+                testCase.verifyEqual(tangents.status_val, 1) % PIQP_SOLVED
+                for o = 1:length(outputs)
+                    name = outputs{o};
+                    fd = (plus{k}.(name) - minus{k}.(name)) / (2 * eps);
+                    finite = ~isinf(plus{k}.(name)); % infinite slacks
+                    testCase.verifyEqual(tangents.(name)(finite), fd(finite), 'AbsTol', 1e-5)
+                    testCase.verifyEqual(tangents.(name)(~finite), zeros(nnz(~finite), 1))
+                end
+            end
+
+            % tangents at a provided solve result, the default call linearizes at the same point
+            tangents = solver.jvp('dc', dc);
+            tangents_fr = solver.jvp(struct('dc', dc, 'solve_result', res));
+            testCase.verifyEqual(tangents_fr.status_val, 1)
+            testCase.verifyEqual(tangents_fr.x, tangents.x, 'AbsTol', 1e-9)
+
+            testCase.verifyError(@() solver.jvp('dc', [1; 2; 3]), ?MException)
+            testCase.verifyError(@() solver.jvp('dc', dc, 'solve_result', 1), 'piqp:solve_result')
+        end
+
+        function res = jvp_solve(testCase, backend, c, G)
+            solver = piqp(backend);
+            solver.setup(testCase.P, c, testCase.A, testCase.b, ...
+                         G, testCase.h_l, testCase.h_u, ...
+                         testCase.x_l, [Inf; 0.1], ...
+                         'eps_abs', 1e-12, 'eps_rel', 1e-12);
+            res = solver.solve();
         end
 
         function L = vjp_loss(testCase, backend, c)

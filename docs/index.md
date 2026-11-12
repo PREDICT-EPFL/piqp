@@ -32,7 +32,7 @@ ArXiv, 2025
 * PIQP is written in header only C++ 14 leveraging the [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) library for vectorized linear algebra.
 * Dense and sparse problem formulations are supported. For small dense problems, vectorized instructions and cache locality can be exploited more efficiently.
 * Special backend for multistage optimization problems.
-* [Differentiation]({{site.baseurl}}/differentiation) through the solution with respect to the problem data (reverse mode), e.g., for learning pipelines.
+* [Differentiation]({{site.baseurl}}/differentiation) through the solution with respect to the problem data in forward (`jvp`) and reverse mode (`vjp`), e.g., for learning pipelines and sensitivity analysis.
 * Allocation free problem updates and re-solves.
 * Open source under the BSD 2-Clause License.
 

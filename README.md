@@ -27,7 +27,7 @@ Combining an infeasible interior point method with the proximal method of multip
 * PIQP is written in header only C++ 14 leveraging the [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) library for vectorized linear algebra.
 * Dense and sparse problem formulations are supported. For small dense problems, vectorized instructions and cache locality can be exploited more efficiently.
 * Special backend for multistage optimization problems.
-* Differentiation through the solution with respect to the problem data (reverse mode), e.g., for learning pipelines.
+* Differentiation through the solution with respect to the problem data in forward (`jvp`) and reverse mode (`vjp`), e.g., for learning pipelines and sensitivity analysis.
 * Allocation free problem updates and re-solves.
 * Open source under the BSD 2-Clause License.
 
@@ -99,7 +99,7 @@ In case you are using the `sparse_multistage_parallel` KKT solver backend, we ad
   year={2026}
 }
 ```
-In case you are using the differentiation (`vjp`), we encourage you to cite:
+In case you are using the differentiation (`vjp`, `jvp`), we encourage you to cite:
 ```
 @misc{song2026cupiqp,
   author={Song, Fenglong and Schwan, Roland and Chen, Yuwen and Jiang, Yuning and Jones, Colin N.},

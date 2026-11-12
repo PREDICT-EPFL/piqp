@@ -59,6 +59,31 @@ TEST(DenseDerivativeTest, FiniteDifferences)
     }
 }
 
+TEST(DenseDerivativeTest, AdjointIdentity)
+{
+    for (unsigned int seed : {1, 2, 3})
+    {
+        SCOPED_TRACE("seed " + std::to_string(seed));
+        DenseSolver<T> solver;
+        configure(solver);
+        run_adjoint_identity_test(solver, make_qp(seed).first);
+    }
+}
+
+TEST(DenseDerivativeTest, LinearizationReuse)
+{
+    DenseSolver<T> solver;
+    configure(solver);
+    run_linearization_reuse_test(solver, make_model());
+}
+
+TEST(DenseDerivativeTest, JVPIgnoredInputs)
+{
+    DenseSolver<T> solver;
+    configure(solver);
+    run_jvp_ignored_inputs_test(solver, make_model());
+}
+
 TEST(DenseDerivativeTest, InvalidStates)
 {
     dense::Model<T> model = make_model();
@@ -94,6 +119,7 @@ TEST(DenseDerivativeTest, SmoothingAnalytic)
  * For the loss L = w^T x + v z this results in
  *   dL/dc = -(w + (v - g^T w) dz/da),  dL/dh = (v - g^T w) dz/dh,  dL/dg = -z w + (v - g^T w) dz/dg,
  * and dL/dP = 0.5 (lam_x x^T + x lam_x^T) with lam_x = dL/dc, since P and c only enter through P x + c.
+ * The tangents along h and g are checked with jvp(), with dx = -dz g along h and dx = -dz g - z dg along g.
  */
 TEST(DenseDerivativeTest, SmoothingAnalytic2D)
 {
@@ -148,6 +174,21 @@ TEST(DenseDerivativeTest, SmoothingAnalytic2D)
             EXPECT_EQ(grads.h_l(0), T(0)) << "r = " << r << ", scale_cost = " << scale_cost;
             EXPECT_LT((grads.G.row(0).transpose() - dL_dg).norm(), 1e-6) << "r = " << r << ", scale_cost = " << scale_cost;
             EXPECT_LT((grads.P - dL_dP).norm(), 1e-6) << "r = " << r << ", scale_cost = " << scale_cost;
+
+            // along h: dz = dz/dh, dx = -g dz
+            Vec<T> dh_u = Vec<T>::Constant(1, T(1));
+            ASSERT_EQ(solver.jvp(nullopt, nullopt, nullopt, nullopt, nullopt, nullopt, dh_u), Status::PIQP_SOLVED);
+            EXPECT_NEAR(solver.jvp_result().z_u(0), dz_dh, 1e-6) << "r = " << r << ", scale_cost = " << scale_cost;
+            EXPECT_LT((solver.jvp_result().x + g * dz_dh).norm(), 1e-6) << "r = " << r << ", scale_cost = " << scale_cost;
+
+            // along g: dz = dz/dg^T dg, dx = -dz g - z dg
+            Vec<T> dg(2);
+            dg << T(-0.4), T(0.9);
+            Mat<T> dG = dg.transpose();
+            ASSERT_EQ(solver.jvp(nullopt, nullopt, nullopt, nullopt, dG), Status::PIQP_SOLVED);
+            T dz = dz_dg.dot(dg);
+            EXPECT_NEAR(solver.jvp_result().z_u(0), dz, 1e-6) << "r = " << r << ", scale_cost = " << scale_cost;
+            EXPECT_LT((solver.jvp_result().x - (-dz * g - z * dg)).norm(), 1e-6) << "r = " << r << ", scale_cost = " << scale_cost;
         }
     }
 }

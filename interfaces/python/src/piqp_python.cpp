@@ -205,6 +205,20 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readonly("x_l", &SparseVJPResult::x_l)
         .def_readonly("x_u", &SparseVJPResult::x_u);
 
+    using JVPResult = piqp::JVPResult<T>;
+    py::class_<JVPResult>(m, "JVPResult", py::module_local())
+        .def_readonly("status", &JVPResult::status)
+        .def_readonly("x", &JVPResult::x)
+        .def_readonly("y", &JVPResult::y)
+        .def_readonly("z_l", &JVPResult::z_l)
+        .def_readonly("z_u", &JVPResult::z_u)
+        .def_readonly("z_bl", &JVPResult::z_bl)
+        .def_readonly("z_bu", &JVPResult::z_bu)
+        .def_readonly("s_l", &JVPResult::s_l)
+        .def_readonly("s_u", &JVPResult::s_u)
+        .def_readonly("s_bl", &JVPResult::s_bl)
+        .def_readonly("s_bu", &JVPResult::s_bu);
+
     using SparseSolver = piqp::SparseSolver<T, I>;
     py::class_<SparseSolver>(m, "SparseSolver", py::module_local())
         .def(py::init<>())
@@ -254,7 +268,28 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("grad_s_l") = piqp::nullopt, py::arg("grad_s_u") = piqp::nullopt,
              py::arg("grad_s_bl") = piqp::nullopt, py::arg("grad_s_bu") = piqp::nullopt,
              py::arg("solve_result") = piqp::nullopt)
-        .def_property_readonly("vjp_result", &SparseSolver::vjp_result);
+        .def_property_readonly("vjp_result", &SparseSolver::vjp_result)
+        .def("jvp",
+             [](SparseSolver &solver,
+                const piqp::optional<piqp::SparseMat<T, I>>& dP = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dc = piqp::nullopt,
+                const piqp::optional<piqp::SparseMat<T, I>>& dA = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& db = piqp::nullopt,
+                const piqp::optional<piqp::SparseMat<T, I>>& dG = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dh_l = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dh_u = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dx_l = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dx_u = piqp::nullopt,
+                const piqp::optional<piqp::Result<T>>& solve_result = piqp::nullopt)
+             {
+                 return solver.jvp(dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u, solve_result);
+             },
+             py::arg("dP") = piqp::nullopt, py::arg("dc") = piqp::nullopt,
+             py::arg("dA") = piqp::nullopt, py::arg("db") = piqp::nullopt,
+             py::arg("dG") = piqp::nullopt, py::arg("dh_l") = piqp::nullopt, py::arg("dh_u") = piqp::nullopt,
+             py::arg("dx_l") = piqp::nullopt, py::arg("dx_u") = piqp::nullopt,
+             py::arg("solve_result") = piqp::nullopt)
+        .def_property_readonly("jvp_result", &SparseSolver::jvp_result);
 
     using DenseSolver = piqp::DenseSolver<T>;
     py::class_<DenseSolver>(m, "DenseSolver", py::module_local())
@@ -279,7 +314,14 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("grad_s_l") = piqp::nullopt, py::arg("grad_s_u") = piqp::nullopt,
              py::arg("grad_s_bl") = piqp::nullopt, py::arg("grad_s_bu") = piqp::nullopt,
              py::arg("solve_result") = piqp::nullopt)
-        .def_property_readonly("vjp_result", &DenseSolver::vjp_result);
+        .def_property_readonly("vjp_result", &DenseSolver::vjp_result)
+        .def("jvp", &DenseSolver::jvp,
+             py::arg("dP") = piqp::nullopt, py::arg("dc") = piqp::nullopt,
+             py::arg("dA") = piqp::nullopt, py::arg("db") = piqp::nullopt,
+             py::arg("dG") = piqp::nullopt, py::arg("dh_l") = piqp::nullopt, py::arg("dh_u") = piqp::nullopt,
+             py::arg("dx_l") = piqp::nullopt, py::arg("dx_u") = piqp::nullopt,
+             py::arg("solve_result") = piqp::nullopt)
+        .def_property_readonly("jvp_result", &DenseSolver::jvp_result);
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

@@ -12,6 +12,7 @@
 #include <memory>
 
 #include "piqp/results.hpp"
+#include "piqp/jvp_result.hpp"
 #include "piqp/settings.hpp"
 #include "piqp/variables.hpp"
 #include "piqp/kkt_system.hpp"
@@ -80,11 +81,14 @@ protected:
     T delta_dual_lin = 0;
 
     // differentiation state (vjp, jvp)
-    Variables<T> m_linearization_point;  // point the gradients are computed at
+    Variables<T> m_linearization_point;  // point the derivatives are computed at
     VJPResultType m_vjp_result;
-    bool m_derivatives_enabled = false;     // differentiation workspace is allocated
-    bool m_derivatives_ready = false;       // a valid solve of the current data is available
-    bool m_derivatives_factor_valid = false; // the KKT is factored at the linearization point of the last solve() result
+    JVPResult<T> m_jvp_result;
+    bool m_derivatives_enabled = false;  // differentiation workspace is allocated
+    bool m_derivatives_ready = false;    // the result of the last solve() of the current data can be differentiated
+    bool m_linearization_valid = false;  // the KKT matrix is factored at m_linearization_point
+    bool m_linearization_smoothing = false;
+    T m_linearization_smoothing_mu = 0;
 
 public:
     SolverBase();
@@ -96,18 +100,31 @@ public:
     Status solve();
 
     Status vjp(const optional<CVecRef<T>>& grad_x = nullopt,
-                    const optional<CVecRef<T>>& grad_y = nullopt,
-                    const optional<CVecRef<T>>& grad_z_l = nullopt,
-                    const optional<CVecRef<T>>& grad_z_u = nullopt,
-                    const optional<CVecRef<T>>& grad_z_bl = nullopt,
-                    const optional<CVecRef<T>>& grad_z_bu = nullopt,
-                    const optional<CVecRef<T>>& grad_s_l = nullopt,
-                    const optional<CVecRef<T>>& grad_s_u = nullopt,
-                    const optional<CVecRef<T>>& grad_s_bl = nullopt,
-                    const optional<CVecRef<T>>& grad_s_bu = nullopt,
-                    const optional<Result<T>>& solve_result = nullopt);
+               const optional<CVecRef<T>>& grad_y = nullopt,
+               const optional<CVecRef<T>>& grad_z_l = nullopt,
+               const optional<CVecRef<T>>& grad_z_u = nullopt,
+               const optional<CVecRef<T>>& grad_z_bl = nullopt,
+               const optional<CVecRef<T>>& grad_z_bu = nullopt,
+               const optional<CVecRef<T>>& grad_s_l = nullopt,
+               const optional<CVecRef<T>>& grad_s_u = nullopt,
+               const optional<CVecRef<T>>& grad_s_bl = nullopt,
+               const optional<CVecRef<T>>& grad_s_bu = nullopt,
+               const optional<Result<T>>& solve_result = nullopt);
 
     const VJPResultType& vjp_result() const { return m_vjp_result; }
+
+    Status jvp(const optional<CMatRefType>& dP = nullopt,
+               const optional<CVecRef<T>>& dc = nullopt,
+               const optional<CMatRefType>& dA = nullopt,
+               const optional<CVecRef<T>>& db = nullopt,
+               const optional<CMatRefType>& dG = nullopt,
+               const optional<CVecRef<T>>& dh_l = nullopt,
+               const optional<CVecRef<T>>& dh_u = nullopt,
+               const optional<CVecRef<T>>& dx_l = nullopt,
+               const optional<CVecRef<T>>& dx_u = nullopt,
+               const optional<Result<T>>& solve_result = nullopt);
+
+    const JVPResult<T>& jvp_result() const { return m_jvp_result; }
 
 protected:
     void setup_impl(const CMatRefType& P,
@@ -184,21 +201,42 @@ protected:
 
     void reduce_dual(Variables<T>& vars);
 
-    Status init_linearization_point(const Result<T>& solve_result);
+    Status check_derivatives_available(const char* name, bool has_solve_result);
 
-    Status smooth_linearization_point(Info<T>& info);
+    Status linearize(const char* name, const optional<Result<T>>& solve_result);
+
+    Status init_linearization_point(const char* name, const Result<T>& solve_result);
+
+    Status smooth_linearization_point(const char* name, Info<T>& info);
+
+    bool linearization_reusable() const;
+
+    static bool valid_size(const optional<CVecRef<T>>& v, isize size, const char* name);
+
+    static bool valid_size(const optional<CMatRefType>& M, isize rows, isize cols, const char* name);
 
     Status vjp_impl(const optional<CVecRef<T>>& grad_x,
-                         const optional<CVecRef<T>>& grad_y,
-                         const optional<CVecRef<T>>& grad_z_l,
-                         const optional<CVecRef<T>>& grad_z_u,
-                         const optional<CVecRef<T>>& grad_z_bl,
-                         const optional<CVecRef<T>>& grad_z_bu,
-                         const optional<CVecRef<T>>& grad_s_l,
-                         const optional<CVecRef<T>>& grad_s_u,
-                         const optional<CVecRef<T>>& grad_s_bl,
-                         const optional<CVecRef<T>>& grad_s_bu,
-                         const optional<Result<T>>& solve_result);
+                    const optional<CVecRef<T>>& grad_y,
+                    const optional<CVecRef<T>>& grad_z_l,
+                    const optional<CVecRef<T>>& grad_z_u,
+                    const optional<CVecRef<T>>& grad_z_bl,
+                    const optional<CVecRef<T>>& grad_z_bu,
+                    const optional<CVecRef<T>>& grad_s_l,
+                    const optional<CVecRef<T>>& grad_s_u,
+                    const optional<CVecRef<T>>& grad_s_bl,
+                    const optional<CVecRef<T>>& grad_s_bu,
+                    const optional<Result<T>>& solve_result);
+
+    Status jvp_impl(const optional<CMatRefType>& dP,
+                    const optional<CVecRef<T>>& dc,
+                    const optional<CMatRefType>& dA,
+                    const optional<CVecRef<T>>& db,
+                    const optional<CMatRefType>& dG,
+                    const optional<CVecRef<T>>& dh_l,
+                    const optional<CVecRef<T>>& dh_u,
+                    const optional<CVecRef<T>>& dx_l,
+                    const optional<CVecRef<T>>& dx_u,
+                    const optional<Result<T>>& solve_result);
 
     void assemble_adjoint_rhs(const optional<CVecRef<T>>& grad_x,
                               const optional<CVecRef<T>>& grad_y,
@@ -212,7 +250,22 @@ protected:
                               const optional<CVecRef<T>>& grad_s_bu,
                               Variables<T>& rhs);
 
-    void unscale_adjoint(Variables<T>& lambda);
+    void scale_like_residuals(Variables<T>& vars);
+
+    void zero_inactive_rows(Vec<T>& v_l, Vec<T>& v_u);
+
+    void assemble_tangent_rhs(const optional<CMatRefType>& dP,
+                              const optional<CVecRef<T>>& dc,
+                              const optional<CMatRefType>& dA,
+                              const optional<CVecRef<T>>& db,
+                              const optional<CMatRefType>& dG,
+                              const optional<CVecRef<T>>& dh_l,
+                              const optional<CVecRef<T>>& dh_u,
+                              const optional<CVecRef<T>>& dx_l,
+                              const optional<CVecRef<T>>& dx_u,
+                              Variables<T>& rhs);
+
+    void store_tangent(Variables<T>& tangent);
 };
 
 template<typename T, typename Preconditioner = dense::RuizEquilibration<T>>

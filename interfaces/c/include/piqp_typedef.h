@@ -198,6 +198,21 @@ typedef struct {
     const piqp_float* x_u; // gradient w.r.t. x_u (size n), zero for infinite bounds
 } piqp_vjp_result;
 
+typedef struct {
+    piqp_status status;     // the tangents are only valid if status is PIQP_SOLVED
+
+    const piqp_float* x;    // tangent of x (size n)
+    const piqp_float* y;    // tangent of y (size p)
+    const piqp_float* z_l;  // tangent of z_l (size m), zero for infinite bounds
+    const piqp_float* z_u;  // tangent of z_u (size m), zero for infinite bounds
+    const piqp_float* z_bl; // tangent of z_bl (size n), zero for infinite bounds
+    const piqp_float* z_bu; // tangent of z_bu (size n), zero for infinite bounds
+    const piqp_float* s_l;  // tangent of s_l (size m), zero for infinite bounds
+    const piqp_float* s_u;  // tangent of s_u (size m), zero for infinite bounds
+    const piqp_float* s_bl; // tangent of s_bl (size n), zero for infinite bounds
+    const piqp_float* s_bu; // tangent of s_bu (size n), zero for infinite bounds
+} piqp_jvp_result;
+
 struct piqp_solver_handle; // An opaque type that we'll use as a handle for the C++ solver object
 typedef struct piqp_solver_handle piqp_solver_handle;
 
@@ -213,6 +228,7 @@ typedef struct {
     piqp_solver_info    solver_info;
     piqp_result*        result;
     piqp_vjp_result*    vjp_result; // NULL if settings->enable_derivatives was not set in the setup
+    piqp_jvp_result*    jvp_result; // NULL if settings->enable_derivatives was not set in the setup
 } piqp_workspace;
 
 # ifdef __cplusplus
