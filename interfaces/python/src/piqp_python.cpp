@@ -27,6 +27,49 @@ struct py::detail::type_caster<tl::nullopt_t> : public py::detail::void_caster<t
 using T = double;
 using I = int;
 
+// scipy.sparse.csc_matrix returned by sparse_matrix_view(), the class gives the correct type in the signature
+template<typename Scalar>
+class ScipyCscMatrix : public py::object
+{
+    static bool check(PyObject*) { return true; }
+public:
+    PYBIND11_OBJECT_DEFAULT(ScipyCscMatrix, object, check)
+};
+
+// same type name as pybind11's Eigen sparse caster, e.g. scipy.sparse.csc_matrix[numpy.float64]
+template<typename Scalar>
+struct py::detail::handle_type_name<ScipyCscMatrix<Scalar>>
+{
+    static constexpr auto name = py::detail::const_name("scipy.sparse.csc_matrix[")
+                                 + py::detail::npy_format_descriptor<Scalar>::name
+                                 + py::detail::const_name("]");
+};
+
+// Read-only scipy.sparse.csc_matrix view into the compressed sparse matrix mat, which is owned by base.
+// The view stays valid as long as the storage of mat is not reallocated.
+template<typename SparseMatType>
+ScipyCscMatrix<typename SparseMatType::Scalar> sparse_matrix_view(const SparseMatType& mat, py::handle base)
+{
+    using Scalar = typename SparseMatType::Scalar;
+    using StorageIndex = typename SparseMatType::StorageIndex;
+    static_assert(!SparseMatType::IsRowMajor, "sparse_matrix_view requires a column-major matrix");
+    if (!mat.isCompressed()) throw std::runtime_error("sparse_matrix_view requires a compressed matrix");
+
+    py::array data = py::array_t<Scalar>(mat.nonZeros(), mat.valuePtr(), base);
+    py::array indices = py::array_t<StorageIndex>(mat.nonZeros(), mat.innerIndexPtr(), base);
+    py::array indptr = py::array_t<StorageIndex>(mat.outerSize() + 1, mat.outerIndexPtr(), base);
+    
+    data.attr("flags").attr("writeable") = false;
+    indices.attr("flags").attr("writeable") = false;
+    indptr.attr("flags").attr("writeable") = false;
+
+    py::object csc = py::module_::import("scipy.sparse").attr("csc_matrix")(
+        py::make_tuple(data, indices, indptr),
+        py::arg("shape") = py::make_tuple(mat.rows(), mat.cols()),
+        py::arg("copy") = false);
+    return csc.cast<ScipyCscMatrix<Scalar>>();
+}
+
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     py::enum_<piqp::Status>(m, "Status", py::module_local())
         .value("PIQP_SOLVED", piqp::Status::PIQP_SOLVED)
@@ -76,6 +119,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("run_time", &piqp::Info<T>::run_time);
 
     py::class_<piqp::Result<T>>(m, "Result", py::module_local())
+        .def(py::init<>())
         .def_readwrite("x", &piqp::Result<T>::x)
         .def_readwrite("y", &piqp::Result<T>::y)
         .def_readwrite("z_l", &piqp::Result<T>::z_l)
@@ -128,8 +172,52 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
         .def_readwrite("iterative_refinement_min_improvement_rate", &piqp::Settings<T>::iterative_refinement_min_improvement_rate)
         .def_readwrite("iterative_refinement_static_regularization_eps", &piqp::Settings<T>::iterative_refinement_static_regularization_eps)
         .def_readwrite("iterative_refinement_static_regularization_rel", &piqp::Settings<T>::iterative_refinement_static_regularization_rel)
+        .def_readwrite("enable_derivatives", &piqp::Settings<T>::enable_derivatives)
+        .def_readwrite("derivative_smoothing", &piqp::Settings<T>::derivative_smoothing)
+        .def_readwrite("derivative_smoothing_mu", &piqp::Settings<T>::derivative_smoothing_mu)
+        .def_readwrite("derivative_smoothing_max_iter", &piqp::Settings<T>::derivative_smoothing_max_iter)
         .def_readwrite("verbose", &piqp::Settings<T>::verbose)
         .def_readwrite("compute_timings", &piqp::Settings<T>::compute_timings);
+
+    using DenseVJPResult = piqp::dense::VJPResult<T>;
+    py::class_<DenseVJPResult>(m, "DenseVJPResult", py::module_local())
+        .def_readonly("status", &DenseVJPResult::status)
+        .def_readonly("P", &DenseVJPResult::P)
+        .def_readonly("c", &DenseVJPResult::c)
+        .def_readonly("A", &DenseVJPResult::A)
+        .def_readonly("b", &DenseVJPResult::b)
+        .def_readonly("G", &DenseVJPResult::G)
+        .def_readonly("h_l", &DenseVJPResult::h_l)
+        .def_readonly("h_u", &DenseVJPResult::h_u)
+        .def_readonly("x_l", &DenseVJPResult::x_l)
+        .def_readonly("x_u", &DenseVJPResult::x_u);
+
+    using SparseVJPResult = piqp::sparse::VJPResult<T, I>;
+    py::class_<SparseVJPResult>(m, "SparseVJPResult", py::module_local())
+        .def_readonly("status", &SparseVJPResult::status)
+        .def_property_readonly("P", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseVJPResult&>().P, self); })
+        .def_readonly("c", &SparseVJPResult::c)
+        .def_property_readonly("A", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseVJPResult&>().A, self); })
+        .def_readonly("b", &SparseVJPResult::b)
+        .def_property_readonly("G", [](const py::object& self) { return sparse_matrix_view(self.cast<const SparseVJPResult&>().G, self); })
+        .def_readonly("h_l", &SparseVJPResult::h_l)
+        .def_readonly("h_u", &SparseVJPResult::h_u)
+        .def_readonly("x_l", &SparseVJPResult::x_l)
+        .def_readonly("x_u", &SparseVJPResult::x_u);
+
+    using JVPResult = piqp::JVPResult<T>;
+    py::class_<JVPResult>(m, "JVPResult", py::module_local())
+        .def_readonly("status", &JVPResult::status)
+        .def_readonly("x", &JVPResult::x)
+        .def_readonly("y", &JVPResult::y)
+        .def_readonly("z_l", &JVPResult::z_l)
+        .def_readonly("z_u", &JVPResult::z_u)
+        .def_readonly("z_bl", &JVPResult::z_bl)
+        .def_readonly("z_bu", &JVPResult::z_bu)
+        .def_readonly("s_l", &JVPResult::s_l)
+        .def_readonly("s_u", &JVPResult::s_u)
+        .def_readonly("s_bl", &JVPResult::s_bl)
+        .def_readonly("s_bu", &JVPResult::s_bu);
 
     using SparseSolver = piqp::SparseSolver<T, I>;
     py::class_<SparseSolver>(m, "SparseSolver", py::module_local())
@@ -172,7 +260,36 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
              py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
              py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
-        .def("solve", &SparseSolver::solve);
+        .def("solve", &SparseSolver::solve)
+        .def("vjp", &SparseSolver::vjp,
+             py::arg("grad_x") = piqp::nullopt, py::arg("grad_y") = piqp::nullopt,
+             py::arg("grad_z_l") = piqp::nullopt, py::arg("grad_z_u") = piqp::nullopt,
+             py::arg("grad_z_bl") = piqp::nullopt, py::arg("grad_z_bu") = piqp::nullopt,
+             py::arg("grad_s_l") = piqp::nullopt, py::arg("grad_s_u") = piqp::nullopt,
+             py::arg("grad_s_bl") = piqp::nullopt, py::arg("grad_s_bu") = piqp::nullopt,
+             py::arg("solve_result") = piqp::nullopt)
+        .def_property_readonly("vjp_result", &SparseSolver::vjp_result)
+        .def("jvp",
+             [](SparseSolver &solver,
+                const piqp::optional<piqp::SparseMat<T, I>>& dP = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dc = piqp::nullopt,
+                const piqp::optional<piqp::SparseMat<T, I>>& dA = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& db = piqp::nullopt,
+                const piqp::optional<piqp::SparseMat<T, I>>& dG = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dh_l = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dh_u = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dx_l = piqp::nullopt,
+                const piqp::optional<piqp::CVecRef<T>>& dx_u = piqp::nullopt,
+                const piqp::optional<piqp::Result<T>>& solve_result = piqp::nullopt)
+             {
+                 return solver.jvp(dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u, solve_result);
+             },
+             py::arg("dP") = piqp::nullopt, py::arg("dc") = piqp::nullopt,
+             py::arg("dA") = piqp::nullopt, py::arg("db") = piqp::nullopt,
+             py::arg("dG") = piqp::nullopt, py::arg("dh_l") = piqp::nullopt, py::arg("dh_u") = piqp::nullopt,
+             py::arg("dx_l") = piqp::nullopt, py::arg("dx_u") = piqp::nullopt,
+             py::arg("solve_result") = piqp::nullopt)
+        .def_property_readonly("jvp_result", &SparseSolver::jvp_result);
 
     using DenseSolver = piqp::DenseSolver<T>;
     py::class_<DenseSolver>(m, "DenseSolver", py::module_local())
@@ -189,7 +306,22 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
              py::arg("A") = piqp::nullopt, py::arg("b") = piqp::nullopt,
              py::arg("G") = piqp::nullopt, py::arg("h_l") = piqp::nullopt, py::arg("h_u") = piqp::nullopt,
              py::arg("x_l") = piqp::nullopt, py::arg("x_u") = piqp::nullopt)
-        .def("solve", &DenseSolver::solve);
+        .def("solve", &DenseSolver::solve)
+        .def("vjp", &DenseSolver::vjp,
+             py::arg("grad_x") = piqp::nullopt, py::arg("grad_y") = piqp::nullopt,
+             py::arg("grad_z_l") = piqp::nullopt, py::arg("grad_z_u") = piqp::nullopt,
+             py::arg("grad_z_bl") = piqp::nullopt, py::arg("grad_z_bu") = piqp::nullopt,
+             py::arg("grad_s_l") = piqp::nullopt, py::arg("grad_s_u") = piqp::nullopt,
+             py::arg("grad_s_bl") = piqp::nullopt, py::arg("grad_s_bu") = piqp::nullopt,
+             py::arg("solve_result") = piqp::nullopt)
+        .def_property_readonly("vjp_result", &DenseSolver::vjp_result)
+        .def("jvp", &DenseSolver::jvp,
+             py::arg("dP") = piqp::nullopt, py::arg("dc") = piqp::nullopt,
+             py::arg("dA") = piqp::nullopt, py::arg("db") = piqp::nullopt,
+             py::arg("dG") = piqp::nullopt, py::arg("dh_l") = piqp::nullopt, py::arg("dh_u") = piqp::nullopt,
+             py::arg("dx_l") = piqp::nullopt, py::arg("dx_u") = piqp::nullopt,
+             py::arg("solve_result") = piqp::nullopt)
+        .def_property_readonly("jvp_result", &DenseSolver::jvp_result);
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

@@ -55,6 +55,10 @@ const char* PIQP_SETTINGS_FIELDS[] = {"rho_init",
                                       "iterative_refinement_min_improvement_rate",
                                       "iterative_refinement_static_regularization_eps",
                                       "iterative_refinement_static_regularization_rel",
+                                      "enable_derivatives",
+                                      "derivative_smoothing",
+                                      "derivative_smoothing_mu",
+                                      "derivative_smoothing_max_iter",
                                       "verbose",
                                       "compute_timings"};
 
@@ -105,6 +109,31 @@ const char* PIQP_RESULT_FIELDS[] = {"x",
                                     "s_bl",
                                     "s_bu",
                                     "info"};
+
+const char* PIQP_JVP_RESULT_FIELDS[] = {"x",
+                                        "y",
+                                        "z_l",
+                                        "z_u",
+                                        "z_bl",
+                                        "z_bu",
+                                        "s_l",
+                                        "s_u",
+                                        "s_bl",
+                                        "s_bu",
+                                        "status",
+                                        "status_val"};
+
+const char* PIQP_VJP_RESULT_FIELDS[] = {"P",
+                                       "c",
+                                       "A",
+                                       "b",
+                                       "G",
+                                       "h_l",
+                                       "h_u",
+                                       "x_l",
+                                       "x_u",
+                                       "status",
+                                       "status_val"};
 
 class piqp_mex_handle
 {
@@ -161,6 +190,29 @@ inline mxArray* eigen_to_mx(const Vec& vec)
     return mx_ptr;
 }
 
+inline mxArray* eigen_to_mx(const Mat& mat)
+{
+    mxArray* mx_ptr = mxCreateDoubleMatrix((mwSize) mat.rows(), (mwSize) mat.cols(), mxREAL);
+    Eigen::Map<Mat>(mxGetPr(mx_ptr), mat.rows(), mat.cols()) = mat;
+    return mx_ptr;
+}
+
+inline mxArray* eigen_to_mx(const SparseMat& mat)
+{
+    mxArray* mx_ptr = mxCreateSparse((mwSize) mat.rows(), (mwSize) mat.cols(), (mwSize) mat.nonZeros(), mxREAL);
+    mwIndex* jc = mxGetJc(mx_ptr);
+    mwIndex* ir = mxGetIr(mx_ptr);
+    double* pr = mxGetPr(mx_ptr);
+    for (Eigen::Index j = 0; j <= mat.cols(); j++) {
+        jc[j] = (mwIndex) mat.outerIndexPtr()[j];
+    }
+    for (Eigen::Index k = 0; k < mat.nonZeros(); k++) {
+        ir[k] = (mwIndex) mat.innerIndexPtr()[k];
+        pr[k] = mat.valuePtr()[k];
+    }
+    return mx_ptr;
+}
+
 piqp::KKTSolver kkt_solver_from_string(const char* kkt_solver, bool is_dense)
 {
     std::string kkt_solver_str(kkt_solver);
@@ -213,6 +265,10 @@ mxArray* settings_to_mx_struct(const piqp::Settings<double>& settings)
     mxSetField(mx_ptr, 0, "iterative_refinement_min_improvement_rate", mxCreateDoubleScalar(settings.iterative_refinement_min_improvement_rate));
     mxSetField(mx_ptr, 0, "iterative_refinement_static_regularization_eps", mxCreateDoubleScalar(settings.iterative_refinement_static_regularization_eps));
     mxSetField(mx_ptr, 0, "iterative_refinement_static_regularization_rel", mxCreateDoubleScalar(settings.iterative_refinement_static_regularization_rel));
+    mxSetField(mx_ptr, 0, "enable_derivatives", mxCreateDoubleScalar(settings.enable_derivatives));
+    mxSetField(mx_ptr, 0, "derivative_smoothing", mxCreateDoubleScalar(settings.derivative_smoothing));
+    mxSetField(mx_ptr, 0, "derivative_smoothing_mu", mxCreateDoubleScalar(settings.derivative_smoothing_mu));
+    mxSetField(mx_ptr, 0, "derivative_smoothing_max_iter", mxCreateDoubleScalar((double) settings.derivative_smoothing_max_iter));
     mxSetField(mx_ptr, 0, "verbose", mxCreateDoubleScalar(settings.verbose));
     mxSetField(mx_ptr, 0, "compute_timings", mxCreateDoubleScalar(settings.compute_timings));
 
@@ -252,8 +308,27 @@ void copy_mx_struct_to_settings(const mxArray* mx_ptr, piqp::Settings<double>& s
     settings.iterative_refinement_min_improvement_rate = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_min_improvement_rate"));
     settings.iterative_refinement_static_regularization_eps = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_static_regularization_eps"));
     settings.iterative_refinement_static_regularization_rel = (double) mxGetScalar(mxGetField(mx_ptr, 0, "iterative_refinement_static_regularization_rel"));
+    settings.enable_derivatives = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "enable_derivatives"));
+    settings.derivative_smoothing = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "derivative_smoothing"));
+    settings.derivative_smoothing_mu = (double) mxGetScalar(mxGetField(mx_ptr, 0, "derivative_smoothing_mu"));
+    settings.derivative_smoothing_max_iter = (piqp::isize) mxGetScalar(mxGetField(mx_ptr, 0, "derivative_smoothing_max_iter"));
     settings.verbose = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "verbose"));
     settings.compute_timings = (bool) mxGetScalar(mxGetField(mx_ptr, 0, "compute_timings"));
+}
+
+// sets the fields x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu
+void set_variables_fields(mxArray* mx_ptr, const piqp::Variables<double>& vars)
+{
+    mxSetField(mx_ptr, 0, "x", eigen_to_mx(vars.x));
+    mxSetField(mx_ptr, 0, "y", eigen_to_mx(vars.y));
+    mxSetField(mx_ptr, 0, "z_l", eigen_to_mx(vars.z_l));
+    mxSetField(mx_ptr, 0, "z_u", eigen_to_mx(vars.z_u));
+    mxSetField(mx_ptr, 0, "z_bl", eigen_to_mx(vars.z_bl));
+    mxSetField(mx_ptr, 0, "z_bu", eigen_to_mx(vars.z_bu));
+    mxSetField(mx_ptr, 0, "s_l", eigen_to_mx(vars.s_l));
+    mxSetField(mx_ptr, 0, "s_u", eigen_to_mx(vars.s_u));
+    mxSetField(mx_ptr, 0, "s_bl", eigen_to_mx(vars.s_bl));
+    mxSetField(mx_ptr, 0, "s_bu", eigen_to_mx(vars.s_bu));
 }
 
 mxArray* result_to_mx_struct(const piqp::Result<double>& result)
@@ -300,19 +375,148 @@ mxArray* result_to_mx_struct(const piqp::Result<double>& result)
     int n_result_fields  = sizeof(PIQP_RESULT_FIELDS) / sizeof(PIQP_RESULT_FIELDS[0]);
     mxArray* mx_result_ptr = mxCreateStructMatrix(1, 1, n_result_fields, PIQP_RESULT_FIELDS);
 
-    mxSetField(mx_result_ptr, 0, "x", eigen_to_mx(result.x));
-    mxSetField(mx_result_ptr, 0, "y", eigen_to_mx(result.y));
-    mxSetField(mx_result_ptr, 0, "z_l", eigen_to_mx(result.z_l));
-    mxSetField(mx_result_ptr, 0, "z_u", eigen_to_mx(result.z_u));
-    mxSetField(mx_result_ptr, 0, "z_bl", eigen_to_mx(result.z_bl));
-    mxSetField(mx_result_ptr, 0, "z_bu", eigen_to_mx(result.z_bu));
-    mxSetField(mx_result_ptr, 0, "s_l", eigen_to_mx(result.s_l));
-    mxSetField(mx_result_ptr, 0, "s_u", eigen_to_mx(result.s_u));
-    mxSetField(mx_result_ptr, 0, "s_bl", eigen_to_mx(result.s_bl));
-    mxSetField(mx_result_ptr, 0, "s_bu", eigen_to_mx(result.s_bu));
+    set_variables_fields(mx_result_ptr, result);
     mxSetField(mx_result_ptr, 0, "info", mx_info_ptr);
 
     return mx_result_ptr;
+}
+
+const mxArray* get_struct_field(const mxArray* mx_ptr, const char* name)
+{
+    const mxArray* field = mxGetField(mx_ptr, 0, name);
+    if (!field) {
+        mexErrMsgIdAndTxt("piqp:solve_result", "solve_result is missing the field '%s'.", name);
+    }
+    return field;
+}
+
+Vec get_struct_vec(const mxArray* mx_ptr, const char* name)
+{
+    const mxArray* field = get_struct_field(mx_ptr, name);
+    if (!mxIsDouble(field) || mxIsComplex(field) || mxIsSparse(field)) {
+        mexErrMsgIdAndTxt("piqp:solve_result", "solve_result.%s must be a real full double array.", name);
+    }
+    return Eigen::Map<const Vec>(mxGetPr(field), (Eigen::Index) mxGetNumberOfElements(field));
+}
+
+piqp::Result<double> mx_struct_to_result(const mxArray* mx_ptr)
+{
+    if (!mxIsStruct(mx_ptr) || mxGetNumberOfElements(mx_ptr) != 1) {
+        mexErrMsgIdAndTxt("piqp:solve_result", "solve_result must be a scalar struct returned by solve().");
+    }
+    piqp::Result<double> result;
+    result.x = get_struct_vec(mx_ptr, "x");
+    result.y = get_struct_vec(mx_ptr, "y");
+    result.z_l = get_struct_vec(mx_ptr, "z_l");
+    result.z_u = get_struct_vec(mx_ptr, "z_u");
+    result.z_bl = get_struct_vec(mx_ptr, "z_bl");
+    result.z_bu = get_struct_vec(mx_ptr, "z_bu");
+    result.s_l = get_struct_vec(mx_ptr, "s_l");
+    result.s_u = get_struct_vec(mx_ptr, "s_u");
+    result.s_bl = get_struct_vec(mx_ptr, "s_bl");
+    result.s_bu = get_struct_vec(mx_ptr, "s_bu");
+    // only the status and the regularization are used by vjp() and jvp()
+    const mxArray* info_ptr = get_struct_field(mx_ptr, "info");
+    result.info.status = (piqp::Status) (int) mxGetScalar(get_struct_field(info_ptr, "status_val"));
+    result.info.rho = mxGetScalar(get_struct_field(info_ptr, "rho"));
+    result.info.delta = mxGetScalar(get_struct_field(info_ptr, "delta"));
+    return result;
+}
+
+template<typename Solver>
+mxArray* run_vjp(Solver& solver, const mxArray* prhs[])
+{
+    // prhs[2], ..., prhs[11] are the gradients w.r.t. x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu,
+    // prhs[12] is the solve result, empty arrays are treated as not provided
+    piqp::optional<Eigen::Map<const Vec>> grads[10];
+    for (int i = 0; i < 10; i++) {
+        const mxArray* ptr = prhs[2 + i];
+        if (!mxIsEmpty(ptr)) {
+            grads[i].emplace(mxGetPr(ptr), (Eigen::Index) mxGetNumberOfElements(ptr));
+        }
+    }
+    piqp::optional<piqp::Result<double>> solve_result;
+    if (!mxIsEmpty(prhs[12])) {
+        solve_result = mx_struct_to_result(prhs[12]);
+    }
+
+    piqp::Status status = solver.vjp(grads[0], grads[1], grads[2], grads[3], grads[4],
+                                     grads[5], grads[6], grads[7], grads[8], grads[9],
+                                     solve_result);
+
+    int n_fields = sizeof(PIQP_VJP_RESULT_FIELDS) / sizeof(PIQP_VJP_RESULT_FIELDS[0]);
+    mxArray* mx_ptr = mxCreateStructMatrix(1, 1, n_fields, PIQP_VJP_RESULT_FIELDS);
+    mxSetField(mx_ptr, 0, "status", mxCreateString(piqp::status_to_string(status)));
+    mxSetField(mx_ptr, 0, "status_val", mxCreateDoubleScalar((double) status));
+    if (status == piqp::Status::PIQP_SOLVED) {
+        const auto& g = solver.vjp_result();
+        mxSetField(mx_ptr, 0, "P", eigen_to_mx(g.P));
+        mxSetField(mx_ptr, 0, "c", eigen_to_mx(g.c));
+        mxSetField(mx_ptr, 0, "A", eigen_to_mx(g.A));
+        mxSetField(mx_ptr, 0, "b", eigen_to_mx(g.b));
+        mxSetField(mx_ptr, 0, "G", eigen_to_mx(g.G));
+        mxSetField(mx_ptr, 0, "h_l", eigen_to_mx(g.h_l));
+        mxSetField(mx_ptr, 0, "h_u", eigen_to_mx(g.h_u));
+        mxSetField(mx_ptr, 0, "x_l", eigen_to_mx(g.x_l));
+        mxSetField(mx_ptr, 0, "x_u", eigen_to_mx(g.x_u));
+    }
+    return mx_ptr;
+}
+
+// the perturbations of the matrices in the matrix type of the solver, the sparse ones are copied
+// since the indices are converted to int
+piqp::optional<Eigen::Map<const Mat>> mx_to_matrix(const DenseSolver&, const mxArray* ptr)
+{
+    piqp::optional<Eigen::Map<const Mat>> mat;
+    if (!mxIsEmpty(ptr)) {
+        mat.emplace(mxGetPr(ptr), (Eigen::Index) mxGetM(ptr), (Eigen::Index) mxGetN(ptr));
+    }
+    return mat;
+}
+
+piqp::optional<SparseMat> mx_to_matrix(const SparseSolver&, const mxArray* ptr)
+{
+    piqp::optional<SparseMat> mat;
+    if (!mxIsEmpty(ptr)) {
+        int cols = (int) mxGetN(ptr);
+        IVec jc = to_int_vec(mxGetJc(ptr), cols + 1);
+        IVec ir = to_int_vec(mxGetIr(ptr), jc(cols));
+        mat = SparseMat(Eigen::Map<const SparseMat>((Eigen::Index) mxGetM(ptr), cols, jc(cols), jc.data(), ir.data(), mxGetPr(ptr)));
+    }
+    return mat;
+}
+
+template<typename Solver>
+mxArray* run_jvp(Solver& solver, const mxArray* prhs[])
+{
+    // prhs[2], ..., prhs[10] are the perturbations dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u,
+    // prhs[11] is the solve result, empty arrays are treated as not provided
+    auto dP = mx_to_matrix(solver, prhs[2]);
+    auto dA = mx_to_matrix(solver, prhs[4]);
+    auto dG = mx_to_matrix(solver, prhs[6]);
+    auto to_vec = [](const mxArray* ptr) {
+        piqp::optional<Eigen::Map<const Vec>> vec;
+        if (!mxIsEmpty(ptr)) {
+            vec.emplace(mxGetPr(ptr), (Eigen::Index) mxGetNumberOfElements(ptr));
+        }
+        return vec;
+    };
+    piqp::optional<piqp::Result<double>> solve_result;
+    if (!mxIsEmpty(prhs[11])) {
+        solve_result = mx_struct_to_result(prhs[11]);
+    }
+
+    piqp::Status status = solver.jvp(dP, to_vec(prhs[3]), dA, to_vec(prhs[5]), dG, to_vec(prhs[7]), to_vec(prhs[8]),
+                                     to_vec(prhs[9]), to_vec(prhs[10]), solve_result);
+
+    int n_fields = sizeof(PIQP_JVP_RESULT_FIELDS) / sizeof(PIQP_JVP_RESULT_FIELDS[0]);
+    mxArray* mx_ptr = mxCreateStructMatrix(1, 1, n_fields, PIQP_JVP_RESULT_FIELDS);
+    mxSetField(mx_ptr, 0, "status", mxCreateString(piqp::status_to_string(status)));
+    mxSetField(mx_ptr, 0, "status_val", mxCreateDoubleScalar((double) status));
+    if (status == piqp::Status::PIQP_SOLVED) {
+        set_variables_fields(mx_ptr, solver.jvp_result());
+    }
+    return mx_ptr;
 }
 
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
@@ -538,6 +742,32 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
             }
 
             mex_handle->as_sparse_ptr()->update(P, c, A, b, G, h_l, h_u, x_l, x_u);
+        }
+
+        return;
+    }
+
+    if (!strcmp("jvp", cmd)) {
+        if (nrhs != 12) {
+            mexErrMsgTxt("jvp expects 9 perturbations and a solve result.");
+        }
+        if (mex_handle->isDense()) {
+            plhs[0] = run_jvp(*mex_handle->as_dense_ptr(), prhs);
+        } else {
+            plhs[0] = run_jvp(*mex_handle->as_sparse_ptr(), prhs);
+        }
+
+        return;
+    }
+
+    if (!strcmp("vjp", cmd)) {
+        if (nrhs != 13) {
+            mexErrMsgTxt("vjp expects 10 cotangents and a solve result.");
+        }
+        if (mex_handle->isDense()) {
+            plhs[0] = run_vjp(*mex_handle->as_dense_ptr(), prhs);
+        } else {
+            plhs[0] = run_vjp(*mex_handle->as_sparse_ptr(), prhs);
         }
 
         return;

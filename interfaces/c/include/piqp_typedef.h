@@ -37,11 +37,11 @@ typedef struct {
     piqp_int   n;    // number of decision variables
     piqp_int   p;    // number of equality constraints
     piqp_int   m;    // number of inequality constraints
-    piqp_float* P;   // quadratic cost matrix P (size n x n), only upper triangular part is used
+    piqp_float* P;   // quadratic cost matrix P (size n x n, row-major), only upper triangular part is used
     piqp_float* c;   // linear cost weights c (size n)
-    piqp_float* A;   // equality constraints matrix A (size p x n), can be NULL
+    piqp_float* A;   // equality constraints matrix A (size p x n, row-major), can be NULL
     piqp_float* b;   // equality constraints constant b (size p), can be NULL
-    piqp_float* G;   // inequality constraints matrix G (size m x n), can be NULL
+    piqp_float* G;   // inequality constraints matrix G (size m x n, row-major), can be NULL
     piqp_float* h_l; // inequality lower bounds h_l (size m), can be NULL
     piqp_float* h_u; // inequality upper bounds h_u (size m), can be NULL
     piqp_float* x_l; // decision variables lower bounds x_l (size n), can be NULL
@@ -103,6 +103,10 @@ typedef struct {
     piqp_float       iterative_refinement_min_improvement_rate;
     piqp_float       iterative_refinement_static_regularization_eps;
     piqp_float       iterative_refinement_static_regularization_rel;
+    piqp_int        enable_derivatives;
+    piqp_int        derivative_smoothing;
+    piqp_float       derivative_smoothing_mu;
+    piqp_int        derivative_smoothing_max_iter;
     piqp_int        verbose;
     piqp_int        compute_timings;
 } piqp_settings;
@@ -177,6 +181,38 @@ typedef struct {
     piqp_info info;
 } piqp_result;
 
+typedef struct {
+    piqp_status status;    // the gradients are only valid if status is PIQP_SOLVED
+
+    const piqp_float* P;   // dense interface: gradient w.r.t. P (size n x n, row-major, symmetric), NULL for sparse
+    const piqp_float* A;   // dense interface: gradient w.r.t. A (size p x n, row-major), NULL for sparse
+    const piqp_float* G;   // dense interface: gradient w.r.t. G (size m x n, row-major), NULL for sparse
+    const piqp_csc* P_csc; // sparse interface: gradient w.r.t. P (size n x n, sparsity pattern of the P passed to setup), NULL for dense
+    const piqp_csc* A_csc; // sparse interface: gradient w.r.t. A (size p x n, sparsity pattern of the A passed to setup), NULL for dense
+    const piqp_csc* G_csc; // sparse interface: gradient w.r.t. G (size m x n, sparsity pattern of the G passed to setup), NULL for dense
+    const piqp_float* c;   // gradient w.r.t. c (size n)
+    const piqp_float* b;   // gradient w.r.t. b (size p)
+    const piqp_float* h_l; // gradient w.r.t. h_l (size m), zero for infinite bounds
+    const piqp_float* h_u; // gradient w.r.t. h_u (size m), zero for infinite bounds
+    const piqp_float* x_l; // gradient w.r.t. x_l (size n), zero for infinite bounds
+    const piqp_float* x_u; // gradient w.r.t. x_u (size n), zero for infinite bounds
+} piqp_vjp_result;
+
+typedef struct {
+    piqp_status status;     // the tangents are only valid if status is PIQP_SOLVED
+
+    const piqp_float* x;    // tangent of x (size n)
+    const piqp_float* y;    // tangent of y (size p)
+    const piqp_float* z_l;  // tangent of z_l (size m), zero for infinite bounds
+    const piqp_float* z_u;  // tangent of z_u (size m), zero for infinite bounds
+    const piqp_float* z_bl; // tangent of z_bl (size n), zero for infinite bounds
+    const piqp_float* z_bu; // tangent of z_bu (size n), zero for infinite bounds
+    const piqp_float* s_l;  // tangent of s_l (size m), zero for infinite bounds
+    const piqp_float* s_u;  // tangent of s_u (size m), zero for infinite bounds
+    const piqp_float* s_bl; // tangent of s_bl (size n), zero for infinite bounds
+    const piqp_float* s_bu; // tangent of s_bu (size n), zero for infinite bounds
+} piqp_jvp_result;
+
 struct piqp_solver_handle; // An opaque type that we'll use as a handle for the C++ solver object
 typedef struct piqp_solver_handle piqp_solver_handle;
 
@@ -191,6 +227,8 @@ typedef struct {
     piqp_solver_handle* solver_handle;
     piqp_solver_info    solver_info;
     piqp_result*        result;
+    piqp_vjp_result*    vjp_result; // NULL if settings->enable_derivatives was not set in the setup
+    piqp_jvp_result*    jvp_result; // NULL if settings->enable_derivatives was not set in the setup
 } piqp_workspace;
 
 # ifdef __cplusplus

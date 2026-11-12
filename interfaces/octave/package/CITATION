@@ -5,7 +5,7 @@ To cite PIQP in publications please use:
 
 A BibTex entry for LaTex users:
 
-@INPROCEEDINGS{schwan2023piqp,
+@inproceedings{schwan2023piqp,
   author={Schwan, Roland and Jiang, Yuning and Kuhn, Daniel and Jones, Colin N.},
   booktitle={2023 62nd IEEE Conference on Decision and Control (CDC)},
   title={{PIQP}: A Proximal Interior-Point Quadratic Programming Solver},

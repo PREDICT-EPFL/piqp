@@ -40,6 +40,29 @@ void piqp_update_sparse(piqp_workspace* workspace,
 
 piqp_status piqp_solve(piqp_workspace* workspace);
 
+// vector-Jacobian product (reverse mode): gradients of a loss w.r.t. the problem data, stored in workspace->vjp_result
+piqp_status piqp_vjp(piqp_workspace* workspace,
+                     const piqp_float* grad_x, const piqp_float* grad_y,
+                     const piqp_float* grad_z_l, const piqp_float* grad_z_u,
+                     const piqp_float* grad_z_bl, const piqp_float* grad_z_bu,
+                     const piqp_float* grad_s_l, const piqp_float* grad_s_u,
+                     const piqp_float* grad_s_bl, const piqp_float* grad_s_bu,
+                     const piqp_result* solve_result);
+
+// Jacobian-vector product (forward mode): tangent of the solution along a perturbation of the problem data, stored in workspace->jvp_result
+piqp_status piqp_jvp_dense(piqp_workspace* workspace,
+                           const piqp_float* dP, const piqp_float* dc,
+                           const piqp_float* dA, const piqp_float* db,
+                           const piqp_float* dG, const piqp_float* dh_l, const piqp_float* dh_u,
+                           const piqp_float* dx_l, const piqp_float* dx_u,
+                           const piqp_result* solve_result);
+piqp_status piqp_jvp_sparse(piqp_workspace* workspace,
+                            const piqp_csc* dP, const piqp_float* dc,
+                            const piqp_csc* dA, const piqp_float* db,
+                            const piqp_csc* dG, const piqp_float* dh_l, const piqp_float* dh_u,
+                            const piqp_float* dx_l, const piqp_float* dx_u,
+                            const piqp_result* solve_result);
+
 void piqp_cleanup(piqp_workspace* workspace);
 
 #ifdef __cplusplus

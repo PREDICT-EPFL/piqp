@@ -13,6 +13,10 @@ nav_order: 2
 | `z_u`                  | Dual solution of upper inequality constraints |
 | `z_bl`                 | Dual solution of lower bound box constraints  |
 | `z_bu`                 | Dual solution of upper bound box constraints  |
+| `s_l`                  | Slack of lower inequality constraints         |
+| `s_u`                  | Slack of upper inequality constraints         |
+| `s_bl`                 | Slack of lower bound box constraints          |
+| `s_bu`                 | Slack of upper bound box constraints          |
 | `info.status`          | Solver status                                 |
 | `info.iter`            | Number of iterations                          |
 | `info.primal_obj`      | Primal objective value                        |

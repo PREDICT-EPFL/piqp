@@ -28,7 +28,8 @@ Data<T>::Data(Model<T> model)
   n_h_l(0), n_h_u(0), n_x_l(0), n_x_u(0),
   h_l_idx(model.G.rows()), h_u_idx(model.G.rows()),
   x_l_idx(model.P.rows()), x_u_idx(model.P.rows()),
-  x_b_scaling(Vec<T>::Constant(model.P.rows(), T(1)))
+  x_b_scaling(Vec<T>::Constant(model.P.rows(), T(1))),
+  G_row_disabled(Vec<bool>::Constant(model.G.rows(), false))
 {
     set_h_l(model.h_l);
     set_h_u(model.h_u);
@@ -62,6 +63,9 @@ void Data<T>::resize(isize n, isize p, isize m)
 
     x_b_scaling.resize(n);
     x_b_scaling.setConstant(T(1));
+
+    G_row_disabled.resize(m);
+    G_row_disabled.setConstant(false);
 }
 
 template<typename T>
@@ -114,10 +118,12 @@ template<typename T>
 void Data<T>::disable_inf_constraints()
 {
     bool msg_printed = false;
+    G_row_disabled.setConstant(false);
     for (isize i = 0; i < m; i++)
     {
         if (h_l(i) <= -PIQP_INF && h_u(i) >= PIQP_INF)
         {
+            G_row_disabled(i) = true;
             set_G_row_zero(i);
             h_l(i) = T(-1);
             h_u(i) = T(1);

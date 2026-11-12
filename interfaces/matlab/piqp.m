@@ -24,6 +24,8 @@ classdef piqp < handle
     %   setup             - configure solver with problem data
     %   solve             - solve the QP
     %   update            - modify problem data
+    %   vjp               - vector-Jacobian product (reverse mode): gradients w.r.t. the problem data
+    %   jvp               - Jacobian-vector product (forward mode): change of the solution along a data perturbation
     %
     %   get_settings      - get the current solver settings
     %   update_settings   - update the current solver settings
@@ -164,16 +166,16 @@ classdef piqp < handle
                 end
             else
                 if this.isDense
-                    P = full(P);
+                    P = full(to_double(P, 'P'));
                 else
-                    P = sparse(P);
+                    P = sparse(to_double(P, 'P'));
                 end
             end
 
             if isempty(c)
                 c = zeros(this.n, 1);
             else
-                c = full(c(:));
+                c = full(reshape(to_double(c, 'c'), [], 1));
             end
 
             % Create proper equalty constraints if they are not passed
@@ -190,11 +192,11 @@ classdef piqp < handle
                 b = zeros(this.p, 1);
             else
                 if this.isDense
-                    A = full(A);
+                    A = full(to_double(A, 'A'));
                 else
-                    A = sparse(A);
+                    A = sparse(to_double(A, 'A'));
                 end
-                b  = full(b(:));
+                b  = full(reshape(to_double(b, 'b'), [], 1));
             end
 
             % Create proper inequalty constraints if they are not passed
@@ -212,24 +214,24 @@ classdef piqp < handle
                 h_u = Inf(this.m, 1);
             else
                 if this.isDense
-                    G = full(G);
+                    G = full(to_double(G, 'G'));
                 else
-                    G = sparse(G);
+                    G = sparse(to_double(G, 'G'));
                 end
-                h_l  = full(h_l(:));
-                h_u  = full(h_u(:));
+                h_l  = full(reshape(to_double(h_l, 'h_l'), [], 1));
+                h_u  = full(reshape(to_double(h_u, 'h_u'), [], 1));
             end
 
             if isempty(x_l)
                 x_l = -Inf(this.n, 1);
             else
-                x_l = full(x_l(:));
+                x_l = full(reshape(to_double(x_l, 'x_l'), [], 1));
             end
 
             if isempty(x_u)
                 x_u = Inf(this.n, 1);
             else
-                x_u = full(x_u(:));
+                x_u = full(reshape(to_double(x_u, 'x_u'), [], 1));
             end
 
             %
@@ -294,62 +296,196 @@ classdef piqp < handle
 
             if ~isempty(P)
                 if this.isDense
-                    P = full(P);
+                    P = full(to_double(P, 'P'));
                 else
-                    P = sparse(P);
+                    P = sparse(to_double(P, 'P'));
                 end
                 assert(size(P, 1) == this.n && size(P, 2) == this.n, 'Incorrect dimension of P')
             end
 
             if ~isempty(c)
-                c = full(c(:));
+                c = full(reshape(to_double(c, 'c'), [], 1));
                 assert(length(c) == this.n, 'Incorrect dimension of c');
             end
 
             if ~isempty(A)
                 if this.isDense
-                    A = full(A);
+                    A = full(to_double(A, 'A'));
                 else
-                    A = sparse(A);
+                    A = sparse(to_double(A, 'A'));
                 end
                 assert(size(A, 1) == this.p && size(A, 2) == this.n, 'Incorrect dimension of A')
             end
 
             if ~isempty(b)
-                b = full(b(:));
+                b = full(reshape(to_double(b, 'b'), [], 1));
                 assert(length(b) == this.p, 'Incorrect dimension of b');
             end
 
             if ~isempty(G)
                 if this.isDense
-                    G = full(G);
+                    G = full(to_double(G, 'G'));
                 else
-                    G = sparse(G);
+                    G = sparse(to_double(G, 'G'));
                 end
                 assert(size(G, 1) == this.m && size(G, 2) == this.n, 'Incorrect dimension of G')
             end
 
             if ~isempty(h_l)
-                h_l = full(h_l(:));
+                h_l = full(reshape(to_double(h_l, 'h_l'), [], 1));
                 assert(length(h_l) == this.m, 'Incorrect dimension of h_l');
             end
 
             if ~isempty(h_u)
-                h_u = full(h_u(:));
+                h_u = full(reshape(to_double(h_u, 'h_u'), [], 1));
                 assert(length(h_u) == this.m, 'Incorrect dimension of h_u');
             end
 
             if ~isempty(x_l)
-                x_l = full(x_l(:));
+                x_l = full(reshape(to_double(x_l, 'x_l'), [], 1));
                 assert(length(x_l) == this.n, 'Incorrect dimension of x_l');
             end
 
             if ~isempty(x_u)
-                x_u = full(x_u(:));
+                x_u = full(reshape(to_double(x_u, 'x_u'), [], 1));
                 assert(length(x_u) == this.n, 'Incorrect dimension of x_u');
             end
 
             this.piqpMexHandle('update',this.objectHandle,this.n,this.p,this.m,P,c,A,b,G,h_l,h_u,x_l,x_u);
+        end
+
+        %%
+        function grads = vjp(this, varargin)
+            % VJP vector-Jacobian product (reverse mode, backpropagation): computes the
+            % gradients of a scalar loss L w.r.t. the problem data.
+            %
+            %   grads = vjp('grad_x', dL_dx, 'grad_y', dL_dy, ...) or vjp(struct)
+            %
+            %   Allowed fields are the gradients of L w.r.t. the solution grad_x, grad_y,
+            %   grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl,
+            %   grad_s_bu (missing ones are zero)
+            %   and solve_result, a result returned by solve() at which the
+            %   gradients are computed (default: the point of the last vjp or jvp, or the result of the last solve() initially and if the smoothing settings changed).
+            %   Requires the setting enable_derivatives to be set in setup().
+            %
+            %   grads has the fields P, c, A, b, G, h_l, h_u, x_l, x_u, which are
+            %   only set if grads.status_val is 1 (PIQP_SOLVED), and status, status_val.
+
+            assert(this.n ~= 0, 'Problem is not initialized.')
+
+            gradFields = {'grad_x','grad_y','grad_z_l','grad_z_u','grad_z_bl','grad_z_bu','grad_s_l','grad_s_u','grad_s_bl','grad_s_bu'};
+            gradSizes = [this.n, this.p, this.m, this.m, this.n, this.n, this.m, this.m, this.n, this.n];
+            allowedFields = [gradFields, {'solve_result'}];
+
+            if isempty(varargin)
+                adjoints = struct();
+            elseif length(varargin) == 1
+                if(~isstruct(varargin{1}))
+                    error('Single input should be a structure with the gradients w.r.t. the solution');
+                else
+                    adjoints = varargin{1};
+                end
+            else % param / value style assumed
+                adjoints = struct(varargin{:});
+            end
+
+            %check for unknown fields
+            newFields = fieldnames(adjoints);
+            badFieldsIdx = find(~ismember(newFields,allowedFields));
+            if(~isempty(badFieldsIdx))
+                 error('Unrecognized input field ''%s'' detected',newFields{badFieldsIdx(1)});
+            end
+
+            grads = cell(1, length(gradFields));
+            for i = 1:length(gradFields)
+                if isfield(adjoints, gradFields{i}) && ~isempty(adjoints.(gradFields{i}))
+                    grads{i} = full(reshape(to_double(adjoints.(gradFields{i}), gradFields{i}), [], 1));
+                    assert(length(grads{i}) == gradSizes(i), 'Incorrect dimension of %s', gradFields{i});
+                else
+                    grads{i} = [];
+                end
+            end
+
+            if isfield(adjoints, 'solve_result')
+                solve_result = adjoints.solve_result;
+            else
+                solve_result = [];
+            end
+
+            grads = this.piqpMexHandle('vjp',this.objectHandle,grads{:},solve_result);
+        end
+
+        %%
+        function tangents = jvp(this, varargin)
+            % JVP Jacobian-vector product (forward mode, sensitivity analysis): computes the
+            % change of the solution along a perturbation of the problem data.
+            %
+            %   tangents = jvp('dP', dP, 'dc', dc, ...) or jvp(struct)
+            %
+            %   Allowed fields are the perturbations of the problem data dP, dc, dA, db,
+            %   dG, dh_l, dh_u, dx_l, dx_u (missing ones are zero), where only the upper
+            %   triangular part of dP is read, and solve_result, a result returned by solve()
+            %   at which the tangents are computed (default: the point of the last vjp or jvp, or the result of the last solve() initially and if the smoothing settings changed).
+            %   Requires the setting enable_derivatives to be set in setup().
+            %
+            %   tangents has the fields x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu,
+            %   which are only set if tangents.status_val is 1 (PIQP_SOLVED), and status, status_val.
+
+            assert(this.n ~= 0, 'Problem is not initialized.')
+
+            dataFields = {'dP','dc','dA','db','dG','dh_l','dh_u','dx_l','dx_u'};
+            isMatrix = [true, false, true, false, true, false, false, false, false];
+            rows = [this.n, this.n, this.p, this.p, this.m, this.m, this.m, this.n, this.n];
+            allowedFields = [dataFields, {'solve_result'}];
+
+            if isempty(varargin)
+                perturbation = struct();
+            elseif length(varargin) == 1
+                if(~isstruct(varargin{1}))
+                    error('Single input should be a structure with the perturbations of the problem data');
+                else
+                    perturbation = varargin{1};
+                end
+            else % param / value style assumed
+                perturbation = struct(varargin{:});
+            end
+
+            %check for unknown fields
+            newFields = fieldnames(perturbation);
+            badFieldsIdx = find(~ismember(newFields,allowedFields));
+            if(~isempty(badFieldsIdx))
+                 error('Unrecognized input field ''%s'' detected',newFields{badFieldsIdx(1)});
+            end
+
+            args = cell(1, length(dataFields));
+            for i = 1:length(dataFields)
+                name = dataFields{i};
+                if isfield(perturbation, name) && ~isempty(perturbation.(name))
+                    value = perturbation.(name);
+                    if isMatrix(i)
+                        if this.isDense
+                            value = full(to_double(value, name));
+                        else
+                            value = sparse(to_double(value, name));
+                        end
+                        assert(size(value, 1) == rows(i) && size(value, 2) == this.n, 'Incorrect dimension of %s', name);
+                    else
+                        value = full(reshape(to_double(value, name), [], 1));
+                        assert(length(value) == rows(i), 'Incorrect dimension of %s', name);
+                    end
+                    args{i} = value;
+                else
+                    args{i} = [];
+                end
+            end
+
+            if isfield(perturbation, 'solve_result')
+                solve_result = perturbation.solve_result;
+            else
+                solve_result = [];
+            end
+
+            tangents = this.piqpMexHandle('jvp',this.objectHandle,args{:},solve_result);
         end
     end
 end
@@ -388,4 +524,12 @@ for i = 1:length(newFields)
     settings.(newFields{i}) = double(newSettings.(newFields{i}));
 end
 
+end
+
+function M = to_double(M, name)
+% converts numeric and logical data to double, the MEX interface only reads real double arrays
+if ~(isnumeric(M) || islogical(M)) || ~isreal(M)
+    error('piqp:input', '%s must be a real numeric array.', name);
+end
+M = double(M);
 end
