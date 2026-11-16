@@ -23,8 +23,16 @@ void nonneg_smoothing(T sigma, T mu, T c, T& s, T& z)
     } else {
         // Smoothing operator
         const T sigma_c = sigma * c;
-        const T disc = sigma_c * sigma_c + T(4) * sigma * mu; // >= 0 always
-        s = (sigma_c + std::sqrt(disc)) / (T(2) * sigma);
+        const T disc = sigma_c * sigma_c + T(4) * sigma * mu;
+        const T root = std::sqrt(disc);
+        if (c >= T(0)) {
+            s = (sigma_c / T(2) + root / T(2)) / sigma;
+            z = mu / s;
+        } else {
+            z = root / T(2) - sigma_c / T(2);
+            s = mu / z;
+        }
+        return;
     }
 
     // Moreau decomposition
