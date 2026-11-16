@@ -1668,6 +1668,11 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::check_derivatives_available
         return Status::PIQP_INVALID_SETTINGS;
     }
 
+    if (!m_settings.verify_settings())
+    {
+        return Status::PIQP_INVALID_SETTINGS;
+    }
+
     if (!m_derivatives_enabled)
     {
         piqp_eprint("%s() requires settings.enable_derivatives to be set before setup()\n", name);
