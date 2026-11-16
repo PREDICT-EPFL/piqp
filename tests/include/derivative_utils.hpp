@@ -17,6 +17,7 @@
 
 #include "piqp/piqp.hpp"
 #include "piqp/utils/random_utils.hpp"
+#include "piqp/utils/smoothing.hpp"
 #include "gtest/gtest.h"
 #include "utils.hpp"
 
@@ -433,7 +434,7 @@ void run_copy_move_test(Solver& solver, Model& model)
     ASSERT_NO_FATAL_FAILURE(jvp(moved));
     expect_same_tangents(solver, moved);
 
-    // a copy after vjp() reuses the copied KKT factorization
+    // a copy after vjp() produces the same derivatives
     Solver copy_after_vjp(solver);
     ASSERT_NO_FATAL_FAILURE(vjp(copy_after_vjp));
     expect_same_gradients(solver, copy_after_vjp);
@@ -722,6 +723,13 @@ struct GradientsCopy
 
     T max_diff(const GradientsCopy& o) const
     {
+        if (!P.allFinite() || !A.allFinite() || !G.allFinite() || !c.allFinite() || !b.allFinite() ||
+            !h_l.allFinite() || !h_u.allFinite() || !x_l.allFinite() || !x_u.allFinite() ||
+            !o.P.allFinite() || !o.A.allFinite() || !o.G.allFinite() || !o.c.allFinite() || !o.b.allFinite() ||
+            !o.h_l.allFinite() || !o.h_u.allFinite() || !o.x_l.allFinite() || !o.x_u.allFinite())
+        {
+            return std::numeric_limits<T>::infinity();
+        }
         T d = 0;
         d = (std::max)(d, (P - o.P).template lpNorm<Eigen::Infinity>());
         d = (std::max)(d, (A - o.A).template lpNorm<Eigen::Infinity>());
@@ -772,10 +780,29 @@ void run_linearization_reuse_test(Solver& solver, const Model& model)
     solver.settings().derivative_smoothing = true;
     ASSERT_EQ(vjp(piqp::nullopt), Status::PIQP_SOLVED);
     const GradientsCopy<T> g_smoothed(solver.vjp_result());
+    GradientsCopy<T> invalid_gradient(g_smoothed);
+    invalid_gradient.c(0) = std::numeric_limits<T>::quiet_NaN();
+    EXPECT_FALSE(std::isfinite(invalid_gradient.max_diff(g_smoothed)));
+    EXPECT_FALSE(std::isfinite(g_smoothed.max_diff(invalid_gradient)));
     solver.settings().derivative_smoothing_max_iter = 1;
     ASSERT_EQ(vjp(piqp::nullopt), Status::PIQP_SOLVED);
     EXPECT_EQ(GradientsCopy<T>(solver.vjp_result()).max_diff(g_smoothed), T(0));
     ASSERT_EQ(jvp(piqp::nullopt), Status::PIQP_SOLVED);
+
+    // Copies retain the smoothed point and factorization: recomputing cannot converge in one iteration.
+    Solver copy(solver);
+    ASSERT_EQ(copy.vjp(w.x, w.y, w.z_l, w.z_u, w.z_bl, w.z_bu, w.s_l, w.s_u, w.s_bl, w.s_bu), Status::PIQP_SOLVED);
+    EXPECT_EQ(GradientsCopy<T>(copy.vjp_result()).max_diff(g_smoothed), T(0));
+    ASSERT_EQ(copy.jvp(d.P, d.c, d.A, d.b, d.G, d.h_l, d.h_u, d.x_l, d.x_u), Status::PIQP_SOLVED);
+
+    // Mutable settings are validated even when a cached linearization is available.
+    for (T invalid_mu : {T(0), T(-1)})
+    {
+        solver.settings().derivative_smoothing_mu = invalid_mu;
+        EXPECT_EQ(vjp(piqp::nullopt), Status::PIQP_INVALID_SETTINGS);
+        EXPECT_EQ(jvp(piqp::nullopt), Status::PIQP_INVALID_SETTINGS);
+    }
+    solver.settings().derivative_smoothing_mu = settings.derivative_smoothing_mu;
 
     // a different mu smooths again, which does not converge with one iteration
     solver.settings().derivative_smoothing_mu = T(2) * settings.derivative_smoothing_mu;
@@ -976,14 +1003,30 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
 {
     using T = typename MatP::Scalar;
     const T mu = 1e-3;
+    // Check positivity and complementarity directly for both imbalance directions.
+    for (T c : {T(-1e8), T(0), T(1e8)})
+    {
+        for (T sigma : {T(0.01), T(1), T(100)})
+        {
+            T s, z;
+            piqp::nonneg_smoothing(sigma, mu, c, s, z);
+            EXPECT_GT(s, T(0));
+            EXPECT_GT(z, T(0));
+            EXPECT_NEAR(s * z, mu, mu * T(1e-14));
+            EXPECT_NEAR(s - z / sigma, c, (1 + std::abs(c)) * T(1e-14));
+        }
+    }
     const T w_x = 1;
     solver.settings().derivative_smoothing = true;
     solver.settings().derivative_smoothing_mu = mu;
 
     for (bool scale_cost : {false, true})
     {
-        for (T a : {T(-0.05), T(0), T(0.05)})
+        for (T a : {T(-1e8), T(-0.05), T(0), T(0.05), T(1e8)})
         {
+            // At extreme costs, cost scaling magnifies KKT regularization; test the
+            // unscaled analytic system here and scaled projections directly above.
+            if (scale_cost && std::abs(a) > T(1)) continue;
             for (T w_s : {T(0), T(-0.6)})
             {
                 SCOPED_TRACE("a = " + std::to_string(a) + ", scale_cost = " + std::to_string(scale_cost) + ", w_s = " + std::to_string(w_s));
@@ -1001,9 +1044,9 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
                 ASSERT_EQ(solver.vjp_result().status, piqp::Status::PIQP_SOLVED);
 
                 T D = std::sqrt(a * a + 4 * mu);
-                T x = (a + D) / 2;
+                T x = a >= 0 ? (a + D) / 2 : 2 * mu / (D - a);
                 T s = x;
-                T z = x - a;
+                T z = mu / x;
                 T dx_da = T(0.5) * (1 + a / D);
                 T dx_dxl = z / (s + z);
                 T dL_dc = -(w_x + w_s) * dx_da;
@@ -1014,7 +1057,7 @@ void run_smoothing_analytic_test(Solver& solver, const MatP& P)
                 const auto& g = solver.vjp_result();
                 EXPECT_NEAR(g.c(0), dL_dc, tol);
                 EXPECT_NEAR(g.x_l(0), w_x * dx_dxl + w_s * (dx_dxl - 1), tol);
-                EXPECT_NEAR(g.P.coeff(0, 0), x * dL_dc, tol);
+                EXPECT_NEAR(g.P.coeff(0, 0), x * dL_dc, tol * (1 + std::abs(x)));
 
                 // along c: dc = -1, i.e. da = 1
                 piqp::Vec<T> dc = piqp::Vec<T>::Constant(1, T(-1));
