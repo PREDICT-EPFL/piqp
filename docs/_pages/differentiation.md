@@ -1,0 +1,198 @@
+---
+title: Differentiation
+layout: default
+nav_order: 4
+---
+
+PIQP can differentiate through the solution of the QP
+
+$$
+\begin{aligned}
+\min_{x} \quad & \frac{1}{2} x^\top P x + c^\top x \\
+\text {s.t.}\quad & Ax=b, \\
+& h_l \leq Gx \leq h_u, \\
+& x_l \leq x \leq x_u,
+\end{aligned}
+$$
+
+with respect to the problem data $$(P, c, A, b, G, h_l, h_u, x_l, x_u)$$, e.g., to use it as a layer in a learning pipeline or for sensitivity analysis. The derivatives are computed by implicit differentiation of the KKT conditions, as described in [CuPIQP](https://arxiv.org/abs/2610.41021) (see also [Citing PIQP]({{site.baseurl}}/citing)). Two modes are available:
+
+* `vjp` (vector-Jacobian product, *reverse mode*, i.e., backpropagation): given the gradients of a scalar loss $$L$$ with respect to the solution $$(x, y, z_l, z_u, z_{bl}, z_{bu}, s_l, s_u, s_{bl}, s_{bu})$$, it computes the gradients of $$L$$ with respect to the problem data. Use it to learn problem data with a gradient-based optimizer.
+* `jvp` (Jacobian-vector product, *forward mode*, i.e., sensitivity analysis): given a perturbation of the problem data, it computes the resulting change of the solution.
+
+{: .note }
+Which one do I need? If you have a scalar loss and want its gradient with respect to the problem data, use `vjp`. If you want to know how the solution changes if the problem data changes in a given direction, use `jvp`. The first call linearizes at the solution, i.e., it factors the KKT matrix there (and runs the derivative smoothing if enabled). Each further call reuses this linearization and costs only one solve with the factored KKT matrix.
+
+## Math
+
+For simplicity, consider the formulation with $$Gx \leq h$$ only. Its solution $$\omega = (x, y, z, s)$$ satisfies the KKT conditions $$F(\omega, \theta) = 0$$ with the problem data $$\theta = (P, c, A, b, G, h)$$ and
+
+$$
+F(\omega, \theta) = \begin{bmatrix}
+Px + c + A^\top y + G^\top z \\
+Ax - b \\
+Gx - h + s \\
+s \circ z
+\end{bmatrix}.
+$$
+
+If $$\partial F / \partial \omega$$ is nonsingular at the solution, the implicit function theorem gives the derivative of the solution map
+
+$$
+\frac{\partial \omega}{\partial \theta} = -\left(\frac{\partial F}{\partial \omega}\right)^{-1} \frac{\partial F}{\partial \theta}.
+$$
+
+Since $$\partial F / \partial \omega$$ only differs from the regularized KKT matrix of the solve by the regularization, the regularized KKT matrix is factored once at the solution, reusing the symbolic analysis of the solve, and the factorization is reused by subsequent `vjp` and `jvp` calls. Neither mode forms the Jacobian.
+
+### Jacobian-vector product
+
+`jvp` computes the tangent of the solution along the perturbation $$d\theta = (dP, dc, dA, db, dG, dh)$$ by solving
+
+$$
+\frac{\partial F}{\partial \omega} \, d\omega = -\frac{\partial F}{\partial \theta} \, d\theta = -\begin{bmatrix}
+dP\, x + dc + dA^\top y + dG^\top z \\
+dA\, x - db \\
+dG\, x - dh \\
+0
+\end{bmatrix}.
+$$
+
+As $$P$$ in `setup`, $$dP$$ is symmetric and only its upper triangular part is read.
+
+### Vector-Jacobian product
+
+`vjp` computes
+
+$$
+\nabla_\theta L = \left(\frac{\partial \omega}{\partial \theta}\right)^\top \nabla_\omega L = \left(\frac{\partial F}{\partial \theta}\right)^\top \lambda, \qquad \left(\frac{\partial F}{\partial \omega}\right)^\top \lambda = -\nabla_\omega L,
+$$
+
+i.e., it solves a single linear system for the adjoint variables $$\lambda = (\lambda_x, \lambda_y, \lambda_z, \lambda_s)$$. The gradients with respect to the problem data are then
+
+| Data  | Gradient                                             |
+|:------|:-----------------------------------------------------|
+| $$P$$ | $$\frac{1}{2}(\lambda_x x^\top + x \lambda_x^\top)$$ |
+| $$c$$ | $$\lambda_x$$                                        |
+| $$A$$ | $$\lambda_y x^\top + y \lambda_x^\top$$              |
+| $$b$$ | $$-\lambda_y$$                                       |
+| $$G$$ | $$\lambda_z x^\top + z \lambda_x^\top$$              |
+| $$h$$ | $$-\lambda_z$$                                       |
+
+The lower bounds $$h_l$$ and the box constraints $$x_l \leq x \leq x_u$$ are handled in the same way with their own slacks and duals, e.g., $$\nabla_{h_l} L = \lambda_{z_l}$$ and $$\nabla_{x_u} L = -\lambda_{z_{bu}}$$.
+
+The sparse gradients have the sparsity patterns of the matrices passed to `setup`, e.g., the gradient with respect to $$P$$ is upper triangular if only the upper triangular part of $$P$$ is passed. The gradient with respect to $$P$$ is always the gradient with respect to the symmetric matrix $$P$$. Hence, if only the upper triangular part of $$P$$ is passed, the derivative with respect to a stored off-diagonal value, which represents both $$P_{ij}$$ and $$P_{ji}$$, is twice the returned entry.
+
+### Infinite bounds and accuracy
+
+Gradients with respect to infinite bounds are zero, and `jvp` ignores the perturbations of infinite bounds and of the rows of $$G$$ with both bounds infinite. The tangents of the duals and slacks of infinite bounds are zero.
+
+Both modes solve the same linear system, i.e., $$\langle \texttt{vjp}(w), d\theta \rangle = \langle w, \texttt{jvp}(d\theta) \rangle$$ up to round-off. Since the KKT matrix is regularized with the final `rho` and `delta` of the solve, which are as small as `reg_lower_limit` at the solution, the KKT matrix is ill-conditioned and the derivatives are accurate to about $$10^{-6}$$ relative to their magnitude by default.
+
+At degenerate solutions, e.g., an active constraint with zero dual, the solution map is not differentiable. In this case, or to get informative derivatives across active-set changes, [derivative smoothing](#derivative-smoothing) can be used.
+
+## Usage
+
+Set `enable_derivatives` before `setup`, then call `vjp` or `jvp` after a `solve` which returned `PIQP_SOLVED` or `PIQP_MAX_ITER_REACHED`. Missing arguments are treated as zero. The results are valid if the returned status, which is also stored in the results, is `PIQP_SOLVED`, and until the next `setup`, `update`, `solve`, or call of the same function.
+
+By default, the derivatives are computed at the solution of the last `solve`. Optionally, a stored result of an earlier `solve` of the same problem can be passed as `solve_result`. Calls without `solve_result` reuse the last linearization, i.e., the point the derivatives were last computed at, including the derivative smoothing and the KKT factorization:
+
+* After a `solve`, `setup`, or `update`, the next call linearizes at the result of the last `solve`.
+* A call with `solve_result` linearizes at it, and the following calls without `solve_result` reuse this linearization.
+* If `derivative_smoothing` or `derivative_smoothing_mu` changed, the next call linearizes at the result of the last `solve`. To use a provided `solve_result` with the new settings, pass it again.
+
+### Status code
+
+{% root_include _common/derivative_status_code_table.md %}
+
+### C++
+
+```c++
+piqp::DenseSolver<double> solver;  // or piqp::SparseSolver<double>
+solver.settings().enable_derivatives = true;
+solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
+solver.solve();
+
+// optional arguments grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result
+if (solver.vjp(dL_dx) == piqp::Status::PIQP_SOLVED) {
+    const auto& grads = solver.vjp_result();  // grads.P, grads.c, ...
+}
+
+// optional arguments dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u, solve_result
+if (solver.jvp(piqp::nullopt, dc) == piqp::Status::PIQP_SOLVED) {
+    const auto& tangents = solver.jvp_result();  // tangents.x, tangents.y, ...
+}
+```
+
+### Python
+
+```python
+solver = piqp.DenseSolver()  # or piqp.SparseSolver()
+solver.settings.enable_derivatives = True
+solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u)
+solver.solve()
+
+# keyword arguments grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result
+if solver.vjp(grad_x=dL_dx) == piqp.PIQP_SOLVED:
+    dL_dc = solver.vjp_result.c  # P, A, G are scipy CSC matrices for the sparse solver
+
+# keyword arguments dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u, solve_result
+# (dP, dA, dG are scipy CSC matrices for the sparse solver)
+if solver.jvp(dc=dc) == piqp.PIQP_SOLVED:
+    dx = solver.jvp_result.x
+```
+
+The fields of `solver.vjp_result` and `solver.jvp_result` are read-only views into the solver memory and are overwritten by the next `vjp` or `jvp`, respectively. Use `.copy()` to keep them.
+
+### C
+
+```c
+settings->enable_derivatives = 1;
+piqp_setup_dense(&work, data, settings);  // or piqp_setup_sparse
+piqp_solve(work);
+
+// arguments grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result (NULL if not provided)
+if (piqp_vjp(work, dL_dx, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL) == PIQP_SOLVED) {
+    const piqp_float* dL_dc = work->vjp_result->c;
+}
+
+// arguments dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u, solve_result (NULL if not provided),
+// piqp_jvp_sparse takes dP, dA, and dG as piqp_csc
+if (piqp_jvp_dense(work, NULL, dc, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL) == PIQP_SOLVED) {
+    const piqp_float* dx = work->jvp_result->x;
+}
+```
+
+The dense interface stores the matrices row-major, i.e., `dP`, `dA`, and `dG` of `piqp_jvp_dense` and `P`, `A`, and `G` of `vjp_result`. The sparse interface provides `P_csc`, `A_csc`, and `G_csc` in `vjp_result`.
+
+### Matlab / Octave
+
+```matlab
+solver = piqp('dense');  % or piqp('sparse')
+solver.update_settings('enable_derivatives', true);
+solver.setup(P, c, A, b, G, h_l, h_u, x_l, x_u);
+solver.solve();
+
+% name/value pairs or a struct with grad_x, grad_y, grad_z_l, grad_z_u, grad_z_bl, grad_z_bu, grad_s_l, grad_s_u, grad_s_bl, grad_s_bu, solve_result
+grads = solver.vjp('grad_x', dL_dx);
+if grads.status_val == 1  % PIQP_SOLVED
+    dL_dc = grads.c;
+end
+
+% name/value pairs or a struct with dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u, solve_result
+tangents = solver.jvp('dc', dc);
+if tangents.status_val == 1  % PIQP_SOLVED
+    dx = tangents.x;
+end
+```
+
+## Derivative Smoothing
+
+With `derivative_smoothing`, `vjp` and `jvp` differentiate at the nearby point with $$s \circ z = \mu$$ instead of the solution. This makes the derivatives smooth across active-set changes at the cost of a bias, which vanishes as $$\mu \to 0$$.
+
+| Setting                         | Default | Description                                          |
+|:--------------------------------|:--------|:-----------------------------------------------------|
+| `derivative_smoothing`          | `false` | Differentiate at the point with $$s \circ z = \mu$$. |
+| `derivative_smoothing_mu`       | `1e-3`  | Smoothing parameter $$\mu$$.                         |
+| `derivative_smoothing_max_iter` | `10`    | Maximum number of Newton iterations.                 |
+
+The point is found with Newton iterations, which use the same tolerances as `solve`, once per linearization, i.e., the following `vjp` and `jvp` calls reuse it (see [usage](#usage)). Constraints with equal lower and upper bounds are treated as equality constraints and are not smoothed.

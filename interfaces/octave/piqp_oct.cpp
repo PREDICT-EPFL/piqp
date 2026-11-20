@@ -77,6 +77,28 @@ inline octave_value eigen_to_ov(const Vec& vec)
     return octave_value(arr);
 }
 
+inline octave_value eigen_to_ov(const Mat& mat)
+{
+    Matrix arr(mat.rows(), mat.cols());
+    Eigen::Map<Mat>(arr.fortran_vec(), mat.rows(), mat.cols()) = mat;
+    return octave_value(arr);
+}
+
+inline octave_value eigen_to_ov(const SparseMat& mat)
+{
+    // explicit casts, otherwise the constructor call is ambiguous if Eigen::Index is not octave_idx_type (e.g. on macOS)
+    SparseMatrix arr(static_cast<octave_idx_type>(mat.rows()), static_cast<octave_idx_type>(mat.cols()),
+                     static_cast<octave_idx_type>(mat.nonZeros()));
+    for (Eigen::Index j = 0; j <= mat.cols(); j++) {
+        arr.xcidx(j) = mat.outerIndexPtr()[j];
+    }
+    for (Eigen::Index k = 0; k < mat.nonZeros(); k++) {
+        arr.xridx(k) = mat.innerIndexPtr()[k];
+        arr.xdata(k) = mat.valuePtr()[k];
+    }
+    return octave_value(arr);
+}
+
 piqp::KKTSolver kkt_solver_from_string(const std::string& kkt_solver, bool is_dense)
 {
     if (kkt_solver == "dense_cholesky") return piqp::KKTSolver::dense_cholesky;
@@ -127,6 +149,10 @@ octave_value settings_to_ov_struct(const piqp::Settings<double>& settings)
     ov_struct.assign("iterative_refinement_min_improvement_rate", octave_value(settings.iterative_refinement_min_improvement_rate));
     ov_struct.assign("iterative_refinement_static_regularization_eps", octave_value(settings.iterative_refinement_static_regularization_eps));
     ov_struct.assign("iterative_refinement_static_regularization_rel", octave_value(settings.iterative_refinement_static_regularization_rel));
+    ov_struct.assign("enable_derivatives", octave_value(settings.enable_derivatives));
+    ov_struct.assign("derivative_smoothing", octave_value(settings.derivative_smoothing));
+    ov_struct.assign("derivative_smoothing_mu", octave_value(settings.derivative_smoothing_mu));
+    ov_struct.assign("derivative_smoothing_max_iter", octave_value(settings.derivative_smoothing_max_iter));
     ov_struct.assign("verbose", octave_value(settings.verbose));
     ov_struct.assign("compute_timings", octave_value(settings.compute_timings));
 
@@ -164,8 +190,27 @@ void copy_ov_struct_to_settings(const octave_scalar_map& ov_struct, piqp::Settin
     settings.iterative_refinement_min_improvement_rate = ov_struct.getfield("iterative_refinement_min_improvement_rate").double_value();
     settings.iterative_refinement_static_regularization_eps = ov_struct.getfield("iterative_refinement_static_regularization_eps").double_value();
     settings.iterative_refinement_static_regularization_rel = ov_struct.getfield("iterative_refinement_static_regularization_rel").double_value();
+    settings.enable_derivatives = ov_struct.getfield("enable_derivatives").bool_value();
+    settings.derivative_smoothing = ov_struct.getfield("derivative_smoothing").bool_value();
+    settings.derivative_smoothing_mu = ov_struct.getfield("derivative_smoothing_mu").double_value();
+    settings.derivative_smoothing_max_iter = ov_struct.getfield("derivative_smoothing_max_iter").int_value();
     settings.verbose = ov_struct.getfield("verbose").bool_value();
     settings.compute_timings = ov_struct.getfield("compute_timings").bool_value();
+}
+
+// assigns the fields x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu
+void assign_variables_fields(octave_scalar_map& ov_struct, const piqp::Variables<double>& vars)
+{
+    ov_struct.assign("x", eigen_to_ov(vars.x));
+    ov_struct.assign("y", eigen_to_ov(vars.y));
+    ov_struct.assign("z_l", eigen_to_ov(vars.z_l));
+    ov_struct.assign("z_u", eigen_to_ov(vars.z_u));
+    ov_struct.assign("z_bl", eigen_to_ov(vars.z_bl));
+    ov_struct.assign("z_bu", eigen_to_ov(vars.z_bu));
+    ov_struct.assign("s_l", eigen_to_ov(vars.s_l));
+    ov_struct.assign("s_u", eigen_to_ov(vars.s_u));
+    ov_struct.assign("s_bl", eigen_to_ov(vars.s_bl));
+    ov_struct.assign("s_bu", eigen_to_ov(vars.s_bu));
 }
 
 octave_value result_to_ov_struct(const piqp::Result<double>& result)
@@ -210,19 +255,154 @@ octave_value result_to_ov_struct(const piqp::Result<double>& result)
 
     octave_scalar_map ov_result_struct;
 
-    ov_result_struct.assign("x", eigen_to_ov(result.x));
-    ov_result_struct.assign("y", eigen_to_ov(result.y));
-    ov_result_struct.assign("z_l", eigen_to_ov(result.z_l));
-    ov_result_struct.assign("z_u", eigen_to_ov(result.z_u));
-    ov_result_struct.assign("z_bl", eigen_to_ov(result.z_bl));
-    ov_result_struct.assign("z_bu", eigen_to_ov(result.z_bu));
-    ov_result_struct.assign("s_l", eigen_to_ov(result.s_l));
-    ov_result_struct.assign("s_u", eigen_to_ov(result.s_u));
-    ov_result_struct.assign("s_bl", eigen_to_ov(result.s_bl));
-    ov_result_struct.assign("s_bu", eigen_to_ov(result.s_bu));
+    assign_variables_fields(ov_result_struct, result);
     ov_result_struct.assign("info", octave_value(ov_info_struct));
 
     return octave_value(ov_result_struct);
+}
+
+octave_value get_struct_field(const octave_scalar_map& map, const std::string& name)
+{
+    if (!map.isfield(name)) {
+        error("solve_result is missing the field '%s'.", name.c_str());
+    }
+    return map.getfield(name);
+}
+
+Vec ov_to_vec(const octave_value& value)
+{
+    NDArray arr = value.array_value();
+    return Eigen::Map<const Vec>(arr.data(), arr.numel());
+}
+
+piqp::Result<double> ov_struct_to_result(const octave_scalar_map& map)
+{
+    piqp::Result<double> result;
+    result.x = ov_to_vec(get_struct_field(map, "x"));
+    result.y = ov_to_vec(get_struct_field(map, "y"));
+    result.z_l = ov_to_vec(get_struct_field(map, "z_l"));
+    result.z_u = ov_to_vec(get_struct_field(map, "z_u"));
+    result.z_bl = ov_to_vec(get_struct_field(map, "z_bl"));
+    result.z_bu = ov_to_vec(get_struct_field(map, "z_bu"));
+    result.s_l = ov_to_vec(get_struct_field(map, "s_l"));
+    result.s_u = ov_to_vec(get_struct_field(map, "s_u"));
+    result.s_bl = ov_to_vec(get_struct_field(map, "s_bl"));
+    result.s_bu = ov_to_vec(get_struct_field(map, "s_bu"));
+    // only the status and the regularization are used by vjp() and jvp()
+    octave_scalar_map info = get_struct_field(map, "info").scalar_map_value();
+    result.info.status = (piqp::Status) get_struct_field(info, "status_val").int_value();
+    result.info.rho = get_struct_field(info, "rho").double_value();
+    result.info.delta = get_struct_field(info, "delta").double_value();
+    return result;
+}
+
+template<typename Solver>
+octave_value run_vjp(Solver& solver, const octave_value_list& args)
+{
+    // args(2), ..., args(11) are the gradients w.r.t. x, y, z_l, z_u, z_bl, z_bu, s_l, s_u, s_bl, s_bu,
+    // args(12) is the solve result, empty arrays are treated as not provided
+    Vec grad_values[10];
+    piqp::optional<Eigen::Map<const Vec>> grads[10];
+    for (int i = 0; i < 10; i++) {
+        if (!args(2 + i).isempty()) {
+            grad_values[i] = ov_to_vec(args(2 + i));
+            grads[i].emplace(grad_values[i].data(), grad_values[i].rows());
+        }
+    }
+    piqp::optional<piqp::Result<double>> solve_result;
+    if (!args(12).isempty()) {
+        solve_result = ov_struct_to_result(args(12).scalar_map_value());
+    }
+
+    piqp::Status status = solver.vjp(grads[0], grads[1], grads[2], grads[3], grads[4],
+                                     grads[5], grads[6], grads[7], grads[8], grads[9],
+                                     solve_result);
+
+    octave_scalar_map ov_struct;
+    ov_struct.assign("status", octave_value(piqp::status_to_string(status)));
+    ov_struct.assign("status_val", octave_value((int) status));
+    if (status == piqp::Status::PIQP_SOLVED) {
+        const auto& g = solver.vjp_result();
+        ov_struct.assign("P", eigen_to_ov(g.P));
+        ov_struct.assign("c", eigen_to_ov(g.c));
+        ov_struct.assign("A", eigen_to_ov(g.A));
+        ov_struct.assign("b", eigen_to_ov(g.b));
+        ov_struct.assign("G", eigen_to_ov(g.G));
+        ov_struct.assign("h_l", eigen_to_ov(g.h_l));
+        ov_struct.assign("h_u", eigen_to_ov(g.h_u));
+        ov_struct.assign("x_l", eigen_to_ov(g.x_l));
+        ov_struct.assign("x_u", eigen_to_ov(g.x_u));
+    } else {
+        for (const char* name : {"P", "c", "A", "b", "G", "h_l", "h_u", "x_l", "x_u"}) {
+            ov_struct.assign(name, Matrix());
+        }
+    }
+    return octave_value(ov_struct);
+}
+
+// copies of the perturbations of the matrices, in the matrix type of the solver
+piqp::optional<Mat> ov_to_matrix(const DenseSolver&, const octave_value& value)
+{
+    piqp::optional<Mat> mat;
+    if (!value.isempty()) {
+        Matrix arr = value.matrix_value();
+        mat = Eigen::Map<const Mat>(arr.data(), arr.rows(), arr.cols());
+    }
+    return mat;
+}
+
+piqp::optional<SparseMat> ov_to_matrix(const SparseSolver&, const octave_value& value)
+{
+    piqp::optional<SparseMat> mat;
+    if (!value.isempty()) {
+        SparseMatrix arr = value.sparse_matrix_value();
+        int cols = (int) arr.cols();
+        IVec cidx = to_int_vec(arr.xcidx(), cols + 1);
+        IVec ridx = to_int_vec(arr.xridx(), cidx(cols));
+        mat = SparseMat(Eigen::Map<const SparseMat>(arr.rows(), cols, cidx(cols), cidx.data(), ridx.data(), arr.xdata()));
+    }
+    return mat;
+}
+
+template<typename Solver>
+octave_value run_jvp(Solver& solver, const octave_value_list& args)
+{
+    // args(2), ..., args(10) are the perturbations dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u,
+    // args(11) is the solve result, empty arrays are treated as not provided
+    auto dP = ov_to_matrix(solver, args(2));
+    auto dA = ov_to_matrix(solver, args(4));
+    auto dG = ov_to_matrix(solver, args(6));
+    auto to_vec = [](const octave_value& value) {
+        piqp::optional<Vec> vec;
+        if (!value.isempty()) {
+            vec = ov_to_vec(value);
+        }
+        return vec;
+    };
+    piqp::optional<Vec> dc = to_vec(args(3));
+    piqp::optional<Vec> db = to_vec(args(5));
+    piqp::optional<Vec> dh_l = to_vec(args(7));
+    piqp::optional<Vec> dh_u = to_vec(args(8));
+    piqp::optional<Vec> dx_l = to_vec(args(9));
+    piqp::optional<Vec> dx_u = to_vec(args(10));
+    piqp::optional<piqp::Result<double>> solve_result;
+    if (!args(11).isempty()) {
+        solve_result = ov_struct_to_result(args(11).scalar_map_value());
+    }
+
+    piqp::Status status = solver.jvp(dP, dc, dA, db, dG, dh_l, dh_u, dx_l, dx_u, solve_result);
+
+    octave_scalar_map ov_struct;
+    ov_struct.assign("status", octave_value(piqp::status_to_string(status)));
+    ov_struct.assign("status_val", octave_value((int) status));
+    if (status == piqp::Status::PIQP_SOLVED) {
+        assign_variables_fields(ov_struct, solver.jvp_result());
+    } else {
+        for (const char* name : {"x", "y", "z_l", "z_u", "z_bl", "z_bu", "s_l", "s_u", "s_bl", "s_bu"}) {
+            ov_struct.assign(name, Matrix());
+        }
+    }
+    return octave_value(ov_struct);
 }
 
 DEFUN_DLD(piqp_oct, args, nargout, "")
@@ -478,6 +658,28 @@ DEFUN_DLD(piqp_oct, args, nargout, "")
         }
 
         return {};
+    }
+
+    if (args(0).string_value() == "jvp") {
+        if (args.length() != 12) {
+            error("jvp expects 9 perturbations and a solve result.");
+        }
+        if (oct_handle->isDense()) {
+            return run_jvp(*oct_handle->as_dense_ptr(), args);
+        } else {
+            return run_jvp(*oct_handle->as_sparse_ptr(), args);
+        }
+    }
+
+    if (args(0).string_value() == "vjp") {
+        if (args.length() != 13) {
+            error("vjp expects 10 cotangents and a solve result.");
+        }
+        if (oct_handle->isDense()) {
+            return run_vjp(*oct_handle->as_dense_ptr(), args);
+        } else {
+            return run_vjp(*oct_handle->as_sparse_ptr(), args);
+        }
     }
 
     // Got here, so command not recognized

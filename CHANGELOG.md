@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- New method `vjp()` (vector-Jacobian product, reverse mode) which computes the gradients w.r.t. the problem data by implicit differentiation of the KKT conditions in all interfaces [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- New method `jvp()` (Jacobian-vector product, forward mode) which computes the change of the solution along a perturbation of the problem data in all interfaces (`piqp_jvp_dense()` and `piqp_jvp_sparse()` in C) [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- New setting `enable_derivatives`, which has to be set before `setup()` to use `vjp()` and `jvp()` [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- New settings `derivative_smoothing`, `derivative_smoothing_mu` and `derivative_smoothing_max_iter` to smooth the derivatives across active-set changes [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+
+### Changed
+- The C settings struct `piqp_settings` and the C workspace `piqp_workspace` have new fields, so code compiled against the C interface must be recompiled
+- `update()` rejects enabling an inequality constraint with both bounds previously infinite if `G` is not passed as well [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- The random generator and distributions in `piqp/utils/random_utils.hpp` are accessed through the functions `piqp::rand::gen()`, `uniform_dist()`, `uniform_dist_pos()` and `normal_dist()`, such that the header can be included in multiple translation units, and `piqp::rand::seed()` reseeds them [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+
+### Fixed
+- Inequality constraints with both bounds infinite stay disabled if only `G` or only one of `h_l` and `h_u` is updated [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+- The Matlab interface converts single, integer and logical problem data to double and rejects complex data instead of misreading it [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
+
 ## [0.7.0] - 2026-11-05
 
 ### Added

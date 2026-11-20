@@ -41,7 +41,7 @@ if(${CMAKE_CXX_COMPILER_ID} IN_LIST gcc_like_cxx)
     target_compile_options(piqp-c-interface-test INTERFACE -Wno-gnu-zero-variadic-macro-arguments -Wno-c++17-attribute-extensions)
 endif()
 target_link_options(piqp-c-interface-test INTERFACE ${linker_flags})
-target_link_libraries(piqp-c-interface-test INTERFACE piqp_c gtest_main gtest)
+target_link_libraries(piqp-c-interface-test INTERFACE piqp_c piqp_header_only gtest_main gtest)
 
 add_executable(c_interface_test src/c_interface_test.cpp)
 target_link_libraries(c_interface_test PRIVATE piqp-c-interface-test)

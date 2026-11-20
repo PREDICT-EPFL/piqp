@@ -39,9 +39,7 @@ public:
     BlasfeoVec(const BlasfeoVec& other)
     {
         if (other.vec.mem) {
-            this->resize(other.rows());
-            // y <= x
-            blasfeo_dveccp(other.rows(), const_cast<BlasfeoVec&>(other).ref(), 0, this->ref(), 0);
+            copy_from(other);
         }
     }
 
@@ -55,10 +53,11 @@ public:
 
     BlasfeoVec& operator=(const BlasfeoVec& other)
     {
+        if (this == &other) {
+            return *this;
+        }
         if (other.vec.mem) {
-            this->resize(other.rows());
-            // y <= x
-            blasfeo_dveccp(other.rows(), const_cast<BlasfeoVec&>(other).ref(), 0, this->ref(), 0);
+            copy_from(other);
         } else {
             if (vec.mem) {
                 blasfeo_free_dvec(&vec);
@@ -160,6 +159,16 @@ public:
             }
         }
         return false;
+    }
+
+protected:
+    void copy_from(const BlasfeoVec& other)
+    {
+        this->resize(other.rows());
+        // copy the whole memory, i.e., also the padding, which blasfeo_dveccp skips,
+        // such that the copy computes bitwise identical results
+        assert(vec.memsize == other.vec.memsize && "memory size mismatch");
+        std::memcpy(vec.mem, other.vec.mem, static_cast<std::size_t>(other.vec.memsize));
     }
 };
 

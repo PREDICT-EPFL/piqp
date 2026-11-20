@@ -13,6 +13,8 @@ target_include_directories(piqp_c PUBLIC
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/piqp_c>
 )
 target_link_libraries(piqp_c PRIVATE piqp_header_only)
+target_compile_options(piqp_c PRIVATE ${compiler_flags})
+target_link_options(piqp_c PRIVATE ${linker_flags})
 set_target_properties(piqp_c PROPERTIES OUTPUT_NAME piqpc)
 add_library(piqp::piqp_c ALIAS piqp_c)
 
