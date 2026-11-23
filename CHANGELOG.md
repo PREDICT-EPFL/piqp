@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-23
+
 ### Added
 - New method `vjp()` (vector-Jacobian product, reverse mode) which computes the gradients w.r.t. the problem data by implicit differentiation of the KKT conditions in all interfaces [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
 - New method `jvp()` (Jacobian-vector product, forward mode) which computes the change of the solution along a perturbation of the problem data in all interfaces (`piqp_jvp_dense()` and `piqp_jvp_sparse()` in C) [#51](https://github.com/PREDICT-EPFL/piqp/pull/51)
@@ -187,7 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release of PIQP!
 
-[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/PREDICT-EPFL/piqp/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/PREDICT-EPFL/piqp/compare/v0.6.2...v0.6.3

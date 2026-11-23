@@ -43,7 +43,7 @@ Status SolverBase<T, I, Preconditioner, MatrixType>::solve()
     if (m_settings.verbose)
     {
         piqp_print("----------------------------------------------------------\n");
-        piqp_print("                        PIQP v0.7.0                       \n");
+        piqp_print("                        PIQP v0.8.0                       \n");
         piqp_print("                    (c) Roland Schwan                     \n");
         piqp_print("   Ecole Polytechnique Federale de Lausanne (EPFL) 2026   \n");
         piqp_print("----------------------------------------------------------\n");
